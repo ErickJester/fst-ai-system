@@ -41,7 +41,17 @@ def main():
                 job = db.get(Job, job_id)
                 video = db.get(Video, job.video_id)
 
-                summaries = run_analysis(video.path)
+                # Generar rutas para video anotado y JSON de tracking
+                from pathlib import Path
+                vid = Path(video.path)
+                tracked_video = str(vid.parent / f"{vid.stem}_tracked.mp4")
+                tracked_json = str(vid.parent / f"{vid.stem}_tracking.json")
+
+                summaries = run_analysis(
+                    video.path,
+                    output_video=tracked_video,
+                    output_json=tracked_json,
+                )
 
                 db.query(ResultSummary).filter(ResultSummary.job_id == job_id).delete()
                 for s in summaries:
