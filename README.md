@@ -12,6 +12,7 @@ pip install opencv-python-headless numpy
 
 ```bash
 python run_tracker.py mi_video.mp4
+python run_tracker.py corto.mp4
 ```
 
 Esto genera:
