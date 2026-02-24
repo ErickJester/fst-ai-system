@@ -49,7 +49,7 @@ def main():
     out_json = str(inp.parent / f"{inp.stem}_tracking.json")
 
     print(f"═══════════════════════════════════════════")
-    print(f"  FST Rat Tracker v1.3.7")
+    print(f"  FST Rat Tracker v1.4.0")
     print(f"═══════════════════════════════════════════")
     print(f"  Entrada:  {video_path}")
     print(f"  Video:    {out_video}")
