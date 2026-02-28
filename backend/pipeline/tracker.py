@@ -179,19 +179,20 @@ class PhysicalGate:
         self._cx: Optional[float] = None
         self._cy: Optional[float] = None
 
-    def check(self, x: int, y: int, w: int, h: int, wl_y: int) -> bool:
+    def check(self, x: int, y: int, w: int, h: int, wl_y: int, warmup: bool = False) -> bool:
         cx, cy = x + w / 2.0, y + h / 2.0
         if not (self.rx <= cx < self.rx + self.rw and self.ry <= cy < self.ry + self.rh):
             return False
         a = float(w * h)
         if a < self.min_a or a > self.max_a:
             return False
-        if cy < self.ry + wl_y - self.head_m:
-            return False
-        if self._cx is not None:
-            d = float(((cx - self._cx)**2 + (cy - self._cy)**2) ** 0.5)
-            if d > self.max_v:
+        if not warmup:
+            if cy < self.ry + wl_y - self.head_m:
                 return False
+            if self._cx is not None:
+                d = float(((cx - self._cx)**2 + (cy - self._cy)**2) ** 0.5)
+                if d > self.max_v:
+                    return False
         return True
 
     def commit(self, cx: float, cy: float):
@@ -538,6 +539,7 @@ def assign_to_rois(
     wls: List[int],
     states: List[ROIState],
     frame_num: int,
+    warmup: bool = False,
 ) -> Dict[int, Optional[Detection]]:
     """
     1 bbox por ROI.
@@ -552,7 +554,7 @@ def assign_to_rois(
         if i is None:
             continue
 
-        if not gates[i].check(bx, by, bw, bh, wls[i]):
+        if not gates[i].check(bx, by, bw, bh, wls[i], warmup=warmup):
             continue
 
         # score base
@@ -642,6 +644,11 @@ def track_video(
     max_freeze_frames: int = MAX_FREEZE,
     stabilize: bool = False,
     device: str = "",
+    # NUEVO: arrancar sin “sembrar basura”
+    skip_frames: int = 0,          # ignora completamente los primeros N frames (sin YOLO, sin tracking)
+    warmup_frames: int = 0,        # durante los siguientes N frames relaja gating (sin waterline/velocidad)
+    warmup_conf: float = 0.0,      # conf SOLO durante warmup (0 = no override)
+    min_area_ratio: float = 0.0,   # override del min_a del gate (0 = default interno)
 ):
     cap = cv2.VideoCapture(str(input_path))
     if not cap.isOpened():
@@ -695,7 +702,10 @@ def track_video(
         wl_trackers.append(StableWaterline(_waterline_raw(src), alpha=0.12, max_dpx=6))
 
     # gates & per-roi state
-    gates = [PhysicalGate(r) for r in rois]
+    if min_area_ratio and float(min_area_ratio) > 0:
+        gates = [PhysicalGate(r, min_a=float(min_area_ratio)) for r in rois]
+    else:
+        gates = [PhysicalGate(r) for r in rois]
     states = [ROIState(max_freeze=max_freeze_frames, decay=FREEZE_DECAY) for _ in rois]
 
     # stabilizer
@@ -723,9 +733,14 @@ def track_video(
         if not ok:
             break
         fnum += 1
+        # skip absoluto: evita que manos/operador siembren falsos positivos/IDs
+        if skip_frames and fnum <= int(skip_frames):
+            continue
         if fnum % step != 0:
             continue
         stats["total"] += 1
+        # warm-up (después del skip y del step)
+        is_warmup = (warmup_frames and stats["total"] <= int(warmup_frames))
 
         if stab is not None:
             frame = stab.stabilize(frame)
@@ -739,23 +754,25 @@ def track_video(
             cur_wl.append(wl_trackers[i].update(raw))
         last_cur_wl = cur_wl
 
-        # choose conf for recovery
+        # choose conf for recovery / warm-up
         use_conf = conf
+        if is_warmup and warmup_conf and float(warmup_conf) > 0:
+            use_conf = min(use_conf, float(warmup_conf))
         if use_yolo and any(states[i].needs_recovery for i in range(4)):
-            use_conf = min(conf, RECOVERY_CONF)
+            use_conf = min(use_conf, RECOVERY_CONF)
 
         # YOLO track/detect
         roi_dets: Dict[int, Optional[Detection]] = {i: None for i in range(4)}
         if use_yolo:
             boxes = yolo.track(frame, conf=use_conf, persist=True)
-            roi_dets = assign_to_rois(boxes, rois, gates, cur_wl, states, fnum)
+            roi_dets = assign_to_rois(boxes, rois, gates, cur_wl, states, fnum, warmup=is_warmup)
 
         # classic fallback for missing ROIs (or when YOLO missing)
         for i, (rx, ry, rw, rh) in enumerate(rois):
             if roi_dets[i] is not None:
                 continue
             cd = detect_classic_roi(gray[ry:ry + rh, rx:rx + rw], bgs[i], (rx, ry), i, fnum, cur_wl[i])
-            if cd is not None and gates[i].check(cd.x, cd.y, cd.w, cd.h, cur_wl[i]):
+            if cd is not None and gates[i].check(cd.x, cd.y, cd.w, cd.h, cur_wl[i], warmup=is_warmup):
                 roi_dets[i] = cd
 
         # apply freeze/lost policy
@@ -786,7 +803,7 @@ def track_video(
                             final_dets.append(None)
                             stats["none"][i] += 1
                             continue
-                    if gates[i].check(frozen.x, frozen.y, frozen.w, frozen.h, cur_wl[i]):
+                    if gates[i].check(frozen.x, frozen.y, frozen.w, frozen.h, cur_wl[i], warmup=is_warmup):
                         final_dets.append(frozen)
                         stats[frozen.source][i] += 1
                         all_dets.append(asdict(frozen))

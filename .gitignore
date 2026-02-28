@@ -1,0 +1,7 @@
+
+# videos grandes
+/data/videos/*.mp4
+/data/videos/*.avi
+/data/videos/*.mov
+/data/videos/*_tracked.mp4
+
