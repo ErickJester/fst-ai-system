@@ -777,6 +777,15 @@ def track_video(
                     stats["none"][i] += 1
                 else:
                     # Si el bbox congelado ya no pasa gating → no lo uses (evitar congelar basura)
+                    # Regla estricta para congelados:
+                    # el centro debe estar CLARAMENTE debajo de la waterline (evita bbox "flotando")
+                    if frozen.source in ("freeze", "lost"):
+                        ry = rois[i][1]
+                        if frozen.cy < (ry + cur_wl[i] + 5):
+                            st.mark_gating_fail(limit=5)   # más agresivo
+                            final_dets.append(None)
+                            stats["none"][i] += 1
+                            continue
                     if gates[i].check(frozen.x, frozen.y, frozen.w, frozen.h, cur_wl[i]):
                         final_dets.append(frozen)
                         stats[frozen.source][i] += 1
