@@ -340,6 +340,7 @@ class YOLOEngine:
             self._model = YOLO(FALLBACK_MODEL)
 
         self.device = self.device or self._pick_device()
+        self._model.to(self.device)
         self.available = True
 
     @staticmethod
