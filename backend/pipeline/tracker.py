@@ -71,12 +71,12 @@ class Detection:
 # ─────────────────────────────────────────────────────────────────────
 # 1 · ROIs adaptativas (separadores de cilindro)
 # ─────────────────────────────────────────────────────────────────────
-def find_cylinder_separators(gray: np.ndarray) -> List[int]:
+def find_cylinder_separators(gray: np.ndarray, n_seps: int = 3) -> List[int]:
     h, w = gray.shape[:2]
     band = gray[int(h * 0.3):int(h * 0.7), :]
     cp = np.mean(band, axis=0)
     sm = np.convolve(cp, np.ones(15) / 15, mode="same")
-    md = w // 6
+    md = w // (n_seps + 2)
     cands = []
     for x in range(md, w - md):
         left  = sm[max(0, x - md // 2):x]
@@ -84,13 +84,16 @@ def find_cylinder_separators(gray: np.ndarray) -> List[int]:
         if len(left) and len(right) and sm[x] < np.min(left) and sm[x] < np.min(right):
             cands.append((x, min(np.mean(left) - sm[x], np.mean(right) - sm[x])))
     cands.sort(key=lambda c: c[1], reverse=True)
-    seps = sorted(c[0] for c in cands[:3])
-    return seps if len(seps) >= 3 else [w // 4, w // 2, 3 * w // 4]
+    seps = sorted(c[0] for c in cands[:n_seps])
+    if len(seps) >= n_seps:
+        return seps
+    # fallback: separadores equidistantes
+    return [int(w * (i + 1) / (n_seps + 1)) for i in range(n_seps)]
 
 
 def compute_rois(fw: int, fh: int, layout: str = "1x4", gray: Optional[np.ndarray] = None):
     if layout == "1x4" and gray is not None:
-        s = find_cylinder_separators(gray)
+        s = find_cylinder_separators(gray, n_seps=3)
         return [
             (0,    0, s[0],          fh),
             (s[0], 0, s[1] - s[0],   fh),
@@ -100,6 +103,16 @@ def compute_rois(fw: int, fh: int, layout: str = "1x4", gray: Optional[np.ndarra
     if layout == "1x4":
         q = fw // 4
         return [(0, 0, q, fh), (q, 0, q, fh), (2*q, 0, q, fh), (3*q, 0, fw - 3*q, fh)]
+    if layout == "1x3" and gray is not None:
+        s = find_cylinder_separators(gray, n_seps=2)
+        return [
+            (0,    0, s[0],        fh),
+            (s[0], 0, s[1] - s[0], fh),
+            (s[1], 0, fw - s[1],   fh),
+        ]
+    if layout == "1x3":
+        q = fw // 3
+        return [(0, 0, q, fh), (q, 0, q, fh), (2*q, 0, fw - 2*q, fh)]
     if layout == "2x2":
         hw, hh = fw // 2, fh // 2
         return [(0, 0, hw, hh), (hw, 0, fw - hw, hh), (0, hh, hw, fh - hh), (hw, hh, fw - hw, fh - hh)]
@@ -720,14 +733,15 @@ def track_video(
 
     step = max(1, int(fps / fps_cap)) if fps_cap and fps_cap > 0 else 1
 
+    n_rats = len(rois)
     all_dets: List[dict] = []
-    stats = {"total": 0, "yolo": [0]*4, "track": [0]*4, "classic": [0]*4, "freeze": [0]*4, "lost": [0]*4, "none": [0]*4}
+    stats = {"total": 0, "yolo": [0]*n_rats, "track": [0]*n_rats, "classic": [0]*n_rats, "freeze": [0]*n_rats, "lost": [0]*n_rats, "none": [0]*n_rats}
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     fnum = 0
     t0 = time.time()
 
-    last_cur_wl = [0, 0, 0, 0]
+    last_cur_wl = [0] * n_rats
 
     while True:
         ok, frame = cap.read()
@@ -759,11 +773,11 @@ def track_video(
         use_conf = conf
         if is_warmup and warmup_conf and float(warmup_conf) > 0:
             use_conf = min(use_conf, float(warmup_conf))
-        if use_yolo and any(states[i].needs_recovery for i in range(4)):
+        if use_yolo and any(states[i].needs_recovery for i in range(n_rats)):
             use_conf = min(use_conf, RECOVERY_CONF)
 
         # YOLO track/detect
-        roi_dets: Dict[int, Optional[Detection]] = {i: None for i in range(4)}
+        roi_dets: Dict[int, Optional[Detection]] = {i: None for i in range(n_rats)}
         if use_yolo:
             boxes = yolo.track(frame, conf=use_conf, persist=True)
             roi_dets = assign_to_rois(boxes, rois, gates, cur_wl, states, fnum, warmup=is_warmup)
@@ -778,7 +792,7 @@ def track_video(
 
         # apply freeze/lost policy
         final_dets: List[Optional[Detection]] = []
-        for i in range(4):
+        for i in range(n_rats):
             det = roi_dets.get(i)
             st = states[i]
 
@@ -857,7 +871,7 @@ def track_video(
         print("\n" + "═" * 60)
         print(f"  Resumen ({elapsed:.1f}s — {n/(elapsed or 1):.1f} fps procesados)")
         print("═" * 60)
-        for i in range(4):
+        for i in range(n_rats):
             real = stats["yolo"][i] + stats["track"][i] + stats["classic"][i]
             fr   = stats["freeze"][i]
             lo   = stats["lost"][i]
