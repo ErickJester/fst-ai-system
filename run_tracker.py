@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# source ~/fst-project/venv/bin/activate
 """
 Runner standalone para el tracker.
 
@@ -29,7 +30,7 @@ def _supports_kw(fn, name: str) -> bool:
 def main():
     p = argparse.ArgumentParser(description="FST Rat Tracker — runner")
     p.add_argument("video", help="Ruta al video .mp4")
-    p.add_argument("--layout", default="auto", choices=["auto", "1x4", "2x2"])
+    p.add_argument("--layout", default="auto", choices=["auto", "1x4", "1x3", "2x2"])
     p.add_argument("--model", default="weights/rat.pt")
     p.add_argument("--tracker", default="bytetrack.yaml")
     p.add_argument("--conf", type=float, default=0.25)
