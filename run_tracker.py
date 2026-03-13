@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 # source ~/fst-project/venv/bin/activate
+
+# python3 run_tracker.py "/home/angel/Downloads/videos_nado_forzado/CAPSA SIN EA G2.mp4" --model weights/rat.pt --layout 1x3 --skip-seconds 3 --conf 0.25
+
+# python3 run_analysis.py "/home/angel/Downloads/videos_nado_forzado/CAPSA SIN EA G2.mp4" --layout 1x3 --model weights/rat.pt --skip-seconds 3 --conf 0.25 --no-video
+
 """
 Runner standalone para el tracker.
 
@@ -56,8 +61,10 @@ def main():
         raise SystemExit(f"Error: no se encontró '{args.video}'")
 
     inp = Path(args.video)
-    out_video = str(inp.parent / f"{inp.stem}_tracked.mp4")
-    out_json = str(inp.parent / f"{inp.stem}_tracking.json")
+    out_dir = inp.parent / inp.stem
+    out_dir.mkdir(exist_ok=True)
+    out_video = str(out_dir / f"{inp.stem}_tracked.mp4")
+    out_json = str(out_dir / f"{inp.stem}_tracking.json")
 
     # Calcular skip-frames desde skip-seconds (si aplica)
     skip_frames = max(0, int(args.skip_frames))
