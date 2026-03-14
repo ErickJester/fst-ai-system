@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
-from pipeline.run_analysis import run_analysis
+from pipeline.run_analysis import run_analysis, VERSION
 
 
 def main():
@@ -23,6 +23,14 @@ def main():
                    help="Umbral de motion en píxeles dentro del bbox; por debajo = inmóvil")
     p.add_argument("--climb-aspect-thr", type=float, default=1.6,
                    help="Umbral de h/w del bbox; por encima = escape (vista lateral)")
+    p.add_argument("--disp-thr",        type=float, default=3.0,
+                   help="Umbral de desplazamiento del centro del bbox (px/frame); por debajo = inmóvil")
+    p.add_argument("--escape-top-thr", type=float, default=0.08,
+                   help="Fracción del ROI: si top del bbox < esta dist del waterline = escape")
+    p.add_argument("--swim-width-thr", type=float, default=0.35,
+                   help="Fracción del ancho del ROI: bbox más ancho que esto = señal de nado")
+    p.add_argument("--pos-std-thr",   type=float, default=10.0,
+                   help="Dispersión espacial del centro del bbox en la ventana (px); por debajo = inmóvil sostenida")
     p.add_argument("--stabilize",    action="store_true")
     p.add_argument("--device",       default="")
     p.add_argument("--no-video",     action="store_true", help="No generar video anotado")
@@ -43,11 +51,11 @@ def main():
         cap.release()
         skip_frames = max(skip_frames, int(round(args.skip_seconds * fps)))
 
-    out_video = None if args.no_video else str(out_dir / f"{inp.stem}_analysis.mp4")
-    out_json  = str(out_dir / f"{inp.stem}_analysis.json")
+    out_video = None if args.no_video else str(out_dir / f"{inp.stem}_analysis_{VERSION}.mp4")
+    out_json  = str(out_dir / f"{inp.stem}_analysis_{VERSION}.json")
 
     print("═" * 50)
-    print("  FST — Análisis de conducta")
+    print(f"  FST — Análisis de conducta  {VERSION}")
     print("═" * 50)
     print(f"  Video:       {args.video}")
     print(f"  Layout:      {args.layout}")
@@ -67,11 +75,16 @@ def main():
         fps_cap=args.fps_cap,
         immobile_thr=args.immobile_thr,
         climb_aspect_thr=args.climb_aspect_thr,
+        disp_thr=args.disp_thr,
+        escape_top_thr=args.escape_top_thr,
+        swim_width_thr=args.swim_width_thr,
+        pos_std_thr=args.pos_std_thr,
         stabilize=args.stabilize,
         device=args.device,
         output_video=out_video,
         output_json=out_json,
         show_progress=True,
+        show_window=not args.no_video,
     )
 
     print("\n" + "═" * 50)
