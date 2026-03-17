@@ -5,6 +5,8 @@
 
 # python3 run_analysis.py "/home/angel/Downloads/videos_nado_forzado/CAPSA SIN EA G2.mp4" --layout 1x3 --model weights/rat.pt --skip-seconds 3 --conf 0.25 --no-video
 
+#python3 run_analysis.py "/home/angel/Downloads/videos_nado_forzado/CAPSA SIN EA G2.mp4" --layout 1x3 --model weights/rat.pt --skip-seconds 3 --conf 0.25
+
 """
 Runner standalone para el tracker.
 
