@@ -24,16 +24,32 @@ conda activate fst-yolo
 pip install -r backend/requirements.txt
 ```
 
-### Standalone tracker (CLI)
+### Standalone tracker (solo tracking, sin clasificación)
 ```bash
 python run_tracker.py "video.mp4" \
   --model weights/rat.pt \
-  --layout 1x4 \
+  --layout 1x3 \
   --conf 0.25 \
   --skip-frames 30 \
   --warmup-frames 50
 ```
-`--layout` accepts `1x4` (horizontal) or `2x2` (grid). `weights/rat.pt` is the custom-trained model; falls back to `yolov8n.pt` (COCO) if missing.
+Genera `*_tracked.mp4` y `*_tracking.json` (coords por frame). `--layout` acepta `auto`, `1x3`, `1x4` o `2x2`. `weights/rat.pt` es el modelo custom; si falta usa `yolov8n.pt` (COCO).
+
+### Standalone análisis de conducta (CLI principal)
+```bash
+python run_analysis.py "video.mp4" \
+  --layout 1x3 \
+  --model weights/rat.pt \
+  --skip-seconds 3 \
+  --conf 0.25
+```
+Genera `*_v1.4.5_analysis.mp4` y `*_v1.4.5_results.json`. Flags útiles:
+- `--no-video` — omite el video anotado
+- `--skip-seconds N` — descarta los primeros N segundos
+- `--disp-thr` (default 8.0) — umbral de desplazamiento del centro (px/frame)
+- `--pos-std-thr` (default 20.0) — dispersión espacial del centro en la ventana (px)
+- `--immobile-thr` (default 6.5) — umbral de motion en px dentro del bbox
+- `--climb-aspect-thr` (default 1.6) — h/w del bbox para detectar escape
 
 ### Flask API (dev)
 ```bash
@@ -75,11 +91,18 @@ Video → track_video() → YOLO detections → assign_to_rois() → PhysicalGat
 - **`ROIState`** — Freeze/lost policy: freezes last bbox up to 20 frames with 0.90 confidence decay; transitions to "lost" after max freeze.
 - **Frame stabilization** — Optional ECC alignment, ORB fallback.
 
-### Behavior classification (`backend/pipeline/run_analysis.py`)
-Frame-to-frame pixel difference per rat, 1-second windows:
-- Immobile: motion < 1.2
-- Swimming: 1.2 ≤ motion ≤ 6.0
-- Escape: motion > 6.0
+### Behavior classification (`backend/pipeline/run_analysis.py`) — v1.4.2
+Features multimodales por ventana de 1 segundo: pixel diff dentro del bbox, desplazamiento del centro (px/frame), dispersión espacial (pos_std), aspect ratio (h/w), ancho normalizado del bbox.
+
+Lógica de clasificación (en orden de prioridad):
+1. **Escape** — `aspect_ratio > 1.6 AND motion >= 6.5` (postura vertical + movimiento)
+   - `escape_top` desactivado: la waterline en vista lateral genera falsos positivos
+2. **Inmóvil** — triple condición sostenida: `motion < 6.5 AND disp < 8.0 AND pos_std < 20.0`
+3. **Nado** — todo lo demás
+
+Umbrales por defecto (en `run_analysis()`): `immobile_thr=6.5`, `disp_thr=8.0`, `pos_std_thr=20.0`, `climb_aspect_thr=1.6`.
+
+Salida: archivos con `VERSION` en el nombre (`v1.4.5`). Incluye ventana de progreso en vivo con barra y ETA (`show_window=True`).
 
 ### API endpoints (`backend/app/main.py`)
 ```

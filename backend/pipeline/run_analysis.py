@@ -11,7 +11,7 @@ Clasificación (por ventana) — v1.4.1:
   resto                                        → Nado
 """
 
-VERSION = "v1.4.2"
+VERSION = "v1.4.5"
 
 import cv2
 import numpy as np
@@ -140,7 +140,7 @@ def run_analysis(
     fps_cap: int = 0,
     output_video: Optional[str] = None,
     output_json: Optional[str] = None,
-    immobile_thr: float = 5.5,        # px promedio de diff dentro del bbox; < = inmóvil
+    immobile_thr: float = 6.5,        # px promedio de diff dentro del bbox; < = inmóvil
     climb_aspect_thr: float = 1.6,   # h/w del bbox; > 1.6 = bbox vertical = escape
     disp_thr: float = 8.0,           # px/frame de desplazamiento del centro; < = inmóvil
     escape_top_thr: float = 0.08,    # fracción del ROI; si top del bbox < esta dist del waterline = escape

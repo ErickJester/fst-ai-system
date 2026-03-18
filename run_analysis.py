@@ -19,17 +19,17 @@ def main():
     p.add_argument("--skip-seconds", type=float, default=0.0)
     p.add_argument("--warmup-frames",type=int,   default=0)
     p.add_argument("--fps-cap",      type=int,   default=0)
-    p.add_argument("--immobile-thr",    type=float, default=5.5,
+    p.add_argument("--immobile-thr",    type=float, default=6.5,
                    help="Umbral de motion en píxeles dentro del bbox; por debajo = inmóvil")
     p.add_argument("--climb-aspect-thr", type=float, default=1.6,
                    help="Umbral de h/w del bbox; por encima = escape (vista lateral)")
-    p.add_argument("--disp-thr",        type=float, default=3.0,
+    p.add_argument("--disp-thr",        type=float, default=8.0,
                    help="Umbral de desplazamiento del centro del bbox (px/frame); por debajo = inmóvil")
     p.add_argument("--escape-top-thr", type=float, default=0.08,
                    help="Fracción del ROI: si top del bbox < esta dist del waterline = escape")
     p.add_argument("--swim-width-thr", type=float, default=0.35,
                    help="Fracción del ancho del ROI: bbox más ancho que esto = señal de nado")
-    p.add_argument("--pos-std-thr",   type=float, default=10.0,
+    p.add_argument("--pos-std-thr",   type=float, default=20.0,
                    help="Dispersión espacial del centro del bbox en la ventana (px); por debajo = inmóvil sostenida")
     p.add_argument("--stabilize",    action="store_true")
     p.add_argument("--device",       default="")
