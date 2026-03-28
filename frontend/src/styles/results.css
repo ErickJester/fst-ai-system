@@ -1,0 +1,147 @@
+/* ─── Results page ────────────────────────────────────────────────── */
+
+/* legend chips */
+.legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.leg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 10px; }
+.leg-swim { background: var(--b-swim-bg); color: var(--b-swim); }
+.leg-imm  { background: var(--b-imm-bg); color: var(--b-imm); }
+.leg-esc  { background: var(--b-esc-bg); color: var(--b-esc); }
+.leg-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* summary cards */
+.sum-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+.sum-card { border-radius: var(--radius); border: 1px solid var(--c-border); padding: 14px 16px; }
+.sum-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin-bottom: 4px; }
+.sum-val   { font-size: 24px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+.sum-avg   { font-size: 11.5px; color: var(--c-text-muted); }
+
+.sum-swim { background: var(--b-swim-bg); border-color: #93c5fd; }
+.sum-swim .sum-label, .sum-swim .sum-val { color: var(--b-swim); }
+.sum-imm  { background: var(--b-imm-bg); border-color: #cbd5e1; }
+.sum-imm  .sum-label, .sum-imm  .sum-val { color: var(--b-imm); }
+.sum-esc  { background: var(--b-esc-bg); border-color: #fcd34d; }
+.sum-esc  .sum-label, .sum-esc  .sum-val { color: var(--b-esc); }
+
+/* stacked bar per animal */
+.animal-bars { display: flex; flex-direction: column; gap: 10px; }
+.abar-row { display: flex; align-items: center; gap: 12px; }
+.abar-label { font-size: 12.5px; font-weight: 600; width: 52px; flex-shrink: 0; color: var(--c-text-label); }
+.abar-track { flex: 1; height: 22px; border-radius: 3px; overflow: hidden; display: flex; }
+.abar-swim { background: var(--b-swim); }
+.abar-imm  { background: var(--b-imm); }
+.abar-esc  { background: var(--b-esc); }
+.abar-total { font-size: 11.5px; color: var(--c-text-muted); width: 50px; text-align: right; flex-shrink: 0; }
+
+/* results table colored columns */
+thead th.th-swim { color: var(--b-swim); }
+thead th.th-imm  { color: var(--b-imm); }
+thead th.th-esc  { color: var(--b-esc); }
+
+td.val-swim { color: var(--b-swim); font-weight: 600; font-variant-numeric: tabular-nums; }
+td.val-imm  { color: var(--b-imm); font-weight: 600; font-variant-numeric: tabular-nums; }
+td.val-esc  { color: var(--b-esc); font-weight: 600; font-variant-numeric: tabular-nums; }
+td.val-tot  { color: var(--c-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+td.rat-name { font-weight: 700; }
+
+tbody tr.total-row { background: #f9fafb; border-top: 2px solid #e5e7eb; }
+
+.rn07-note {
+  font-size: 11px; color: var(--c-text-muted); margin-top: 8px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 10px; background: #f9fafb; border-radius: 4px;
+  border: 1px solid #eaecf0;
+}
+
+/* per-minute breakdown */
+.min-animal-section { margin-bottom: 16px; }
+.min-animal-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.min-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.min-tbl th { padding: 6px 10px; text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--c-text-muted); font-weight: 600; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+.min-tbl td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; font-variant-numeric: tabular-nums; }
+.min-tbl tr:last-child td { border-bottom: none; }
+.min-bar-cell { display: flex; align-items: center; gap: 6px; }
+.mini-stk { height: 10px; border-radius: 2px; overflow: hidden; display: flex; flex: 1; max-width: 120px; }
+
+/* comparison D1 vs D2 */
+.comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.comp-day-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid; }
+.comp-day-d1 .comp-day-title { border-color: #3b6fb6; color: #1e3a5f; }
+.comp-day-d2 .comp-day-title { border-color: #10b981; color: #065f46; }
+
+.comp-animal { margin-bottom: 12px; }
+.comp-animal-name { font-size: 12px; font-weight: 700; color: var(--c-text-label); margin-bottom: 5px; }
+.comp-track { height: 18px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 2px; }
+.comp-pct-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--c-text-muted); }
+
+.delta-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0; border-bottom: 1px solid #f0f2f5; font-size: 12.5px;
+}
+.delta-row:last-child { border-bottom: none; }
+.delta-label { color: var(--c-text-muted); }
+.delta-chip {
+  font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.d-down { background: #ecfdf5; color: #065f46; }
+.d-up   { background: #eff6ff; color: #1d4ed8; }
+.d-neu  { background: #f3f4f6; color: #6b7280; }
+
+.one-session-notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: #fffbeb; border: 1px solid #fcd34d;
+  border-radius: var(--radius); padding: 12px 16px;
+  margin-bottom: 16px; font-size: 12.5px; color: #78350f;
+}
+
+.rn03-note {
+  font-size: 11.5px; color: var(--c-text-muted); margin-top: 14px;
+  padding: 8px 12px; background: #f9fafb;
+  border: 1px solid #eaecf0; border-radius: 4px;
+  display: flex; gap: 6px; align-items: flex-start;
+}
+
+/* disk gauge (admin) */
+.disk-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.gauge-label { font-size: 12.5px; font-weight: 600; color: var(--c-text-label); margin-bottom: 6px; display: flex; justify-content: space-between; }
+.gauge-track { height: 14px; background: #e5e7eb; border-radius: 7px; overflow: hidden; margin-bottom: 6px; }
+.gauge-fill  { height: 100%; border-radius: 7px; transition: width .4s; }
+.gauge-ok   .gauge-fill { background: linear-gradient(90deg, #10b981, #059669); }
+.gauge-warn .gauge-fill { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.gauge-crit .gauge-fill { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.gauge-sub  { font-size: 11.5px; color: var(--c-text-muted); }
+.gauge-breakdown { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.gb-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.gb-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* queue panel */
+.queue-stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.q-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--c-text-muted); font-weight: 600; margin-bottom: 3px; }
+.q-val { font-size: 22px; font-weight: 800; line-height: 1; }
+.queue-items { display: flex; flex-direction: column; gap: 6px; }
+.qi-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 4px;
+  border: 1px solid var(--c-border); background: #fafafa; font-size: 12.5px;
+}
+.qi-active { background: var(--c-proc-bg); border-color: var(--c-proc-bdr); }
+
+/* status badge (admin users) */
+.status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 10px; border: 1px solid transparent; white-space: nowrap; }
+.s-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sb-active { background: var(--c-ok-bg); color: var(--c-ok-text); border-color: var(--c-ok-bdr); }
+.sb-active .s-dot { background: #10b981; }
+.sb-inactive { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
+.sb-inactive .s-dot { background: #9ca3af; }
+
+/* activity bar */
+.act-bar { height: 5px; border-radius: 3px; background: #3b6fb6; display: inline-block; vertical-align: middle; }
+
+/* row actions */
+.row-acts { display: flex; gap: 4px; }
+
+@media (max-width: 680px) {
+  .comp-grid { grid-template-columns: 1fr; }
+  .sum-grid  { grid-template-columns: 1fr; }
+  .disk-panel { grid-template-columns: 1fr; }
+}
