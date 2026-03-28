@@ -1,0 +1,16 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--c-bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--c-text);
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: var(--font); }
+img, svg { display: block; }
+ul, ol { list-style: none; }
