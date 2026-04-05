@@ -1,0 +1,13 @@
+
+# videos grandes
+/data/videos/*.mp4
+/data/videos/*.avi
+/data/videos/*.mov
+/data/videos/*_tracked.mp4
+
+venv/
+__pycache__/
+*.pyc
+
+# AI context — local only, not for the repo
+CLAUDE.md

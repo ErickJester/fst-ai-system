@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: fst
+      POSTGRES_USER: fst
+      POSTGRES_PASSWORD: fst
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://fst:fst@db:5432/fst
+      DATA_DIR: /data
+      FLASK_ENV: development
+      UPLOAD_MAX_MB: "2048"
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/data
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "worker.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://fst:fst@db:5432/fst
+      DATA_DIR: /data
+    depends_on:
+      - db
+    volumes:
+      - data:/data
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  dbdata:
+  data:

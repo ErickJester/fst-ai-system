@@ -1,0 +1,48 @@
+:root {
+  --c-bg:           #f4f5f7;
+  --c-surface:      #ffffff;
+  --c-border:       #d0d5dd;
+  --c-border-focus: #3b6fb6;
+  --c-text:         #1a1f2e;
+  --c-text-muted:   #5c6478;
+  --c-text-label:   #374151;
+  --c-primary:      #2c5282;
+  --c-primary-hov:  #1e3a5f;
+  --c-link:         #3b6fb6;
+  --c-header-bg:    #1e2d45;
+  --c-header-text:  #e8ecf4;
+  --c-badge-bg:     #2c5282;
+  --c-sidebar:      #162035;
+
+  /* status */
+  --c-ok-bg:        #ecfdf5;
+  --c-ok-text:      #065f46;
+  --c-ok-bdr:       #6ee7b7;
+  --c-proc-bg:      #eff6ff;
+  --c-proc-text:    #1d4ed8;
+  --c-proc-bdr:     #93c5fd;
+  --c-err-bg:       #fef2f2;
+  --c-err-text:     #991b1b;
+  --c-err-bdr:      #fca5a5;
+  --c-warn-bg:      #fffbeb;
+  --c-warn-text:    #92400e;
+  --c-warn-bdr:     #fcd34d;
+
+  /* error extra */
+  --c-error-bg:     #fef2f2;
+  --c-error-bdr:    #f87171;
+  --c-error-text:   #991b1b;
+
+  /* behavior colors — results */
+  --b-swim:         #2c5282;
+  --b-swim-bg:      #dbeafe;
+  --b-imm:          #475569;
+  --b-imm-bg:       #e2e8f0;
+  --b-esc:          #92400e;
+  --b-esc-bg:       #fef3c7;
+
+  --radius:         6px;
+  --shadow:         0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-card:    0 1px 4px rgba(0,0,0,.09), 0 0 0 1px rgba(0,0,0,.04);
+  --font:           'Segoe UI', system-ui, -apple-system, sans-serif;
+}
