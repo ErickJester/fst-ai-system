@@ -20,6 +20,12 @@ import time
 from dataclasses import dataclass, asdict
 from typing import Optional, List
 
+try:
+    from .classifier import FSTClassifier
+    _CNN_AVAILABLE = True
+except ImportError:
+    _CNN_AVAILABLE = False
+
 from .tracker import (
     YOLOEngine,
     PhysicalGate,
@@ -146,6 +152,11 @@ def run_analysis(
     escape_top_thr: float = 0.08,    # fracción del ROI; si top del bbox < esta dist del waterline = escape
     swim_width_thr: float = 0.35,    # fracción del ancho del ROI; > = bbox "gordo" = señal de nado
     pos_std_thr: float = 20.0,       # px; dispersión espacial del centro en la ventana; < = inmóvil sostenida
+    # CNN classifier params
+    use_cnn: bool = True,
+    cnn_primary_weights: str = "weights/fst_resnet18.pt",
+    cnn_fallback_weights: str = "weights/fst_resnet50.pt",
+    cnn_conf_thr: float = 0.65,
     # tracker params
     model_path: str = DEFAULT_MODEL,
     conf: float = DEFAULT_CONF,
@@ -192,6 +203,18 @@ def run_analysis(
     yolo = YOLOEngine(model_path=model_path, conf=conf, tracker_yaml=tracker_yaml, device=device)
     use_yolo = yolo.available
 
+    # CNN classifier (opcional — si no hay pesos, recae en heurística)
+    clf = None
+    if use_cnn and _CNN_AVAILABLE:
+        clf = FSTClassifier(
+            primary_weights=cnn_primary_weights,
+            fallback_weights=cnn_fallback_weights,
+            primary_conf_thr=cnn_conf_thr,
+            device=device,
+        )
+        if not clf.is_available:
+            clf = None
+
     # background model + waterlines
     bgs = build_bg(cap, rois)
     wl_trackers: List[StableWaterline] = []
@@ -222,6 +245,7 @@ def run_analysis(
 
     # ── estado de clasificación de conducta ───────────────────────────
     win_target      = max(int(round(seconds_per_window * fps / step)), 1)
+    cnn_votes: List[List[str]] = [[] for _ in range(n_rats)]   # votos CNN por ventana
     motion_acc      = [0.0] * n_rats
     aspect_acc      = [0.0] * n_rats   # h/w del bbox
     disp_acc        = [0.0] * n_rats   # desplazamiento del centro (px/frame)
@@ -344,6 +368,14 @@ def run_analysis(
                 if st.freeze_count > int(fps * 2):
                     gates[i].reset_velocity()
 
+        # ── votos CNN por frame ────────────────────────────────────────
+        if clf is not None:
+            for i in range(n_rats):
+                det = final_dets[i] if i < len(final_dets) else None
+                result = clf.classify_frame(frame, det)
+                if result.label != "unknown":
+                    cnn_votes[i].append(result.label)
+
         # ── acumulación de features por frame ─────────────────────────
         for i, (rx, ry, rw, rh) in enumerate(rois):
             det = final_dets[i] if i < len(final_dets) else None
@@ -444,33 +476,38 @@ def run_analysis(
                 else:
                     pos_std = 0.0
 
-                # ── ESCAPE ──────────────────────────────────────────────
-                # escape_top (top_dist_norm < thr) desactivado: la waterline en videos
-                # de vista lateral se detecta incorrectamente (agarra el borde del cilindro),
-                # lo que hace que top_dist_norm sea ~0 para todos los frames → falsos positivos.
-                # top_dist_norm se conserva en el JSON para análisis futuro.
-                escape_shape = ar > climb_aspect_thr and m >= immobile_thr
-                if escape_shape:
-                    beh = "escape"
-                    totals[i]["esc"] += seconds
-
-                # ── INMOVILIDAD ─────────────────────────────────────────
-                # Señal 1: poco movimiento de píxeles Y bbox casi no se traslada frame a frame
-                # Señal 2: bbox se mantuvo en la misma zona durante toda la ventana (pos_std bajo)
-                elif m < immobile_thr and disp < disp_thr and pos_std < pos_std_thr:
-                    beh = "immobile"
-                    totals[i]["imm"] += seconds
-
-                # ── NADO ────────────────────────────────────────────────
-                # Movimiento activo + bbox más ancho (postura horizontal)
-                # También cae aquí todo lo que no sea escape ni inmovilidad clara
+                # ── CLASIFICACIÓN ──────────────────────────────────────
+                # CNN (si hay pesos): voto mayoritario de los frames de la ventana
+                # Heurística: árbol de decisión basado en features agregadas
+                if clf is not None and len(cnn_votes[i]) > 0:
+                    from collections import Counter
+                    beh       = Counter(cnn_votes[i]).most_common(1)[0][0]
+                    classifier_source = "cnn"
                 else:
-                    beh = "swim"
+                    # escape_top (top_dist_norm < thr) desactivado: la waterline en videos
+                    # de vista lateral se detecta incorrectamente (agarra el borde del cilindro),
+                    # lo que hace que top_dist_norm sea ~0 para todos los frames → falsos positivos.
+                    # top_dist_norm se conserva en el JSON para análisis futuro.
+                    escape_shape = ar > climb_aspect_thr and m >= immobile_thr
+                    if escape_shape:
+                        beh = "escape"
+                    elif m < immobile_thr and disp < disp_thr and pos_std < pos_std_thr:
+                        beh = "immobile"
+                    else:
+                        beh = "swim"
+                    classifier_source = "heuristic"
+
+                if beh == "escape":
+                    totals[i]["esc"] += seconds
+                elif beh == "immobile":
+                    totals[i]["imm"] += seconds
+                else:
                     totals[i]["swim"] += seconds
 
                 current_behavior[i] = beh
                 win_entry["rats"][str(i)] = {
                     "behavior":      beh,
+                    "classifier":    classifier_source,
                     "motion":        round(m, 4),
                     "aspect_ratio":  round(ar, 4),
                     "displacement":  round(disp, 4),
@@ -489,6 +526,7 @@ def run_analysis(
             depth_from_max_acc = [0.0] * n_rats
             cx_win             = [[] for _ in range(n_rats)]
             cy_win             = [[] for _ in range(n_rats)]
+            cnn_votes          = [[] for _ in range(n_rats)]
             frames_in_win      = 0
 
         # ── progreso ──────────────────────────────────────────────────
