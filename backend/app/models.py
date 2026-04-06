@@ -71,10 +71,9 @@ class User(Base):
 
 class Experiment(Base):
     """Agrupa los videos y resultados de un experimento FST.
-    Cada experimento pertenece a un investigador (user_id FK).
-    layout es el parámetro de disposición espacial del pipeline
-    ('auto', '1x3', '1x4', '2x2'); reemplaza num_animals para capturar
-    la geometría real del encuadre en lugar de un conteo plano.
+    layout es la fuente de verdad para la disposición espacial del pipeline
+    ('auto', '1x3', '1x4', '2x2'). analysis_configs NO duplica este campo;
+    el job hereda el layout de su experimento vía video → experiment.
     """
     __tablename__ = "experiments"
 
@@ -98,9 +97,8 @@ class Experiment(Base):
 
 class Subject(Base):
     """Identidad persistente de un animal dentro de un experimento.
-    rat_idx es la posición física en el encuadre (0-based); es constante
-    entre DAY1 y DAY2, lo que permite comparaciones longitudinales sin
-    depender de los IDs de job.
+    rat_idx es la ÚNICA fuente de verdad para la posición del animal;
+    ni animals ni rois duplican este campo — ambos referencian subject_id.
     """
     __tablename__ = "subjects"
 
@@ -111,6 +109,7 @@ class Subject(Base):
 
     experiment: Mapped["Experiment"] = relationship(back_populates="subjects")
     animals: Mapped[list["Animal"]] = relationship(back_populates="subject")
+    rois: Mapped[list["ROI"]] = relationship(back_populates="subject")
 
     __table_args__ = (
         UniqueConstraint("experiment_id", "rat_idx", name="uq_subject_position"),
@@ -152,23 +151,24 @@ class Video(Base):
 
 class ROI(Base):
     """Región de interés (cilindro) detectada en un video.
-    Geometría de la cámara; normalmente invariante entre re-ejecuciones
-    del mismo video.
+    Referencia subject_id en lugar de rat_idx crudo para mantener
+    la posición sincronizada con la identidad del animal vía FK.
     """
     __tablename__ = "rois"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False, index=True)
-    rat_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), nullable=False, index=True)
     x: Mapped[int] = mapped_column(Integer, nullable=False)
     y: Mapped[int] = mapped_column(Integer, nullable=False)
     w: Mapped[int] = mapped_column(Integer, nullable=False)
     h: Mapped[int] = mapped_column(Integer, nullable=False)
 
     video: Mapped["Video"] = relationship(back_populates="rois")
+    subject: Mapped["Subject"] = relationship(back_populates="rois")
 
     __table_args__ = (
-        UniqueConstraint("video_id", "rat_idx", name="uq_roi_position"),
+        UniqueConstraint("video_id", "subject_id", name="uq_roi_position"),
     )
 
 
@@ -176,16 +176,17 @@ class ROI(Base):
 
 class AnalysisConfig(Base):
     """Parámetros exactos usados en una ejecución del pipeline.
-    Permite reproducibilidad: cualquier job puede ser re-ejecutado con
-    la misma configuración, y los resultados son citables en publicaciones.
+    layout NO se duplica aquí — la autoridad es experiments.layout
+    (el job hereda vía video → experiment).
+    model_hash (SHA-256) permite reproducibilidad exacta de los pesos.
     """
     __tablename__ = "analysis_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    model_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     pipeline_version: Mapped[str] = mapped_column(String(30), nullable=False)
-    layout: Mapped[str] = mapped_column(String(20), nullable=False)
     conf_threshold: Mapped[float] = mapped_column(Float, nullable=False)
     skip_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     immobile_thr: Mapped[float] = mapped_column(Float, nullable=False, default=6.5)
@@ -225,31 +226,33 @@ class Job(Base):
 
 class Animal(Base):
     """Un animal en una ejecución de análisis específica.
-    subject_id enlaza al Subject persistente del experimento, lo que
-    permite trazar la misma rata a través de DAY1 y DAY2.
-    rat_idx se mantiene para compatibilidad con el pipeline YOLO.
+    subject_id es la ÚNICA referencia a la identidad del animal;
+    rat_idx se eliminó para evitar duplicidad conceptual con Subject.
+    Para obtener la posición: animal.subject.rat_idx.
     """
     __tablename__ = "animals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), nullable=False, index=True)
-    subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True, index=True)
-    rat_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), nullable=False, index=True)
 
     job: Mapped["Job"] = relationship(back_populates="animals")
-    subject: Mapped["Subject | None"] = relationship(back_populates="animals")
+    subject: Mapped["Subject"] = relationship(back_populates="animals")
     results: Mapped[list["BehaviorResult"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
     per_minute: Mapped[list["BehaviorPerMinute"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
 
     __table_args__ = (
-        UniqueConstraint("job_id", "rat_idx", name="uq_job_animal"),
+        UniqueConstraint("job_id", "subject_id", name="uq_job_subject"),
     )
 
 
 # ── Behavior results (antes "result_summary") ────────────────────────
 
 class BehaviorResult(Base):
-    """Tiempo total en segundos de cada conducta para un animal en una sesión."""
+    """Tiempo total en segundos de cada conducta para un animal en una sesión.
+    total_analyzed_s captura la duración efectivamente analizada para este
+    animal, permitiendo validar que swim + immobile + escape no la excedan.
+    """
     __tablename__ = "behavior_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -257,6 +260,7 @@ class BehaviorResult(Base):
     swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    total_analyzed_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
     animal: Mapped["Animal"] = relationship(back_populates="results")
 
@@ -264,6 +268,10 @@ class BehaviorResult(Base):
         CheckConstraint(
             "swim_s >= 0 AND immobile_s >= 0 AND escape_s >= 0",
             name="ck_behavior_non_negative",
+        ),
+        CheckConstraint(
+            "swim_s + immobile_s + escape_s <= total_analyzed_s + 0.01",
+            name="ck_behavior_within_duration",
         ),
     )
 
@@ -312,7 +320,8 @@ class Report(Base):
 
 class Notification(Base):
     """Aviso al investigador: análisis completado, error, video próximo
-    a eliminarse, etc.
+    a eliminarse, etc. Todos los tipos de notificación actuales requieren
+    un experimento asociado, por lo que experiment_id es NOT NULL.
     """
     __tablename__ = "notifications"
 
@@ -322,6 +331,6 @@ class Notification(Base):
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    experiment_id: Mapped[int | None] = mapped_column(ForeignKey("experiments.id"), nullable=True)
+    experiment_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="notifications")

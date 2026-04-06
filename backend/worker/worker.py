@@ -1,5 +1,7 @@
+import hashlib
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from sqlalchemy import text, select
 from app.db import SessionLocal
 from app.models import (
@@ -12,6 +14,18 @@ from pipeline.tracker import DEFAULT_MODEL, DEFAULT_CONF
 
 POLL_SECONDS = 2
 VIDEO_RETENTION_DAYS = 30
+
+
+def _model_hash(model_path: str) -> str:
+    """SHA-256 del archivo de pesos para reproducibilidad exacta."""
+    h = hashlib.sha256()
+    try:
+        with open(model_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except FileNotFoundError:
+        return "file-not-found"
 
 
 def claim_next_job_id(db):
@@ -53,7 +67,6 @@ def main():
                 experiment = video.experiment
                 layout = experiment.layout
 
-                from pathlib import Path
                 vid = Path(video.path)
                 tracked_video = str(vid.parent / f"{vid.stem}_tracked.mp4")
                 tracked_json = str(vid.parent / f"{vid.stem}_tracking.json")
@@ -61,8 +74,8 @@ def main():
                 # Registrar config antes de correr para reproducibilidad
                 config = AnalysisConfig(
                     model_name=DEFAULT_MODEL,
+                    model_hash=_model_hash(DEFAULT_MODEL),
                     pipeline_version=VERSION,
-                    layout=layout,
                     conf_threshold=DEFAULT_CONF,
                     skip_seconds=0.0,
                     immobile_thr=6.5,
@@ -88,7 +101,7 @@ def main():
                 db.flush()
 
                 for s in summaries:
-                    # Upsert Subject para identidad persistente del animal
+                    # Upsert Subject — identidad persistente del animal
                     subject = db.execute(
                         select(Subject).where(
                             Subject.experiment_id == experiment.id,
@@ -100,9 +113,12 @@ def main():
                         db.add(subject)
                         db.flush()
 
-                    # Upsert ROI para este video
+                    # Upsert ROI — referencia subject_id, no rat_idx crudo
                     roi_rec = db.execute(
-                        select(ROI).where(ROI.video_id == video.id, ROI.rat_idx == s.rat_idx)
+                        select(ROI).where(
+                            ROI.video_id == video.id,
+                            ROI.subject_id == subject.id,
+                        )
                     ).scalars().first()
                     roi_coords = s.roi
                     if roi_rec:
@@ -110,7 +126,7 @@ def main():
                     else:
                         roi_rec = ROI(
                             video_id=video.id,
-                            rat_idx=s.rat_idx,
+                            subject_id=subject.id,
                             x=roi_coords[0],
                             y=roi_coords[1],
                             w=roi_coords[2],
@@ -119,19 +135,21 @@ def main():
                         db.add(roi_rec)
                     db.flush()
 
+                    # Animal sin rat_idx — identidad vía subject_id
                     animal = Animal(
                         job_id=job_id,
-                        rat_idx=s.rat_idx,
                         subject_id=subject.id,
                     )
                     db.add(animal)
                     db.flush()
 
+                    total_analyzed = s.swim_s + s.immobile_s + s.escape_s
                     result = BehaviorResult(
                         animal_id=animal.id,
                         swim_s=s.swim_s,
                         immobile_s=s.immobile_s,
                         escape_s=s.escape_s,
+                        total_analyzed_s=total_analyzed,
                     )
                     db.add(result)
 
