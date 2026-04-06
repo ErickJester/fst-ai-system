@@ -17,8 +17,9 @@ import cv2
 import numpy as np
 import json
 import time
-from dataclasses import dataclass, asdict
-from typing import Optional, List
+from collections import defaultdict
+from dataclasses import dataclass, field, asdict
+from typing import Optional, List, Tuple
 
 try:
     from .classifier import FSTClassifier
@@ -68,6 +69,8 @@ class RatSummary:
     swim_s: float
     immobile_s: float
     escape_s: float
+    roi: Tuple[int, int, int, int] = field(default_factory=lambda: (0, 0, 0, 0))
+    per_minute: List[dict] = field(default_factory=list)
 
 
 def _draw_behavior(
@@ -590,7 +593,40 @@ def run_analysis(
         with open(str(output_json), "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
+    # Aggregate behavior_windows into per-minute buckets per rat
+    pm_acc: dict = defaultdict(lambda: defaultdict(lambda: {"swim": 0.0, "imm": 0.0, "esc": 0.0}))
+    for win in behavior_windows:
+        minute = int(win["t_start"] // 60) + 1
+        duration = win["t_end"] - win["t_start"]
+        for rat_str, data in win["rats"].items():
+            rat_i = int(rat_str)
+            beh = data["behavior"]
+            if beh == "swim":
+                pm_acc[rat_i][minute]["swim"] += duration
+            elif beh == "immobile":
+                pm_acc[rat_i][minute]["imm"] += duration
+            else:
+                pm_acc[rat_i][minute]["esc"] += duration
+
+    per_minute_by_rat: dict = {i: [] for i in range(n_rats)}
+    for rat_i in range(n_rats):
+        for minute in sorted(pm_acc[rat_i].keys()):
+            d = pm_acc[rat_i][minute]
+            per_minute_by_rat[rat_i].append({
+                "minute": minute,
+                "swim_s": round(d["swim"], 3),
+                "immobile_s": round(d["imm"], 3),
+                "escape_s": round(d["esc"], 3),
+            })
+
     return [
-        RatSummary(i, totals[i]["swim"], totals[i]["imm"], totals[i]["esc"])
+        RatSummary(
+            rat_idx=i,
+            swim_s=totals[i]["swim"],
+            immobile_s=totals[i]["imm"],
+            escape_s=totals[i]["esc"],
+            roi=tuple(rois[i]) if i < len(rois) else (0, 0, 0, 0),
+            per_minute=per_minute_by_rat[i],
+        )
         for i in range(n_rats)
     ]

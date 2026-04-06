@@ -2,7 +2,7 @@ import enum
 from datetime import datetime, timedelta
 from sqlalchemy import (
     String, Integer, DateTime, Enum, ForeignKey, Text, Float,
-    Boolean, JSON, UniqueConstraint, Index,
+    Boolean, UniqueConstraint, Index, CheckConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
@@ -72,6 +72,9 @@ class User(Base):
 class Experiment(Base):
     """Agrupa los videos y resultados de un experimento FST.
     Cada experimento pertenece a un investigador (user_id FK).
+    layout es el parámetro de disposición espacial del pipeline
+    ('auto', '1x3', '1x4', '2x2'); reemplaza num_animals para capturar
+    la geometría real del encuadre en lugar de un conteo plano.
     """
     __tablename__ = "experiments"
 
@@ -82,12 +85,36 @@ class Experiment(Base):
     experiment_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     treatment: Mapped[str | None] = mapped_column(String(255), nullable=True)
     species: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    num_animals: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
+    layout: Mapped[str] = mapped_column(String(20), nullable=False, default="auto")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="experiments")
     videos: Mapped[list["Video"]] = relationship(back_populates="experiment", cascade="all, delete-orphan")
+    subjects: Mapped[list["Subject"]] = relationship(back_populates="experiment", cascade="all, delete-orphan")
     reports: Mapped[list["Report"]] = relationship(back_populates="experiment", cascade="all, delete-orphan")
+
+
+# ── Subjects ──────────────────────────────────────────────────────────
+
+class Subject(Base):
+    """Identidad persistente de un animal dentro de un experimento.
+    rat_idx es la posición física en el encuadre (0-based); es constante
+    entre DAY1 y DAY2, lo que permite comparaciones longitudinales sin
+    depender de los IDs de job.
+    """
+    __tablename__ = "subjects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    experiment_id: Mapped[int] = mapped_column(ForeignKey("experiments.id"), nullable=False, index=True)
+    rat_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    experiment: Mapped["Experiment"] = relationship(back_populates="subjects")
+    animals: Mapped[list["Animal"]] = relationship(back_populates="subject")
+
+    __table_args__ = (
+        UniqueConstraint("experiment_id", "rat_idx", name="uq_subject_position"),
+    )
 
 
 # ── Videos ───────────────────────────────────────────────────────────
@@ -95,6 +122,7 @@ class Experiment(Base):
 class Video(Base):
     """Archivo de video subido. Se elimina del disco 30 días después
     de que el análisis termina (RN-05, RF-24, RNF-08).
+    duration_s se establece por el worker al completar el análisis.
     """
     __tablename__ = "videos"
 
@@ -104,15 +132,68 @@ class Video(Base):
     day: Mapped[Day] = mapped_column(Enum(Day), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     path: Mapped[str] = mapped_column(String(512), nullable=False)
-    roi_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
     deletion_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     experiment: Mapped["Experiment"] = relationship(back_populates="videos")
     jobs: Mapped[list["Job"]] = relationship(back_populates="video", cascade="all, delete-orphan")
+    rois: Mapped[list["ROI"]] = relationship(back_populates="video", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("experiment_id", "day", name="uq_experiment_day"),
+        CheckConstraint(
+            "deletion_date IS NULL OR deletion_date > created_at",
+            name="ck_deletion_after_creation",
+        ),
     )
+
+
+# ── ROIs ──────────────────────────────────────────────────────────────
+
+class ROI(Base):
+    """Región de interés (cilindro) detectada en un video.
+    Geometría de la cámara; normalmente invariante entre re-ejecuciones
+    del mismo video.
+    """
+    __tablename__ = "rois"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False, index=True)
+    rat_idx: Mapped[int] = mapped_column(Integer, nullable=False)
+    x: Mapped[int] = mapped_column(Integer, nullable=False)
+    y: Mapped[int] = mapped_column(Integer, nullable=False)
+    w: Mapped[int] = mapped_column(Integer, nullable=False)
+    h: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    video: Mapped["Video"] = relationship(back_populates="rois")
+
+    __table_args__ = (
+        UniqueConstraint("video_id", "rat_idx", name="uq_roi_position"),
+    )
+
+
+# ── Analysis configs ─────────────────────────────────────────────────
+
+class AnalysisConfig(Base):
+    """Parámetros exactos usados en una ejecución del pipeline.
+    Permite reproducibilidad: cualquier job puede ser re-ejecutado con
+    la misma configuración, y los resultados son citables en publicaciones.
+    """
+    __tablename__ = "analysis_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    pipeline_version: Mapped[str] = mapped_column(String(30), nullable=False)
+    layout: Mapped[str] = mapped_column(String(20), nullable=False)
+    conf_threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    skip_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    immobile_thr: Mapped[float] = mapped_column(Float, nullable=False, default=6.5)
+    disp_thr: Mapped[float] = mapped_column(Float, nullable=False, default=8.0)
+    pos_std_thr: Mapped[float] = mapped_column(Float, nullable=False, default=20.0)
+    climb_aspect_thr: Mapped[float] = mapped_column(Float, nullable=False, default=1.6)
+
+    jobs: Mapped[list["Job"]] = relationship(back_populates="config")
 
 
 # ── Jobs ─────────────────────────────────────────────────────────────
@@ -120,11 +201,13 @@ class Video(Base):
 class Job(Base):
     """Tarea de análisis encolada por el worker.
     Incluye stage y progress_pct para la barra de progreso (RF-15).
+    config_id enlaza a los parámetros exactos usados para reproducibilidad.
     """
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False, index=True)
+    config_id: Mapped[int | None] = mapped_column(ForeignKey("analysis_configs.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -134,27 +217,29 @@ class Job(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     video: Mapped["Video"] = relationship(back_populates="jobs")
+    config: Mapped["AnalysisConfig | None"] = relationship(back_populates="jobs")
     animals: Mapped[list["Animal"]] = relationship(back_populates="job", cascade="all, delete-orphan")
 
 
 # ── Animals ──────────────────────────────────────────────────────────
 
 class Animal(Base):
-    """Un animal detectado en un video procesado.
-    rat_idx es la posición en el encuadre (0..3), asignada por ROI.
+    """Un animal en una ejecución de análisis específica.
+    subject_id enlaza al Subject persistente del experimento, lo que
+    permite trazar la misma rata a través de DAY1 y DAY2.
+    rat_idx se mantiene para compatibilidad con el pipeline YOLO.
     """
     __tablename__ = "animals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), nullable=False, index=True)
+    subject_id: Mapped[int | None] = mapped_column(ForeignKey("subjects.id"), nullable=True, index=True)
     rat_idx: Mapped[int] = mapped_column(Integer, nullable=False)
-    roi_x: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    roi_y: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    roi_w: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    roi_h: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     job: Mapped["Job"] = relationship(back_populates="animals")
+    subject: Mapped["Subject | None"] = relationship(back_populates="animals")
     results: Mapped[list["BehaviorResult"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
+    per_minute: Mapped[list["BehaviorPerMinute"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("job_id", "rat_idx", name="uq_job_animal"),
@@ -164,10 +249,7 @@ class Animal(Base):
 # ── Behavior results (antes "result_summary") ────────────────────────
 
 class BehaviorResult(Base):
-    """Tiempo en segundos de cada conducta para un animal en una sesión.
-    per_minute_json guarda el desglose por minuto (RF-19) como lista de
-    dicts: [{"minute": 1, "swim_s": ..., "immobile_s": ..., "escape_s": ...}, ...]
-    """
+    """Tiempo total en segundos de cada conducta para un animal en una sesión."""
     __tablename__ = "behavior_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -175,9 +257,38 @@ class BehaviorResult(Base):
     swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    per_minute_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     animal: Mapped["Animal"] = relationship(back_populates="results")
+
+    __table_args__ = (
+        CheckConstraint(
+            "swim_s >= 0 AND immobile_s >= 0 AND escape_s >= 0",
+            name="ck_behavior_non_negative",
+        ),
+    )
+
+
+# ── Behavior per minute (RF-19) ───────────────────────────────────────
+
+class BehaviorPerMinute(Base):
+    """Desglose por minuto de la conducta de un animal (RF-19).
+    Normalizado en tabla propia para permitir consultas SQL directas
+    en lugar de parsear blobs JSON.
+    """
+    __tablename__ = "behavior_per_minute"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, index=True)
+    minute: Mapped[int] = mapped_column(Integer, nullable=False)
+    swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    animal: Mapped["Animal"] = relationship(back_populates="per_minute")
+
+    __table_args__ = (
+        UniqueConstraint("animal_id", "minute", name="uq_animal_minute"),
+    )
 
 
 # ── Reports (RF-21, RN-06) ───────────────────────────────────────────
