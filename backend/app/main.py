@@ -5,7 +5,7 @@ from .schema import init_db
 from .db import SessionLocal
 from .models import (
     User, Role, Experiment, Video, Day, Job, JobStatus,
-    Animal, BehaviorResult, BehaviorPerMinute, Report, ReportFormat,
+    Animal, Subject, BehaviorResult, BehaviorPerMinute, Report, ReportFormat,
     Notification, NotificationType, PipelineStage,
 )
 from .storage import ensure_dirs, video_path
@@ -295,13 +295,15 @@ def create_app() -> Flask:
                 if not latest_job:
                     continue
                 animals = db.execute(
-                    select(Animal).where(Animal.job_id == latest_job.id).order_by(Animal.rat_idx)
+                    select(Animal).join(Subject)
+                    .where(Animal.job_id == latest_job.id)
+                    .order_by(Subject.rat_idx)
                 ).scalars().all()
                 day_results = []
                 for a in animals:
                     for br in a.results:
                         day_results.append({
-                            "rat_idx": a.rat_idx,
+                            "rat_idx": a.subject.rat_idx,
                             "swim_s": br.swim_s,
                             "immobile_s": br.immobile_s,
                             "escape_s": br.escape_s,
@@ -328,7 +330,9 @@ def create_app() -> Flask:
                 if not latest_job:
                     continue
                 animals = db.execute(
-                    select(Animal).where(Animal.job_id == latest_job.id).order_by(Animal.rat_idx)
+                    select(Animal).join(Subject)
+                    .where(Animal.job_id == latest_job.id)
+                    .order_by(Subject.rat_idx)
                 ).scalars().all()
                 day_data = []
                 for a in animals:
@@ -338,7 +342,7 @@ def create_app() -> Flask:
                         .order_by(BehaviorPerMinute.minute)
                     ).scalars().all()
                     day_data.append({
-                        "rat_idx": a.rat_idx,
+                        "rat_idx": a.subject.rat_idx,
                         "per_minute": [
                             {
                                 "minute": m.minute,
@@ -371,14 +375,16 @@ def create_app() -> Flask:
                 if not latest_job:
                     continue
                 animals = db.execute(
-                    select(Animal).where(Animal.job_id == latest_job.id).order_by(Animal.rat_idx)
+                    select(Animal).join(Subject)
+                    .where(Animal.job_id == latest_job.id)
+                    .order_by(Subject.rat_idx)
                 ).scalars().all()
                 day_results = []
                 for a in animals:
                     for br in a.results:
                         total = br.swim_s + br.immobile_s + br.escape_s
                         day_results.append({
-                            "rat_idx": a.rat_idx,
+                            "rat_idx": a.subject.rat_idx,
                             "swim_s": br.swim_s,
                             "immobile_s": br.immobile_s,
                             "escape_s": br.escape_s,
@@ -601,13 +607,15 @@ def create_app() -> Flask:
     def legacy_get_summary(job_id: int):
         with SessionLocal() as db:
             animals = db.execute(
-                select(Animal).where(Animal.job_id == job_id).order_by(Animal.rat_idx)
+                select(Animal).join(Subject)
+                .where(Animal.job_id == job_id)
+                .order_by(Subject.rat_idx)
             ).scalars().all()
             result = []
             for a in animals:
                 for br in a.results:
                     result.append({
-                        "rat_idx": a.rat_idx,
+                        "rat_idx": a.subject.rat_idx,
                         "swim_s": br.swim_s,
                         "immobile_s": br.immobile_s,
                         "escape_s": br.escape_s,

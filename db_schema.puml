@@ -91,10 +91,9 @@ entity "experiments" as experiments {
 }
 
 note right of experiments
-  layout: parámetro de disposición espacial
-  del pipeline ('auto', '1x3', '1x4', '2x2')
-  Reemplaza num_animals — captura geometría
-  real, no solo conteo.
+  layout: fuente de verdad para
+  disposición espacial del pipeline.
+  analysis_configs NO duplica este campo.
 end note
 
 entity "subjects" as subjects {
@@ -108,10 +107,11 @@ entity "subjects" as subjects {
 }
 
 note right of subjects
-  Identidad persistente del animal.
-  rat_idx = posición física en el encuadre.
+  Fuente UNICA de rat_idx.
+  Ni animals ni rois duplican este campo;
+  ambos referencian subject_id via FK.
   Permite trazar la misma rata entre
-  DAY1 y DAY2 sin depender del job_id.
+  DAY1 y DAY2.
 end note
 
 entity "videos" as videos {
@@ -133,20 +133,19 @@ entity "rois" as rois {
     * id : INTEGER <<PK>>
     --
     * video_id : INTEGER <<FK→videos>>
-    * rat_idx : INTEGER
+    * subject_id : INTEGER <<FK→subjects>>
     * x : INTEGER
     * y : INTEGER
     * w : INTEGER
     * h : INTEGER
     --
-    <<UNIQUE (video_id, rat_idx)>>
+    <<UNIQUE (video_id, subject_id)>>
 }
 
 note right of rois
-  Geometría del cilindro detectado.
-  Normalizado desde roi_json (TEXT) y
-  animals.roi_* a tabla propia para
-  permitir consultas SQL directas.
+  Referencia subject_id (no rat_idx)
+  para mantener posicion sincronizada
+  con identidad del animal via FK.
 end note
 
 entity "analysis_configs" as analysis_configs {
@@ -154,8 +153,8 @@ entity "analysis_configs" as analysis_configs {
     --
     * created_at : DATETIME
     * model_name : VARCHAR(120)
+    * model_hash : VARCHAR(64)
     * pipeline_version : VARCHAR(30)
-    * layout : VARCHAR(20)
     * conf_threshold : FLOAT
     * skip_seconds : FLOAT = 0.0
     * immobile_thr : FLOAT = 6.5
@@ -165,9 +164,10 @@ entity "analysis_configs" as analysis_configs {
 }
 
 note right of analysis_configs
-  Reproducibilidad: parámetros exactos
-  de cada ejecución del pipeline.
-  Citables en publicaciones.
+  model_hash: SHA-256 de los weights.
+  Reproducibilidad exacta, no solo nombre.
+  layout NO se duplica aqui; autoridad
+  es experiments.layout.
 end note
 
 entity "jobs" as jobs {
@@ -188,11 +188,16 @@ entity "animals" as animals {
     * id : INTEGER <<PK>>
     --
     * job_id : INTEGER <<FK→jobs>>
-    subject_id : INTEGER <<FK→subjects>>
-    * rat_idx : INTEGER
+    * subject_id : INTEGER <<FK→subjects>>
     --
-    <<UNIQUE (job_id, rat_idx)>>
+    <<UNIQUE (job_id, subject_id)>>
 }
+
+note right of animals
+  rat_idx ELIMINADO.
+  Posicion via: animal.subject.rat_idx
+  Cero duplicidad conceptual.
+end note
 
 entity "behavior_results" as behavior_results {
     * id : INTEGER <<PK>>
@@ -201,9 +206,12 @@ entity "behavior_results" as behavior_results {
     * swim_s : FLOAT = 0.0
     * immobile_s : FLOAT = 0.0
     * escape_s : FLOAT = 0.0
+    * total_analyzed_s : FLOAT = 0.0
     --
     <<CHECK: swim_s >= 0 AND immobile_s >= 0>>
     <<        AND escape_s >= 0>>
+    <<CHECK: swim_s + immobile_s + escape_s>>
+    <<        <= total_analyzed_s + 0.01>>
 }
 
 entity "behavior_per_minute" as behavior_per_minute {
@@ -217,12 +225,6 @@ entity "behavior_per_minute" as behavior_per_minute {
     --
     <<UNIQUE (animal_id, minute)>>
 }
-
-note right of behavior_per_minute
-  Reemplaza behavior_results.per_minute_json.
-  Tabla normalizada: consultable con SQL,
-  validable con constraints (RF-19).
-end note
 
 entity "reports" as reports {
     * id : INTEGER <<PK>>
@@ -241,8 +243,14 @@ entity "notifications" as notifications {
     * type : NotificationType
     * message : TEXT
     * is_read : BOOLEAN = false
-    experiment_id : INTEGER <<FK→experiments>>
+    * experiment_id : INTEGER <<FK→experiments>>
 }
+
+note right of notifications
+  experiment_id: NOT NULL.
+  Todos los NotificationType actuales
+  requieren experimento asociado.
+end note
 
 ' ─────────────────────────────────────────────
 '  RELACIONES
@@ -254,43 +262,41 @@ users               ||--o{ notifications       : "user_id"
 experiments         ||--o{ videos              : "experiment_id"
 experiments         ||--o{ subjects            : "experiment_id"
 experiments         ||--o{ reports             : "experiment_id"
-experiments         |o--o{ notifications       : "experiment_id"
+experiments         ||--o{ notifications       : "experiment_id"
 
 videos              ||--o{ jobs                : "video_id"
 videos              ||--o{ rois                : "video_id"
+
+subjects            ||--o{ animals             : "subject_id"
+subjects            ||--o{ rois                : "subject_id"
 
 analysis_configs    ||--o{ jobs                : "config_id"
 
 jobs                ||--o{ animals             : "job_id"
 
-subjects            ||--o{ animals             : "subject_id"
-
 animals             ||--o{ behavior_results    : "animal_id"
 animals             ||--o{ behavior_per_minute : "animal_id"
 
 ' ─────────────────────────────────────────────
-'  NOTAS EXPLICATIVAS
+'  NOTAS GENERALES
 ' ─────────────────────────────────────────────
 
 note bottom of videos
-  deletion_date = finished_at + 30 días
+  deletion_date = finished_at + 30 dias
   CHECK: deletion_date > created_at
-  (RN-05, RF-24, RNF-08)
   UNIQUE (experiment_id, day):
-  máx 1 video por día (RN-03)
+  max 1 video por dia (RN-03)
 end note
 
 note bottom of jobs
-  stage + progress_pct
-  alimentan la barra de progreso
-  en tiempo real (RF-15)
-  config_id → reproducibilidad del análisis
+  stage + progress_pct alimentan
+  la barra de progreso (RF-15).
+  config_id -> reproducibilidad.
 end note
 
 note right of users
-  password_hash: bcrypt con sal
-  (RNF-05)
-  must_change_password: contraseña
+  password_hash: bcrypt con sal (RNF-05)
+  must_change_password: contrasena
   temporal del Admin (RF-05)
 end note
 
