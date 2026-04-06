@@ -5,8 +5,10 @@ from app.db import SessionLocal
 from app.models import (
     JobStatus, Job, Video, Animal, BehaviorResult,
     PipelineStage, Notification, NotificationType,
+    Subject, ROI, AnalysisConfig, BehaviorPerMinute,
 )
-from pipeline.run_analysis import run_analysis
+from pipeline.run_analysis import run_analysis, VERSION
+from pipeline.tracker import DEFAULT_MODEL, DEFAULT_CONF
 
 POLL_SECONDS = 2
 VIDEO_RETENTION_DAYS = 30
@@ -48,14 +50,35 @@ def main():
             with SessionLocal() as db:
                 job = db.get(Job, job_id)
                 video = db.get(Video, job.video_id)
+                experiment = video.experiment
+                layout = experiment.layout
 
                 from pathlib import Path
                 vid = Path(video.path)
                 tracked_video = str(vid.parent / f"{vid.stem}_tracked.mp4")
                 tracked_json = str(vid.parent / f"{vid.stem}_tracking.json")
 
+                # Registrar config antes de correr para reproducibilidad
+                config = AnalysisConfig(
+                    model_name=DEFAULT_MODEL,
+                    pipeline_version=VERSION,
+                    layout=layout,
+                    conf_threshold=DEFAULT_CONF,
+                    skip_seconds=0.0,
+                    immobile_thr=6.5,
+                    disp_thr=8.0,
+                    pos_std_thr=20.0,
+                    climb_aspect_thr=1.6,
+                )
+                db.add(config)
+                db.flush()
+                job.config_id = config.id
+                db.add(job)
+                db.flush()
+
                 summaries = run_analysis(
                     video.path,
+                    layout=layout,
                     output_video=tracked_video,
                     output_json=tracked_json,
                 )
@@ -65,9 +88,41 @@ def main():
                 db.flush()
 
                 for s in summaries:
+                    # Upsert Subject para identidad persistente del animal
+                    subject = db.execute(
+                        select(Subject).where(
+                            Subject.experiment_id == experiment.id,
+                            Subject.rat_idx == s.rat_idx,
+                        )
+                    ).scalars().first()
+                    if not subject:
+                        subject = Subject(experiment_id=experiment.id, rat_idx=s.rat_idx)
+                        db.add(subject)
+                        db.flush()
+
+                    # Upsert ROI para este video
+                    roi_rec = db.execute(
+                        select(ROI).where(ROI.video_id == video.id, ROI.rat_idx == s.rat_idx)
+                    ).scalars().first()
+                    roi_coords = s.roi
+                    if roi_rec:
+                        roi_rec.x, roi_rec.y, roi_rec.w, roi_rec.h = roi_coords
+                    else:
+                        roi_rec = ROI(
+                            video_id=video.id,
+                            rat_idx=s.rat_idx,
+                            x=roi_coords[0],
+                            y=roi_coords[1],
+                            w=roi_coords[2],
+                            h=roi_coords[3],
+                        )
+                        db.add(roi_rec)
+                    db.flush()
+
                     animal = Animal(
                         job_id=job_id,
                         rat_idx=s.rat_idx,
+                        subject_id=subject.id,
                     )
                     db.add(animal)
                     db.flush()
@@ -77,9 +132,17 @@ def main():
                         swim_s=s.swim_s,
                         immobile_s=s.immobile_s,
                         escape_s=s.escape_s,
-                        per_minute_json=getattr(s, 'per_minute', None),
                     )
                     db.add(result)
+
+                    for pm in s.per_minute:
+                        db.add(BehaviorPerMinute(
+                            animal_id=animal.id,
+                            minute=pm["minute"],
+                            swim_s=pm["swim_s"],
+                            immobile_s=pm["immobile_s"],
+                            escape_s=pm["escape_s"],
+                        ))
 
                 job.status = JobStatus.DONE
                 job.stage = PipelineStage.DONE
@@ -90,12 +153,16 @@ def main():
                 # RF-24/RN-05: programar borrado del video a 30 días
                 video.deletion_date = datetime.utcnow() + timedelta(days=VIDEO_RETENTION_DAYS)
 
+                # Duración del video derivada del total de ventanas analizadas
+                if summaries and summaries[0].per_minute:
+                    last_minute = summaries[0].per_minute[-1]
+                    video.duration_s = last_minute["minute"] * 60.0
+
                 db.add(job)
                 db.commit()
 
                 # Crear notificación de análisis completado
                 try:
-                    experiment = video.experiment
                     notification = Notification(
                         user_id=experiment.user_id,
                         type=NotificationType.ANALYSIS_DONE,

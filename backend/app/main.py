@@ -5,7 +5,7 @@ from .schema import init_db
 from .db import SessionLocal
 from .models import (
     User, Role, Experiment, Video, Day, Job, JobStatus,
-    Animal, BehaviorResult, Report, ReportFormat,
+    Animal, BehaviorResult, BehaviorPerMinute, Report, ReportFormat,
     Notification, NotificationType, PipelineStage,
 )
 from .storage import ensure_dirs, video_path
@@ -97,7 +97,7 @@ def create_app() -> Flask:
                 experiment_date=exp_date,
                 treatment=data.get("treatment"),
                 species=data.get("species"),
-                num_animals=int(data.get("num_animals", 4)),
+                layout=data.get("layout", "auto"),
                 notes=data.get("notes"),
             )
             db.add(exp)
@@ -108,7 +108,7 @@ def create_app() -> Flask:
                 "name": exp.name,
                 "created_at": exp.created_at.isoformat(),
                 "treatment": exp.treatment,
-                "num_animals": exp.num_animals,
+                "layout": exp.layout,
             }
 
     @app.get("/experiments")
@@ -128,7 +128,7 @@ def create_app() -> Flask:
                     "created_at": e.created_at.isoformat(),
                     "treatment": e.treatment,
                     "species": e.species,
-                    "num_animals": e.num_animals,
+                    "layout": e.layout,
                     "experiment_date": e.experiment_date.isoformat() if e.experiment_date else None,
                     "user_id": e.user_id,
                 })
@@ -165,7 +165,7 @@ def create_app() -> Flask:
                 "experiment_date": exp.experiment_date.isoformat() if exp.experiment_date else None,
                 "treatment": exp.treatment,
                 "species": exp.species,
-                "num_animals": exp.num_animals,
+                "layout": exp.layout,
                 "notes": exp.notes,
                 "user_id": exp.user_id,
                 "videos": videos,
@@ -332,11 +332,23 @@ def create_app() -> Flask:
                 ).scalars().all()
                 day_data = []
                 for a in animals:
-                    for br in a.results:
-                        day_data.append({
-                            "rat_idx": a.rat_idx,
-                            "per_minute": br.per_minute_json,
-                        })
+                    minutes = db.execute(
+                        select(BehaviorPerMinute)
+                        .where(BehaviorPerMinute.animal_id == a.id)
+                        .order_by(BehaviorPerMinute.minute)
+                    ).scalars().all()
+                    day_data.append({
+                        "rat_idx": a.rat_idx,
+                        "per_minute": [
+                            {
+                                "minute": m.minute,
+                                "swim_s": m.swim_s,
+                                "immobile_s": m.immobile_s,
+                                "escape_s": m.escape_s,
+                            }
+                            for m in minutes
+                        ],
+                    })
                 per_minute[v.day.value] = day_data
             return {"experiment_id": exp_id, "per_minute": per_minute}
 
