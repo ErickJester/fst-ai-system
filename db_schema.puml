@@ -1,0 +1,211 @@
+@startuml db_schema
+!theme plain
+skinparam linetype ortho
+skinparam roundcorner 8
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+
+skinparam class {
+    BackgroundColor White
+    BorderColor #444444
+    HeaderBackgroundColor #2C6E9E
+    HeaderFontColor White
+    HeaderFontStyle bold
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+}
+
+' ─────────────────────────────────────────────
+'  ENUMS
+' ─────────────────────────────────────────────
+
+enum Role <<enum>> {
+    INVESTIGADOR
+    ADMIN
+}
+
+enum Day <<enum>> {
+    DAY1
+    DAY2
+}
+
+enum JobStatus <<enum>> {
+    QUEUED
+    RUNNING
+    DONE
+    FAILED
+}
+
+enum PipelineStage <<enum>> {
+    PREPROCESSING
+    ROI_DETECTION
+    TRACKING
+    CLASSIFICATION
+    DONE
+}
+
+enum ReportFormat <<enum>> {
+    PDF
+    CSV
+}
+
+enum NotificationType <<enum>> {
+    ANALYSIS_DONE
+    ANALYSIS_FAILED
+    VIDEO_EXPIRING
+    VIDEO_DELETED
+}
+
+' ─────────────────────────────────────────────
+'  TABLAS
+' ─────────────────────────────────────────────
+
+entity "users" as users {
+    * id : INTEGER <<PK>>
+    --
+    * email : VARCHAR(255) <<UNIQUE>>
+    * password_hash : VARCHAR(255)
+    * name : VARCHAR(120)
+    * role : Role
+    * is_active : BOOLEAN = true
+    * must_change_password : BOOLEAN = false
+    * created_at : DATETIME
+    last_login : DATETIME
+}
+
+entity "experiments" as experiments {
+    * id : INTEGER <<PK>>
+    --
+    * user_id : INTEGER <<FK>>
+    * created_at : DATETIME
+    * name : VARCHAR(120)
+    experiment_date : DATETIME
+    treatment : VARCHAR(255)
+    species : VARCHAR(120)
+    * num_animals : INTEGER = 4
+    notes : TEXT
+}
+
+entity "videos" as videos {
+    * id : INTEGER <<PK>>
+    --
+    * experiment_id : INTEGER <<FK>>
+    * created_at : DATETIME
+    * day : Day
+    * filename : VARCHAR(255)
+    * path : VARCHAR(512)
+    roi_json : TEXT
+    deletion_date : DATETIME
+    --
+    <<UNIQUE (experiment_id, day)>>
+}
+
+entity "jobs" as jobs {
+    * id : INTEGER <<PK>>
+    --
+    * video_id : INTEGER <<FK>>
+    * created_at : DATETIME
+    started_at : DATETIME
+    finished_at : DATETIME
+    * status : JobStatus = QUEUED
+    stage : PipelineStage
+    * progress_pct : INTEGER = 0
+    error : TEXT
+}
+
+entity "animals" as animals {
+    * id : INTEGER <<PK>>
+    --
+    * job_id : INTEGER <<FK>>
+    * rat_idx : INTEGER
+    roi_x : INTEGER
+    roi_y : INTEGER
+    roi_w : INTEGER
+    roi_h : INTEGER
+    --
+    <<UNIQUE (job_id, rat_idx)>>
+}
+
+entity "behavior_results" as behavior_results {
+    * id : INTEGER <<PK>>
+    --
+    * animal_id : INTEGER <<FK>>
+    * swim_s : FLOAT = 0.0
+    * immobile_s : FLOAT = 0.0
+    * escape_s : FLOAT = 0.0
+    per_minute_json : JSON
+}
+
+entity "reports" as reports {
+    * id : INTEGER <<PK>>
+    --
+    * experiment_id : INTEGER <<FK>>
+    * created_at : DATETIME
+    * format : ReportFormat
+    * path : VARCHAR(512)
+}
+
+entity "notifications" as notifications {
+    * id : INTEGER <<PK>>
+    --
+    * user_id : INTEGER <<FK>>
+    * created_at : DATETIME
+    * type : NotificationType
+    * message : TEXT
+    * is_read : BOOLEAN = false
+    experiment_id : INTEGER <<FK>>
+}
+
+' ─────────────────────────────────────────────
+'  RELACIONES
+' ─────────────────────────────────────────────
+
+users           ||--o{ experiments     : "user_id"
+users           ||--o{ notifications   : "user_id"
+
+experiments     ||--o{ videos          : "experiment_id"
+experiments     ||--o{ reports         : "experiment_id"
+experiments     |o--o{ notifications   : "experiment_id"
+
+videos          ||--o{ jobs            : "video_id"
+
+jobs            ||--o{ animals         : "job_id"
+
+animals         ||--o{ behavior_results : "animal_id"
+
+' ─────────────────────────────────────────────
+'  NOTAS EXPLICATIVAS
+' ─────────────────────────────────────────────
+
+note bottom of videos
+  deletion_date = finished_at + 30 días
+  (RN-05, RF-24, RNF-08)
+  UNIQUE (experiment_id, day):
+  máx 1 video por día (RN-03)
+end note
+
+note bottom of behavior_results
+  per_minute_json: desglose por minuto
+  [{"minute": 1, "swim_s": ...,
+    "immobile_s": ..., "escape_s": ...}]
+  (RF-19)
+end note
+
+note bottom of jobs
+  stage + progress_pct
+  alimentan la barra de progreso
+  en tiempo real (RF-15)
+end note
+
+note right of users
+  password_hash: bcrypt con sal
+  (RNF-05)
+  must_change_password: contraseña
+  temporal del Admin (RF-05)
+end note
+
+@enduml
