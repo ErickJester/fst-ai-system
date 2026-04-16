@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fst -d fst"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: ./backend
@@ -20,11 +25,13 @@ services:
       FLASK_ENV: development
       UPLOAD_MAX_MB: "2048"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
       - data:/data
+    restart: on-failure
 
   worker:
     build: ./backend
@@ -33,9 +40,11 @@ services:
       DATABASE_URL: postgresql+psycopg2://fst:fst@db:5432/fst
       DATA_DIR: /data
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - data:/data
+    restart: on-failure
 
   frontend:
     build: ./frontend
