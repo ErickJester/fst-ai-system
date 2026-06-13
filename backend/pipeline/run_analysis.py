@@ -2,22 +2,34 @@
 Pipeline de análisis FST.
 
 Usa el tracker YOLO para localizar cada rata y clasifica la conducta
-(nado, inmovilidad, escape) por ventana temporal de 1 segundo.
+(nado, inmovilidad, escape) frame a frame, consolidando por voto mayoritario
+en ventanas temporales de 1 segundo.
 
-Clasificación (por ventana) — v1.4.1:
-  escape_shape (aspect > thr AND motion ≥ thr) → Escape (postura vertical + movimiento)
-  [escape_top desactivado: waterline incorrecta en vista lateral genera falsos positivos]
-  motion < thr AND disp < thr AND pos_std < thr → Inmovilidad sostenida
-  resto                                        → Nado
+Cascada de clasificación por cuadro (cap. 5, Módulo 4 del diseño):
+  1. ResNet-18  — si conf ≥ umbral primario   → se acepta.
+  2. ResNet-50  — si conf ≥ umbral de respaldo → se acepta.
+  3. Heurística motion + aspect ratio (último recurso): se aplica cuando
+     ambas redes quedan por debajo de su umbral o no hay pesos CNN cargados.
+       escape_shape (aspect > thr AND motion ≥ thr) → Escape
+       motion < thr AND disp < thr                  → Inmovilidad
+       resto                                        → Nado
+
+Consolidación por ventana:
+  - Voto mayoritario de las etiquetas por cuadro. Los cuadros de baja confianza
+    no votan con la red: caen al nivel 3 (heurística).
+  - Guarda de inmovilidad sostenida: si la ventana muestra movimiento,
+    desplazamiento y dispersión espacial bajos, se reclasifica a inmóvil.
+  - RN-13 (merge_active): si está activo, Escape se agrupa con Nado bajo
+    la categoría unificada de "conducta activa".
 """
 
-VERSION = "v1.4.5"
+VERSION = "v1.5.0"
 
 import cv2
 import numpy as np
 import json
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List, Tuple
 
@@ -61,6 +73,31 @@ _BEHAVIOR_LABEL = {
     "escape":    "ESCAPE",
     "unknown":   "?",
 }
+
+
+def _heuristic_label(
+    motion: float,
+    aspect: float,
+    disp: float,
+    immobile_thr: float,
+    climb_aspect_thr: float,
+    disp_thr: float,
+) -> str:
+    """Nivel 3 de la cascada: regla geométrica motion + aspect ratio por cuadro.
+
+    Decide la conducta de un cuadro sin modelo entrenado:
+      - bbox vertical (aspect alto) con movimiento → escape (postura de trepada)
+      - poco movimiento y poco desplazamiento      → inmovilidad
+      - resto                                       → nado
+
+    Nota: la dispersión espacial (pos_std) es una señal de ventana, no de
+    cuadro; se aplica como guarda al consolidar (ver run_analysis).
+    """
+    if aspect > climb_aspect_thr and motion >= immobile_thr:
+        return "escape"
+    if motion < immobile_thr and disp < disp_thr:
+        return "immobile"
+    return "swim"
 
 
 @dataclass
@@ -159,7 +196,9 @@ def run_analysis(
     use_cnn: bool = True,
     cnn_primary_weights: str = "weights/fst_resnet18.pt",
     cnn_fallback_weights: str = "weights/fst_resnet50.pt",
-    cnn_conf_thr: float = 0.65,
+    cnn_conf_thr: float = 0.65,           # umbral ResNet-18; < → consulta ResNet-50
+    cnn_fallback_conf_thr: float = 0.40,  # umbral ResNet-50; < → cae a heurística
+    merge_active: bool = False,           # RN-13: agrupa escape+nado en "conducta activa"
     # tracker params
     model_path: str = DEFAULT_MODEL,
     conf: float = DEFAULT_CONF,
@@ -213,6 +252,7 @@ def run_analysis(
             primary_weights=cnn_primary_weights,
             fallback_weights=cnn_fallback_weights,
             primary_conf_thr=cnn_conf_thr,
+            fallback_conf_thr=cnn_fallback_conf_thr,
             device=device,
         )
         if not clf.is_available:
@@ -248,7 +288,10 @@ def run_analysis(
 
     # ── estado de clasificación de conducta ───────────────────────────
     win_target      = max(int(round(seconds_per_window * fps / step)), 1)
-    cnn_votes: List[List[str]] = [[] for _ in range(n_rats)]   # votos CNN por ventana
+    # etiqueta por cuadro (cascada CNN→heurística) consolidada por voto mayoritario
+    frame_votes: List[List[str]] = [[] for _ in range(n_rats)]
+    cnn_conf_count  = [0] * n_rats   # cuadros resueltos por CNN con confianza suficiente
+    heur_count      = [0] * n_rats   # cuadros resueltos por la heurística (nivel 3)
     motion_acc      = [0.0] * n_rats
     aspect_acc      = [0.0] * n_rats   # h/w del bbox
     disp_acc        = [0.0] * n_rats   # desplazamiento del centro (px/frame)
@@ -371,14 +414,6 @@ def run_analysis(
                 if st.freeze_count > int(fps * 2):
                     gates[i].reset_velocity()
 
-        # ── votos CNN por frame ────────────────────────────────────────
-        if clf is not None:
-            for i in range(n_rats):
-                det = final_dets[i] if i < len(final_dets) else None
-                result = clf.classify_frame(frame, det)
-                if result.label != "unknown":
-                    cnn_votes[i].append(result.label)
-
         # ── acumulación de features por frame ─────────────────────────
         for i, (rx, ry, rw, rh) in enumerate(rois):
             det = final_dets[i] if i < len(final_dets) else None
@@ -453,6 +488,24 @@ def run_analysis(
                 depth_from_max = 0.0
             depth_from_max_acc[i] += depth_from_max
 
+            # ── cascada de clasificación por cuadro (CNN → heurística) ──
+            #    Solo se vota cuando hay detección en este cuadro.
+            if det is not None:
+                frame_label: Optional[str] = None
+                if clf is not None:
+                    result = clf.classify_frame(frame, det)
+                    if result.source in ("resnet18", "resnet50"):
+                        frame_label = result.label      # CNN con confianza suficiente
+                        cnn_conf_count[i] += 1
+                if frame_label is None:
+                    # nivel 3: heurística geométrica por cuadro (CNN ausente o baja confianza)
+                    frame_label = _heuristic_label(
+                        motion, aspect, disp,
+                        immobile_thr, climb_aspect_thr, disp_thr,
+                    )
+                    heur_count[i] += 1
+                frame_votes[i].append(frame_label)
+
         frames_in_win += 1
         if frames_in_win >= win_target:
             seconds   = frames_in_win * step / fps
@@ -479,18 +532,23 @@ def run_analysis(
                 else:
                     pos_std = 0.0
 
-                # ── CLASIFICACIÓN ──────────────────────────────────────
-                # CNN (si hay pesos): voto mayoritario de los frames de la ventana
-                # Heurística: árbol de decisión basado en features agregadas
-                if clf is not None and len(cnn_votes[i]) > 0:
-                    from collections import Counter
-                    beh       = Counter(cnn_votes[i]).most_common(1)[0][0]
-                    classifier_source = "cnn"
+                # ── CLASIFICACIÓN (voto mayoritario por ventana) ───────
+                # Cada cuadro aportó una etiqueta vía cascada CNN→heurística.
+                # Se consolida la ventana con el voto mayoritario.
+                votes = frame_votes[i]
+                if votes:
+                    beh = Counter(votes).most_common(1)[0][0]
+                    # guarda de inmovilidad sostenida: corrige nado espurio
+                    # (ruido de aspect/motion por cuadro) cuando la ventana fue
+                    # claramente estática según los agregados + dispersión espacial.
+                    if beh == "swim" and m < immobile_thr and disp < disp_thr and pos_std < pos_std_thr:
+                        beh = "immobile"
+                    classifier_source = "cnn" if cnn_conf_count[i] > heur_count[i] else "heuristic"
                 else:
-                    # escape_top (top_dist_norm < thr) desactivado: la waterline en videos
-                    # de vista lateral se detecta incorrectamente (agarra el borde del cilindro),
-                    # lo que hace que top_dist_norm sea ~0 para todos los frames → falsos positivos.
-                    # top_dist_norm se conserva en el JSON para análisis futuro.
+                    # sin detección en toda la ventana → heurística sobre agregados.
+                    # escape_top (top_dist_norm < thr) sigue desactivado: la waterline en
+                    # vista lateral se detecta mal (agarra el borde del cilindro) y produce
+                    # falsos positivos. top_dist_norm se conserva en el JSON para análisis.
                     escape_shape = ar > climb_aspect_thr and m >= immobile_thr
                     if escape_shape:
                         beh = "escape"
@@ -499,6 +557,10 @@ def run_analysis(
                     else:
                         beh = "swim"
                     classifier_source = "heuristic"
+
+                # RN-13: agrupar escape + nado en la categoría unificada "conducta activa"
+                if merge_active and beh == "escape":
+                    beh = "swim"
 
                 if beh == "escape":
                     totals[i]["esc"] += seconds
@@ -511,6 +573,8 @@ def run_analysis(
                 win_entry["rats"][str(i)] = {
                     "behavior":      beh,
                     "classifier":    classifier_source,
+                    "cnn_votes":     cnn_conf_count[i],     # cuadros resueltos por CNN
+                    "heur_votes":    heur_count[i],         # cuadros resueltos por heurística
                     "motion":        round(m, 4),
                     "aspect_ratio":  round(ar, 4),
                     "displacement":  round(disp, 4),
@@ -529,7 +593,9 @@ def run_analysis(
             depth_from_max_acc = [0.0] * n_rats
             cx_win             = [[] for _ in range(n_rats)]
             cy_win             = [[] for _ in range(n_rats)]
-            cnn_votes          = [[] for _ in range(n_rats)]
+            frame_votes        = [[] for _ in range(n_rats)]
+            cnn_conf_count     = [0] * n_rats
+            heur_count         = [0] * n_rats
             frames_in_win      = 0
 
         # ── progreso ──────────────────────────────────────────────────
@@ -581,6 +647,7 @@ def run_analysis(
             "fps":                    float(fps),
             "frame_size":             [fw, fh],
             "layout":                 layout,
+            "merged_active":          merge_active,   # RN-13: escape agrupado con nado
             "rois": [
                 {"rat_idx": i, "x": r[0], "y": r[1], "w": r[2], "h": r[3]}
                 for i, r in enumerate(rois)

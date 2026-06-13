@@ -31,6 +31,14 @@ def main():
                    help="Fracción del ancho del ROI: bbox más ancho que esto = señal de nado")
     p.add_argument("--pos-std-thr",   type=float, default=20.0,
                    help="Dispersión espacial del centro del bbox en la ventana (px); por debajo = inmóvil sostenida")
+    p.add_argument("--cnn-conf-thr",  type=float, default=0.65,
+                   help="Umbral de confianza de ResNet-18; por debajo consulta ResNet-50")
+    p.add_argument("--cnn-fallback-conf-thr", type=float, default=0.40,
+                   help="Umbral de confianza de ResNet-50; por debajo cae a la heurística (nivel 3)")
+    p.add_argument("--no-cnn",        action="store_true",
+                   help="Desactiva el clasificador CNN y usa solo la heurística geométrica")
+    p.add_argument("--merge-active",  action="store_true",
+                   help="RN-13: agrupa escape y nado en la categoría unificada 'conducta activa'")
     p.add_argument("--stabilize",    action="store_true")
     p.add_argument("--device",       default="")
     p.add_argument("--no-video",     action="store_true", help="No generar video anotado")
@@ -79,6 +87,10 @@ def main():
         escape_top_thr=args.escape_top_thr,
         swim_width_thr=args.swim_width_thr,
         pos_std_thr=args.pos_std_thr,
+        use_cnn=not args.no_cnn,
+        cnn_conf_thr=args.cnn_conf_thr,
+        cnn_fallback_conf_thr=args.cnn_fallback_conf_thr,
+        merge_active=args.merge_active,
         stabilize=args.stabilize,
         device=args.device,
         output_video=out_video,
