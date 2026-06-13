@@ -1,16 +1,20 @@
 """
 Clasificador CNN de conducta FST.
 
-Arquitectura dual:
-  Primario  — ResNet-18  (rápido, liviano)
-  Respaldo  — ResNet-50  (más preciso, activa cuando confianza < umbral)
+Cascada de confianza de tres niveles (cap. 5, Módulo 4 del diseño):
+  Nivel 1 — ResNet-18  (rápido, liviano): si conf ≥ primary_conf_thr  → se acepta.
+  Nivel 2 — ResNet-50  (más preciso):     si conf ≥ fallback_conf_thr → se acepta.
+  Nivel 3 — Heurística geométrica (la aplica el caller): cuando ambas redes
+            quedan por debajo de su umbral, `classify_crop` devuelve
+            source="low_conf" para que el pipeline use la regla motion+aspect.
 
 Clases: swim (0) | immobile (1) | escape (2)
 
 Uso:
     clf = FSTClassifier()
     if clf.is_available:
-        label, conf, source = clf.classify_frame(frame, det)
+        result = clf.classify_frame(frame, det)
+        # result.source ∈ {"resnet18","resnet50","low_conf","no_det"}
 
 Si torch/torchvision no están instalados, o si los pesos no existen,
 `is_available` es False y el módulo no lanza excepción al importarse.
@@ -196,29 +200,40 @@ class FSTClassifier:
 
     def classify_crop(self, crop_bgr: np.ndarray) -> ClassifierResult:
         """
-        Clasifica un crop BGR del rat.
+        Clasifica un crop BGR de la rata mediante la cascada de confianza.
 
-        Cascada:
-          1. ResNet-18 → si confianza ≥ primary_conf_thr → retorna
-          2. ResNet-50 (si disponible) → retorna
-          3. Si solo hay ResNet-18, retorna su resultado aunque la confianza sea baja
+        Cascada (cap. 5, Módulo 4 del diseño):
+          1. ResNet-18  — si conf ≥ primary_conf_thr  → se acepta (source="resnet18").
+          2. ResNet-50  — si conf ≥ fallback_conf_thr → se acepta (source="resnet50").
+          3. Ninguna red alcanza su umbral → source="low_conf": el caller debe
+             aplicar la heurística geométrica (nivel 3). En ese caso `label`/
+             `confidence` traen la mejor estimación disponible, pero es solo
+             informativa y no debe consolidarse como voto del CNN.
         """
         if not self.is_available or crop_bgr is None or crop_bgr.size == 0:
             return ClassifierResult("unknown", 0.0, "no_det")
 
         tensor = self.preprocess(crop_bgr)
 
-        # ResNet-18
+        best_label, best_conf = "unknown", 0.0
+
+        # ── Nivel 1: ResNet-18 ──
         if self._primary is not None:
             label18, conf18 = self._infer(self._primary, tensor)
-            if conf18 >= self.primary_conf_thr or self._fallback is None:
+            if conf18 >= self.primary_conf_thr:
                 return ClassifierResult(label18, conf18, "resnet18")
-        else:
-            label18, conf18 = "unknown", 0.0
+            best_label, best_conf = label18, conf18
 
-        # ResNet-50 (respaldo)
-        label50, conf50 = self._infer(self._fallback, tensor)
-        return ClassifierResult(label50, conf50, "resnet50")
+        # ── Nivel 2: ResNet-50 ──
+        if self._fallback is not None:
+            label50, conf50 = self._infer(self._fallback, tensor)
+            if conf50 >= self.fallback_conf_thr:
+                return ClassifierResult(label50, conf50, "resnet50")
+            if conf50 > best_conf:
+                best_label, best_conf = label50, conf50
+
+        # ── Nivel 3: ambas redes por debajo del umbral → heurística (caller) ──
+        return ClassifierResult(best_label, best_conf, "low_conf")
 
     def classify_frame(self, frame: np.ndarray, det) -> ClassifierResult:
         """
