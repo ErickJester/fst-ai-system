@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Etiquetado FST — visor y regiones de interés</title>
+  <link rel="stylesheet" href="/static/css/estilos.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div>
+    <h1>Etiquetado de conducta en nado forzado</h1>
+    <p class="subtitulo">
+      FST (<em>forced swim test</em>, prueba de nado forzado) —
+      herramienta interna de construcción del conjunto de entrenamiento.
+      <span id="version" class="version"></span>
+    </p>
+  </div>
+  <div class="selector-video">
+    <label for="selector-video">Video</label>
+    <select id="selector-video" aria-label="Video a revisar">
+      <option value="">— cargando lista —</option>
+    </select>
+    <button id="btn-recargar" type="button" class="secundario" title="Volver a leer la carpeta de videos">
+      Recargar lista
+    </button>
+  </div>
+</header>
+
+<div id="aviso" class="aviso oculto" role="status"></div>
+
+<main class="disposicion">
+
+  <!-- ------------------------------------------------------ escenario -->
+  <section class="panel escenario-contenedor">
+    <div id="escenario" class="escenario">
+      <!-- El marco se ajusta al tamaño real del cuadro mostrado, para que el
+           lienzo de dibujo quede exactamente encima y no desplazado. -->
+      <div id="marco" class="marco">
+        <img id="cuadro" class="cuadro" alt="Cuadro actual del video">
+        <canvas id="capa-dibujo" class="capa-dibujo"></canvas>
+      </div>
+      <div id="capa-vacia" class="capa-mensaje">
+        Selecciona un video para empezar.
+      </div>
+      <div id="capa-cargando" class="capa-cargando oculto">Cargando cuadro…</div>
+    </div>
+
+    <p id="pista-modo" class="pista-modo">
+      Selecciona un video para dibujar las regiones de interés.
+    </p>
+
+    <!-- ----------------------------------------------------- controles -->
+    <div class="transporte">
+      <input id="barra" class="barra" type="range" min="0" max="0" value="0" step="1"
+             aria-label="Posición en el video" disabled>
+
+      <div class="botonera">
+        <button id="btn-inicio" type="button" title="Primer cuadro (Inicio)" disabled>|&lt;</button>
+        <button id="btn-retroceder-salto" type="button" title="Retroceder varios cuadros (Shift + flecha izquierda)" disabled>&laquo;</button>
+        <button id="btn-anterior" type="button" title="Cuadro anterior (flecha izquierda)" disabled>&lsaquo;</button>
+        <button id="btn-reproducir" type="button" class="principal" title="Reproducir o pausar (espacio)" disabled>
+          Reproducir
+        </button>
+        <button id="btn-siguiente" type="button" title="Cuadro siguiente (flecha derecha)" disabled>&rsaquo;</button>
+        <button id="btn-avanzar-salto" type="button" title="Avanzar varios cuadros (Shift + flecha derecha)" disabled>&raquo;</button>
+        <button id="btn-fin" type="button" title="Último cuadro conocido (Fin)" disabled>&gt;|</button>
+
+        <span class="separador"></span>
+
+        <label class="campo-en-linea" for="salto-cuadros">
+          Salto
+          <input id="salto-cuadros" type="number" min="1" step="1" value="10" disabled>
+          <span class="unidad">cuadros</span>
+        </label>
+
+        <label class="campo-en-linea" for="velocidad">
+          Velocidad
+          <select id="velocidad" disabled>
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1× (real)</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </label>
+
+        <label class="campo-en-linea" for="ir-cuadro">
+          Ir al cuadro
+          <input id="ir-cuadro" type="number" min="0" step="1" disabled>
+        </label>
+        <button id="btn-ir" type="button" class="secundario" disabled>Ir</button>
+      </div>
+
+      <div class="indicadores">
+        <span id="indicador-cuadro" class="indicador-principal">cuadro — de —</span>
+        <span id="indicador-tiempo" class="indicador">—</span>
+        <span id="indicador-estado" class="indicador">en pausa</span>
+        <span id="indicador-omitidos" class="indicador atenuado"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------- panel lateral -->
+  <aside class="panel lateral">
+
+    <section class="bloque">
+      <h2>Regiones de interés</h2>
+      <p class="nota">
+        ROI (<em>region of interest</em>, región de interés): el contorno de una
+        cámara de natación. Se dibuja como cuadrilátero de cuatro esquinas
+        porque la cámara web puede no estar nivelada y el contorno no sale
+        alineado a los ejes. Hasta cuatro por toma, numeradas de izquierda a
+        derecha. Cada una lleva su propia línea de agua.
+      </p>
+      <div class="botonera-regiones">
+        <button id="btn-nueva-roi" type="button" class="secundario" disabled>
+          Nueva región <span class="tecla">R</span>
+        </button>
+        <button id="btn-linea-agua" type="button" class="secundario" disabled>
+          Línea de agua <span class="tecla">W</span>
+        </button>
+        <button id="btn-deshacer" type="button" class="secundario" disabled>
+          Deshacer <span class="tecla">Z</span>
+        </button>
+      </div>
+      <ul id="lista-regiones" class="lista-regiones"></ul>
+      <p class="nota">
+        Las coordenadas se guardan en píxeles del archivo original, no del
+        cuadro reescalado que viaja al navegador.
+      </p>
+    </section>
+
+    <section class="bloque">
+      <h2>Cuadros por segundo</h2>
+      <p class="nota">
+        FPS = cuadros por segundo. La reproducción a velocidad real depende de
+        este valor; se lee del archivo y no se supone ninguno.
+      </p>
+      <label class="campo" for="fps-efectivo">
+        Valor usado
+        <input id="fps-efectivo" type="number" min="0.1" step="0.001" disabled>
+      </label>
+      <p id="fps-origen" class="nota origen">—</p>
+    </section>
+
+    <section class="bloque">
+      <h2>Metadata del archivo</h2>
+      <dl id="tabla-metadata" class="metadata">
+        <div><dt>Archivo</dt><dd>—</dd></div>
+      </dl>
+      <button id="btn-verificar-total" type="button" class="secundario ancho-completo" disabled
+              title="Recorre el archivo completo decodificando; puede tardar en videos largos">
+        Verificar total de cuadros
+      </button>
+    </section>
+
+    <section class="bloque">
+      <h2>Transporte de imagen</h2>
+      <p class="nota">
+        Solo afecta lo que viaja al navegador. El análisis posterior siempre usa
+        la resolución real del archivo. Ambos valores son puntos de partida a
+        calibrar.
+      </p>
+      <label class="campo" for="max-ancho">
+        Ancho máximo
+        <input id="max-ancho" type="number" min="16" step="16" disabled>
+      </label>
+      <label class="campo" for="calidad">
+        Calidad JPEG
+        <input id="calidad" type="number" min="1" max="100" step="1" disabled>
+      </label>
+    </section>
+
+    <section class="bloque">
+      <h2>Atajos de teclado</h2>
+      <dl class="atajos">
+        <div><dt>&larr; / &rarr;</dt><dd>cuadro anterior / siguiente</dd></div>
+        <div><dt>Shift + &larr; / &rarr;</dt><dd>salto de varios cuadros</dd></div>
+        <div><dt>Espacio</dt><dd>reproducir o pausar</dd></div>
+        <div><dt>Inicio / Fin</dt><dd>primer / último cuadro conocido</dd></div>
+        <div><dt>R</dt><dd>nueva región de interés</dd></div>
+        <div><dt>W</dt><dd>línea de agua de la región activa</dd></div>
+        <div><dt>Z</dt><dd>deshacer</dd></div>
+        <div><dt>Supr</dt><dd>borrar la región activa</dd></div>
+        <div><dt>Esc</dt><dd>cancelar el dibujo en curso</dd></div>
+      </dl>
+    </section>
+
+  </aside>
+</main>
+
+<footer class="pie">
+  Módulo 3 de 9 — visor, regiones de interés y línea de agua. El espécimen no
+  se analiza todavía: los detectores llegan a partir del Módulo 4.
+</footer>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

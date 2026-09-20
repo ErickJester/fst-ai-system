@@ -1,7 +1,9 @@
-"""Endpoints HTTP del servidor de cuadros (Modulo 1).
+"""Endpoints HTTP del servidor de cuadros (Modulos 1 a 3).
 
 Rutas:
+  GET /api/indice
   GET /api/salud
+  GET /api/preferencias
   GET /api/videos
   GET /api/videos/<video_id>/metadata[?conteo_exacto=1]
   GET /api/videos/<video_id>/frame/<n>[?calidad=1..100][&max_ancho=px]
@@ -11,6 +13,7 @@ from __future__ import annotations
 import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
+from . import __version__
 from .video_source import (
     CuadroNoDisponible,
     ErrorVideo,
@@ -36,12 +39,37 @@ def _entero(nombre: str, predeterminado: int | None = None) -> int | None:
 def crear_blueprint(catalogo, cfg) -> Blueprint:
     bp = Blueprint("api", __name__, url_prefix="/api")
 
+    @bp.get("/indice")
+    def indice():
+        """Indice de la interfaz HTTP, para consultarla sin abrir el visor."""
+        return jsonify(
+            {
+                "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
+                "version": __version__,
+                "modulo_actual": "3 - regiones de interes y linea de agua",
+                "videos_dir": str(catalogo.raiz),
+                "endpoints": {
+                    "visor": "/",
+                    "salud": "/api/salud",
+                    "preferencias": "/api/preferencias",
+                    "listar_videos": "/api/videos",
+                    "metadata": "/api/videos/<video_id>/metadata?conteo_exacto=1",
+                    "cuadro": "/api/videos/<video_id>/frame/<n>?calidad=85&max_ancho=960",
+                },
+            }
+        )
+
+    @bp.get("/preferencias")
+    def preferencias():
+        """Valores por defecto del visor, definidos del lado del servidor."""
+        return jsonify(cfg.preferencias_visor())
+
     @bp.get("/salud")
     def salud():
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "1 - servidor de cuadros",
+                "modulo": "3 - regiones de interes y linea de agua",
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
