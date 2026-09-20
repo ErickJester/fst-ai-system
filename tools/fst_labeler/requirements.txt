@@ -1,0 +1,10 @@
+# Herramienta interna de etiquetado FST (forced swim test / nado forzado).
+# Instalacion:  pip install -r requirements.txt
+Flask==3.0.3
+opencv-python==4.10.0.84
+numpy==2.0.1
+
+# TensorFlow se habilita en el Modulo 5 (modelo 3D preentrenado de
+# Della Valle et al. 2025). Se deja comentado para que la instalacion de los
+# modulos 1-4 no arrastre ~600 MB de dependencias que todavia no se usan.
+# tensorflow==2.17.0
