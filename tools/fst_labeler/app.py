@@ -3,6 +3,8 @@
 
 Modulo 1: sirve cualquier cuadro de un video por numero de cuadro y su
 metadata, leida siempre del archivo real con OpenCV.
+Modulo 2: visor cuadro a cuadro en el navegador, servido en la raiz.
+Modulo 3: dibujo de regiones de interes y linea de agua sobre el cuadro.
 
 Uso:
     pip install -r requirements.txt
@@ -16,16 +18,20 @@ from __future__ import annotations
 import argparse
 import sys
 
-from flask import Flask, jsonify
+from flask import Flask, send_from_directory
 
 from fst_labeler import __version__
 from fst_labeler.api import crear_blueprint
-from fst_labeler.config import Config
+from fst_labeler.config import DIR_INTERFAZ, Config
 from fst_labeler.video_source import CatalogoVideos
 
 
 def crear_app(cfg: Config) -> Flask:
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        static_folder=str(DIR_INTERFAZ),
+        static_url_path="/static",
+    )
     app.config["FST_CONFIG"] = cfg
 
     catalogo = CatalogoVideos(
@@ -37,22 +43,11 @@ def crear_app(cfg: Config) -> Flask:
     app.register_blueprint(crear_blueprint(catalogo, cfg))
 
     @app.get("/")
-    def indice():
-        """Indice de la interfaz HTTP. La interfaz grafica llega en el Modulo 2."""
-        return jsonify(
-            {
-                "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
-                "version": __version__,
-                "modulo_actual": "1 - servidor de cuadros (sin interfaz todavia)",
-                "videos_dir": str(cfg.videos_dir),
-                "endpoints": {
-                    "salud": "/api/salud",
-                    "listar_videos": "/api/videos",
-                    "metadata": "/api/videos/<video_id>/metadata?conteo_exacto=1",
-                    "cuadro": "/api/videos/<video_id>/frame/<n>?calidad=85&max_ancho=960",
-                },
-            }
-        )
+    def visor():
+        """Visor y editor de regiones. El indice JSON esta en /api/indice."""
+        # max_age=0: la pagina se revalida en cada carga para que al editar la
+        # interfaz no haya que limpiar el cache del navegador a mano.
+        return send_from_directory(DIR_INTERFAZ, "index.html", max_age=0)
 
     return app
 
@@ -60,7 +55,7 @@ def crear_app(cfg: Config) -> Flask:
 def parsear_argumentos(argv: list[str]) -> Config:
     base = Config.desde_entorno()
     p = argparse.ArgumentParser(
-        description="Servidor de cuadros para el etiquetado de conducta en nado forzado (FST)."
+        description="Servidor y visor de cuadros para el etiquetado de conducta en nado forzado (FST)."
     )
     p.add_argument("--videos-dir", default=str(base.videos_dir),
                    help="Carpeta donde estan los videos a etiquetar.")
@@ -70,6 +65,12 @@ def parsear_argumentos(argv: list[str]) -> Config:
                    help="Calidad JPEG de los cuadros servidos (1-100).")
     p.add_argument("--seek-forward-max", type=int, default=base.seek_forward_max,
                    help="Cuadros que se avanzan decodificando antes de hacer un salto.")
+    p.add_argument("--visor-max-ancho", type=int, default=base.visor_max_ancho,
+                   help="Ancho maximo del cuadro enviado al navegador (solo transporte).")
+    p.add_argument("--visor-prefetch", type=int, default=base.visor_prefetch,
+                   help="Cuadros que el visor pide por adelantado.")
+    p.add_argument("--visor-salto-cuadros", type=int, default=base.visor_salto_cuadros,
+                   help="Tamano del salto de varios cuadros en el visor.")
     p.add_argument("--debug", action="store_true", help="Modo depuracion de Flask.")
     args = p.parse_args(argv)
 
@@ -79,6 +80,9 @@ def parsear_argumentos(argv: list[str]) -> Config:
         port=args.port,
         jpeg_quality=args.jpeg_quality,
         seek_forward_max=args.seek_forward_max,
+        visor_max_ancho=args.visor_max_ancho,
+        visor_prefetch=args.visor_prefetch,
+        visor_salto_cuadros=args.visor_salto_cuadros,
         debug=args.debug,
     )
 
@@ -96,8 +100,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Videos detectados en {cfg.videos_dir}: {len(encontrados)}")
         for video in encontrados[:10]:
             print(f"  - {video['video_id']}")
+        if not encontrados:
+            print("       La carpeta esta vacia. Puedes generar un video de prueba con:")
+            print("       python scripts/generar_video_prueba.py --fps 30 --segundos 60")
 
-    print(f"\nHerramienta de etiquetado FST v{__version__} (Modulo 1)")
+    print(f"\nHerramienta de etiquetado FST v{__version__} (Modulo 3)")
     print(f"Abre en el navegador: http://{cfg.host}:{cfg.port}/")
     app.run(host=cfg.host, port=cfg.port, debug=cfg.debug, threaded=True)
     return 0

@@ -7,4 +7,4 @@ inmovilidad, escalamiento) para entrenar el clasificador de produccion del
 sistema; no es el sistema entregable.
 """
 
-__version__ = "0.1.0"  # Modulo 1: servidor de cuadros
+__version__ = "0.3.0"  # Modulo 3: regiones de interes y linea de agua
