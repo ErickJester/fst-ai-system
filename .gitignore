@@ -11,3 +11,6 @@ __pycache__/
 
 # AI context — local only, not for the repo
 CLAUDE.md
+
+# videos de prueba de la herramienta de etiquetado
+/tools/fst_labeler/videos/
