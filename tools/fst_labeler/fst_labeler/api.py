@@ -9,6 +9,7 @@ Rutas:
   GET /api/videos/<video_id>/frame/<n>[?calidad=1..100][&max_ancho=px]
   POST /api/videos/<video_id>/deteccion-movimiento
   POST /api/videos/<video_id>/estabilidad-camara
+  POST /api/videos/<video_id>/modelo-3d
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from . import __version__, estabilizacion
+from . import modelo_3d
 from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
@@ -49,7 +51,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             {
                 "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
                 "version": __version__,
-                "modulo_actual": "4 - detector de movimiento por umbral",
+                "modulo_actual": "5 - modelo 3D preentrenado",
                 "videos_dir": str(catalogo.raiz),
                 "endpoints": {
                     "visor": "/",
@@ -60,6 +62,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                     "cuadro": "/api/videos/<video_id>/frame/<n>?calidad=85&max_ancho=960",
                     "deteccion_movimiento": "POST /api/videos/<video_id>/deteccion-movimiento",
                     "estabilidad_camara": "POST /api/videos/<video_id>/estabilidad-camara",
+                    "modelo_3d": "POST /api/videos/<video_id>/modelo-3d",
                 },
             }
         )
@@ -74,7 +77,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "4 - detector de movimiento por umbral",
+                "modulo": "5 - modelo 3D preentrenado",
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
@@ -236,6 +239,63 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         )
         informe["video"] = video_id
         return jsonify(informe)
+
+    # --------------------------------------------- Modulo 5: modelo 3D
+
+    @bp.get("/modelo-3d/estado")
+    def modelo_3d_estado():
+        """Dice si los pesos y TensorFlow estan disponibles, sin cargarlos."""
+        ruta = modelo_3d.RUTA_PESOS
+        import importlib.util as util
+        return jsonify(
+            {
+                "pesos_presentes": ruta.is_file(),
+                "ruta_pesos": str(ruta),
+                "tensorflow": util.find_spec("tensorflow") is not None,
+                "tf_keras": util.find_spec("tf_keras") is not None,
+                "clases": list(modelo_3d.CLASES.values()),
+                "segundos_por_clip": modelo_3d.SEGUNDOS_CLIP,
+                "advertencia_exactitud": modelo_3d.EXACTITUD_AUTORES,
+            }
+        )
+
+    @bp.post("/videos/<path:video_id>/modelo-3d")
+    def modelo_3d_inferencia(video_id: str):
+        """Capa 1: prediccion de las tres conductas por clip de 3 s."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        fps = _fps_efectivo(cuerpo, lector.metadatos)
+        total = lector.contar_cuadros_exacto()
+
+        opciones = cuerpo.get("parametros") or {}
+        parametros = modelo_3d.Parametros(
+            remuestrear=bool(opciones.get("remuestrear", True)),
+            fondo=str(opciones.get("fondo", "mediana")),
+            cuadro_fondo=int(opciones.get("cuadro_fondo", 0)),
+            estabilizar=bool(opciones.get("estabilizar", True)),
+            lote=int(opciones.get("lote", 8)),
+            max_clips=(None if opciones.get("max_clips") in (None, "", 0)
+                       else int(opciones["max_clips"])),
+        )
+        if parametros.fondo not in ("mediana", "primer_cuadro"):
+            raise ValueError("El fondo debe ser 'mediana' o 'primer_cuadro'.")
+
+        informe = modelo_3d.analizar(
+            ruta=str(lector.ruta),
+            regiones=regiones,
+            fps=fps,
+            total_cuadros=total,
+            cuadro_referencia=int(cuerpo.get("cuadro_referencia", 0)),
+            cuadro_inicio=int(cuerpo.get("cuadro_inicio", 0)),
+            parametros=parametros,
+        )
+        informe["video"] = video_id
+        return jsonify(informe)
+
+    @bp.errorhandler(modelo_3d.ModeloNoDisponible)
+    def _sin_modelo(error):
+        return jsonify({"error": str(error), "tipo": "modelo_no_disponible"}), 503
 
     # --------------------------------------------------------------- errores
     @bp.errorhandler(VideoNoEncontrado)

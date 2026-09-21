@@ -9,6 +9,7 @@ import { ClienteFST } from "./api.js";
 import { Visor } from "./visor.js";
 import { EditorRegiones, MODO, MAX_REGIONES, COLORES } from "./dibujo.js";
 import { PanelDeteccion } from "./deteccion.js";
+import { PanelModelo } from "./modelo.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -63,6 +64,14 @@ const nodos = {
   btnAnalizar: el("btn-analizar"),
   estado: el("estado-deteccion"),
   resultados: el("resultados-deteccion"),
+
+  remuestrear: el("remuestrear"),
+  fondo: el("fondo-modelo"),
+  estabilizarModelo: el("estabilizar-modelo"),
+  maxClips: el("max-clips"),
+  btnModelo: el("btn-modelo"),
+  estadoModelo: el("estado-modelo"),
+  resultadosModelo: el("resultados-modelo"),
 };
 
 const cliente = new ClienteFST();
@@ -70,6 +79,11 @@ const visor = new Visor(cliente, nodos.cuadro, { alCambiar: dibujar });
 const editor = new EditorRegiones(nodos.capaDibujo, nodos.cuadro, {
   alCambiar: dibujarRegiones,
 });
+const irAlCuadro = (cuadro) => {
+  visor.pausar();
+  visor.irA(cuadro);
+};
+const modelo = new PanelModelo(nodos, { alPedirCuadro: irAlCuadro });
 const deteccion = new PanelDeteccion(nodos, {
   // Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
   alPedirCuadro: (cuadro) => {
@@ -376,6 +390,13 @@ function dibujar(v) {
 }
 
 function sincronizarDeteccion() {
+  const estado = {
+    videoId: visor.videoId,
+    fps: visor.fps,
+    cuadroActual: visor.cuadroActual === null ? 0 : visor.cuadroActual,
+    regiones: editor.regiones,
+  };
+  modelo.sincronizar(estado);
   deteccion.sincronizar({
     videoId: visor.videoId,
     fps: visor.fps,
