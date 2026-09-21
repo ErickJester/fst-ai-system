@@ -188,9 +188,13 @@ def cargar_modelo(ruta: Path | None = None):
     ruta = Path(ruta or RUTA_PESOS)
     if not ruta.is_file():
         raise ModeloNoDisponible(
-            f"No se encontraron los pesos en {ruta}. Descárgalos de Zenodo "
-            "(DOI 10.5281/zenodo.14638257, CC-BY-4.0); el archivo es "
-            "ML_FST/src/TrainedModels/classes3/Model/model.h5."
+            f"No se encontraron los pesos en {ruta}. El archivo es "
+            "ML_FST/src/TrainedModels/classes3/Model/model.h5 (10.7 MB) y la "
+            "licencia y la cita salen de Zenodo (DOI 10.5281/zenodo.14638257, "
+            "CC-BY-4.0). Como Zenodo solo lo publica dentro de un zip de 8.2 GB, "
+            "el mismo archivo se puede traer suelto del repositorio de los "
+            "autores: raw.githubusercontent.com/adso42/FST_3DRCNN/main/"
+            "ML_FST/src/TrainedModels/classes3/Model/model.h5"
         )
 
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
@@ -199,8 +203,11 @@ def cargar_modelo(ruta: Path | None = None):
         import tf_keras
     except ImportError as e:
         raise ModeloNoDisponible(
-            "Falta TensorFlow. Instala 'tensorflow==2.17.1' y 'tf-keras==2.17.0': "
-            "los pesos son Keras 2.6 y Keras 3 no los carga."
+            "Falta TensorFlow. Los pesos son Keras 2.6 y Keras 3 no los carga, asi "
+            "que hace falta tf-keras: en Python 3.10 a 3.12 instala "
+            "'tensorflow==2.17.1' y 'tf-keras==2.17.0'; en Python 3.13, "
+            "'tensorflow==2.21.0' y 'tf-keras==2.21.0'. Para Python 3.14 todavia "
+            "no hay ruedas de TensorFlow."
         ) from e
 
     modelo = tf_keras.models.load_model(str(ruta), compile=False)

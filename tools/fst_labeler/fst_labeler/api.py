@@ -11,6 +11,8 @@ Rutas:
   POST /api/videos/<video_id>/estabilidad-camara
   POST /api/videos/<video_id>/modelo-3d
   POST /api/videos/<video_id>/reglas-geometricas
+  POST /api/videos/<video_id>/consenso
+  POST /api/consenso
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from . import __version__, estabilizacion
-from . import modelo_3d, reglas_geometricas
+from . import consenso, modelo_3d, reglas_geometricas
 from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
@@ -59,7 +61,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             {
                 "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
                 "version": __version__,
-                "modulo_actual": "6 - reglas geometricas",
+                "modulo_actual": "7 - consenso y cola de discrepancias",
                 "videos_dir": str(catalogo.raiz),
                 "endpoints": {
                     "visor": "/",
@@ -72,6 +74,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                     "estabilidad_camara": "POST /api/videos/<video_id>/estabilidad-camara",
                     "modelo_3d": "POST /api/videos/<video_id>/modelo-3d",
                     "reglas_geometricas": "POST /api/videos/<video_id>/reglas-geometricas",
+                    "consenso_del_video": "POST /api/videos/<video_id>/consenso",
+                    "consenso_de_informes": "POST /api/consenso",
                 },
             }
         )
@@ -86,7 +90,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "6 - reglas geometricas",
+                "modulo": "7 - consenso y cola de discrepancias",
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
@@ -219,17 +223,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         informe["total_cuadros"] = total
         return jsonify(informe)
 
-    @bp.post("/videos/<path:video_id>/deteccion-movimiento")
-    def deteccion_movimiento(video_id: str):
-        """Capa 2 mas compuerta de cordura de la Capa 0, por region."""
-        cuerpo = request.get_json(silent=True) or {}
-        regiones = _regiones_del_cuerpo(cuerpo)
-        lector = catalogo.lector(video_id)
-        meta = lector.metadatos
-        fps = _fps_efectivo(cuerpo, meta)
-        total = lector.contar_cuadros_exacto()
-
-        opciones = cuerpo.get("parametros") or {}
+    def _parametros_movimiento(opciones: dict) -> Parametros:
+        """Parametros de la Capa 2. Compartido con el consenso del Modulo 7."""
         parametros = Parametros(
             segundos_por_bloque=float(opciones.get("segundos_por_bloque", cfg.deteccion_segundos_bloque)),
             umbral_binarizacion=int(opciones.get("umbral_binarizacion", cfg.deteccion_umbral_binarizacion)),
@@ -246,6 +241,19 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             raise ValueError("La duracion del bloque debe ser mayor que cero.")
         if not 1 <= parametros.umbral_binarizacion <= 254:
             raise ValueError("El umbral de binarizacion debe estar entre 1 y 254.")
+        return parametros
+
+    @bp.post("/videos/<path:video_id>/deteccion-movimiento")
+    def deteccion_movimiento(video_id: str):
+        """Capa 2 mas compuerta de cordura de la Capa 0, por region."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        meta = lector.metadatos
+        fps = _fps_efectivo(cuerpo, meta)
+        total = lector.contar_cuadros_exacto()
+
+        parametros = _parametros_movimiento(cuerpo.get("parametros") or {})
 
         informe = analizar(
             ruta=str(lector.ruta),
@@ -279,16 +287,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             }
         )
 
-    @bp.post("/videos/<path:video_id>/modelo-3d")
-    def modelo_3d_inferencia(video_id: str):
-        """Capa 1: prediccion de las tres conductas por clip de 3 s."""
-        cuerpo = request.get_json(silent=True) or {}
-        regiones = _regiones_del_cuerpo(cuerpo)
-        lector = catalogo.lector(video_id)
-        fps = _fps_efectivo(cuerpo, lector.metadatos)
-        total = lector.contar_cuadros_exacto()
-
-        opciones = cuerpo.get("parametros") or {}
+    def _parametros_modelo(opciones: dict) -> "modelo_3d.Parametros":
+        """Parametros de la Capa 1. Compartido con el consenso del Modulo 7."""
         parametros = modelo_3d.Parametros(
             remuestrear=bool(opciones.get("remuestrear", True)),
             fondo=str(opciones.get("fondo", "mediana")),
@@ -300,6 +300,18 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         )
         if parametros.fondo not in ("mediana", "primer_cuadro"):
             raise ValueError("El fondo debe ser 'mediana' o 'primer_cuadro'.")
+        return parametros
+
+    @bp.post("/videos/<path:video_id>/modelo-3d")
+    def modelo_3d_inferencia(video_id: str):
+        """Capa 1: prediccion de las tres conductas por clip de 3 s."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        fps = _fps_efectivo(cuerpo, lector.metadatos)
+        total = lector.contar_cuadros_exacto()
+
+        parametros = _parametros_modelo(cuerpo.get("parametros") or {})
 
         informe = modelo_3d.analizar(
             ruta=str(lector.ruta),
@@ -319,16 +331,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
 
     # ------------------------------------- Modulo 6: reglas geometricas
 
-    @bp.post("/videos/<path:video_id>/reglas-geometricas")
-    def reglas_geometricas_analisis(video_id: str):
-        """Capa 3 simplificada: las tres conductas por reglas sobre la mascara."""
-        cuerpo = request.get_json(silent=True) or {}
-        regiones = _regiones_del_cuerpo(cuerpo)
-        lector = catalogo.lector(video_id)
-        fps = _fps_efectivo(cuerpo, lector.metadatos)
-        total = lector.contar_cuadros_exacto()
-
-        opciones = cuerpo.get("parametros") or {}
+    def _parametros_reglas(opciones: dict) -> "reglas_geometricas.Parametros":
+        """Parametros de la Capa 3. Compartido con el consenso del Modulo 7."""
         crudos = opciones.get("umbrales") or {}
         parametros = reglas_geometricas.Parametros(
             umbrales=reglas_geometricas.Umbrales(
@@ -360,6 +364,18 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             raise ValueError("La fraccion superior debe estar entre 0 y 1.")
         if not 0 <= parametros.area_minima < 1:
             raise ValueError("El area minima debe estar entre 0 y 1.")
+        return parametros
+
+    @bp.post("/videos/<path:video_id>/reglas-geometricas")
+    def reglas_geometricas_analisis(video_id: str):
+        """Capa 3 simplificada: las tres conductas por reglas sobre la mascara."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        fps = _fps_efectivo(cuerpo, lector.metadatos)
+        total = lector.contar_cuadros_exacto()
+
+        parametros = _parametros_reglas(cuerpo.get("parametros") or {})
 
         informe = reglas_geometricas.analizar(
             ruta=str(lector.ruta),
@@ -374,6 +390,87 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             parametros=parametros,
         )
         informe["video"] = video_id
+        return jsonify(informe)
+
+    # ----------------------------------------------- Modulo 7: consenso
+
+    def _parametros_consenso(opciones: dict) -> consenso.Parametros:
+        p = consenso.Parametros(
+            confianza_minima_modelo=float(
+                opciones.get("confianza_minima_modelo", cfg.consenso_confianza_minima)
+            ),
+            margen_minimo_reglas=float(
+                opciones.get("margen_minimo_reglas", cfg.consenso_margen_minimo)
+            ),
+            cobertura_minima_modelo=float(
+                opciones.get("cobertura_minima_modelo", cfg.consenso_cobertura_minima)
+            ),
+            minimo_votantes=int(
+                opciones.get("minimo_votantes", cfg.consenso_minimo_votantes)
+            ),
+            encolar_empates=bool(opciones.get("encolar_empates", True)),
+        )
+        p.validar()
+        return p
+
+    @bp.post("/consenso")
+    def consenso_de_informes():
+        """Capa 5 sobre tres reportes ya calculados, sin tocar el video.
+
+        Cada capa recorre el video entero, asi que recalcularlas para mover un
+        umbral del consenso costaria tres pasadas por cada ajuste. Este camino
+        recibe los reportes que los paneles ya tienen en pantalla y solo los
+        compara, que es instantaneo.
+        """
+        cuerpo = request.get_json(silent=True) or {}
+        informe = consenso.combinar(
+            movimiento=cuerpo.get("movimiento"),
+            modelo=cuerpo.get("modelo"),
+            reglas=cuerpo.get("reglas"),
+            parametros=_parametros_consenso(cuerpo.get("parametros") or {}),
+            video=cuerpo.get("video"),
+        )
+        return jsonify(informe)
+
+    @bp.post("/videos/<path:video_id>/consenso")
+    def consenso_del_video(video_id: str):
+        """Corre las tres capas sobre el video y las compara. Tres pasadas."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        fps = _fps_efectivo(cuerpo, lector.metadatos)
+        total = lector.contar_cuadros_exacto()
+
+        opciones = cuerpo.get("parametros") or {}
+        movimiento, modelo, reglas, avisos = consenso.correr_capas(
+            ruta=str(lector.ruta),
+            regiones=regiones,
+            fps=fps,
+            total_cuadros=total,
+            cuadro_referencia=int(cuerpo.get("cuadro_referencia", 0)),
+            cuadro_inicio=int(cuerpo.get("cuadro_inicio", 0)),
+            cuadro_fin=(
+                None if cuerpo.get("cuadro_fin") in (None, "") else int(cuerpo["cuadro_fin"])
+            ),
+            p_movimiento=_parametros_movimiento(opciones.get("movimiento") or {}),
+            p_modelo=_parametros_modelo(opciones.get("modelo") or {}),
+            p_reglas=_parametros_reglas(opciones.get("reglas") or {}),
+            capas=cuerpo.get("capas"),
+        )
+        if movimiento is None and reglas is None:
+            raise RuntimeError(
+                "Ninguna de las dos capas que definen la rejilla de bloques pudo "
+                "correr. " + " ".join(avisos)
+            )
+
+        informe = consenso.combinar(
+            movimiento=movimiento,
+            modelo=modelo,
+            reglas=reglas,
+            parametros=_parametros_consenso(opciones.get("consenso") or {}),
+            video=video_id,
+        )
+        informe["avisos"] = avisos + informe["avisos"]
         return jsonify(informe)
 
     # --------------------------------------------------------------- errores
