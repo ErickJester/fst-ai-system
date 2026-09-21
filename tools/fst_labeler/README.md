@@ -40,7 +40,7 @@ Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 | 1 | Servidor de cuadros y metadata | **listo** |
 | 2 | Visor cuadro a cuadro en el navegador | **listo** |
 | 3 | Dibujo de region de interes (ROI) y linea de agua | **listo** |
-| 4 | Capa 0 + Capa 2: detector de movimiento por umbral | pendiente |
+| 4 | Capa 0 + Capa 2: detector de movimiento por umbral | **listo** |
 | 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | pendiente |
 | 6 | Capa 3 simplificada: reglas geometricas sin pose | pendiente |
 | 7 | Capa 5: consenso y cola de discrepancias | pendiente |
@@ -241,13 +241,118 @@ proposito):
 4. Arrastrar una esquina y pulsar `Z`: vuelve exactamente a donde estaba y la
    linea de agua no se toca.
 
+## Modulo 4 — deteccion de movimiento por umbral
+
+Capa 2 del pipeline (equivalente a DBscorer, reimplementado en Python con
+OpenCV, sin MATLAB) mas la compuerta de cordura de la Capa 0.
+
+| Archivo | Contenido |
+|---|---|
+| `fst_labeler/deteccion_movimiento.py` | El detector y la compuerta de cordura. |
+| `fst_labeler/estabilizacion.py` | Seguimiento del movimiento de la camara. |
+| `static/js/deteccion.js` | Panel de la interfaz y reporte. |
+
+Rutas: `POST /api/videos/<video_id>/deteccion-movimiento` y
+`POST /api/videos/<video_id>/estabilidad-camara`. Las regiones viajan en el
+cuerpo de la peticion; **no se guardan en el servidor**, el navegador sigue
+siendo su dueno hasta que el Modulo 8 introduzca sqlite.
+
+### Por que sustraccion de fondo y no diferencia directa entre cuadros
+
+Medido sobre material real del laboratorio (1280x720, 29.45 FPS, 5.3 min): la
+diferencia entre cuadros consecutivos cambia el **37 %** del encuadre por
+encima de 20 niveles de gris, y esa senal no viene del especimen. Viene de la
+banda de agua agitada, que cruza los cuatro cilindros, y del temblor de la
+camara sobre los bordes verticales de alto contraste. Compensar la traslacion
+de la camara reduce esa senal solo un **2.8 %**: no alcanza.
+
+La mediana temporal del recorte lo resuelve. El cilindro, la mesa y el nivel
+medio del agua estan en casi todos los cuadros y sobreviven a la mediana; el
+especimen esta en un sitio distinto en cada cuadro y desaparece de ella.
+Restar esa mediana deja al especimen como un blanco solido. Es ademas lo que
+hace el metodo original, que tambien parte de sustraccion de fondo.
+
+Despues se aplica apertura morfologica y se conserva el **componente conexo
+mayor**: el especimen es un cuerpo unico, y lo demas es reflejo, burbuja o
+ruido de compresion. La puntuacion de cada par de cuadros es el area del XOR
+entre mascaras consecutivas, dividida entre el area de la region.
+
+### La camara se mueve
+
+Los videos se graban con camara de mano. Medido sobre material real: la camara
+se reencuadra unos **205 px en los primeros ~18 s** mientras se acomoda, y
+despues conserva una deriva residual de **25 px de mediana y 78 px de
+maxima**. Sobre un cilindro de ~300 px de ancho, 78 px es una cuarta parte del
+cilindro.
+
+El boton **Buscar inicio estable** recorre el video y devuelve el primer
+cuadro a partir del cual la camara ya no se reacomoda. No usa una constante de
+segundos a omitir: compara cada muestra contra la dispersion normal de la
+segunda mitad del propio video. Sobre el material de prueba devolvio el cuadro
+330 (11.2 s), con deriva posterior de 20.9 px de mediana y 68.7 px de maxima.
+
+Durante el analisis, la transformacion de la camara se reestima cada segundo y
+las esquinas de la region se arrastran con ella. El estimador se apoya en lo
+que queda **fuera** de las regiones: si estas encierran los cilindros, lo de
+fuera es la mesa, las paredes y el fondo, que no se mueven.
+
+### Dos compuertas que avisan en vez de callar
+
+**Capa 0, prior del laboratorio.** El porcentaje de bloques inmoviles se
+contrasta contra **23.2-52.4 %**, que es el rango de la Tabla 4 de la tesis de
+la Seccion de Posgrado (ENMyH-IPN) sobre especimenes Wistar hembra en el ensayo de
+5 min, seis grupos experimentales. **No se usa el prior de ~75 % que circula
+en la descripcion del proyecto**: ese valor no corresponde a este laboratorio,
+cuyo maximo registrado es 52 %, y una compuerta anclada ahi marcaria como
+sospechoso todo analisis correcto. Bogdanova et al. (Physiol Behav, 2017)
+confirman que no hay un prior universal: en Wistar control la inmovilidad
+publicada cubre todo el rango de 0 a 300 s segun el estudio.
+
+**Separacion de la distribucion.** Otsu siempre devuelve un corte, incluso
+sobre una distribucion de una sola joroba. El delator es la razon entre
+varianza entre grupos y varianza total: una distribucion normal cortada en su
+media da exactamente 2/pi = 0.64, y una con dos modos separados da bastante
+mas. Por debajo de 0.75 el reporte avisa que el porcentaje no es interpretable
+todavia.
+
+Ninguna de las dos descarta el resultado: lo marcan y explican por que.
+
+### Lo que esta capa NO decide
+
+Distingue **inmovil de activo**, dos clases. No separa nado de escalamiento.
+El Modulo 7 tiene que tratarla como un votante sobre el eje de inmovilidad, no
+como un votante de tres clases.
+
+### Criterio de verificacion
+
+Con el video real del laboratorio, tres regiones sobre los cilindros,
+analizando desde el cuadro 330:
+
+- 62 bloques de 5 s por region (147 cuadros a 29.4524 FPS), **70 s** de
+  computo para 9006 cuadros por tres regiones.
+- Umbral de actividad 0.02459, calculado por Otsu sobre los bloques de las
+  tres regiones juntas.
+- Region 1: 71.0 % de inmovilidad; region 2: 77.4 %; region 3: 77.4 %.
+- Las tres salieron **sospechosas**, y con razon: el laboratorio mide entre
+  23 y 52 %. El detector sin calibrar sobreestima la inmovilidad unos 25
+  puntos. Las dos compuertas lo dijeron en vez de entregar el numero en
+  silencio.
+
+Un solo umbral para todo el video, juntando los bloques de las regiones: el
+umbral describe las condiciones de grabacion, no al especimen. Uno por region
+normalizaria a cada especimen contra si mismo y todos saldrian cerca del 50 %,
+borrando justo la diferencia entre especimenes que el experimento mide.
+
+Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
+
 ## Parametros a calibrar
 
 Los valores por defecto de `fst_labeler/config.py` son **puntos de partida a
 calibrar** con los videos del laboratorio, no resultados experimentales:
 calidad JPEG 85, `seek_forward_max` 60 cuadros, 4 lectores abiertos,
-ancho maximo de transporte 960 px, 8 cuadros pedidos por adelantado y
-salto de 10 cuadros.
+ancho maximo de transporte 960 px, 8 cuadros pedidos por adelantado,
+salto de 10 cuadros, umbral de binarizacion 40, bloque de 5 s, 40 muestras
+de fondo y reestimacion de camara cada 30 cuadros.
 
 ## Dependencias
 

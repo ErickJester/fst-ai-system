@@ -328,3 +328,91 @@ input[type="number"] { width: 6rem; }
 .region-borrar:hover:not(:disabled) { color: var(--error); background: rgba(216, 106, 92, 0.12); }
 
 .region-vacia { color: var(--texto-tenue); font-size: 0.82rem; padding: 0.2rem 0; }
+
+/* ------------------------------------ Módulo 4: detección de movimiento */
+
+.campo.casilla { justify-content: space-between; }
+.campo.casilla input[type="checkbox"] { width: auto; accent-color: var(--acento); }
+
+.estado-deteccion {
+  margin: 0.5rem 0 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radio);
+  background: var(--fondo-hundido);
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+}
+.estado-deteccion.error { color: #f3c4bd; background: rgba(216, 106, 92, 0.14); }
+
+.resultados-deteccion:not(:empty) { margin-top: 0.9rem; }
+
+.resumen-deteccion {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo-hundido);
+  font-size: 0.82rem;
+}
+.resumen-deteccion p { margin: 0 0 0.3rem; color: var(--texto-tenue); }
+.resumen-deteccion p:last-child { margin-bottom: 0; }
+.resumen-deteccion strong { color: var(--texto); }
+
+.region-deteccion {
+  margin-top: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo-hundido);
+}
+.region-deteccion h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.region-deteccion .pct { color: var(--acento-fuerte); font-variant-numeric: tabular-nums; }
+
+.sello {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sello.bueno { background: rgba(95, 191, 127, 0.18); color: #8fd9a8; }
+.sello.malo { background: rgba(216, 164, 74, 0.2); color: #f0d9ae; }
+
+.region-deteccion .detalle {
+  margin: 0 0 0.55rem;
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+}
+
+/* Un recuadro por bloque de 5 s, en orden temporal. */
+.tira-bloques { display: flex; flex-wrap: wrap; gap: 2px; }
+.bloque {
+  width: 14px;
+  height: 22px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.bloque-inmovil { background: #4a9dd8; }
+.bloque-activo { background: #e0a53c; }
+.bloque-sin-datos { background: #3a424e; }
+.bloque:hover { outline: 2px solid var(--texto); outline-offset: 1px; }
+
+.aviso-deteccion {
+  margin: 0.55rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--aviso);
+  border-radius: var(--radio);
+  background: rgba(216, 164, 74, 0.1);
+  color: #f0d9ae;
+  font-size: 0.76rem;
+}

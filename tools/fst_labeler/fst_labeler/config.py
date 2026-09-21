@@ -68,6 +68,29 @@ class Config:
     # Punto de partida a calibrar: 10 cuadros.
     visor_salto_cuadros: int = 10
 
+    # -------------------------------------------- deteccion de movimiento
+    # Duracion del bloque de analisis. 5 s es el estandar de Detke et al.
+    # (1995); Alonso-Fernandez et al. (2015) no hallaron diferencias entre
+    # 3, 5 y 10 s en especimenes Wistar, asi que es un parametro, no una constante.
+    deteccion_segundos_bloque: float = 5.0
+
+    # Niveles de gris que un pixel debe apartarse del fondo para contar como
+    # especimen. Punto de partida a calibrar: 40, medido sobre material real
+    # del laboratorio.
+    deteccion_umbral_binarizacion: int = 40
+
+    # Cuadros de los que se toma la mediana para construir el fondo.
+    # Punto de partida a calibrar: 40.
+    deteccion_muestras_fondo: int = 40
+
+    # Cada cuantos cuadros se reestima el movimiento de la camara.
+    # Punto de partida a calibrar: 30 cuadros (~1 s a 30 Hz).
+    deteccion_cadencia_camara: int = 30
+
+    # Lado mayor del recorte rectificado, en pixeles.
+    # Punto de partida a calibrar: 480.
+    deteccion_lado_maximo: int = 480
+
     debug: bool = False
 
     def __post_init__(self) -> None:
@@ -84,6 +107,16 @@ class Config:
             raise ValueError("visor_prefetch no puede ser negativo")
         if self.visor_salto_cuadros < 1:
             raise ValueError("visor_salto_cuadros debe ser al menos 1")
+        if self.deteccion_segundos_bloque <= 0:
+            raise ValueError("deteccion_segundos_bloque debe ser mayor que cero")
+        if not 1 <= self.deteccion_umbral_binarizacion <= 254:
+            raise ValueError("deteccion_umbral_binarizacion debe estar entre 1 y 254")
+        if self.deteccion_muestras_fondo < 3:
+            raise ValueError("deteccion_muestras_fondo debe ser al menos 3")
+        if self.deteccion_cadencia_camara < 1:
+            raise ValueError("deteccion_cadencia_camara debe ser al menos 1")
+        if self.deteccion_lado_maximo < 16:
+            raise ValueError("deteccion_lado_maximo debe ser de al menos 16 pixeles")
 
     def preferencias_visor(self) -> dict:
         """Valores por defecto que el visor toma del servidor al arrancar."""
@@ -92,6 +125,13 @@ class Config:
             "calidad": self.jpeg_quality,
             "prefetch": self.visor_prefetch,
             "salto_cuadros": self.visor_salto_cuadros,
+            "deteccion": {
+                "segundos_por_bloque": self.deteccion_segundos_bloque,
+                "umbral_binarizacion": self.deteccion_umbral_binarizacion,
+                "muestras_fondo": self.deteccion_muestras_fondo,
+                "cadencia_camara": self.deteccion_cadencia_camara,
+                "lado_maximo": self.deteccion_lado_maximo,
+            },
             "nota": (
                 "Valores por defecto: puntos de partida a calibrar con los "
                 "videos del laboratorio, no resultados experimentales."
