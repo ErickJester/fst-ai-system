@@ -12,9 +12,12 @@
 import { COLOR_CLASE } from "./modelo.js";
 
 export class PanelReglas {
-  constructor(nodos, { alPedirCuadro } = {}) {
+  constructor(nodos, { alPedirCuadro, alTerminar } = {}) {
     this.n = nodos;
     this.alPedirCuadro = alPedirCuadro || (() => {});
+    // El panel del consenso (Modulo 7) necesita saber cuando hay un
+    // reporte nuevo que combinar.
+    this.alTerminar = alTerminar || (() => {});
     this.videoId = null;
     this.ocupado = false;
     this.informe = null;
@@ -94,6 +97,7 @@ export class PanelReglas {
     } finally {
       this.ocupado = false;
       this.dibujar();
+      this.alTerminar();
     }
   }
 
