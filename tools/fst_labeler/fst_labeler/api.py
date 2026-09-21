@@ -7,13 +7,16 @@ Rutas:
   GET /api/videos
   GET /api/videos/<video_id>/metadata[?conteo_exacto=1]
   GET /api/videos/<video_id>/frame/<n>[?calidad=1..100][&max_ancho=px]
+  POST /api/videos/<video_id>/deteccion-movimiento
+  POST /api/videos/<video_id>/estabilidad-camara
 """
 from __future__ import annotations
 
 import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from . import __version__
+from . import __version__, estabilizacion
+from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
     ErrorVideo,
@@ -46,7 +49,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             {
                 "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
                 "version": __version__,
-                "modulo_actual": "3 - regiones de interes y linea de agua",
+                "modulo_actual": "4 - detector de movimiento por umbral",
                 "videos_dir": str(catalogo.raiz),
                 "endpoints": {
                     "visor": "/",
@@ -55,6 +58,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                     "listar_videos": "/api/videos",
                     "metadata": "/api/videos/<video_id>/metadata?conteo_exacto=1",
                     "cuadro": "/api/videos/<video_id>/frame/<n>?calidad=85&max_ancho=960",
+                    "deteccion_movimiento": "POST /api/videos/<video_id>/deteccion-movimiento",
+                    "estabilidad_camara": "POST /api/videos/<video_id>/estabilidad-camara",
                 },
             }
         )
@@ -69,7 +74,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "3 - regiones de interes y linea de agua",
+                "modulo": "4 - detector de movimiento por umbral",
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
@@ -137,6 +142,101 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         respuesta.headers["X-Alto-Original"] = str(alto_original)
         return respuesta
 
+    # ------------------------------------------------- Modulo 4: deteccion
+    #
+    # Las regiones viajan en el cuerpo de la peticion, no se guardan en el
+    # servidor: el navegador sigue siendo su dueno hasta que el Modulo 8
+    # introduzca la base de datos.
+
+    def _regiones_del_cuerpo(cuerpo: dict) -> list:
+        regiones = cuerpo.get("regiones")
+        if not isinstance(regiones, list) or not regiones:
+            raise ValueError("Hace falta al menos una region de interes.")
+        limpias = []
+        for i, region in enumerate(regiones, start=1):
+            esquinas = (region or {}).get("esquinas")
+            if not isinstance(esquinas, list) or len(esquinas) != 4:
+                raise ValueError(f"La region {i} no tiene cuatro esquinas.")
+            try:
+                puntos = [{"x": float(p["x"]), "y": float(p["y"])} for p in esquinas]
+            except (KeyError, TypeError, ValueError):
+                raise ValueError(f"Las esquinas de la region {i} no son coordenadas validas.")
+            limpias.append({"esquinas": puntos, "lineaAgua": region.get("lineaAgua")})
+        return limpias
+
+    def _fps_efectivo(cuerpo: dict, meta) -> float:
+        """El FPS lo manda el navegador solo si el archivo no lo declara bien."""
+        crudo = cuerpo.get("fps")
+        if crudo is not None:
+            valor = float(crudo)
+            if valor <= 0:
+                raise ValueError("Los cuadros por segundo deben ser mayores que cero.")
+            return valor
+        if meta.fps and meta.fps_confiable:
+            return float(meta.fps)
+        raise ValueError(
+            "El archivo no declara cuadros por segundo confiables. Indica el valor "
+            "real en el visor antes de analizar: de el dependen las fronteras de "
+            "los bloques de 5 s."
+        )
+
+    @bp.post("/videos/<path:video_id>/estabilidad-camara")
+    def estabilidad_camara(video_id: str):
+        """Busca a partir de que cuadro la camara deja de reacomodarse."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        total = lector.contar_cuadros_exacto()
+        cadencia = int(cuerpo.get("cadencia", cfg.deteccion_cadencia_camara))
+        if cadencia < 1:
+            raise ValueError("La cadencia debe ser de al menos un cuadro.")
+        informe = estabilizacion.detectar_inicio_estable(
+            str(lector.ruta), regiones, cadencia, total
+        )
+        informe["total_cuadros"] = total
+        return jsonify(informe)
+
+    @bp.post("/videos/<path:video_id>/deteccion-movimiento")
+    def deteccion_movimiento(video_id: str):
+        """Capa 2 mas compuerta de cordura de la Capa 0, por region."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        meta = lector.metadatos
+        fps = _fps_efectivo(cuerpo, meta)
+        total = lector.contar_cuadros_exacto()
+
+        opciones = cuerpo.get("parametros") or {}
+        parametros = Parametros(
+            segundos_por_bloque=float(opciones.get("segundos_por_bloque", cfg.deteccion_segundos_bloque)),
+            umbral_binarizacion=int(opciones.get("umbral_binarizacion", cfg.deteccion_umbral_binarizacion)),
+            umbral_actividad=(
+                None if opciones.get("umbral_actividad") in (None, "", "auto")
+                else float(opciones["umbral_actividad"])
+            ),
+            muestras_fondo=int(opciones.get("muestras_fondo", cfg.deteccion_muestras_fondo)),
+            cadencia_camara=int(opciones.get("cadencia_camara", cfg.deteccion_cadencia_camara)),
+            estabilizar=bool(opciones.get("estabilizar", True)),
+            lado_maximo=int(opciones.get("lado_maximo", cfg.deteccion_lado_maximo)),
+        )
+        if parametros.segundos_por_bloque <= 0:
+            raise ValueError("La duracion del bloque debe ser mayor que cero.")
+        if not 1 <= parametros.umbral_binarizacion <= 254:
+            raise ValueError("El umbral de binarizacion debe estar entre 1 y 254.")
+
+        informe = analizar(
+            ruta=str(lector.ruta),
+            regiones=regiones,
+            fps=fps,
+            total_cuadros=total,
+            cuadro_referencia=int(cuerpo.get("cuadro_referencia", 0)),
+            cuadro_inicio=int(cuerpo.get("cuadro_inicio", 0)),
+            cuadro_fin=(None if cuerpo.get("cuadro_fin") in (None, "") else int(cuerpo["cuadro_fin"])),
+            parametros=parametros,
+        )
+        informe["video"] = video_id
+        return jsonify(informe)
+
     # --------------------------------------------------------------- errores
     @bp.errorhandler(VideoNoEncontrado)
     def _no_encontrado(error):
@@ -149,6 +249,10 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
     @bp.errorhandler(VideoNoAbierto)
     def _no_abierto(error):
         return jsonify({"error": str(error), "tipo": "video_no_abierto"}), 500
+
+    @bp.errorhandler(RuntimeError)
+    def _fallo_analisis(error):
+        return jsonify({"error": str(error), "tipo": "fallo_analisis"}), 500
 
     @bp.errorhandler(ValueError)
     def _parametro_invalido(error):

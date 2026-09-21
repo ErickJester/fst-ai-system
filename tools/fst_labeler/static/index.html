@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Etiquetado FST — visor y regiones de interés</title>
+  <title>Etiquetado FST — visor, regiones y detección</title>
   <link rel="stylesheet" href="/static/css/estilos.css">
 </head>
 <body>
@@ -50,6 +50,8 @@
     <p id="pista-modo" class="pista-modo">
       Selecciona un video para dibujar las regiones de interés.
     </p>
+
+    <div id="resultados-deteccion" class="resultados-deteccion"></div>
 
     <!-- ----------------------------------------------------- controles -->
     <div class="transporte">
@@ -133,6 +135,51 @@
     </section>
 
     <section class="bloque">
+      <h2>Detección de movimiento</h2>
+      <p class="nota">
+        Capa 2 del análisis: segmenta al espécimen por sustracción de fondo
+        dentro de cada región y mide cuánta de esa área cambia entre cuadros.
+        Decide <strong>inmóvil o activo</strong> por bloque; no separa nado de
+        escalamiento, eso llega en los Módulos 5 y 6.
+      </p>
+      <label class="campo" for="segundos-bloque">
+        Segundos por bloque
+        <input id="segundos-bloque" type="number" min="0.5" step="0.5" value="5">
+      </label>
+      <label class="campo" for="umbral-binarizacion">
+        Umbral de binarización
+        <input id="umbral-binarizacion" type="number" min="1" max="254" step="1" value="40">
+      </label>
+      <label class="campo" for="umbral-actividad">
+        Umbral de actividad
+        <input id="umbral-actividad" type="text" placeholder="auto (Otsu)">
+      </label>
+      <label class="campo" for="cuadro-inicio-analisis">
+        Primer cuadro
+        <input id="cuadro-inicio-analisis" type="number" min="0" step="1" value="0">
+      </label>
+      <label class="campo casilla" for="estabilizar">
+        Compensar movimiento de cámara
+        <input id="estabilizar" type="checkbox" checked>
+      </label>
+      <div class="botonera-regiones">
+        <button id="btn-inicio-estable" type="button" class="secundario" disabled>
+          Buscar inicio estable
+        </button>
+        <button id="btn-analizar" type="button" class="principal" disabled>
+          Analizar movimiento
+        </button>
+      </div>
+      <p id="estado-deteccion" class="estado-deteccion">Selecciona un video.</p>
+      <p class="nota">
+        Los valores por omisión son puntos de partida a calibrar. El umbral de
+        actividad en «auto» lo calcula el método de Otsu sobre los bloques del
+        propio video; el artículo de DBscorer indica calibrarlo puntuando a
+        mano 3 o 4 videos.
+      </p>
+    </section>
+
+    <section class="bloque">
       <h2>Cuadros por segundo</h2>
       <p class="nota">
         FPS = cuadros por segundo. La reproducción a velocidad real depende de
@@ -192,8 +239,9 @@
 </main>
 
 <footer class="pie">
-  Módulo 3 de 9 — visor, regiones de interés y línea de agua. El espécimen no
-  se analiza todavía: los detectores llegan a partir del Módulo 4.
+  Módulo 4 de 9 — visor, regiones de interés y detector de movimiento por
+  umbral. El modelo preentrenado y las reglas geométricas llegan en los
+  Módulos 5 y 6.
 </footer>
 
 <script type="module" src="/static/js/app.js"></script>
