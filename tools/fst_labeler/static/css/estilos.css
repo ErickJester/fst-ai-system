@@ -416,3 +416,13 @@ input[type="number"] { width: 6rem; }
   color: #f0d9ae;
   font-size: 0.76rem;
 }
+
+/* --------------------------------------- Módulo 5: modelo preentrenado */
+
+.resumen-deteccion .advertencia {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--borde);
+  color: #f0d9ae;
+}
+.region-deteccion h3 .pct { font-variant-numeric: tabular-nums; font-size: 0.85rem; }
