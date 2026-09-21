@@ -8,7 +8,10 @@
    aquí está por establecerse: entra al consenso del Módulo 7 como un votante
    más, no como juez. */
 
-const COLOR_CLASE = {
+/* Compartido con el panel de reglas geométricas: los colores de las clases
+   tienen que coincidir entre paneles para poder comparar las dos capas de un
+   vistazo. */
+export const COLOR_CLASE = {
   inmovilidad: "#4a9dd8",
   nado: "#5fbf7f",
   escalamiento: "#e0a53c",

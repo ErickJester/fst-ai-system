@@ -42,7 +42,7 @@ Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 | 3 | Dibujo de region de interes (ROI) y linea de agua | **listo** |
 | 4 | Capa 0 + Capa 2: detector de movimiento por umbral | **listo** |
 | 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | **listo** |
-| 6 | Capa 3 simplificada: reglas geometricas sin pose | pendiente |
+| 6 | Capa 3 simplificada: reglas geometricas sin pose | **listo** |
 | 7 | Capa 5: consenso y cola de discrepancias | pendiente |
 | 8 | Interfaz de revision humana | pendiente |
 | 9 | Suavizado temporal y exportacion a CSV | pendiente |
@@ -455,6 +455,135 @@ escalamiento 31-37 %), el modelo **sobreestima el nado y subestima el
 escalamiento**. Y discrepa fuerte con el detector del Modulo 4, que sobre el
 mismo video daba 71-77 % de inmovilidad. Esa discrepancia es precisamente lo
 que el Modulo 7 tiene que arbitrar.
+
+## Modulo 6 — reglas geometricas sin pose (Capa 3)
+
+Las tres definiciones operativas del laboratorio son geometricas, asi que se
+pueden escribir como reglas sobre coordenadas. Esta capa las escribe.
+
+| Archivo | Contenido |
+|---|---|
+| `fst_labeler/reglas_geometricas.py` | Medicion, las tres reglas y el voto por bloque. |
+| `static/js/reglas.js` | Panel de la interfaz. |
+
+Ruta: `POST /api/videos/<video_id>/reglas-geometricas`.
+
+### Puntos clave sin modelo de pose
+
+El plan original de esta capa pedia nariz, base de la cola y las dos patas
+anteriores con DeepLabCut o SLEAP. Entrenar eso es un proyecto en si mismo y
+queda fuera de la herramienta. Aqui los puntos clave salen de la **misma
+mascara del especimen que segmenta el Modulo 4**:
+
+| Punto clave | De donde sale |
+|---|---|
+| Centroide | Centro de masa de la mascara. |
+| Caja del cuerpo | Extremos de la mascara; su relacion alto/ancho es la verticalidad. |
+| Cuerpo anterior | Franja superior de la mascara (un tercio, configurable). Cuando el especimen trepa, las patas anteriores son lo mas alto y lo mas pegado a la pared que hay en la mascara. |
+| Masa sobre el agua | Fraccion de la mascara por encima de la linea de agua del Modulo 3. |
+
+Es un sustituto, no un equivalente: la mascara no distingue una pata de la
+cabeza, y un especimen que asoma el hocico para respirar produce masa sobre el
+agua igual que uno que trepa. Por eso la regla de escalamiento exige las tres
+senales a la vez.
+
+### Las tres reglas
+
+```
+escalamiento  proximidad_pared < umbral  Y  verticalidad > umbral
+              Y  sobre_agua > umbral   (si la region tiene linea de agua)
+inmovilidad   desplazamiento < umbral
+nado          el resto
+```
+
+**El escalamiento se comprueba antes que la inmovilidad**, y no es un detalle
+de implementacion. Un especimen trepando apenas mueve su centro de masa --sube
+y baja pegado al cilindro-- asi que la regla de inmovilidad lo atrapa antes de
+que la de escalamiento llegue a verlo. La definicion operativa lo prohibe:
+inmovilidad es «no hacer mayores intentos por escapar», y trepar es
+precisamente un intento de escapar. Sobre el video sintetico de prueba la fase
+de escalamiento tiene el desplazamiento **mas bajo** de las tres, y con el
+orden inverso el 100 % del video salia inmovil.
+
+Sin linea de agua dibujada la tercera senal no se puede evaluar y la regla
+decide con las otras dos. El reporte lo avisa: es una regla mas debil.
+
+### Unidades: ningun umbral en pixeles
+
+Las dimensiones del recipiente cambian entre montajes, asi que nada se mide en
+pixeles crudos. Todo va sobre el recorte enderezado y normalizado:
+
+| Medida | Unidad |
+|---|---|
+| `desplazamiento` | Fracciones del **alto** de la region **por segundo**. Por segundo y no por cuadro, para que no dependa del FPS del archivo. |
+| `proximidad_pared` | Fraccion del **ancho** de la region. Menor es mas pegado. |
+| `verticalidad` | Alto/ancho de la caja del cuerpo. Adimensional. |
+| `sobre_agua` | Fraccion del area del cuerpo. Adimensional. |
+
+### Ningun umbral trae valor de fabrica
+
+Los cuatro se calculan por Otsu sobre la distribucion del propio video, igual
+que el umbral de actividad del Modulo 4, y el reporte declara **cuanto separa
+cada corte**: Otsu devuelve uno aunque la distribucion tenga una sola joroba.
+Se pueden fijar a mano uno por uno desde el panel.
+
+La cola se recorta al percentil 99 antes del corte. Las medidas por cuadro
+tienen cola larga --un salto de segmentacion mueve el centroide de golpe-- y
+Otsu reparte sus niveles entre el minimo y el maximo, asi que un solo valor
+extremo arrastra el corte hacia arriba. Medido sobre el video sintetico: sin
+recorte el corte de desplazamiento salia en 0.83 con la mediana de la fase de
+nado en 0.35, y todo el video caia del lado inmovil.
+
+Los cuatro umbrales se calculan sobre **todos** los cuadros medidos. Una
+version previa calculaba los tres del escalamiento solo sobre los cuadros
+activos, suponiendo que trepar es una forma de actividad; es falso por la
+misma razon que obliga a comprobar el escalamiento primero, y el corte de
+verticalidad se calculaba sin ver ni un solo cuadro de trepada.
+
+### Voto por bloque
+
+Cada cuadro recibe una clase y el bloque se queda con la predominante, como
+manda Detke et al. (1995). El **margen del voto** viaja en el reporte: es lo
+que el Modulo 7 puede comparar contra la confianza del modelo del Modulo 5. Un
+empate se resuelve por el orden de las reglas y se marca; un bloque empatado
+deberia entrar a la cola de revision aunque las demas capas coincidan con el.
+
+### Limite de la independencia entre capas
+
+Esta capa mide sobre la misma mascara que el Modulo 4, a proposito. Lo que las
+hace fuentes distintas es la **regla de decision**, no la segmentacion: la
+Capa 2 mira cuanta area cambia entre cuadros y decide inmovil o activo; esta
+mira donde esta esa area y que forma tiene, y decide entre las tres conductas.
+Segmentar dos veces por separado haria que discreparan por el recorte y no por
+la conducta, y el consenso del Modulo 7 no podria distinguir una cosa de la
+otra. Es un limite real de la independencia entre capas y hay que tenerlo
+presente al leer el consenso.
+
+### Criterio de verificacion
+
+Con `videos/prueba_sintetica.mp4` (20 s a 30 FPS), cuyo archivo de verdad
+declara cuatro fases que caen exactamente en cuatro bloques de 5 s: nado,
+nado, inmovilidad, escalamiento.
+
+Con los cuatro umbrales en automatico, **3 de 4 bloques correctos**:
+
+| Bloque | Esperado | Predicho | Margen | Desplazamiento | Verticalidad |
+|---|---|---|---|---|---|
+| 1 | nado | inmovilidad | 0.51 | 0.323 | 0.52 |
+| 2 | nado | nado | 0.52 | 0.387 | 0.52 |
+| 3 | inmovilidad | inmovilidad | 0.92 | 0.174 | 0.52 |
+| 4 | escalamiento | escalamiento | **1.00** | 0.110 | **1.62** |
+
+El bloque que falla lo hace con 76 votos contra 73: el corte automatico de
+desplazamiento cae en 0.3275 y la mediana del bloque en 0.3231. El reporte ya
+lo habia avisado --la razon de varianzas del desplazamiento es 0.73, por
+debajo del 0.75 que se exige-- y el margen de 0.51 lo declara como bloque
+repartido. **Fijando el umbral de desplazamiento a mano en 0.25 salen los
+cuatro bloques correctos**, que es justo lo que el aviso recomienda hacer.
+
+El video sintetico sirve para verificar que la cadena funciona de extremo a
+extremo; **no sustituye material real de laboratorio** y ajustar las reglas
+para acertar cuatro de cuatro sobre el seria sobreajustar a un artefacto.
 
 ## Parametros a calibrar
 
