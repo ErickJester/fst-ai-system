@@ -199,13 +199,25 @@ class ResultadoRegion:
 
 
 # --------------------------------------------------------------------- utiles
+#
+# Publicas a proposito: el Modulo 6 (reglas geometricas) mide sobre la MISMA
+# mascara del especimen que esta capa, en lugar de segmentar por su cuenta.
+# Dos segmentaciones distintas harian que las capas discreparan por el
+# recorte y no por la conducta, y el consenso del Modulo 7 no podria
+# distinguir una cosa de la otra.
 
 def _lado(a: dict, b: dict) -> float:
     return float(np.hypot(a["x"] - b["x"], a["y"] - b["y"]))
 
 
-def _tamano_rectificado(esquinas: list[dict], lado_maximo: int) -> tuple[int, int]:
-    """Tamano del recorte enderezado, a partir de los lados del cuadrilatero."""
+def tamano_rectificado(esquinas: list[dict], lado_maximo: int) -> tuple[int, int]:
+    """Tamano del recorte enderezado, a partir de los lados del cuadrilatero.
+
+    El ancho y el alto salen de los lados reales del cuadrilatero y se escalan
+    por igual, asi que el recorte conserva la relacion de aspecto de la camara
+    de natacion. De eso depende que el Modulo 6 pueda leer la verticalidad del
+    especimen directamente en pixeles del recorte.
+    """
     ancho = (_lado(esquinas[0], esquinas[1]) + _lado(esquinas[3], esquinas[2])) / 2
     alto = (_lado(esquinas[1], esquinas[2]) + _lado(esquinas[0], esquinas[3])) / 2
     ancho, alto = max(8.0, ancho), max(8.0, alto)
@@ -213,20 +225,30 @@ def _tamano_rectificado(esquinas: list[dict], lado_maximo: int) -> tuple[int, in
     return max(8, int(round(ancho * escala))), max(8, int(round(alto * escala)))
 
 
-def _rectificar(gris: np.ndarray, esquinas: list[dict], tamano: tuple[int, int]) -> np.ndarray:
+def matriz_rectificacion(esquinas: list[dict], tamano: tuple[int, int]) -> np.ndarray:
+    """Homografia que lleva el cuadrilatero al recorte enderezado.
+
+    Se expone aparte de `rectificar` porque el Modulo 6 necesita llevar al
+    mismo espacio puntos que no son imagen --los dos extremos de la linea de
+    agua-- con `cv2.perspectiveTransform`.
+    """
+    ancho, alto = tamano
+    origen = np.float32([[p["x"], p["y"]] for p in esquinas])
+    destino = np.float32([[0, 0], [ancho - 1, 0], [ancho - 1, alto - 1], [0, alto - 1]])
+    return cv2.getPerspectiveTransform(origen, destino)
+
+
+def rectificar(gris: np.ndarray, esquinas: list[dict], tamano: tuple[int, int]) -> np.ndarray:
     """Endereza el cuadrilatero a un rectangulo con transformacion de perspectiva.
 
     Es la misma rectificacion que exige el preprocesamiento del modelo
     preentrenado del Modulo 5, por eso la region se dibuja con cuatro esquinas
     y no como rectangulo alineado a los ejes.
     """
-    ancho, alto = tamano
-    origen = np.float32([[p["x"], p["y"]] for p in esquinas])
-    destino = np.float32([[0, 0], [ancho - 1, 0], [ancho - 1, alto - 1], [0, alto - 1]])
-    return cv2.warpPerspective(gris, cv2.getPerspectiveTransform(origen, destino), (ancho, alto))
+    return cv2.warpPerspective(gris, matriz_rectificacion(esquinas, tamano), tamano)
 
 
-def _mascara_especimen(recorte: np.ndarray, fondo: np.ndarray, p: Parametros) -> np.ndarray:
+def mascara_especimen(recorte: np.ndarray, fondo: np.ndarray, p: "Parametros") -> np.ndarray:
     """Segmenta al especimen: lo que se aparta del fondo, sin la mota."""
     binaria = (cv2.absdiff(recorte, fondo) > p.umbral_binarizacion).astype(np.uint8)
     if p.apertura > 0:
@@ -241,7 +263,7 @@ def _mascara_especimen(recorte: np.ndarray, fondo: np.ndarray, p: Parametros) ->
     return (etiquetas == mayor).astype(np.uint8)
 
 
-def _umbral_otsu(valores: np.ndarray) -> float:
+def umbral_otsu(valores: np.ndarray) -> float:
     """Corte de Otsu sobre las puntuaciones de bloque, sin constantes."""
     if valores.size < 2 or float(valores.max()) <= float(valores.min()):
         return float(valores.max()) if valores.size else 0.0
@@ -249,6 +271,29 @@ def _umbral_otsu(valores: np.ndarray) -> float:
     enteros = np.clip(valores * escala, 0, 255).astype(np.uint8)
     corte, _ = cv2.threshold(enteros, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return float(corte) / escala
+
+
+def razon_de_varianzas(valores: np.ndarray, umbral: float) -> float | None:
+    """Cuanto separa un corte: varianza entre grupos sobre varianza total.
+
+    Otsu siempre devuelve un corte, incluso sobre una distribucion de una sola
+    joroba, y en ese caso el corte no significa nada. Esta razon es el delator:
+    una distribucion normal cortada en su media da exactamente 2/pi, y una con
+    dos modos separados da bastante mas.
+
+    Devuelve None si el corte dejo todos los valores de un mismo lado.
+    """
+    bajos, altos = valores[valores <= umbral], valores[valores > umbral]
+    if bajos.size == 0 or altos.size == 0:
+        return None
+    media, total = valores.mean(), float(valores.var())
+    if total <= 0:
+        return None
+    entre = (
+        bajos.size * (bajos.mean() - media) ** 2
+        + altos.size * (altos.mean() - media) ** 2
+    ) / valores.size
+    return float(entre / total)
 
 
 # ------------------------------------------------------------------ analisis
@@ -303,10 +348,10 @@ def analizar(
                     "movimiento de la cámara; el análisis corre sin compensarlo."
                 )
 
-        tamanos = [_tamano_rectificado(r["esquinas"], p.lado_maximo) for r in regiones]
+        tamanos = [tamano_rectificado(r["esquinas"], p.lado_maximo) for r in regiones]
 
-        fondos = _construir_fondos(
-            cap, regiones, tamanos, seguidor, p, cuadro_inicio, fin
+        fondos = construir_fondos(
+            cap, regiones, tamanos, seguidor, p.muestras_fondo, cuadro_inicio, fin
         )
         resultados = _recorrer(
             cap, regiones, tamanos, fondos, seguidor, p, fps, cuadro_inicio, fin
@@ -339,9 +384,14 @@ def analizar(
     }
 
 
-def _construir_fondos(cap, regiones, tamanos, seguidor, p: Parametros, inicio, fin):
-    """Mediana temporal del recorte de cada region, en el espacio rectificado."""
-    indices = np.linspace(inicio, max(inicio, fin - 1), p.muestras_fondo).astype(int)
+def construir_fondos(cap, regiones, tamanos, seguidor, muestras: int, inicio, fin):
+    """Mediana temporal del recorte de cada region, en el espacio rectificado.
+
+    El cilindro, la mesa y el nivel medio del agua estan en casi todos los
+    cuadros y sobreviven a la mediana; el especimen esta en un sitio distinto
+    en cada cuadro y desaparece de ella.
+    """
+    indices = np.linspace(inicio, max(inicio, fin - 1), muestras).astype(int)
     pilas = [[] for _ in regiones]
     for n in indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(n))
@@ -354,7 +404,7 @@ def _construir_fondos(cap, regiones, tamanos, seguidor, p: Parametros, inicio, f
             matriz, _ = seguidor.matriz(gris)
         for i, region in enumerate(regiones):
             esquinas = estabilizacion.aplicar(matriz, region["esquinas"])
-            pilas[i].append(_rectificar(gris, esquinas, tamanos[i]))
+            pilas[i].append(rectificar(gris, esquinas, tamanos[i]))
     fondos = []
     for i, pila in enumerate(pilas):
         if not pila:
@@ -405,8 +455,8 @@ def _recorrer(cap, regiones, tamanos, fondos, seguidor, p: Parametros, fps, inic
 
         for i, region in enumerate(regiones):
             esquinas = estabilizacion.aplicar(matriz, region["esquinas"])
-            recorte = _rectificar(gris, esquinas, tamanos[i])
-            mascara = _mascara_especimen(recorte, fondos[i], p)
+            recorte = rectificar(gris, esquinas, tamanos[i])
+            mascara = mascara_especimen(recorte, fondos[i], p)
             areas[i][b].append(float(mascara.mean()))
             if previas[i] is not None:
                 cambio = float(np.logical_xor(mascara, previas[i]).mean())
@@ -441,7 +491,7 @@ def _recorrer(cap, regiones, tamanos, fondos, seguidor, p: Parametros, fps, inic
         umbral = float(p.umbral_actividad)
         origen = "fijado a mano"
     else:
-        umbral = _umbral_otsu(juntos)
+        umbral = umbral_otsu(juntos)
         origen = (
             "calculado por el método de Otsu sobre los bloques de todas las regiones "
             "de este video; supone que la distribución es bimodal y debe calibrarse "
@@ -477,15 +527,10 @@ def _aviso_de_separacion(resultados, valores: np.ndarray, umbral: float) -> None
     valores muy por encima. Se avisa por debajo de REFERENCIA_UNIMODAL mas un
     margen, porque cerca de ese valor el corte no es evidencia de dos grupos.
     """
-    bajos, altos = valores[valores <= umbral], valores[valores > umbral]
-    if bajos.size == 0 or altos.size == 0:
+    razon = razon_de_varianzas(valores, umbral)
+    if razon is None:
         mensaje = "El umbral dejó todos los bloques de un solo lado."
     else:
-        n = valores.size
-        entre = (bajos.size * (bajos.mean() - valores.mean()) ** 2
-                 + altos.size * (altos.mean() - valores.mean()) ** 2) / n
-        total = float(valores.var())
-        razon = entre / total if total > 0 else 0.0
         if razon >= UMBRAL_SEPARACION:
             return
         mensaje = (

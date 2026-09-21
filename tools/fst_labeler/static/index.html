@@ -53,6 +53,7 @@
 
     <div id="resultados-deteccion" class="resultados-deteccion"></div>
     <div id="resultados-modelo" class="resultados-deteccion"></div>
+    <div id="resultados-reglas" class="resultados-deteccion"></div>
 
     <!-- ----------------------------------------------------- controles -->
     <div class="transporte">
@@ -217,6 +218,53 @@
     </section>
 
     <section class="bloque">
+      <h2>Reglas geométricas</h2>
+      <p class="nota">
+        Capa 3: traduce las tres definiciones operativas a reglas sobre la
+        forma y la posición del cuerpo, sin modelo de pose. Mide sobre la misma
+        máscara que la detección de movimiento; lo que cambia es la decisión.
+        Usa la línea de agua de cada región, así que conviene dibujarla (W).
+      </p>
+      <label class="campo" for="reglas-segundos-bloque">
+        Segundos por bloque
+        <input id="reglas-segundos-bloque" type="number" min="0.5" step="0.5" value="5">
+      </label>
+      <label class="campo" for="umbral-desplazamiento">
+        Umbral de desplazamiento
+        <input id="umbral-desplazamiento" type="text" placeholder="auto (Otsu)">
+      </label>
+      <label class="campo" for="umbral-pared">
+        Umbral de proximidad a la pared
+        <input id="umbral-pared" type="text" placeholder="auto (Otsu)">
+      </label>
+      <label class="campo" for="umbral-verticalidad">
+        Umbral de verticalidad
+        <input id="umbral-verticalidad" type="text" placeholder="auto (Otsu)">
+      </label>
+      <label class="campo" for="umbral-sobre-agua">
+        Umbral de masa sobre el agua
+        <input id="umbral-sobre-agua" type="text" placeholder="auto (Otsu)">
+      </label>
+      <label class="campo casilla" for="estabilizar-reglas">
+        Compensar movimiento de cámara
+        <input id="estabilizar-reglas" type="checkbox" checked>
+      </label>
+      <div class="botonera-regiones">
+        <button id="btn-reglas" type="button" class="principal" disabled>
+          Aplicar reglas
+        </button>
+      </div>
+      <p id="estado-reglas" class="estado-deteccion">Selecciona un video.</p>
+      <p class="nota">
+        Ningún umbral trae valor de fábrica: en «auto» los calcula el método de
+        Otsu sobre la distribución del propio video. Otsu devuelve un corte
+        aunque no haya dos grupos que separar, así que el reporte dice cuánto
+        separa cada uno. El primer cuadro del análisis se toma del campo
+        «Primer cuadro» de la detección de movimiento.
+      </p>
+    </section>
+
+    <section class="bloque">
       <h2>Cuadros por segundo</h2>
       <p class="nota">
         FPS = cuadros por segundo. La reproducción a velocidad real depende de
@@ -276,8 +324,9 @@
 </main>
 
 <footer class="pie">
-  Módulo 5 de 9 — visor, regiones de interés, detector por umbral y modelo
-  preentrenado. Las reglas geométricas llegan en el Módulo 6.
+  Módulo 6 de 9 — visor, regiones de interés, detector por umbral, modelo
+  preentrenado y reglas geométricas. El consenso entre las tres capas llega en
+  el Módulo 7.
 </footer>
 
 <script type="module" src="/static/js/app.js"></script>
