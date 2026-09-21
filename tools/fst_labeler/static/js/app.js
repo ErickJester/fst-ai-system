@@ -8,6 +8,7 @@
 import { ClienteFST } from "./api.js";
 import { Visor } from "./visor.js";
 import { EditorRegiones, MODO, MAX_REGIONES, COLORES } from "./dibujo.js";
+import { PanelDeteccion } from "./deteccion.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -52,12 +53,29 @@ const nodos = {
   btnLineaAgua: el("btn-linea-agua"),
   btnDeshacer: el("btn-deshacer"),
   listaRegiones: el("lista-regiones"),
+
+  segundosBloque: el("segundos-bloque"),
+  umbralBinarizacion: el("umbral-binarizacion"),
+  umbralActividad: el("umbral-actividad"),
+  cuadroInicio: el("cuadro-inicio-analisis"),
+  estabilizar: el("estabilizar"),
+  btnEstable: el("btn-inicio-estable"),
+  btnAnalizar: el("btn-analizar"),
+  estado: el("estado-deteccion"),
+  resultados: el("resultados-deteccion"),
 };
 
 const cliente = new ClienteFST();
 const visor = new Visor(cliente, nodos.cuadro, { alCambiar: dibujar });
 const editor = new EditorRegiones(nodos.capaDibujo, nodos.cuadro, {
   alCambiar: dibujarRegiones,
+});
+const deteccion = new PanelDeteccion(nodos, {
+  // Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
+  alPedirCuadro: (cuadro) => {
+    visor.pausar();
+    visor.irA(cuadro);
+  },
 });
 
 // Mensaje propio de la interfaz (errores al listar videos, por ejemplo),
@@ -90,6 +108,7 @@ async function arrancar() {
   await cargarListaDeVideos();
   dibujar(visor);
   dibujarRegiones(editor);
+  sincronizarDeteccion();
 }
 
 async function cargarListaDeVideos() {
@@ -353,6 +372,16 @@ function dibujar(v) {
   // Las regiones pertenecen al video, no al cuadro: al cambiar de cuadro el
   // editor solo se vuelve a pintar; al cambiar de video, se cambian.
   editor.sincronizar(v.videoId, v.meta);
+  sincronizarDeteccion();
+}
+
+function sincronizarDeteccion() {
+  deteccion.sincronizar({
+    videoId: visor.videoId,
+    fps: visor.fps,
+    cuadroActual: visor.cuadroActual === null ? 0 : visor.cuadroActual,
+    regiones: editor.regiones,
+  });
 }
 
 function textoDeTiempo(v) {
@@ -413,6 +442,9 @@ function agregarFila(tabla, clave, valor, sospechoso = false) {
 /* ----------------------------------------------------- panel de regiones */
 
 function dibujarRegiones(ed) {
+  // El detector del Modulo 4 trabaja sobre estas regiones: cualquier cambio
+  // en ellas cambia lo que se analizaria.
+  sincronizarDeteccion();
   const listo = ed.listo;
   nodos.btnNuevaRoi.disabled = !listo || ed.regiones.length >= MAX_REGIONES;
   nodos.btnLineaAgua.disabled = !listo || !ed.seleccionada;
