@@ -7,4 +7,4 @@ inmovilidad, escalamiento) para entrenar el clasificador de produccion del
 sistema; no es el sistema entregable.
 """
 
-__version__ = "0.5.0"  # Modulo 5: modelo 3D preentrenado
+__version__ = "0.6.0"  # Modulo 6: reglas geometricas sin pose

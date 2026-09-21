@@ -10,6 +10,7 @@ import { Visor } from "./visor.js";
 import { EditorRegiones, MODO, MAX_REGIONES, COLORES } from "./dibujo.js";
 import { PanelDeteccion } from "./deteccion.js";
 import { PanelModelo } from "./modelo.js";
+import { PanelReglas } from "./reglas.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -72,6 +73,16 @@ const nodos = {
   btnModelo: el("btn-modelo"),
   estadoModelo: el("estado-modelo"),
   resultadosModelo: el("resultados-modelo"),
+
+  reglasSegundosBloque: el("reglas-segundos-bloque"),
+  umbralDesplazamiento: el("umbral-desplazamiento"),
+  umbralPared: el("umbral-pared"),
+  umbralVerticalidad: el("umbral-verticalidad"),
+  umbralSobreAgua: el("umbral-sobre-agua"),
+  estabilizarReglas: el("estabilizar-reglas"),
+  btnReglas: el("btn-reglas"),
+  estadoReglas: el("estado-reglas"),
+  resultadosReglas: el("resultados-reglas"),
 };
 
 const cliente = new ClienteFST();
@@ -84,6 +95,7 @@ const irAlCuadro = (cuadro) => {
   visor.irA(cuadro);
 };
 const modelo = new PanelModelo(nodos, { alPedirCuadro: irAlCuadro });
+const reglas = new PanelReglas(nodos, { alPedirCuadro: irAlCuadro });
 const deteccion = new PanelDeteccion(nodos, {
   // Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
   alPedirCuadro: (cuadro) => {
@@ -397,6 +409,7 @@ function sincronizarDeteccion() {
     regiones: editor.regiones,
   };
   modelo.sincronizar(estado);
+  reglas.sincronizar(estado);
   deteccion.sincronizar({
     videoId: visor.videoId,
     fps: visor.fps,

@@ -10,6 +10,7 @@ Rutas:
   POST /api/videos/<video_id>/deteccion-movimiento
   POST /api/videos/<video_id>/estabilidad-camara
   POST /api/videos/<video_id>/modelo-3d
+  POST /api/videos/<video_id>/reglas-geometricas
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from . import __version__, estabilizacion
-from . import modelo_3d
+from . import modelo_3d, reglas_geometricas
 from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
@@ -29,6 +30,13 @@ from .video_source import (
 
 def _verdadero(valor: str | None) -> bool:
     return str(valor).lower() in ("1", "true", "si", "sí", "yes")
+
+
+def _umbral_opcional(valor) -> float | None:
+    """None cuando el umbral se deja en automatico; si no, el numero."""
+    if valor in (None, "", "auto"):
+        return None
+    return float(valor)
 
 
 def _entero(nombre: str, predeterminado: int | None = None) -> int | None:
@@ -51,7 +59,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             {
                 "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
                 "version": __version__,
-                "modulo_actual": "5 - modelo 3D preentrenado",
+                "modulo_actual": "6 - reglas geometricas",
                 "videos_dir": str(catalogo.raiz),
                 "endpoints": {
                     "visor": "/",
@@ -63,6 +71,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                     "deteccion_movimiento": "POST /api/videos/<video_id>/deteccion-movimiento",
                     "estabilidad_camara": "POST /api/videos/<video_id>/estabilidad-camara",
                     "modelo_3d": "POST /api/videos/<video_id>/modelo-3d",
+                    "reglas_geometricas": "POST /api/videos/<video_id>/reglas-geometricas",
                 },
             }
         )
@@ -77,7 +86,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "5 - modelo 3D preentrenado",
+                "modulo": "6 - reglas geometricas",
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
@@ -164,7 +173,18 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                 puntos = [{"x": float(p["x"]), "y": float(p["y"])} for p in esquinas]
             except (KeyError, TypeError, ValueError):
                 raise ValueError(f"Las esquinas de la region {i} no son coordenadas validas.")
-            limpias.append({"esquinas": puntos, "lineaAgua": region.get("lineaAgua")})
+            # La linea de agua es opcional: solo el Modulo 6 la usa, y su regla
+            # de escalamiento corre con dos senales de tres cuando falta.
+            agua = (region or {}).get("lineaAgua")
+            linea = None
+            if isinstance(agua, list) and len(agua) == 2:
+                try:
+                    linea = [{"x": float(p["x"]), "y": float(p["y"])} for p in agua]
+                except (KeyError, TypeError, ValueError):
+                    raise ValueError(
+                        f"La linea de agua de la region {i} no son coordenadas validas."
+                    )
+            limpias.append({"esquinas": puntos, "lineaAgua": linea})
         return limpias
 
     def _fps_efectivo(cuerpo: dict, meta) -> float:
@@ -296,6 +316,65 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
     @bp.errorhandler(modelo_3d.ModeloNoDisponible)
     def _sin_modelo(error):
         return jsonify({"error": str(error), "tipo": "modelo_no_disponible"}), 503
+
+    # ------------------------------------- Modulo 6: reglas geometricas
+
+    @bp.post("/videos/<path:video_id>/reglas-geometricas")
+    def reglas_geometricas_analisis(video_id: str):
+        """Capa 3 simplificada: las tres conductas por reglas sobre la mascara."""
+        cuerpo = request.get_json(silent=True) or {}
+        regiones = _regiones_del_cuerpo(cuerpo)
+        lector = catalogo.lector(video_id)
+        fps = _fps_efectivo(cuerpo, lector.metadatos)
+        total = lector.contar_cuadros_exacto()
+
+        opciones = cuerpo.get("parametros") or {}
+        crudos = opciones.get("umbrales") or {}
+        parametros = reglas_geometricas.Parametros(
+            umbrales=reglas_geometricas.Umbrales(
+                desplazamiento=_umbral_opcional(crudos.get("desplazamiento")),
+                proximidad_pared=_umbral_opcional(crudos.get("proximidad_pared")),
+                verticalidad=_umbral_opcional(crudos.get("verticalidad")),
+                sobre_agua=_umbral_opcional(crudos.get("sobre_agua")),
+            ),
+            segundos_por_bloque=float(
+                opciones.get("segundos_por_bloque", cfg.deteccion_segundos_bloque)
+            ),
+            umbral_binarizacion=int(
+                opciones.get("umbral_binarizacion", cfg.deteccion_umbral_binarizacion)
+            ),
+            muestras_fondo=int(opciones.get("muestras_fondo", cfg.deteccion_muestras_fondo)),
+            area_minima=float(opciones.get("area_minima", cfg.reglas_area_minima)),
+            fraccion_superior=float(
+                opciones.get("fraccion_superior", cfg.reglas_fraccion_superior)
+            ),
+            estabilizar=bool(opciones.get("estabilizar", True)),
+            cadencia_camara=int(opciones.get("cadencia_camara", cfg.deteccion_cadencia_camara)),
+            lado_maximo=int(opciones.get("lado_maximo", cfg.deteccion_lado_maximo)),
+        )
+        if parametros.segundos_por_bloque <= 0:
+            raise ValueError("La duracion del bloque debe ser mayor que cero.")
+        if not 1 <= parametros.umbral_binarizacion <= 254:
+            raise ValueError("El umbral de binarizacion debe estar entre 1 y 254.")
+        if not 0 < parametros.fraccion_superior <= 1:
+            raise ValueError("La fraccion superior debe estar entre 0 y 1.")
+        if not 0 <= parametros.area_minima < 1:
+            raise ValueError("El area minima debe estar entre 0 y 1.")
+
+        informe = reglas_geometricas.analizar(
+            ruta=str(lector.ruta),
+            regiones=regiones,
+            fps=fps,
+            total_cuadros=total,
+            cuadro_referencia=int(cuerpo.get("cuadro_referencia", 0)),
+            cuadro_inicio=int(cuerpo.get("cuadro_inicio", 0)),
+            cuadro_fin=(
+                None if cuerpo.get("cuadro_fin") in (None, "") else int(cuerpo["cuadro_fin"])
+            ),
+            parametros=parametros,
+        )
+        informe["video"] = video_id
+        return jsonify(informe)
 
     # --------------------------------------------------------------- errores
     @bp.errorhandler(VideoNoEncontrado)

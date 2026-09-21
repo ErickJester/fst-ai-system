@@ -91,6 +91,22 @@ class Config:
     # Punto de partida a calibrar: 480.
     deteccion_lado_maximo: int = 480
 
+    # ------------------------------------------------ reglas geometricas
+    # Area minima de la mascara para dar un cuadro por medible, en fraccion
+    # del area de la region. Es el mismo 0.5 % con el que el detector de
+    # movimiento avisa de bloques sin especimen.
+    reglas_area_minima: float = 0.005
+
+    # Franja superior de la mascara que hace de cuerpo anterior, en fraccion
+    # de la altura del cuerpo. Punto de partida a calibrar: un tercio.
+    reglas_fraccion_superior: float = 1.0 / 3.0
+
+    # Los cuatro umbrales de las reglas no viven aqui: en automatico se
+    # calculan por Otsu sobre la distribucion del propio video, porque un
+    # valor en estas unidades depende del montaje y no es transferible entre
+    # grabaciones. Se fijan a mano desde el panel cuando haya videos
+    # puntuados con los que calibrarlos.
+
     debug: bool = False
 
     def __post_init__(self) -> None:
@@ -117,6 +133,10 @@ class Config:
             raise ValueError("deteccion_cadencia_camara debe ser al menos 1")
         if self.deteccion_lado_maximo < 16:
             raise ValueError("deteccion_lado_maximo debe ser de al menos 16 pixeles")
+        if not 0 <= self.reglas_area_minima < 1:
+            raise ValueError("reglas_area_minima debe estar entre 0 y 1")
+        if not 0 < self.reglas_fraccion_superior <= 1:
+            raise ValueError("reglas_fraccion_superior debe estar entre 0 y 1")
 
     def preferencias_visor(self) -> dict:
         """Valores por defecto que el visor toma del servidor al arrancar."""
@@ -131,6 +151,10 @@ class Config:
                 "muestras_fondo": self.deteccion_muestras_fondo,
                 "cadencia_camara": self.deteccion_cadencia_camara,
                 "lado_maximo": self.deteccion_lado_maximo,
+            },
+            "reglas": {
+                "area_minima": self.reglas_area_minima,
+                "fraccion_superior": self.reglas_fraccion_superior,
             },
             "nota": (
                 "Valores por defecto: puntos de partida a calibrar con los "
