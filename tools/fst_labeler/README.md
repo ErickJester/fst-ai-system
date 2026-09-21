@@ -41,7 +41,7 @@ Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 | 2 | Visor cuadro a cuadro en el navegador | **listo** |
 | 3 | Dibujo de region de interes (ROI) y linea de agua | **listo** |
 | 4 | Capa 0 + Capa 2: detector de movimiento por umbral | **listo** |
-| 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | pendiente |
+| 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | **listo** |
 | 6 | Capa 3 simplificada: reglas geometricas sin pose | pendiente |
 | 7 | Capa 5: consenso y cola de discrepancias | pendiente |
 | 8 | Interfaz de revision humana | pendiente |
@@ -344,6 +344,117 @@ normalizaria a cada especimen contra si mismo y todos saldrian cerca del 50 %,
 borrando justo la diferencia entre especimenes que el experimento mide.
 
 Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
+
+## Modulo 5 — modelo 3D preentrenado (Capa 1)
+
+Red residual convolucional 3D de Della Valle et al. (2025). Predice **las tres
+conductas** por clip de 3 s, con confianza. Es la primera capa que separa nado
+de escalamiento.
+
+| Archivo | Contenido |
+|---|---|
+| `fst_labeler/modelo_3d.py` | Preprocesamiento, carga de pesos e inferencia. |
+| `static/js/modelo.js` | Panel de la interfaz. |
+
+Rutas: `POST /api/videos/<video_id>/modelo-3d` y `GET /api/modelo-3d/estado`,
+que dice si hay pesos y TensorFlow sin cargar nada.
+
+### De donde bajar los pesos, y por que importa
+
+De **Zenodo**, DOI 10.5281/zenodo.14638257, que declara **CC-BY-4.0**. El
+repositorio de GitHub tiene los mismos archivos pero **sin licencia declarada**,
+lo que por omision significa todos los derechos reservados. Citar a los autores,
+como exige CC-BY.
+
+El deposito completo pesa 8.2 GB, casi todo dataset de entrenamiento. Solo hace
+falta `ML_FST/src/TrainedModels/classes3/Model/model.h5`, **10.7 MB**. Se deja
+en `modelo_3drcnn/`, fuera del control de versiones.
+
+### TensorFlow
+
+Los autores declaran TensorFlow 2.7.0, de 2021, que no tiene ruedas para
+Python 3.10 o superior. Sus pesos son **Keras 2.6**, y TensorFlow 2.16 en
+adelante trae Keras 3, que no los carga. La combinacion verificada es:
+
+```
+pip install tensorflow==2.17.1 tf-keras==2.17.0
+```
+
+cargando con `tf_keras` y `TF_USE_LEGACY_KERAS=1`. TensorFlow se importa dentro
+de la funcion de carga, no al principio del archivo, para que los Modulos 1 a 4
+sigan funcionando sin el.
+
+### El preprocesamiento sale del codigo, no del articulo
+
+Leyendo `src/functionsDatagenerator.py` y `Predictor/main.py` de los autores
+aparecen varias cosas que la descripcion del proyecto tenia distintas:
+
+- El tensor es **(75, 128, 64, 1)**: 128 de alto y 64 de ancho. La descripcion
+  dice "75x64x128"; alimentarlo transpuesto da basura.
+- La resta del fondo es `cv2.subtract` en BGR --saturada, no valor absoluto--
+  y **despues** se pasa a gris.
+- En prediccion **no aplican desenfoque**: la funcion trae 5 por omision pero
+  el programa principal pasa 1, y solo se aplica por encima de 1.
+- La normalizacion es min-max sobre el clip completo, no division entre 255.
+- El orden de esquinas es horario desde la superior izquierda, el mismo que
+  normaliza el Modulo 3.
+
+### Dos adaptaciones para nuestro material
+
+**Remuestreo a 25 Hz.** Su codigo lee el FPS del archivo y acto seguido lo
+sustituye por 25 fijo, y toma 75 cuadros **consecutivos**. En sus videos, que
+son de 25 Hz, eso son 3 s. En los nuestros, de 29.45 Hz, serian 2.55 s y el
+movimiento entre cuadros se veria mas lento del que el modelo aprendio, lo que
+sesga hacia inmovilidad. Por omision se remuestrea; `remuestrear=False`
+reproduce su comportamiento literal.
+
+**Fondo por mediana temporal.** Ellos restan el primer cuadro del archivo, que
+en su protocolo esta vacio porque empiezan a grabar antes de meter al
+especimen; por eso su `start_time_array` va de 7 a 28 s. En nuestro material
+eso no se cumple: en el primer cuadro hay cilindros que ya tienen especimen y
+otro al que lo estan soltando, y ademas la camara se mueve despues. La mediana
+temporal del recorte enderezado estima lo mismo y si existe siempre.
+
+### Criterio de verificacion
+
+**Contra la puntuacion manual de los autores.** Se alimentaron al modelo los
+100 tensores ya preprocesados del especimen Rat-0 de su Exp1 y se compararon
+contra su anotacion humana:
+
+| Clase | Soporte | Precision | Recall | F1 |
+|---|---|---|---|---|
+| inmovilidad | 38 | 0.87 | 0.89 | 0.88 |
+| nado | 28 | 0.80 | 0.86 | 0.83 |
+| escalamiento | 34 | 0.97 | 0.88 | 0.92 |
+
+**88.0 % de acuerdo global**, consistente con el 86 +/- 4 % que reportan. Eso
+verifica la carga de los pesos, la orientacion del tensor y la correspondencia
+entre la salida softmax y las conductas, que no es la alfabetica: el indice 0
+es nado, el 1 inmovilidad y el 2 escalamiento.
+
+**Sobre video, en la configuracion literal de los autores.** Su video
+`Trial195.mpg` con su ROI y su `start_time` de 28 s: 100 clips en 23 s, 60 %
+nado, 31 % inmovilidad, 9 % escalamiento, confianza media 0.85.
+
+**Sobre material del laboratorio.** Video de 1280x720 a 29.45 Hz, tres
+regiones, desde el cuadro 330: 100 clips por region en 58 s.
+
+| Region | nado | inmovilidad | escalamiento | Confianza media | Clips bajo 0.70 |
+|---|---|---|---|---|---|
+| 1 | 63 % | 20 % | 17 % | 0.834 | 24 |
+| 2 | 62 % | 23 % | 15 % | 0.810 | 31 |
+| 3 | 43 % | 39 % | 18 % | 0.801 | 34 |
+
+La confianza baja de 0.85 a 0.81 y un tercio de los clips queda por debajo de
+0.70, que es el umbral con el que el sistema principal detiene el analisis
+(RN-11). Es la caida esperable por el cambio de montaje, y el reporte la
+declara en vez de callarla.
+
+Comparado con lo que mide el laboratorio (inmovilidad 23-52 %, nado 17-45 %,
+escalamiento 31-37 %), el modelo **sobreestima el nado y subestima el
+escalamiento**. Y discrepa fuerte con el detector del Modulo 4, que sobre el
+mismo video daba 71-77 % de inmovilidad. Esa discrepancia es precisamente lo
+que el Modulo 7 tiene que arbitrar.
 
 ## Parametros a calibrar
 

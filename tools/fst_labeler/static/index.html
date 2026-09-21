@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Etiquetado FST — visor, regiones y detección</title>
+  <title>Etiquetado FST — visor, regiones y clasificación</title>
   <link rel="stylesheet" href="/static/css/estilos.css">
 </head>
 <body>
@@ -52,6 +52,7 @@
     </p>
 
     <div id="resultados-deteccion" class="resultados-deteccion"></div>
+    <div id="resultados-modelo" class="resultados-deteccion"></div>
 
     <!-- ----------------------------------------------------- controles -->
     <div class="transporte">
@@ -180,6 +181,42 @@
     </section>
 
     <section class="bloque">
+      <h2>Modelo preentrenado</h2>
+      <p class="nota">
+        Capa 1: red residual convolucional 3D de Della Valle et al. (2025),
+        pesos publicados en Zenodo bajo CC-BY-4.0. Predice <strong>las tres
+        conductas</strong> por clip de 3 s, con confianza. Se entrenó sobre
+        otro montaje de cámara, así que su exactitud aquí está por
+        establecerse.
+      </p>
+      <label class="campo casilla" for="remuestrear">
+        Remuestrear a 25 Hz
+        <input id="remuestrear" type="checkbox" checked>
+      </label>
+      <label class="campo" for="fondo-modelo">
+        Fondo
+        <select id="fondo-modelo">
+          <option value="mediana" selected>mediana temporal</option>
+          <option value="primer_cuadro">primer cuadro</option>
+        </select>
+      </label>
+      <label class="campo casilla" for="estabilizar-modelo">
+        Compensar movimiento de cámara
+        <input id="estabilizar-modelo" type="checkbox" checked>
+      </label>
+      <label class="campo" for="max-clips">
+        Máximo de clips
+        <input id="max-clips" type="number" min="0" step="10" value="100">
+      </label>
+      <div class="botonera-regiones">
+        <button id="btn-modelo" type="button" class="principal" disabled>
+          Predecir conducta
+        </button>
+      </div>
+      <p id="estado-modelo" class="estado-deteccion">Consultando el modelo…</p>
+    </section>
+
+    <section class="bloque">
       <h2>Cuadros por segundo</h2>
       <p class="nota">
         FPS = cuadros por segundo. La reproducción a velocidad real depende de
@@ -239,9 +276,8 @@
 </main>
 
 <footer class="pie">
-  Módulo 4 de 9 — visor, regiones de interés y detector de movimiento por
-  umbral. El modelo preentrenado y las reglas geométricas llegan en los
-  Módulos 5 y 6.
+  Módulo 5 de 9 — visor, regiones de interés, detector por umbral y modelo
+  preentrenado. Las reglas geométricas llegan en el Módulo 6.
 </footer>
 
 <script type="module" src="/static/js/app.js"></script>

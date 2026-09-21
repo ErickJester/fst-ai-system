@@ -14,3 +14,6 @@ CLAUDE.md
 
 # videos de prueba de la herramienta de etiquetado
 /tools/fst_labeler/videos/
+
+# modelo preentrenado y videos de ejemplo de Zenodo (CC-BY-4.0), no se versionan
+/tools/fst_labeler/modelo_3drcnn/
