@@ -54,6 +54,7 @@
     <div id="resultados-deteccion" class="resultados-deteccion"></div>
     <div id="resultados-modelo" class="resultados-deteccion"></div>
     <div id="resultados-reglas" class="resultados-deteccion"></div>
+    <div id="resultados-consenso" class="resultados-deteccion"></div>
 
     <!-- ----------------------------------------------------- controles -->
     <div class="transporte">
@@ -265,6 +266,57 @@
     </section>
 
     <section class="bloque">
+      <h2>Consenso entre capas</h2>
+      <p class="nota">
+        Capa 5: compara lo que dijeron las tres capas sobre cada bloque de 5 s.
+        Acepta sin revisión los bloques en que coinciden y manda el resto a la
+        cola del Módulo 8, con el motivo escrito. Los clips de 3 s del modelo
+        se reproyectan sobre la rejilla de bloques pesando cada uno por los
+        cuadros que comparte.
+      </p>
+      <label class="campo" for="consenso-confianza">
+        Confianza mínima del modelo
+        <input id="consenso-confianza" type="number" min="0" max="1" step="0.05" value="0.7">
+      </label>
+      <label class="campo" for="consenso-margen">
+        Margen mínimo de las reglas
+        <input id="consenso-margen" type="number" min="0" max="1" step="0.05" value="0.6">
+      </label>
+      <label class="campo" for="consenso-cobertura">
+        Cobertura mínima del modelo
+        <input id="consenso-cobertura" type="number" min="0" max="1" step="0.05" value="0.6">
+      </label>
+      <label class="campo" for="consenso-votantes">
+        Capas de tres clases que deben coincidir
+        <select id="consenso-votantes">
+          <option value="2" selected>2 — modelo y reglas</option>
+          <option value="1">1 — desactiva el consenso</option>
+        </select>
+      </label>
+      <label class="campo casilla" for="consenso-empates">
+        Encolar los empates de las reglas
+        <input id="consenso-empates" type="checkbox" checked>
+      </label>
+      <div class="botonera-regiones">
+        <button id="btn-combinar" type="button" class="principal" disabled>
+          Combinar (0 de 3)
+        </button>
+        <button id="btn-consenso-completo" type="button" class="secundario" disabled
+                title="Recorre el video una vez por capa; tarda">
+          Correr las tres capas
+        </button>
+      </div>
+      <p id="estado-consenso" class="estado-deteccion">Selecciona un video.</p>
+      <p class="nota">
+        Mover estos umbrales no cambia nada de lo que midieron las capas, así
+        que «Combinar» vuelve a decidir al instante sobre los reportes que ya
+        están en pantalla. Son puntos de partida: dónde ponerlos se decide
+        midiendo cuántos de los aceptados estaban bien, contra el conjunto de
+        prueba etiquetado a mano.
+      </p>
+    </section>
+
+    <section class="bloque">
       <h2>Cuadros por segundo</h2>
       <p class="nota">
         FPS = cuadros por segundo. La reproducción a velocidad real depende de
@@ -324,9 +376,9 @@
 </main>
 
 <footer class="pie">
-  Módulo 6 de 9 — visor, regiones de interés, detector por umbral, modelo
-  preentrenado y reglas geométricas. El consenso entre las tres capas llega en
-  el Módulo 7.
+  Módulo 7 de 9 — visor, regiones de interés, las tres capas de etiquetado y
+  el consenso entre ellas. La interfaz para resolver los clips en discrepancia
+  llega en el Módulo 8.
 </footer>
 
 <script type="module" src="/static/js/app.js"></script>

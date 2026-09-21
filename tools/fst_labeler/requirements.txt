@@ -8,14 +8,22 @@ numpy==2.0.1
 #
 # Los autores declaran tensorflow 2.7.0, que es de 2021 y no tiene ruedas para
 # Python 3.10 o superior. Sus pesos se guardaron con Keras 2.6, y TensorFlow
-# 2.16 en adelante trae Keras 3, que no los carga. La combinacion verificada
-# es TensorFlow 2.17.1 mas tf-keras 2.17.0 (la capa de compatibilidad con
-# Keras 2), cargando el modelo con tf_keras en lugar de tf.keras.
+# 2.16 en adelante trae Keras 3, que no los carga. Por eso el modelo se carga
+# con tf_keras --la capa de compatibilidad con Keras 2-- en lugar de tf.keras.
 #
-# Descomenta estas dos lineas para el Modulo 5. Son ~600 MB, por eso no van
-# activas para quien solo use los modulos 1 a 4.
+# Hay dos combinaciones verificadas, y cual toca depende de la version de
+# Python. Descomenta UNA de las dos para el Modulo 5. Son ~600 MB, por eso no
+# van activas para quien solo use los modulos 1 a 4.
+#
+# Python 3.10 a 3.12:
 # tensorflow==2.17.1
 # tf-keras==2.17.0
+#
+# Python 3.13 (para 2.17 no hay ruedas; las primeras que hay son las 2.20):
+# tensorflow==2.21.0
+# tf-keras==2.21.0
+#
+# Python 3.14 no sirve todavia: no hay ruedas de TensorFlow para esa version.
 #
 # h5py se usa para inspeccionar el archivo de pesos sin cargar TensorFlow.
 # h5py

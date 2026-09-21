@@ -43,7 +43,7 @@ Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 | 4 | Capa 0 + Capa 2: detector de movimiento por umbral | **listo** |
 | 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | **listo** |
 | 6 | Capa 3 simplificada: reglas geometricas sin pose | **listo** |
-| 7 | Capa 5: consenso y cola de discrepancias | pendiente |
+| 7 | Capa 5: consenso y cola de discrepancias | **listo** |
 | 8 | Interfaz de revision humana | pendiente |
 | 9 | Suavizado temporal y exportacion a CSV | pendiente |
 
@@ -370,19 +370,46 @@ El deposito completo pesa 8.2 GB, casi todo dataset de entrenamiento. Solo hace
 falta `ML_FST/src/TrainedModels/classes3/Model/model.h5`, **10.7 MB**. Se deja
 en `modelo_3drcnn/`, fuera del control de versiones.
 
+Zenodo publica el deposito como **un unico zip de 8.2 GB**: no se puede bajar
+solo el archivo de pesos desde ahi. El mismo archivo esta suelto en el
+repositorio de GitHub de los autores, en la misma ruta, y de ahi si se puede
+traer solo el:
+
+```
+mkdir -p modelo_3drcnn/ML_FST/src/TrainedModels/classes3/Model
+curl -L -o modelo_3drcnn/ML_FST/src/TrainedModels/classes3/Model/model.h5 \
+  https://raw.githubusercontent.com/adso42/FST_3DRCNN/main/ML_FST/src/TrainedModels/classes3/Model/model.h5
+```
+
+Eso es un atajo de descarga, **no un cambio de procedencia**: la licencia y la
+cita salen del deposito de Zenodo, que es donde los autores declararon
+CC-BY-4.0.
+
 ### TensorFlow
 
 Los autores declaran TensorFlow 2.7.0, de 2021, que no tiene ruedas para
 Python 3.10 o superior. Sus pesos son **Keras 2.6**, y TensorFlow 2.16 en
-adelante trae Keras 3, que no los carga. La combinacion verificada es:
+adelante trae Keras 3, que no los carga. De ahi que se cargue con `tf_keras`
+--la capa de compatibilidad con Keras 2-- y `TF_USE_LEGACY_KERAS=1`.
+
+Dos combinaciones verificadas, segun la version de Python:
 
 ```
+# Python 3.10 a 3.12
 pip install tensorflow==2.17.1 tf-keras==2.17.0
+
+# Python 3.13 (para 2.17 no hay ruedas; las primeras son 2.20)
+pip install tensorflow==2.21.0 tf-keras==2.21.0
 ```
 
-cargando con `tf_keras` y `TF_USE_LEGACY_KERAS=1`. TensorFlow se importa dentro
-de la funcion de carga, no al principio del archivo, para que los Modulos 1 a 4
-sigan funcionando sin el.
+La segunda se comprobo en Python 3.13.9: carga el `model.h5` de Keras 2.6 sin
+conversion, con entrada `(None, 75, 128, 64, 1)`, salida `(None, 3)`, 45 capas
+y 920,411 parametros, y produce predicciones. Solo emite avisos de APIs
+obsoletas de `tf.compat.v1`. **Python 3.14 no sirve todavia**: no hay ruedas de
+TensorFlow para esa version.
+
+TensorFlow se importa dentro de la funcion de carga, no al principio del
+archivo, para que los Modulos 1 a 4 sigan funcionando sin el.
 
 ### El preprocesamiento sale del codigo, no del articulo
 
@@ -585,6 +612,197 @@ El video sintetico sirve para verificar que la cadena funciona de extremo a
 extremo; **no sustituye material real de laboratorio** y ajustar las reglas
 para acertar cuatro de cuatro sobre el seria sobreajustar a un artefacto.
 
+## Modulo 7 — consenso y cola de discrepancias (Capa 5)
+
+`POST /api/videos/<video_id>/consenso` corre las tres capas y las compara.
+`POST /api/consenso` compara tres reportes ya calculados, sin tocar el video.
+
+Esta capa no mide nada. Recibe lo que dijeron las tres anteriores y decide que
+clips se aceptan sin que nadie los mire y cuales pasan a la cola de revision
+del Modulo 8, con el motivo escrito.
+
+### Dos desajustes antes de poder comparar
+
+| Capa | Modulo | Unidad | Salida | Certidumbre |
+|---|---|---|---|---|
+| 2 | 4 | bloque de 5 s | inmovil / activo | distancia al umbral |
+| 1 | 5 | clip de 3 s | las tres conductas | softmax |
+| 3 | 6 | bloque de 5 s | las tres conductas | margen del voto |
+
+**La unidad.** Manda el bloque de 5 s: es la unidad de esta prueba desde Detke
+et al. (1995) y es lo que el CSV final tiene que entregar. Los clips de 3 s del
+modelo se reproyectan sobre la rejilla pesando cada clip por los **cuadros**
+que comparte con el bloque --no por segundos: los tres reportes traen indices
+de cuadro absolutos y esos no dependen de si el modelo remuestreo a 25 Hz--.
+
+Se promedian las **probabilidades**, no las clases ganadoras. Dos clips con
+0.51 y 0.49 repartidos entre nado e inmovilidad describen un bloque dudoso, y
+contarlos como un voto para cada una perderia justamente eso.
+
+El reporte guarda que fraccion del bloque cubrieron los clips. Donde el modelo
+se quedo corto --fin del video, tope de clips-- la cobertura lo dice y la capa
+**se abstiene** en vez de opinar sobre la parte que no vio.
+
+**El alfabeto.** La Capa 2 no distingue nado de escalamiento. No es un voto de
+tres clases y contarlo como si lo fuera inflaria el acuerdo. Entra como
+**compuerta**: `inmovil` solo es compatible con inmovilidad y `activo` solo con
+nado o escalamiento. Puede vetar el acuerdo de las otras dos, pero no puede
+nombrar una conducta por si sola.
+
+### Cuando se acepta un clip sin revisarlo
+
+Las cuatro condiciones a la vez:
+
+1. Al menos `minimo_votantes` capas de tres clases opinaron --por omision 2,
+   que son todas las que hay-- y nombraron la **misma** conducta.
+2. La Capa 2, si opino, es compatible con esa conducta.
+3. Ninguna opino con poca certidumbre: la confianza del modelo supera
+   `confianza_minima_modelo` y el margen del voto supera `margen_minimo_reglas`.
+4. Las reglas no marcaron empate.
+
+Todo lo demas va a la cola. Cada clip encolado lleva sus motivos en codigo y en
+prosa, para que el Modulo 8 pueda ordenar la cola por tipo de problema:
+`desacuerdo`, `movimiento_incompatible`, `pocos_votantes`, `confianza_baja`,
+`margen_bajo`, `empate`, `cobertura_baja`, `sin_datos`.
+
+**El consenso no propone conducta para los clips en discrepancia.** El Modulo 8
+muestra lo que dijo cada capa y la persona decide. Poner ahi una sugerencia del
+propio sistema convertiria la revision en confirmar al sistema.
+
+### El identificador de clip
+
+`video|rN|cuadro_inicio-cuadro_fin`, por ejemplo
+`prueba_sintetica.mp4|r1|0-149`.
+
+Lleva el rango de cuadros a proposito. Si se vuelve a correr con otra duracion
+de bloque o desde otro cuadro de inicio, la rejilla es otra y los
+identificadores cambian, asi que el Modulo 9 no puede reanudar encima de
+decisiones tomadas mirando otro tramo de video. Un identificador por numero de
+bloque si permitiria esa confusion. Por la misma razon los bloques de capas
+distintas se emparejan por **cuadro de inicio** y no por numero.
+
+### Que tan independientes son de verdad estas fuentes
+
+Las Capas 2 y 3 miden sobre la **misma** mascara de sustraccion de fondo. Si la
+region esta mal dibujada o el umbral de binarizacion es malo, las dos se
+equivocan juntas y el consenso no lo nota: coincidir no es lo mismo que tener
+razon. Solo la Capa 1 segmenta por su cuenta, desde los pixeles.
+
+Por eso el reporte publica el acuerdo por pares y la matriz entre las dos capas
+de tres clases. **Si la Capa 2 y la Capa 3 coinciden mucho mas entre si que
+cualquiera de las dos con la Capa 1, lo que se esta midiendo es la segmentacion
+compartida y no la conducta.** Ese numero hay que leerlo antes de creerle al
+porcentaje de aceptacion automatica.
+
+La matriz dice ademas *donde* discrepan, que es lo accionable: si el modelo ve
+nado donde las reglas ven escalamiento, el sospechoso es el umbral de
+verticalidad, no la conducta.
+
+### La compuerta de cordura se aplica a lo aceptado
+
+La Capa 0 se mide solo sobre los clips **aceptados**, que son los que entrarian
+al conjunto de entrenamiento sin que nadie los mire. Si esa seleccion se desvia
+del rango del laboratorio, el consenso esta aceptando de forma sesgada aunque
+cada clip por separado parezca solido: lo mas probable es que este aceptando
+inmovilidad facil y encolando todo lo demas.
+
+### Dos caminos, y la diferencia es de minutos
+
+Los umbrales del consenso **no cambian nada de lo que midieron las capas**, asi
+que recalcularlas para mover uno costaria tres recorridos del video por cada
+ajuste. El panel tiene por eso dos botones:
+
+- **Combinar** toma los reportes que los otros tres paneles ya tienen en
+  pantalla y solo los compara. Es instantaneo.
+- **Correr las tres capas** recorre el video tres veces, una por capa. Es el
+  camino cuando cambio algo que si afecta a las capas: la region, la linea de
+  agua o sus propios umbrales.
+
+### Degradacion sin el modelo preentrenado
+
+Si faltan TensorFlow o los pesos, la Capa 1 no corre, el reporte lo dice y
+**nada se acepta solo**: con una sola capa de tres clases no hay consenso, hay
+una opinion sin confirmar. `minimo_votantes: 1` lo permite, y el reporte avisa
+de lo que eso significa.
+
+### Criterio de verificacion
+
+**Logica del consenso, con reportes sinteticos** (`python
+scripts/verificar_consenso.py`, no necesita video ni TensorFlow). Cuarenta
+comprobaciones sobre reportes construidos a mano con la forma exacta de los
+Modulos 4, 5 y 6, una por rama de la decision. Seis bloques de 5 s cubiertos
+por diez clips de 3 s,
+con las fronteras desalineadas a proposito para que los clips 2, 4, 7 y 9
+queden a caballo entre dos bloques:
+
+| Bloque | Movimiento | Modelo | Reglas | Estado | Motivo |
+|---|---|---|---|---|---|
+| 1 | activo | nado 0.95 | nado 0.95 | **aceptado** | — |
+| 2 | activo | nado 0.95 | escalamiento 0.90 | en cola | `desacuerdo` |
+| 3 | **inmovil** | nado 0.95 | nado 0.90 | en cola | `movimiento_incompatible` |
+| 4 | inmovil | inmovilidad **0.55** | inmovilidad 0.90 | en cola | `confianza_baja` |
+| 5 | activo | nado 0.81 | nado **empate** | en cola | `empate` |
+| 6 | activo | nado 0.95 | nado **0.45** | en cola | `margen_bajo` |
+
+La reproyeccion se verifico aparte con aritmetica cerrada: un clip de nado a
+0.90 que aporta 90 cuadros y uno de inmovilidad a 0.80 que aporta 60 dan
+nado 0.58 e inmovilidad 0.35 sobre el bloque, que gana nado pero **por debajo
+del umbral de confianza**, asi que el bloque se encola aunque los dos clips
+fueran firmes por separado. Tambien se comprobo que un solo clip de 3 s sobre
+un bloque de 5 s da cobertura 0.6 exacta, y que con la cobertura minima en 0.7
+la capa se abstiene y con 0.6 acepta.
+
+**Corrida de extremo a extremo con las tres capas** sobre
+`videos/prueba_sintetica.mp4` (30 s a 30 FPS, seis bloques, diez clips de 3 s),
+con los pesos de los autores cargados y el umbral de desplazamiento fijado
+en 0.25:
+
+| Bloque | Verdad | Movim. | Modelo (conf.) | Reglas (margen) | Motivos |
+|---|---|---|---|---|---|
+| 1 | nado | activo | inmovilidad (0.93) | nado (0.56) | `desacuerdo`, `margen_bajo` |
+| 2 | nado | activo | inmovilidad (0.75) | nado (0.57) | `desacuerdo`, `margen_bajo` |
+| 3 | inmovilidad | activo | nado (0.68) | nado (0.73) | `confianza_baja` |
+| 4 | escalamiento | inmovil | inmovilidad (0.97) | escalamiento (1.00) | `desacuerdo` |
+| 5 | inmovilidad | inmovil | nado (0.49) | nado (0.70) | `movimiento_incompatible`, `confianza_baja` |
+| 6 | inmovilidad | inmovil | nado (0.60) | nado (0.76) | `movimiento_incompatible`, `confianza_baja` |
+
+La **cobertura del modelo fue 1.0 en los seis bloques**, que es lo que verifica
+la reproyeccion sobre material real: diez clips de 3 s cubren exactamente seis
+bloques de 5 s pese a que las fronteras no coinciden.
+
+**Cero aceptados, los seis a la cola.** Es el resultado correcto, y es el
+sistema haciendo su trabajo: las tres capas no se ponen de acuerdo, asi que
+nada entra al conjunto de entrenamiento sin que una persona lo mire. El acuerdo
+entre modelo y reglas es del 50 %, y la matriz dice donde esta el problema: el
+modelo ve inmovilidad donde las reglas ven nado en dos bloques, y donde ven
+escalamiento en uno.
+
+**Por que el modelo falla asi de seguro.** Predice inmovilidad con 0.93 sobre
+un bloque de nado. No es un fallo del Modulo 7: es exactamente la advertencia
+de los autores hecha numero. El modelo aprendio de especimenes reales en un
+cilindro de plexiglas con iluminacion controlada, y esto es un dibujo animado.
+Los autores declaran que su exactitud cae con iluminacion, posicion de camara y
+relacion de tamano distintas, y las tres cosas cambian aqui.
+
+**Lo que esta corrida NO demuestra.** Que la cadena funciona de extremo a
+extremo, si. Exactitud, no: el video sintetico no es material de laboratorio.
+Ajustar los umbrales hasta que acierte los seis bloques seria sobreajustar a un
+artefacto. Los umbrales del consenso se calibran midiendo, sobre el conjunto de
+prueba etiquetado a mano, cuantos de los clips aceptados automaticamente
+estaban bien. Y el numero que hay que mirar primero sobre material real es si
+la Capa 1 sigue discrepando tanto: si lo hace, el modelo preentrenado no
+transfiere a nuestro montaje y hay que reentrenarlo antes de que aporte algo al
+consenso.
+
+**Interfaz.** Panel verificado en el navegador sobre el mismo video: se dibuja
+la region y la linea de agua, se corren las Capas 2 y 3 desde sus paneles --el
+boton pasa de «Combinar (0 de 3)» a «(2 de 3)» conforme terminan--, se combina,
+y la tira de bloques pinta en verde los aceptados con el tono de su conducta y
+en ambar los encolados, cada uno con lo que dijo cada capa en el texto
+emergente. Cambiar `minimo_votantes` a 1 y volver a combinar rehace la decision
+al instante sin recorrer el video: pasa de 0 a 3 clips aceptados y aparece el
+aviso de que eso ya no es consenso.
+
 ## Parametros a calibrar
 
 Los valores por defecto de `fst_labeler/config.py` son **puntos de partida a
@@ -593,6 +811,13 @@ calidad JPEG 85, `seek_forward_max` 60 cuadros, 4 lectores abiertos,
 ancho maximo de transporte 960 px, 8 cuadros pedidos por adelantado,
 salto de 10 cuadros, umbral de binarizacion 40, bloque de 5 s, 40 muestras
 de fondo y reestimacion de camara cada 30 cuadros.
+
+Los tres umbrales del consenso --confianza minima del modelo 0.70, margen
+minimo de las reglas 0.60 y cobertura minima 0.60-- mueven todos el mismo
+cursor: mas exigentes aceptan menos clips sin revision y mandan mas a la cola;
+mas laxos aceptan mas y meten mas errores en el conjunto de entrenamiento.
+Donde ponerlos se decide midiendo cuantos de los aceptados estaban bien, contra
+el conjunto de prueba etiquetado a mano. No se puede fijar de antemano.
 
 ## Dependencias
 

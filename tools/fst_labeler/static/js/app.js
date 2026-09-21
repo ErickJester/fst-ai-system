@@ -11,6 +11,7 @@ import { EditorRegiones, MODO, MAX_REGIONES, COLORES } from "./dibujo.js";
 import { PanelDeteccion } from "./deteccion.js";
 import { PanelModelo } from "./modelo.js";
 import { PanelReglas } from "./reglas.js";
+import { PanelConsenso } from "./consenso.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -83,6 +84,16 @@ const nodos = {
   btnReglas: el("btn-reglas"),
   estadoReglas: el("estado-reglas"),
   resultadosReglas: el("resultados-reglas"),
+
+  consensoConfianza: el("consenso-confianza"),
+  consensoMargen: el("consenso-margen"),
+  consensoCobertura: el("consenso-cobertura"),
+  consensoVotantes: el("consenso-votantes"),
+  consensoEmpates: el("consenso-empates"),
+  btnCombinar: el("btn-combinar"),
+  btnConsensoCompleto: el("btn-consenso-completo"),
+  estadoConsenso: el("estado-consenso"),
+  resultadosConsenso: el("resultados-consenso"),
 };
 
 const cliente = new ClienteFST();
@@ -94,14 +105,31 @@ const irAlCuadro = (cuadro) => {
   visor.pausar();
   visor.irA(cuadro);
 };
-const modelo = new PanelModelo(nodos, { alPedirCuadro: irAlCuadro });
-const reglas = new PanelReglas(nodos, { alPedirCuadro: irAlCuadro });
+// Cada capa avisa al terminar para que el panel del consenso actualice cuántos
+// reportes tiene ya disponibles para combinar.
+const capaTermino = () => consenso.dibujar();
+const modelo = new PanelModelo(nodos, {
+  alPedirCuadro: irAlCuadro,
+  alTerminar: capaTermino,
+});
+const reglas = new PanelReglas(nodos, {
+  alPedirCuadro: irAlCuadro,
+  alTerminar: capaTermino,
+});
 const deteccion = new PanelDeteccion(nodos, {
   // Hacer clic en un bloque del reporte lleva el visor a ese punto del video.
-  alPedirCuadro: (cuadro) => {
-    visor.pausar();
-    visor.irA(cuadro);
-  },
+  alPedirCuadro: irAlCuadro,
+  alTerminar: capaTermino,
+});
+// El consenso no vuelve a medir: lee los reportes que los otros tres paneles
+// ya tienen calculados y solo los compara.
+const consenso = new PanelConsenso(nodos, {
+  alPedirCuadro: irAlCuadro,
+  informesDeCapas: () => ({
+    movimiento: deteccion.informe,
+    modelo: modelo.informe,
+    reglas: reglas.informe,
+  }),
 });
 
 // Mensaje propio de la interfaz (errores al listar videos, por ejemplo),
@@ -126,6 +154,12 @@ async function arrancar() {
     nodos.calidad.value = prefs.calidad;
     nodos.maxAncho.value = prefs.max_ancho;
     nodos.saltoCuadros.value = prefs.salto_cuadros;
+    if (prefs.consenso) {
+      nodos.consensoConfianza.value = prefs.consenso.confianza_minima_modelo;
+      nodos.consensoMargen.value = prefs.consenso.margen_minimo_reglas;
+      nodos.consensoCobertura.value = prefs.consenso.cobertura_minima_modelo;
+      nodos.consensoVotantes.value = prefs.consenso.minimo_votantes;
+    }
   } catch (e) {
     avisoInterfaz = "No se pudieron leer las preferencias del servidor: " + e.message;
   }
@@ -410,12 +444,8 @@ function sincronizarDeteccion() {
   };
   modelo.sincronizar(estado);
   reglas.sincronizar(estado);
-  deteccion.sincronizar({
-    videoId: visor.videoId,
-    fps: visor.fps,
-    cuadroActual: visor.cuadroActual === null ? 0 : visor.cuadroActual,
-    regiones: editor.regiones,
-  });
+  deteccion.sincronizar(estado);
+  consenso.sincronizar(estado);
 }
 
 function textoDeTiempo(v) {

@@ -107,6 +107,28 @@ class Config:
     # grabaciones. Se fijan a mano desde el panel cuando haya videos
     # puntuados con los que calibrarlos.
 
+    # --------------------------------------------------------- consenso
+    # Los tres umbrales del Modulo 7 mueven el mismo cursor: mas exigentes
+    # aceptan menos clips sin revision y mandan mas a la cola. Donde ponerlos
+    # se decide midiendo cuantos de los aceptados estaban bien, contra el
+    # conjunto de prueba etiquetado a mano; no se puede fijar de antemano.
+
+    # Confianza minima del modelo preentrenado. Punto de partida: 0.70, el
+    # mismo corte con el que el sistema principal detiene el analisis (RN-11).
+    consenso_confianza_minima: float = 0.70
+
+    # Fraccion minima de votos del ganador en el bloque de las reglas.
+    # Punto de partida a calibrar: 0.60, sobre un azar de 0.33 con tres clases.
+    consenso_margen_minimo: float = 0.60
+
+    # Fraccion minima del bloque que los clips de 3 s tienen que cubrir para
+    # que la reproyeccion del modelo valga. Punto de partida a calibrar: 0.60.
+    consenso_cobertura_minima: float = 0.60
+
+    # Capas de tres clases que tienen que coincidir para aceptar sin revision.
+    # 2 son todas las que hay; en 1 el consenso queda desactivado.
+    consenso_minimo_votantes: int = 2
+
     debug: bool = False
 
     def __post_init__(self) -> None:
@@ -137,6 +159,14 @@ class Config:
             raise ValueError("reglas_area_minima debe estar entre 0 y 1")
         if not 0 < self.reglas_fraccion_superior <= 1:
             raise ValueError("reglas_fraccion_superior debe estar entre 0 y 1")
+        if not 0 <= self.consenso_confianza_minima <= 1:
+            raise ValueError("consenso_confianza_minima debe estar entre 0 y 1")
+        if not 0 <= self.consenso_margen_minimo <= 1:
+            raise ValueError("consenso_margen_minimo debe estar entre 0 y 1")
+        if not 0 <= self.consenso_cobertura_minima <= 1:
+            raise ValueError("consenso_cobertura_minima debe estar entre 0 y 1")
+        if self.consenso_minimo_votantes not in (1, 2):
+            raise ValueError("consenso_minimo_votantes debe ser 1 o 2")
 
     def preferencias_visor(self) -> dict:
         """Valores por defecto que el visor toma del servidor al arrancar."""
@@ -155,6 +185,12 @@ class Config:
             "reglas": {
                 "area_minima": self.reglas_area_minima,
                 "fraccion_superior": self.reglas_fraccion_superior,
+            },
+            "consenso": {
+                "confianza_minima_modelo": self.consenso_confianza_minima,
+                "margen_minimo_reglas": self.consenso_margen_minimo,
+                "cobertura_minima_modelo": self.consenso_cobertura_minima,
+                "minimo_votantes": self.consenso_minimo_votantes,
             },
             "nota": (
                 "Valores por defecto: puntos de partida a calibrar con los "
