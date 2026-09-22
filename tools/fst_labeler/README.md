@@ -25,12 +25,14 @@ pip install -r requirements.txt
 python app.py --videos-dir /ruta/a/mis/videos
 ```
 
-Abre `http://127.0.0.1:5055/`: ahi esta el visor cuadro a cuadro. La carpeta de videos tambien se puede fijar con
-la variable de entorno `FST_VIDEOS_DIR`. **No hay rutas de laboratorio
-codificadas en el programa**; si no se indica ninguna, se usa `videos/` dentro
-de esta carpeta.
+Abre `http://127.0.0.1:5055/`: ahi esta el visor cuadro a cuadro. La cola de
+revision del Modulo 8 esta en `http://127.0.0.1:5055/revision`, y la
+exportacion final del Modulo 9 en `http://127.0.0.1:5055/exportacion`. La
+carpeta de videos tambien se puede fijar con la variable de entorno
+`FST_VIDEOS_DIR`. **No hay rutas de laboratorio codificadas en el programa**;
+si no se indica ninguna, se usa `videos/` dentro de esta carpeta.
 
-Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
+Opciones: `--base-datos`, `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 `--visor-max-ancho`, `--visor-prefetch`, `--visor-salto-cuadros`, `--debug`.
 
 ## Estado por modulos
@@ -44,8 +46,8 @@ Opciones: `--host`, `--port`, `--jpeg-quality`, `--seek-forward-max`,
 | 5 | Capa 1: modelo 3D preentrenado (Della Valle et al. 2025) | **listo** |
 | 6 | Capa 3 simplificada: reglas geometricas sin pose | **listo** |
 | 7 | Capa 5: consenso y cola de discrepancias | **listo** |
-| 8 | Interfaz de revision humana | pendiente |
-| 9 | Suavizado temporal y exportacion a CSV | pendiente |
+| 8 | Interfaz de revision humana | **listo** |
+| 9 | Suavizado temporal y exportacion a CSV | **listo** |
 
 ## Modulo 1 — interfaz HTTP
 
@@ -222,9 +224,10 @@ completo, no cada paso del raton.
 ### Persistencia
 
 Las regiones viven **por video y en la pagina**, como pide el plan de modulos:
-siguen ahi al navegar entre cuadros y al cambiar de video y volver. Todavia no
-se guardan en disco — la base sqlite llega en el Modulo 8, y hasta entonces
-**recargar la pagina las pierde**.
+siguen ahi al navegar entre cuadros y al cambiar de video y volver.
+**Recargar la pagina las pierde.** Lo que si queda en disco desde el Modulo 8
+es la geometria con que corrieron las capas, guardada con cada corrida que se
+manda a revision.
 
 ### Criterio de verificacion
 
@@ -254,8 +257,8 @@ OpenCV, sin MATLAB) mas la compuerta de cordura de la Capa 0.
 
 Rutas: `POST /api/videos/<video_id>/deteccion-movimiento` y
 `POST /api/videos/<video_id>/estabilidad-camara`. Las regiones viajan en el
-cuerpo de la peticion; **no se guardan en el servidor**, el navegador sigue
-siendo su dueno hasta que el Modulo 8 introduzca sqlite.
+cuerpo de la peticion y el reporte las devuelve en `regiones_dibujadas`; el
+Modulo 8 las guarda con la corrida cuando se manda a revision.
 
 ### Por que sustraccion de fondo y no diferencia directa entre cuadros
 
@@ -803,6 +806,334 @@ emergente. Cambiar `minimo_votantes` a 1 y volver a combinar rehace la decision
 al instante sin recorrer el video: pasa de 0 a 3 clips aceptados y aparece el
 aviso de que eso ya no es consenso.
 
+## Modulo 8 — revision humana de la cola
+
+La pagina `http://127.0.0.1:5055/revision` resuelve, un clip a la vez, los
+bloques que el consenso del Modulo 7 no pudo aceptar solo. Es la primera parte
+de la herramienta que escribe en disco.
+
+| Archivo | Contenido |
+|---|---|
+| `fst_labeler/revision.py` | La base sqlite: corridas, clips y decisiones. |
+| `static/revision.html` | La pagina de revision. |
+| `static/js/revision.js` | Cableado: cola, visor del clip, editor de la region, decision. |
+| `scripts/verificar_revision.py` | Verificacion de la base sin video ni navegador. |
+
+| Metodo y ruta | Que hace |
+|---|---|
+| `POST /api/revision/corridas` | Guarda un reporte del consenso como corrida. |
+| `GET /api/revision/cola[?video=...]` | Clips en discrepancia de la corrida vigente de cada video, con su decision si la tienen. |
+| `POST /api/revision/decisiones` | Guarda o reemplaza la decision sobre un clip. |
+| `GET /api/revision/decisiones` | Todas las decisiones, para verificarlas. |
+
+La base vive en `datos/revision.sqlite3`, fuera del control de versiones. Se
+cambia con `--base-datos` o con la variable `FST_BASE_DATOS`.
+
+### Flujo
+
+1. En el visor, correr las capas y **Combinar** (Modulo 7).
+2. **Enviar a revision** guarda ese consenso como una *corrida*: los clips
+   aceptados, los de la cola y los que no tuvieron datos, mas la geometria con
+   que corrieron las capas y los umbrales del consenso. Es un paso explicito
+   porque **Combinar** se usa para tantear umbrales, y cada tanteo no debe
+   volverse una corrida.
+3. **Abrir la cola de revision** lleva a `/revision`.
+
+En la pagina de revision, por cada clip:
+
+- El visor queda acotado al bloque: la barra recorre solo sus cuadros y la
+  reproduccion lo **repite en bucle**. Las flechas si pueden salir del bloque
+  para ver el contexto, y el indicador lo dice.
+- La region del clip se dibuja tal como la usaron las capas, con su numero
+  verdadero. Se pueden arrastrar las esquinas y redibujar la linea de agua
+  (`W`); no se pueden agregar ni borrar regiones, porque el clip es de un solo
+  especimen.
+- El panel lateral muestra que dijo cada capa, con su certidumbre contra el
+  umbral de la corrida: las probabilidades del modelo, los votos de las
+  reglas y la salida de la compuerta de movimiento.
+- `1`, `2` o `3` eligen escalamiento, nado o inmovilidad (el orden de la
+  rubrica del laboratorio); `D` descarta; `Enter` guarda y abre el siguiente
+  pendiente. **Guardar esta deshabilitado hasta que haya decision.**
+
+### Que se guarda
+
+| Columna de `decisiones` | Contenido |
+|---|---|
+| `clip_id` | El del Modulo 7: `video\|rN\|cuadro_inicio-cuadro_fin`. |
+| `corrida_id` | La corrida cuyo contexto vio la persona. |
+| `etiqueta_humana` | `escalamiento`, `inmovilidad` o `nado`; nula si se descarto. |
+| `descartado` | 1 si el clip no debe entrar al conjunto de entrenamiento. |
+| `roi_corregida`, `esquinas_nuevas` | Si se movio la region y, solo en ese caso, sus cuatro esquinas nuevas. |
+| `linea_agua_corregida`, `linea_agua_nueva` | Lo mismo para la linea de agua. |
+| `notas` | Texto libre, opcional. |
+| `a_ciegas` | 1 si la decision se tomo sin ver las predicciones. |
+| `timestamp` | Hora local con desfase, ISO 8601. |
+
+Un `CHECK` de la tabla impide que un clip quede descartado y etiquetado a la
+vez, o sin ninguna de las dos cosas. Cambiar de opinion sobre un clip
+reemplaza la fila; no la duplica. Todas las coordenadas estan en pixeles del
+archivo original, como en el Modulo 3.
+
+### Nada viene preseleccionado
+
+El consenso no propone conducta para los clips en discrepancia, y la pagina
+tampoco: ninguna de las tres opciones aparece marcada al abrir un clip.
+Marcar la de alguna capa convertiria la revision en confirmar al sistema.
+
+### La correccion de geometria la decide el servidor
+
+El navegador manda la region y la linea de agua que tiene en pantalla y el
+servidor las compara contra las de la corrida. Asi la bandera no depende de
+que la interfaz lleve bien la cuenta. La tolerancia es de 0.01 px, que solo
+absorbe el ruido de coma flotante: cualquier arrastre real cuenta como
+correccion. La pagina muestra en el momento si la geometria cambio, con un
+boton para restaurar la original, para que un arrastre accidental no se
+guarde como correccion.
+
+Para poder compararlas, **las tres capas ahora devuelven las regiones con que
+corrieron** (`regiones_dibujadas`) y el consenso las lleva al reporte. Eso
+destapo un hueco del Modulo 7: cada capa se corre desde su panel, y entre una
+y otra se puede mover una region o navegar a otro cuadro. El consenso
+combinaba en silencio capas medidas sobre recortes distintos. Ahora lo avisa,
+y tambien cuando las capas tomaron cuadros de referencia distintos.
+
+### La camara se mueve, y eso no es un error de la region
+
+La region se dibujo sobre el cuadro de referencia, y las capas la arrastraron
+con el movimiento de la camara (Modulo 4). En un bloque lejano del cuadro de
+referencia la region se ve desplazada aunque las capas la hayan seguido bien.
+La pagina muestra el desplazamiento medio de la camara en ese bloque, para no
+confundir la deriva con un contorno mal dibujado. Las capas solo reportan la
+magnitud del desplazamiento, no su direccion, asi que la region no se puede
+dibujar ya compensada.
+
+### Revision a ciegas
+
+La casilla **Revision a ciegas** oculta las predicciones y los motivos. La
+decision se guarda con `a_ciegas = 1` solo si las predicciones no se
+mostraron **ni un momento** mientras el clip estuvo abierto: activar la
+casilla despues de verlas no cuenta.
+
+Importa por esto: la cola es una muestra sesgada --los clips dificiles-- y
+etiquetarla viendo lo que dijeron las capas ancla el juicio. Sirve para el
+conjunto de entrenamiento, pero **no es el conjunto de prueba** con el que se
+reportan precision, recall y F1 por clase. Ese tiene que ser una muestra de
+todos los bloques, no solo de la cola, etiquetada a ciegas. La columna permite
+separar unas decisiones de otras despues.
+
+### Varias corridas del mismo video
+
+Mandar otra vez el consenso de un video crea otra corrida y la cola muestra la
+mas reciente. Las decisiones se ligan al `clip_id`, que lleva el rango de
+cuadros:
+
+- **Misma rejilla** (se movio un umbral del consenso): los identificadores
+  coinciden y las decisiones ya tomadas siguen valiendo.
+- **Otra rejilla** (otro cuadro de inicio u otra duracion de bloque): los
+  identificadores cambian y la cola empieza limpia. Las decisiones viejas no
+  se borran.
+
+El `clip_id` lleva el numero de region, y las regiones se numeran de izquierda
+a derecha. Si entre dos corridas se agrega una region a la izquierda, `r1`
+pasa a ser otro cilindro. Al guardar la corrida se comprueba que el centro de
+cada region nueva caiga dentro de la region del mismo numero en la corrida
+anterior, y si no, se avisa.
+
+### Lo que el Modulo 9 tiene que saber
+
+- Un clip puede tener decision humana y a la vez salir **aceptado** en una
+  corrida posterior con umbrales mas laxos. La decision humana manda.
+- Los descartados no entran al CSV.
+- Las correcciones de geometria quedan registradas, pero **las capas no se
+  vuelven a correr con ellas**: la conducta decidida es la de la persona, y la
+  geometria corregida sirve para recalcular despues si hace falta.
+
+### Criterio de verificacion
+
+**La base, sin video** (`python scripts/verificar_revision.py`): 50
+comprobaciones sobre un archivo temporal. Guardar una corrida y leer la cola
+en orden de region y tiempo; decidir sin correccion, con la region corregida
+y descartando con la linea de agua corregida; rechazar etiquetas fuera de las
+tres clases, un descarte con etiqueta, una region de tres esquinas, un clip o
+una corrida que no existen; reemplazar una decision al cambiar de opinion; que
+las decisiones sobrevivan a otra corrida con la misma rejilla y no a una con
+otra rejilla; avisar de regiones renumeradas y de capas corridas con regiones
+o cuadros de referencia distintos. Al final lee el archivo sqlite sin pasar
+por la clase.
+
+**De extremo a extremo en el navegador**, con `videos/prueba_sintetica.mp4`
+(20 s a 30 FPS): region y linea de agua dibujadas, las tres capas corridas
+desde sus paneles con el umbral de desplazamiento en 0.25, **Combinar** y
+**Enviar a revision**. La corrida 1 quedo con 4 clips en cola y 0 aceptados.
+En `/revision`:
+
+| Clip | Que se hizo | Lo que quedo en sqlite |
+|---|---|---|
+| `r1\|0-149` | `Enter` sin decision (no guarda nada), `2`, `Enter` | `nado`, sin correcciones, `a_ciegas = 0` |
+| `r1\|150-299` | Arrastrar la esquina superior derecha, `Z`, volver a arrastrarla, nota, activar la casilla a ciegas, `2`, `Enter` | `nado`, `roi_corregida = 1` con la esquina en (548, 54), la nota, `a_ciegas = 0`: las predicciones ya se habian visto |
+| `r1\|300-449` | Abre a ciegas; `W` y dos clics, `3`, `Enter` | `inmovilidad`, `linea_agua_corregida = 1` con la linea nueva, `a_ciegas = 1` |
+| `r1\|450-599` | `D`, nota, `Enter` | `descartado = 1`, etiqueta nula, la nota, `a_ciegas = 1` |
+
+La reproduccion del clip `150-299` a 2x dio la vuelta del final del bloque al
+cuadro 150 sin entrar al bloque siguiente. Al recargar la pagina, la cola dice
+«4 de 4 clips de la cola decididos» y cada clip vuelve a mostrar su decision y
+su geometria corregida.
+
+Para mirar la base a mano, `scripts/verificar_revision.py` muestra como leerla
+con el modulo `sqlite3` de la biblioteca estandar; la tabla es `decisiones`.
+
+### Dos arreglos de paso
+
+- **Panel lateral.** Las secciones del panel se llaman `.bloque`, igual que
+  los cuadritos de la tira de bloques del Modulo 4, y heredaban sus 14 px de
+  ancho: desde el Modulo 4 el panel lateral salia aplastado. La regla de los
+  cuadritos queda acotada a `.tira-bloques`.
+- **Reproducir desde el final.** Pulsar reproducir en el ultimo cuadro
+  pretendia volver al principio, pero el reloj se anclaba en el cuadro viejo y
+  el primer paso saltaba de vuelta al final. Ahora se ancla en el cuadro de
+  arranque.
+
+## Modulo 9 — suavizado temporal y exportacion final
+
+Ultimo eslabon de la cadena, en `http://127.0.0.1:5055/exportacion`. No mide
+nada nuevo: lee lo que ya existe en la base del Modulo 8 y produce el CSV que
+alimenta el entrenamiento del clasificador de produccion.
+
+| Archivo | Contenido |
+|---|---|
+| `fst_labeler/exportacion.py` | Prioridad de la clase final, suavizado y armado del CSV. |
+| `static/exportacion.html` | La pagina de exportacion. |
+| `static/js/exportacion.js` | Cableado: tablero de estado, vista previa, enlace de descarga. |
+| `scripts/verificar_exportacion.py` | Verificacion del suavizado y de la cadena completa, sin video. |
+
+| Metodo y ruta | Que hace |
+|---|---|
+| `GET /api/exportacion/resumen[?ventana=N]` | Cuantos bloques por video estan listos, cuantos faltan. |
+| `GET /api/exportacion/vista-previa[?video=...][&ventana=N]` | Las filas que saldrian en el CSV, sin descargarlo. |
+| `GET /api/exportacion/csv[?video=...][&ventana=N]` | El CSV final, para descargar. |
+
+### De donde sale la clase final de cada bloque
+
+Por prioridad:
+
+1. Si hay una **decision humana** y no es descarte, esa etiqueta manda,
+   incluso sobre un bloque que el consenso habia aceptado solo. El Modulo 8
+   no ofrece corregir un aceptado desde su cola, pero si alguien decidio ese
+   `clip_id` por otra via, la decision humana pesa mas que el consenso.
+2. Si no hay decision y el bloque quedo **aceptado**, se usa la clase del
+   consenso.
+3. Un bloque **descartado** por una persona queda fuera del CSV para siempre.
+4. Un bloque en **discrepancia sin decidir** esta pendiente: no se exporta, y
+   el tablero de la pagina lo cuenta aparte para que quede claro que el CSV
+   es parcial mientras el video no este completo.
+5. Un bloque **sin datos** nunca llega a la cola del Modulo 8 -ninguna capa
+   pudo medirlo-, asi que tampoco se puede decidir. Queda fuera del CSV y se
+   cuenta aparte, en vez de desaparecer en silencio.
+
+### El suavizado opera sobre la secuencia, no sobre el tiempo
+
+Un especimen no alterna de conducta en medio segundo: un bloque de 5 s que
+discrepa de los que lo rodean por los dos lados es mas probable que sea un
+error de alguna capa que un cambio real. El voto mayoritario en una ventana
+centrada corrige eso sin que nadie tenga que mirar cada bloque otra vez.
+
+La ventana opera sobre la secuencia de bloques **que van al CSV**, por video y
+region, en el orden en que ocurren -- no sobre el tiempo real del video. Un
+bloque pendiente o descartado abre un hueco real en el video, pero para el
+suavizado simplemente no esta: sus vecinos en la secuencia son el bloque
+exportable anterior y el siguiente, esten a 5 s o a 5 minutos de distancia. Es
+una simplificacion deliberada: exigir continuidad temporal estricta dejaria
+sin suavizar cualquier bloque junto a uno pendiente, que es exactamente donde
+mas factible es un error de una capa.
+
+Un empate en la ventana -dos o tres conductas con el mismo numero de votos- no
+se resuelve por sorteo ni por orden alfabetico: no hay una conducta "por
+defecto". El bloque se deja como estaba y se cuenta aparte, igual que las
+reglas geometricas dejan escrito un empate en vez de decidirlo a ciegas
+(Modulo 6).
+
+**El voto es en paralelo, no en cadena.** Cada posicion vota sobre la
+secuencia **original**, no sobre la que ya se corrigio en pasadas anteriores
+del mismo calculo. Eso evita una asimetria de izquierda a derecha -que este
+proyecto evita en todos los demas modulos: el orden de Otsu, el orden de las
+reglas geometricas, el desempate de la Capa 3-, pero tiene un costo
+documentado: si dos bloques anomalos caen a un bloque de distancia, corregir
+el primero puede arrastrar al segundo si sus votos alcanzan a mezclarse. El
+script de verificacion deja este caso escrito, con un ejemplo concreto, en
+vez de esconderlo.
+
+### La ventana es un parametro, no una constante
+
+El valor por omision (3) es el minimo que tiene sentido: un solo bloque
+flanqueado por otros dos que concuerdan entre si. Ampliarla suaviza mas fuerte
+y puede borrar una transicion real y corta entre dos conductas; para saber
+donde ponerla hay que medir, sobre el conjunto de prueba etiquetado a mano, si
+el suavizado corrige errores o borra conducta real.
+
+### El CSV
+
+Columnas: `clip_id`, `video`, `region`, `bloque`, `cuadro_inicio`,
+`cuadro_fin`, `segundo_inicio`, `segundo_fin`, `clase`, `origen`
+(`automatico` o `humano`), `suavizado`, `clase_antes_de_suavizar` (solo si
+`suavizado` es verdadero), `a_ciegas` y `notas`. Nada se decide en el CSV
+mismo: es una lectura de lo que ya existia en la base, mas el suavizado.
+
+### Por que "reanudar" no necesita ningun mecanismo nuevo
+
+Los Modulos 7 y 8 ya escriben todo en sqlite. Esta pagina no guarda nada
+propio: cada carga es una lectura del estado actual de la base. Cerrar la
+herramienta, o incluso apagar el proceso de Python entero y volver a
+arrancarlo, no pierde nada ni exige rehacer ningun paso -las capas no se
+vuelven a correr, las decisiones no se piden otra vez-. El script de
+verificacion lo prueba reabriendo la base con una conexion nueva a mitad de
+la corrida.
+
+### Criterio de verificacion
+
+**El suavizado como funcion pura** (`python scripts/verificar_exportacion.py`,
+no necesita video): un bloque aislado que se corrige, una transicion real de
+tres bloques que no se toca, un empate de tres clases distintas que se deja
+igual, una ventana mas ancha que la secuencia, la ventana minima (1, que es la
+identidad), una secuencia vacia, y el caso documentado de dos anomalias
+contiguas que se interfieren entre si. Mas los rechazos: ventana par, cero o
+negativa.
+
+**La cadena completa sobre una base sqlite temporal**: una corrida con 9
+bloques en una sola region -dos aceptados por el consenso, un bloque aislado
+decidido a mano que el suavizado corrige, dos aceptados mas, una transicion
+real a inmovilidad que no se toca, un bloque pendiente, otro aceptado y un
+descartado-. Se comprueba el resumen (7 exportables, 1 pendiente, 1
+descartado, un solo cambio por suavizado), el contenido del CSV, y que
+reabrir la base con una conexion nueva entrega exactamente lo mismo. Despues
+se decide el bloque pendiente y se confirma que la siguiente exportacion ya
+lo incluye sin tocar nada de lo que ya estaba resuelto: 42 comprobaciones en
+total.
+
+**De extremo a extremo por HTTP**, sobre `videos/prueba_sintetica.mp4` (las
+mismas cuatro fases del Modulo 7: nado, nado, inmovilidad, escalamiento):
+consenso guardado como corrida (0 aceptados, 4 en cola, igual que en el
+Modulo 7), tres clips decididos a mano dejando el cuarto pendiente. El
+resumen respondio 3 exportables, 1 pendiente, video no listo, y un empate sin
+cambios -con solo tres bloques resueltos, el ultimo empata en su ventana de
+frontera contra el penultimo en vez de aceptar una mayoria de dos contra uno
+que no existe-. Al decidir el ultimo bloque el resumen paso a 4 exportables, 0
+pendientes, video listo, y el CSV salio con las cuatro clases exactas de la
+verdad del video sintetico, sin que el suavizado tocara ninguna -con solo
+cuatro bloques y las cuatro conductas distintas, las ventanas de frontera
+vuelven a empatar en vez de imponer una mayoria artificial-. **Apagar el
+proceso de Python por completo y volver a levantarlo** conservo el resumen y
+las cuatro decisiones exactamente iguales, sin volver a correr ninguna capa.
+
+El navegador embebido de esta sesion no pudo abrir servidores locales durante
+esta verificacion (la pagina respondia bien por HTTP directo, `curl` incluido,
+pero la pestana del navegador se negaba a navegar a `localhost`); la cadena
+completa -guardar la corrida, decidir clips, leer el resumen, la vista previa
+y el CSV- se verifico con peticiones HTTP reales contra el servidor en
+marcha, y los identificadores del HTML se cotejaron uno a uno contra los que
+pide `exportacion.js` para descartar un `id` mal escrito. Falta la
+confirmacion visual de que la tabla y la vista previa se pintan bien en el
+navegador.
+
 ## Parametros a calibrar
 
 Los valores por defecto de `fst_labeler/config.py` son **puntos de partida a
@@ -818,6 +1149,11 @@ cursor: mas exigentes aceptan menos clips sin revision y mandan mas a la cola;
 mas laxos aceptan mas y meten mas errores en el conjunto de entrenamiento.
 Donde ponerlos se decide midiendo cuantos de los aceptados estaban bien, contra
 el conjunto de prueba etiquetado a mano. No se puede fijar de antemano.
+
+La ventana de suavizado del Modulo 9 -3 bloques por omision- es igual de
+provisional: mas ancha limpia mas ruido y borra mas transiciones reales cortas.
+Se calibra viendo, sobre el conjunto de prueba, si el suavizado corrige
+errores o conducta real.
 
 ## Dependencias
 

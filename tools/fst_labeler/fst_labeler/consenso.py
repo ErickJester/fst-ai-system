@@ -521,6 +521,10 @@ def combinar(
     return {
         "video": nombre_video,
         "clases": list(CLASES),
+        # La geometria con que corrieron las capas. El Modulo 8 la guarda con
+        # la corrida para saber, al revisar, si la persona la corrigio.
+        "regiones_dibujadas": _geometria(movimiento, modelo, reglas),
+        "cuadro_referencia": rejilla.get("cuadro_referencia"),
         "parametros": p.to_dict(),
         "capas_presentes": {
             "movimiento": movimiento is not None,
@@ -574,6 +578,18 @@ def _indexar_por_cuadro(bloques: list[dict]) -> dict:
     return {b["cuadro_inicio"]: b for b in bloques}
 
 
+def _geometria(movimiento, modelo, reglas) -> list[dict] | None:
+    """Regiones con que corrieron las capas; las de las reglas primero.
+
+    Las reglas son la unica capa que usa la linea de agua, asi que su copia es
+    la unica que la trae completa.
+    """
+    for informe in (reglas, movimiento, modelo):
+        if informe is not None and informe.get("regiones_dibujadas"):
+            return informe["regiones_dibujadas"]
+    return None
+
+
 def _avisar_desalineacion(movimiento, modelo, reglas, avisos: list[str]) -> None:
     """Delata reportes que no describen el mismo material."""
     presentes = [(n, i) for n, i in
@@ -598,6 +614,33 @@ def _avisar_desalineacion(movimiento, modelo, reglas, avisos: list[str]) -> None
             "Las capas empezaron en cuadros distintos (" +
             ", ".join(str(c) for c in sorted(inicios, key=lambda x: (x is None, x))) +
             "). Los bloques que no se emparejan quedan con una sola opinion."
+        )
+
+    # Cada capa se corre desde su panel, y entre una y otra se puede mover una
+    # region o navegar a otro cuadro. Solo se comparan las esquinas: la linea
+    # de agua la usan las reglas y ninguna otra capa.
+    firmas = {
+        n: tuple(
+            tuple((round(p["x"], 2), round(p["y"], 2)) for p in r["esquinas"])
+            for r in i["regiones_dibujadas"]
+        )
+        for n, i in presentes if i.get("regiones_dibujadas")
+    }
+    if len(set(firmas.values())) > 1:
+        avisos.append(
+            "Las capas no corrieron con las mismas regiones de interes (" +
+            ", ".join(sorted(firmas)) + "): alguna region se movio entre una corrida y "
+            "otra. Sus bloques describen recortes distintos; vuelve a correr las que "
+            "quedaron con la region vieja."
+        )
+    referencias = {i.get("cuadro_referencia") for _, i in presentes
+                   if i.get("cuadro_referencia") is not None}
+    if len(referencias) > 1:
+        avisos.append(
+            "Las capas tomaron cuadros de referencia distintos (" +
+            ", ".join(str(c) for c in sorted(referencias)) + "). Las regiones se "
+            "dibujaron sobre uno solo: con la camara en movimiento, las demas capas "
+            "las colocaron desplazadas."
         )
 
     if movimiento is not None and reglas is not None:

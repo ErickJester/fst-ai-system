@@ -13,7 +13,12 @@
 
    Lo que el panel pinta no es un porcentaje de acierto. Es cuántos clips se
    pueden aceptar sin que nadie los mire y, sobre todo, por qué se encolan los
-   demás: ese conteo de motivos es lo que dice qué ajustar. */
+   demás: ese conteo de motivos es lo que dice qué ajustar.
+
+   «Enviar a revisión» guarda el reporte en la base sqlite del Módulo 8 como
+   una corrida, con la geometría con que corrieron las capas, y la cola queda
+   disponible en /revision. Es un paso explícito y no automático: «Combinar»
+   se usa para tantear umbrales, y cada tanteo no debe volverse una corrida. */
 
 import { COLOR_CLASE } from "./modelo.js";
 
@@ -34,7 +39,9 @@ export class PanelConsenso {
     this.mensaje = null;
     this.error = null;
     this.regiones = [];
+    this.envio = null;
     this.n.btnCombinar.addEventListener("click", () => this.combinar());
+    this.n.btnEnviarRevision.addEventListener("click", () => this.enviarARevision());
     this.n.btnConsensoCompleto.addEventListener("click", () => this.correrTodo());
   }
 
@@ -44,6 +51,7 @@ export class PanelConsenso {
       this.informe = null;
       this.mensaje = null;
       this.error = null;
+      this.envio = null;
     }
     this.fps = fps;
     this.cuadroActual = cuadroActual;
@@ -75,7 +83,8 @@ export class PanelConsenso {
     const capas = this.informesDeCapas();
     if (!capas.movimiento && !capas.reglas) {
       this.error =
-        "Hace falta al menos la detección de movimiento o las reglas geométricas: " +
+        "No se pudo combinar: hace falta al menos la detección de movimiento o " +
+        "las reglas geométricas: " +
         "el modelo preentrenado trabaja en clips de 3 s y no define la rejilla de bloques.";
       this.informe = null;
       this.dibujar();
@@ -115,6 +124,7 @@ export class PanelConsenso {
     this.ocupado = true;
     this.error = null;
     this.informe = null;
+    this.envio = null;
     this.mensaje = mensaje;
     this.dibujar();
     try {
@@ -128,7 +138,33 @@ export class PanelConsenso {
       this.informe = datos;
       this.mensaje = null;
     } catch (e) {
-      this.error = e.message;
+      this.error = "No se pudo combinar: " + e.message;
+      this.mensaje = null;
+    } finally {
+      this.ocupado = false;
+      this.dibujar();
+    }
+  }
+
+  async enviarARevision() {
+    if (!this.informe || this.ocupado) return;
+    this.ocupado = true;
+    this.error = null;
+    this.envio = null;
+    this.mensaje = "Guardando la corrida en la base de la revisión…";
+    this.dibujar();
+    try {
+      const resp = await fetch("/api/revision/corridas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ informe: this.informe }),
+      });
+      const datos = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error((datos && datos.error) || "HTTP " + resp.status);
+      this.envio = datos;
+      this.mensaje = null;
+    } catch (e) {
+      this.error = "No se pudo enviar a revisión: " + e.message;
       this.mensaje = null;
     } finally {
       this.ocupado = false;
@@ -140,6 +176,8 @@ export class PanelConsenso {
     const calculadas = this.capasCalculadas;
     this.n.btnCombinar.disabled = this.ocupado || calculadas === 0;
     this.n.btnConsensoCompleto.disabled = !this.listo;
+    this.n.btnEnviarRevision.disabled =
+      this.ocupado || !this.informe || !this.informe.totales.clips;
     this.n.btnCombinar.textContent = this.ocupado
       ? "Trabajando…"
       : "Combinar (" + calculadas + " de 3)";
@@ -152,8 +190,16 @@ export class PanelConsenso {
 
     const e = this.n.estadoConsenso;
     e.className = "estado-deteccion" + (this.error ? " error" : "");
-    if (this.error) e.textContent = "No se pudo combinar: " + this.error;
+    if (this.error) e.textContent = this.error;
     else if (this.mensaje) e.textContent = this.mensaje;
+    else if (this.envio)
+      e.textContent =
+        "Corrida " + this.envio.corrida_id + " guardada: " + this.envio.en_cola +
+        " clips a la cola de revisión" +
+        (this.envio.en_cola_ya_decididos
+          ? " (" + this.envio.en_cola_ya_decididos + " ya tenían decisión de una corrida anterior)"
+          : "") +
+        " y " + this.envio.aceptados + " aceptados. Ábrela con «Abrir la cola de revisión».";
     else if (!this.videoId) e.textContent = "Selecciona un video.";
     else if (!this.regiones.length)
       e.textContent = "Dibuja al menos una región de interés (R).";
@@ -168,6 +214,14 @@ export class PanelConsenso {
 
     this.n.resultadosConsenso.innerHTML = "";
     if (!this.informe) return;
+    if (this.envio) {
+      for (const aviso of this.envio.avisos) {
+        const p = document.createElement("p");
+        p.className = "aviso-deteccion";
+        p.textContent = aviso;
+        this.n.resultadosConsenso.appendChild(p);
+      }
+    }
     this._dibujarResumen();
     this.informe.regiones.forEach((r) => this._dibujarRegion(r));
   }
