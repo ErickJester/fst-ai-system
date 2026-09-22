@@ -129,10 +129,22 @@ class Config:
     # 2 son todas las que hay; en 1 el consenso queda desactivado.
     consenso_minimo_votantes: int = 2
 
+    # ------------------------------------------------- revision humana
+    # Base sqlite de la cola de revision y de las decisiones (Modulo 8). Vive
+    # fuera del control de versiones: son datos, no codigo.
+    base_datos: Path = field(default=DIR_HERRAMIENTA / "datos" / "revision.sqlite3")
+
+    # --------------------------------------------- exportacion (Modulo 9)
+    # Ventana del voto mayoritario, en bloques. Impar, para que tenga centro.
+    # Punto de partida a calibrar: 3, el minimo que corrige un bloque aislado
+    # flanqueado por otros dos que concuerdan entre si.
+    exportacion_ventana_suavizado: int = 3
+
     debug: bool = False
 
     def __post_init__(self) -> None:
         self.videos_dir = Path(self.videos_dir).expanduser().resolve()
+        self.base_datos = Path(self.base_datos).expanduser().resolve()
         if not 1 <= self.jpeg_quality <= 100:
             raise ValueError("jpeg_quality debe estar entre 1 y 100")
         if self.seek_forward_max < 0:
@@ -167,6 +179,8 @@ class Config:
             raise ValueError("consenso_cobertura_minima debe estar entre 0 y 1")
         if self.consenso_minimo_votantes not in (1, 2):
             raise ValueError("consenso_minimo_votantes debe ser 1 o 2")
+        if self.exportacion_ventana_suavizado < 1 or self.exportacion_ventana_suavizado % 2 == 0:
+            raise ValueError("exportacion_ventana_suavizado debe ser un numero impar de al menos 1")
 
     def preferencias_visor(self) -> dict:
         """Valores por defecto que el visor toma del servidor al arrancar."""
@@ -204,6 +218,8 @@ class Config:
         datos: dict = {}
         if os.environ.get("FST_VIDEOS_DIR"):
             datos["videos_dir"] = Path(os.environ["FST_VIDEOS_DIR"])
+        if os.environ.get("FST_BASE_DATOS"):
+            datos["base_datos"] = Path(os.environ["FST_BASE_DATOS"])
         if os.environ.get("FST_HOST"):
             datos["host"] = os.environ["FST_HOST"]
         if os.environ.get("FST_PORT"):

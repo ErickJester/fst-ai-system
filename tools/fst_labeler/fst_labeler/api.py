@@ -1,4 +1,4 @@
-"""Endpoints HTTP del servidor de cuadros (Modulos 1 a 3).
+"""Endpoints HTTP de la herramienta de etiquetado (Modulos 1 a 9).
 
 Rutas:
   GET /api/indice
@@ -13,14 +13,22 @@ Rutas:
   POST /api/videos/<video_id>/reglas-geometricas
   POST /api/videos/<video_id>/consenso
   POST /api/consenso
+  POST /api/revision/corridas
+  GET  /api/revision/cola[?video=...]
+  POST /api/revision/decisiones
+  GET  /api/revision/decisiones
+  GET  /api/exportacion/resumen[?ventana=N]
+  GET  /api/exportacion/vista-previa[?video=...][&ventana=N]
+  GET  /api/exportacion/csv[?video=...][&ventana=N]
 """
 from __future__ import annotations
 
 import cv2
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from . import __version__, estabilizacion
+from . import __version__, estabilizacion, exportacion
 from . import consenso, modelo_3d, reglas_geometricas
+from .revision import BaseRevision, ClipNoEncontrado
 from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
@@ -51,7 +59,7 @@ def _entero(nombre: str, predeterminado: int | None = None) -> int | None:
         raise ValueError(f"El parametro {nombre} debe ser un numero entero.")
 
 
-def crear_blueprint(catalogo, cfg) -> Blueprint:
+def crear_blueprint(catalogo, cfg, revision: BaseRevision) -> Blueprint:
     bp = Blueprint("api", __name__, url_prefix="/api")
 
     @bp.get("/indice")
@@ -61,7 +69,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             {
                 "herramienta": "Etiquetado semi-automatico FST (nado forzado)",
                 "version": __version__,
-                "modulo_actual": "7 - consenso y cola de discrepancias",
+                "modulo_actual": "9 - suavizado temporal y exportacion final",
                 "videos_dir": str(catalogo.raiz),
                 "endpoints": {
                     "visor": "/",
@@ -76,6 +84,15 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
                     "reglas_geometricas": "POST /api/videos/<video_id>/reglas-geometricas",
                     "consenso_del_video": "POST /api/videos/<video_id>/consenso",
                     "consenso_de_informes": "POST /api/consenso",
+                    "revision": "/revision",
+                    "revision_guardar_corrida": "POST /api/revision/corridas",
+                    "revision_cola": "/api/revision/cola?video=<video_id>",
+                    "revision_decidir": "POST /api/revision/decisiones",
+                    "revision_decisiones": "/api/revision/decisiones",
+                    "exportacion": "/exportacion",
+                    "exportacion_resumen": "/api/exportacion/resumen",
+                    "exportacion_vista_previa": "/api/exportacion/vista-previa?video=<video_id>",
+                    "exportacion_csv": "/api/exportacion/csv?video=<video_id>",
                 },
             }
         )
@@ -90,7 +107,8 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         return jsonify(
             {
                 "estado": "ok",
-                "modulo": "7 - consenso y cola de discrepancias",
+                "modulo": "9 - suavizado temporal y exportacion final",
+                "base_datos": str(revision.ruta),
                 "videos_dir": str(catalogo.raiz),
                 "videos_dir_existe": catalogo.raiz.is_dir(),
                 "opencv": cv2.__version__,
@@ -160,9 +178,9 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
 
     # ------------------------------------------------- Modulo 4: deteccion
     #
-    # Las regiones viajan en el cuerpo de la peticion, no se guardan en el
-    # servidor: el navegador sigue siendo su dueno hasta que el Modulo 8
-    # introduzca la base de datos.
+    # Las regiones viajan en el cuerpo de la peticion. Cada capa las devuelve
+    # en `regiones_dibujadas`, para que el consenso sepa con que geometria
+    # corrio y el Modulo 8 la guarde con la corrida al mandarla a revision.
 
     def _regiones_del_cuerpo(cuerpo: dict) -> list:
         regiones = cuerpo.get("regiones")
@@ -266,6 +284,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             parametros=parametros,
         )
         informe["video"] = video_id
+        informe["regiones_dibujadas"] = regiones
         return jsonify(informe)
 
     # --------------------------------------------- Modulo 5: modelo 3D
@@ -323,6 +342,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             parametros=parametros,
         )
         informe["video"] = video_id
+        informe["regiones_dibujadas"] = regiones
         return jsonify(informe)
 
     @bp.errorhandler(modelo_3d.ModeloNoDisponible)
@@ -390,6 +410,7 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             parametros=parametros,
         )
         informe["video"] = video_id
+        informe["regiones_dibujadas"] = regiones
         return jsonify(informe)
 
     # ----------------------------------------------- Modulo 7: consenso
@@ -457,6 +478,9 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
             p_reglas=_parametros_reglas(opciones.get("reglas") or {}),
             capas=cuerpo.get("capas"),
         )
+        for informe_capa in (movimiento, modelo, reglas):
+            if informe_capa is not None:
+                informe_capa["regiones_dibujadas"] = regiones
         if movimiento is None and reglas is None:
             raise RuntimeError(
                 "Ninguna de las dos capas que definen la rejilla de bloques pudo "
@@ -473,7 +497,102 @@ def crear_blueprint(catalogo, cfg) -> Blueprint:
         informe["avisos"] = avisos + informe["avisos"]
         return jsonify(informe)
 
+    # ------------------------------------------- Modulo 8: revision humana
+
+    @bp.post("/revision/corridas")
+    def revision_guardar_corrida():
+        """Guarda un reporte del consenso como corrida y alimenta la cola."""
+        cuerpo = request.get_json(silent=True) or {}
+        informe = cuerpo.get("informe")
+        if not isinstance(informe, dict):
+            raise ValueError("Falta el reporte del consenso a guardar.")
+        return jsonify(revision.guardar_corrida(informe))
+
+    @bp.get("/revision/cola")
+    def revision_cola():
+        """Clips en discrepancia de la corrida vigente de cada video."""
+        return jsonify(revision.cola(video=request.args.get("video") or None))
+
+    @bp.post("/revision/decisiones")
+    def revision_decidir():
+        """Decision humana sobre un clip; la correccion de geometria se
+        determina aqui, comparando contra la corrida."""
+        cuerpo = request.get_json(silent=True) or {}
+        for campo in ("clip_id", "corrida_id", "esquinas"):
+            if cuerpo.get(campo) in (None, ""):
+                raise ValueError(f"Falta el campo {campo}.")
+        decision = revision.decidir(
+            clip_id=str(cuerpo["clip_id"]),
+            corrida_id=int(cuerpo["corrida_id"]),
+            etiqueta=cuerpo.get("etiqueta"),
+            descartado=bool(cuerpo.get("descartado")),
+            esquinas=cuerpo["esquinas"],
+            linea_agua=cuerpo.get("linea_agua"),
+            notas=cuerpo.get("notas"),
+            a_ciegas=bool(cuerpo.get("a_ciegas")),
+        )
+        return jsonify({"decision": decision})
+
+    @bp.get("/revision/decisiones")
+    def revision_decisiones():
+        """Todas las decisiones guardadas, para verificarlas."""
+        decisiones = revision.decisiones()
+        return jsonify({"total": len(decisiones), "decisiones": decisiones})
+
+    # ---------------------------------------- Modulo 9: suavizado y export
+
+    def _ventana_suavizado() -> int:
+        ventana = _entero("ventana", cfg.exportacion_ventana_suavizado)
+        exportacion.validar_ventana(ventana)
+        return ventana
+
+    @bp.get("/exportacion/resumen")
+    def exportacion_resumen():
+        """Cuantos bloques por video estan listos para exportar y cuantos faltan.
+
+        No descarga nada: es la lectura barata para un tablero que se puede
+        refrescar en cualquier momento sin volver a correr ninguna capa.
+        """
+        _filas, resumen = exportacion.filas_exportables(
+            revision, video=None, ventana=_ventana_suavizado()
+        )
+        return jsonify(resumen)
+
+    @bp.get("/exportacion/vista-previa")
+    def exportacion_vista_previa():
+        """Las filas que saldrian en el CSV, sin descargarlo.
+
+        Sirve para ver el efecto del suavizado --que bloques cambiaron de
+        clase y donde hubo empate-- antes de comprometerse a exportar.
+        """
+        video = request.args.get("video") or None
+        filas, resumen = exportacion.filas_exportables(
+            revision, video=video, ventana=_ventana_suavizado()
+        )
+        return jsonify({"filas": filas, "resumen": resumen})
+
+    @bp.get("/exportacion/csv")
+    def exportacion_csv():
+        """El CSV final: clase resuelta (decision humana o consenso), suavizada.
+
+        Los bloques pendientes de revision o sin datos quedan fuera; el
+        resumen de `/exportacion/resumen` dice cuantos son.
+        """
+        video = request.args.get("video") or None
+        filas, _resumen = exportacion.filas_exportables(
+            revision, video=video, ventana=_ventana_suavizado()
+        )
+        texto = exportacion.exportar_csv(filas)
+        nombre = f"fst_{video}.csv" if video else "fst_etiquetas.csv"
+        respuesta = Response(texto, mimetype="text/csv; charset=utf-8")
+        respuesta.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return respuesta
+
     # --------------------------------------------------------------- errores
+    @bp.errorhandler(ClipNoEncontrado)
+    def _no_existe(error):
+        return jsonify({"error": str(error), "tipo": "no_encontrado"}), 404
+
     @bp.errorhandler(VideoNoEncontrado)
     def _no_encontrado(error):
         return jsonify({"error": str(error), "tipo": "video_no_encontrado"}), 404

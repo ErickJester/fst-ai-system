@@ -7,4 +7,4 @@ inmovilidad, escalamiento) para entrenar el clasificador de produccion del
 sistema; no es el sistema entregable.
 """
 
-__version__ = "0.7.0"  # Modulo 7: consenso y cola de discrepancias
+__version__ = "0.9.0"  # Modulo 9: suavizado temporal y exportacion final

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exportación FST — suavizado y CSV final</title>
+  <link rel="stylesheet" href="/static/css/estilos.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div>
+    <h1>Suavizado temporal y exportación final</h1>
+    <p class="subtitulo">
+      Un bloque de 5 s que discrepa de los que lo rodean por los dos lados es
+      más probable que sea un error de alguna capa que un cambio real de
+      conducta. Esta página limpia esos casos y exporta el CSV que alimenta
+      el entrenamiento del clasificador de producción.
+      <span id="version" class="version"></span>
+    </p>
+  </div>
+  <div class="selector-video">
+    <a class="boton secundario" href="/revision">Cola de revisión</a>
+    <a class="boton secundario" href="/">Volver al análisis</a>
+  </div>
+</header>
+
+<div id="aviso" class="aviso oculto" role="status"></div>
+
+<main class="disposicion-simple">
+
+  <section class="panel bloque-ancho">
+    <h2>Estado por video</h2>
+    <p class="nota">
+      Solo la corrida más reciente de cada video cuenta. Un video queda
+      <strong>listo</strong> cuando ningún bloque suyo sigue en la cola sin
+      decidir; los descartados y los bloques sin datos no cuentan como
+      pendientes, pero tampoco entran al CSV.
+    </p>
+    <table id="tabla-videos" class="tabla-datos">
+      <thead>
+        <tr>
+          <th>Video</th>
+          <th>Bloques</th>
+          <th>Exportables</th>
+          <th>Pendientes</th>
+          <th>Descartados</th>
+          <th>Sin datos</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="filas-videos">
+        <tr><td colspan="7">Cargando…</td></tr>
+      </tbody>
+    </table>
+    <p id="resumen-global" class="estado-deteccion">—</p>
+  </section>
+
+  <section class="panel bloque-ancho">
+    <h2>Suavizado temporal</h2>
+    <p class="nota">
+      Voto mayoritario en una ventana centrada de bloques, por video y
+      región. Corrige un bloque aislado que no concuerda con sus vecinos; un
+      empate en la ventana se deja tal cual y se cuenta aparte, no se
+      resuelve al azar. La ventana es un <strong>punto de partida a
+      calibrar</strong>, no un resultado experimental: 3 es el mínimo que
+      tiene sentido (un bloque flanqueado por otros dos que concuerdan entre
+      sí). Ampliarla suaviza más fuerte y puede borrar una transición real y
+      corta.
+    </p>
+    <div class="controles-exportacion">
+      <label class="campo" for="ventana">
+        Ventana (bloques, impar)
+        <input id="ventana" type="number" min="1" step="2" value="3">
+      </label>
+      <label class="campo" for="selector-video-export">
+        Video a exportar
+        <select id="selector-video-export">
+          <option value="">— todos los videos listos —</option>
+        </select>
+      </label>
+    </div>
+    <div class="botonera-regiones">
+      <button id="btn-vista-previa" type="button" class="secundario">
+        Vista previa del suavizado
+      </button>
+      <a id="enlace-csv" class="boton principal" href="#" download>
+        Descargar CSV
+      </a>
+    </div>
+    <p id="estado-exportacion" class="estado-deteccion">—</p>
+  </section>
+
+  <section class="panel bloque-ancho">
+    <h2>Qué cambió el suavizado</h2>
+    <p class="nota">
+      Ningún cambio queda en silencio: cada fila dice qué clase tenía el
+      bloque antes de suavizar y con cuál se queda. Esto es una vista previa;
+      no descarga nada por sí sola.
+    </p>
+    <div id="resumen-suavizado" class="resultados-deteccion"></div>
+    <table id="tabla-cambios" class="tabla-datos oculto">
+      <thead>
+        <tr>
+          <th>Video</th>
+          <th>Región</th>
+          <th>Bloque</th>
+          <th>Tramo</th>
+          <th>Antes</th>
+          <th>Después</th>
+        </tr>
+      </thead>
+      <tbody id="filas-cambios"></tbody>
+    </table>
+    <p id="sin-cambios" class="nota oculto">
+      Ningún bloque cambió de clase con esta ventana.
+    </p>
+  </section>
+
+</main>
+
+<footer class="pie">
+  Módulo 9 de 9 — suavizado temporal y exportación final a CSV. Es el último
+  módulo de la herramienta de etiquetado semi-automático.
+</footer>
+
+<script type="module" src="/static/js/exportacion.js"></script>
+</body>
+</html>

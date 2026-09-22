@@ -92,6 +92,7 @@ const nodos = {
   consensoEmpates: el("consenso-empates"),
   btnCombinar: el("btn-combinar"),
   btnConsensoCompleto: el("btn-consenso-completo"),
+  btnEnviarRevision: el("btn-enviar-revision"),
   estadoConsenso: el("estado-consenso"),
   resultadosConsenso: el("resultados-consenso"),
 };

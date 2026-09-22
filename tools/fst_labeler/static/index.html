@@ -306,6 +306,14 @@
           Correr las tres capas
         </button>
       </div>
+      <div class="botonera-regiones">
+        <button id="btn-enviar-revision" type="button" class="secundario" disabled
+                title="Guarda este consenso en la base de la revisión como una corrida">
+          Enviar a revisión
+        </button>
+        <a class="boton secundario" href="/revision">Abrir la cola de revisión</a>
+        <a class="boton secundario" href="/exportacion">Exportación final</a>
+      </div>
       <p id="estado-consenso" class="estado-deteccion">Selecciona un video.</p>
       <p class="nota">
         Mover estos umbrales no cambia nada de lo que midieron las capas, así
@@ -313,6 +321,11 @@
         están en pantalla. Son puntos de partida: dónde ponerlos se decide
         midiendo cuántos de los aceptados estaban bien, contra el conjunto de
         prueba etiquetado a mano.
+      </p>
+      <p class="nota">
+        «Enviar a revisión» guarda el consenso que está en pantalla, con las
+        regiones y líneas de agua con que corrieron las capas. Los clips en
+        discrepancia se resuelven en la página de revisión.
       </p>
     </section>
 
@@ -376,9 +389,9 @@
 </main>
 
 <footer class="pie">
-  Módulo 7 de 9 — visor, regiones de interés, las tres capas de etiquetado y
-  el consenso entre ellas. La interfaz para resolver los clips en discrepancia
-  llega en el Módulo 8.
+  Módulo 9 de 9 — visor, regiones de interés, las tres capas de etiquetado, el
+  consenso entre ellas, la revisión humana de la cola, el suavizado temporal y
+  la exportación final a CSV.
 </footer>
 
 <script type="module" src="/static/js/app.js"></script>
