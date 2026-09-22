@@ -17,3 +17,6 @@ CLAUDE.md
 
 # modelo preentrenado y videos de ejemplo de Zenodo (CC-BY-4.0), no se versionan
 /tools/fst_labeler/modelo_3drcnn/
+
+# base sqlite de la revision humana (Modulo 8): datos, no codigo
+/tools/fst_labeler/datos/

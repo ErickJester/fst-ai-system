@@ -46,6 +46,9 @@ export class Visor {
 
     this.reproduciendo = false;
     this.velocidad = 1;
+    // Tramo que la reproducción repite en bucle: el clip en revisión del
+    // Módulo 8. null reproduce el video entero, como en el Módulo 2.
+    this.rango = null;
     this.cargando = false;
     this.omitidos = 0;
     this.mensaje = null;
@@ -280,17 +283,27 @@ export class Visor {
 
   reproducir() {
     if (this.reproduciendo || !this.puedeReproducir()) return;
+    // Punto de arranque: el inicio del tramo si se está fuera de él, o el
+    // principio del video si ya se estaba al final. El reloj se ancla en ese
+    // cuadro y no en el actual, o el primer paso saltaría de vuelta al final.
+    let base = this.cuadroActual;
     const tope = this.ultimoCuadro;
-    if (tope !== null && this.cuadroActual >= tope) {
-      this.irA(0);   // estaba al final: vuelve a empezar
+    if (this.rango && (base < this.rango.inicio || base >= this.rango.fin)) {
+      base = this.rango.inicio;
+    } else if (!this.rango && tope !== null && base >= tope) {
+      base = 0;
     }
     this.reproduciendo = true;
     this.omitidos = 0;
     this.mensaje = null;
-    this._cuadroBase = this.cuadroActual;
+    this._cuadroBase = base;
     this._t0 = performance.now();
     this._enVuelo = false;
     this._pasoObservado = 1;
+    if (base !== this.cuadroActual) {
+      this._enVuelo = true;
+      this.irA(base).finally(() => { this._enVuelo = false; });
+    }
     this._notificar();
     this._raf = requestAnimationFrame(() => this._paso());
   }
@@ -324,6 +337,19 @@ export class Visor {
     const transcurrido = (performance.now() - this._t0) / 1000;
     const objetivo = this._cuadroBase + Math.floor(transcurrido * this.fps * this.velocidad);
     const tope = this.ultimoCuadro;
+
+    if (this.rango && objetivo > this.rango.fin) {
+      // Fin del tramo: vuelve a empezar. Quien revisa suele necesitar ver el
+      // clip más de una vez antes de decidir.
+      if (!this._enVuelo) {
+        this._cuadroBase = this.rango.inicio;
+        this._t0 = performance.now();
+        this._enVuelo = true;
+        this.irA(this.rango.inicio).finally(() => { this._enVuelo = false; });
+      }
+      this._raf = requestAnimationFrame(() => this._paso());
+      return;
+    }
 
     if (tope !== null && objetivo >= tope) {
       this._enVuelo = true;

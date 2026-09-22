@@ -37,11 +37,15 @@ export const MODO = {
 };
 
 export class EditorRegiones {
-  constructor(lienzo, imagen, { alCambiar } = {}) {
+  constructor(lienzo, imagen, { alCambiar, numeroDe } = {}) {
     this.lienzo = lienzo;
     this.imagen = imagen;
     this.ctx = lienzo.getContext("2d");
     this.alCambiar = alCambiar || (() => {});
+    // Número con que se rotula y colorea cada región. En el visor es su
+    // posición de izquierda a derecha; en la revisión (Módulo 8) se muestra
+    // una sola región y tiene que llevar su número verdadero.
+    this.numeroDe = numeroDe || ((indice) => indice + 1);
 
     // Las regiones viven por video: al volver a un video ya trabajado siguen
     // ahí mientras la página no se recargue.
@@ -81,6 +85,22 @@ export class EditorRegiones {
       return;
     }
     this.redibujar();
+  }
+
+  /* Reemplaza las regiones de un video desde fuera (Módulo 8: la geometría
+     con que corrieron las capas). Empieza un historial nuevo: deshacer no
+     debe devolver las regiones de otro clip. */
+  fijarRegiones(videoId, regiones) {
+    const copia = regiones.map(clonarRegion);
+    this.porVideo.set(videoId, copia);
+    if (videoId !== this.videoId) return;   // se aplican al sincronizar
+    this.regiones = copia;
+    this.seleccionada = copia[0] || null;
+    this.modo = MODO.NAVEGAR;
+    this._enCurso = [];
+    this._historial = [];
+    this._arrastre = null;
+    this._notificar();
   }
 
   _regionesDe(videoId) {
@@ -386,7 +406,7 @@ export class EditorRegiones {
 
   _dibujarRegion(region, indice, activa) {
     const ctx = this.ctx;
-    const color = COLORES[indice % COLORES.length];
+    const color = this._color(indice);
     const puntos = region.esquinas.map((p) => this._aPantalla(p));
 
     ctx.save();
@@ -411,7 +431,11 @@ export class EditorRegiones {
       this._tirador(p, color, i === 0, activa);
     });
 
-    this._etiqueta(puntos[0], String(indice + 1), color);
+    this._etiqueta(puntos[0], String(this.numeroDe(indice)), color);
+  }
+
+  _color(indice) {
+    return COLORES[(this.numeroDe(indice) - 1) % COLORES.length];
   }
 
   _dibujarLineaDeAgua(region, color, activa) {
@@ -478,7 +502,7 @@ export class EditorRegiones {
     if (!this._enCurso.length) return;
     const ctx = this.ctx;
     const color = this.modo === MODO.DIBUJAR_AGUA && this.seleccionada
-      ? COLORES[this.regiones.indexOf(this.seleccionada) % COLORES.length]
+      ? this._color(this.regiones.indexOf(this.seleccionada))
       : COLORES[this.regiones.length % COLORES.length];
     const puntos = this._enCurso.map((p) => this._aPantalla(p));
     if (this._raton) puntos.push(this._aPantalla(this._raton));

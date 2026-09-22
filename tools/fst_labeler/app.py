@@ -5,13 +5,17 @@ Modulo 1: sirve cualquier cuadro de un video por numero de cuadro y su
 metadata, leida siempre del archivo real con OpenCV.
 Modulo 2: visor cuadro a cuadro en el navegador, servido en la raiz.
 Modulo 3: dibujo de regiones de interes y linea de agua sobre el cuadro.
+Modulos 4 a 7: las tres capas de etiquetado y el consenso entre ellas.
+Modulo 8: revision humana de la cola de discrepancias, en /revision, con las
+decisiones guardadas en sqlite.
+Modulo 9: suavizado temporal y exportacion final a CSV, en /exportacion.
 
 Uso:
     pip install -r requirements.txt
     python app.py --videos-dir /ruta/a/mis/videos
 
 La carpeta de videos tambien se puede fijar con la variable de entorno
-FST_VIDEOS_DIR. No hay ninguna ruta de laboratorio codificada en el programa.
+FST_VIDEOS_DIR, y la base de la revision con --base-datos o FST_BASE_DATOS. No hay ninguna ruta de laboratorio codificada en el programa.
 """
 from __future__ import annotations
 
@@ -23,6 +27,7 @@ from flask import Flask, send_from_directory
 from fst_labeler import __version__
 from fst_labeler.api import crear_blueprint
 from fst_labeler.config import DIR_INTERFAZ, Config
+from fst_labeler.revision import BaseRevision
 from fst_labeler.video_source import CatalogoVideos
 
 
@@ -40,7 +45,9 @@ def crear_app(cfg: Config) -> Flask:
         max_lectores=cfg.max_lectores_abiertos,
     )
     app.config["FST_CATALOGO"] = catalogo
-    app.register_blueprint(crear_blueprint(catalogo, cfg))
+    revision = BaseRevision(cfg.base_datos)
+    app.config["FST_REVISION"] = revision
+    app.register_blueprint(crear_blueprint(catalogo, cfg, revision))
 
     @app.get("/")
     def visor():
@@ -48,6 +55,16 @@ def crear_app(cfg: Config) -> Flask:
         # max_age=0: la pagina se revalida en cada carga para que al editar la
         # interfaz no haya que limpiar el cache del navegador a mano.
         return send_from_directory(DIR_INTERFAZ, "index.html", max_age=0)
+
+    @app.get("/revision")
+    def revision_pagina():
+        """Revision humana de los clips en discrepancia (Modulo 8)."""
+        return send_from_directory(DIR_INTERFAZ, "revision.html", max_age=0)
+
+    @app.get("/exportacion")
+    def exportacion_pagina():
+        """Suavizado temporal y exportacion final a CSV (Modulo 9)."""
+        return send_from_directory(DIR_INTERFAZ, "exportacion.html", max_age=0)
 
     return app
 
@@ -59,6 +76,8 @@ def parsear_argumentos(argv: list[str]) -> Config:
     )
     p.add_argument("--videos-dir", default=str(base.videos_dir),
                    help="Carpeta donde estan los videos a etiquetar.")
+    p.add_argument("--base-datos", default=str(base.base_datos),
+                   help="Archivo sqlite de la cola de revision y las decisiones.")
     p.add_argument("--host", default=base.host, help="Interfaz de red donde escuchar.")
     p.add_argument("--port", type=int, default=base.port, help="Puerto HTTP.")
     p.add_argument("--jpeg-quality", type=int, default=base.jpeg_quality,
@@ -76,6 +95,7 @@ def parsear_argumentos(argv: list[str]) -> Config:
 
     return Config(
         videos_dir=args.videos_dir,
+        base_datos=args.base_datos,
         host=args.host,
         port=args.port,
         jpeg_quality=args.jpeg_quality,
@@ -104,8 +124,11 @@ def main(argv: list[str] | None = None) -> int:
             print("       La carpeta esta vacia. Puedes generar un video de prueba con:")
             print("       python scripts/generar_video_prueba.py --fps 30 --segundos 60")
 
-    print(f"\nHerramienta de etiquetado FST v{__version__} (Modulo 3)")
+    print(f"Base de la revision: {cfg.base_datos}")
+    print(f"\nHerramienta de etiquetado FST v{__version__} (Modulo 9)")
     print(f"Abre en el navegador: http://{cfg.host}:{cfg.port}/")
+    print(f"Cola de revision:     http://{cfg.host}:{cfg.port}/revision")
+    print(f"Exportacion final:    http://{cfg.host}:{cfg.port}/exportacion")
     app.run(host=cfg.host, port=cfg.port, debug=cfg.debug, threaded=True)
     return 0
 

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revisión FST — cola de discrepancias</title>
+  <link rel="stylesheet" href="/static/css/estilos.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div>
+    <h1>Revisión de clips en discrepancia</h1>
+    <p class="subtitulo">
+      Bloques de 5 s en los que las capas de etiquetado no se pusieron de
+      acuerdo. La conducta la decide quien revisa: el sistema no propone
+      ninguna. <span id="version" class="version"></span>
+    </p>
+  </div>
+  <div class="selector-video">
+    <span id="progreso" class="indicador">—</span>
+    <a class="boton secundario" href="/exportacion">Exportación final</a>
+    <a class="boton secundario" href="/">Volver al análisis</a>
+  </div>
+</header>
+
+<div id="aviso" class="aviso oculto" role="status"></div>
+
+<main class="disposicion">
+
+  <!-- ------------------------------------------------------ escenario -->
+  <section class="panel escenario-contenedor">
+    <p id="titulo-clip" class="titulo-clip">—</p>
+    <div id="escenario" class="escenario">
+      <div id="marco" class="marco">
+        <img id="cuadro" class="cuadro" alt="Cuadro actual del clip en revisión">
+        <canvas id="capa-dibujo" class="capa-dibujo"></canvas>
+      </div>
+      <div id="capa-vacia" class="capa-mensaje">Cargando la cola…</div>
+      <div id="capa-cargando" class="capa-cargando oculto">Cargando cuadro…</div>
+    </div>
+
+    <p id="pista-modo" class="pista-modo"></p>
+
+    <div class="transporte">
+      <input id="barra" class="barra" type="range" min="0" max="0" value="0" step="1"
+             aria-label="Posición dentro del clip" disabled>
+
+      <div class="botonera">
+        <button id="btn-inicio-clip" type="button" title="Inicio del clip (Inicio)">|&lt;</button>
+        <button id="btn-retroceder-salto" type="button" title="Retroceder varios cuadros (Shift + flecha izquierda)">&laquo;</button>
+        <button id="btn-anterior" type="button" title="Cuadro anterior (flecha izquierda)">&lsaquo;</button>
+        <button id="btn-reproducir" type="button" class="principal" title="Reproducir el clip en bucle o pausar (espacio)">
+          Reproducir
+        </button>
+        <button id="btn-siguiente" type="button" title="Cuadro siguiente (flecha derecha)">&rsaquo;</button>
+        <button id="btn-avanzar-salto" type="button" title="Avanzar varios cuadros (Shift + flecha derecha)">&raquo;</button>
+        <button id="btn-fin-clip" type="button" title="Último cuadro del clip (Fin)">&gt;|</button>
+
+        <span class="separador"></span>
+
+        <label class="campo-en-linea" for="velocidad">
+          Velocidad
+          <select id="velocidad">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1× (real)</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="indicadores">
+        <span id="indicador-cuadro" class="indicador-principal">cuadro —</span>
+        <span id="indicador-clip" class="indicador">—</span>
+        <span id="indicador-estado" class="indicador">en pausa</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------- panel lateral -->
+  <aside class="panel lateral">
+
+    <section class="bloque">
+      <h2>Cola</h2>
+      <label class="campo" for="filtro-video">
+        Video
+        <select id="filtro-video"></select>
+      </label>
+      <label class="campo" for="filtro-motivo">
+        Motivo
+        <select id="filtro-motivo"></select>
+      </label>
+      <label class="campo casilla" for="filtro-pendientes">
+        Solo pendientes
+        <input id="filtro-pendientes" type="checkbox" checked>
+      </label>
+      <p id="posicion-cola" class="estado-deteccion">—</p>
+      <div class="botonera-regiones">
+        <button id="btn-clip-anterior" type="button" class="secundario" disabled>&lsaquo; Clip anterior</button>
+        <button id="btn-clip-siguiente" type="button" class="secundario" disabled>Clip siguiente &rsaquo;</button>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Decisión</h2>
+      <div id="opciones" class="opciones"></div>
+      <button id="btn-descartar" type="button" class="secundario ancho-completo opcion" disabled>
+        Descartar el clip <span class="tecla">D</span>
+      </button>
+      <label class="campo-vertical" for="notas">
+        Notas (opcional)
+        <textarea id="notas" rows="2" placeholder="Qué se ve, por qué se descarta…"></textarea>
+      </label>
+      <button id="btn-guardar" type="button" class="principal ancho-completo" disabled>
+        Guardar y siguiente <span class="tecla">Enter</span>
+      </button>
+      <p id="estado-decision" class="estado-deteccion">—</p>
+      <p class="nota">
+        Descartar deja el clip fuera del conjunto de entrenamiento: no se ve al
+        espécimen, la región no lo contiene o no hay una conducta predominante
+        en el bloque.
+      </p>
+    </section>
+
+    <section class="bloque">
+      <h2>Lo que dijo cada capa</h2>
+      <label class="campo casilla" for="a-ciegas">
+        Revisión a ciegas
+        <input id="a-ciegas" type="checkbox">
+      </label>
+      <p id="capas-ocultas" class="nota oculto">
+        Las predicciones están ocultas. Si las muestras antes de guardar, la
+        decisión de este clip ya no se registra como tomada a ciegas.
+      </p>
+      <div id="capas"></div>
+    </section>
+
+    <section class="bloque">
+      <h2>Región y línea de agua</h2>
+      <p class="nota">
+        Es la geometría con que corrieron las capas. Arrastra las esquinas para
+        corregir la región; W redibuja la línea de agua. Al guardar, el
+        servidor la compara contra la original y registra si cambió y las
+        coordenadas nuevas.
+      </p>
+      <p id="estado-geometria" class="estado-deteccion">—</p>
+      <p id="nota-camara" class="nota"></p>
+      <div class="botonera-regiones">
+        <button id="btn-linea-agua" type="button" class="secundario" disabled>
+          Línea de agua <span class="tecla">W</span>
+        </button>
+        <button id="btn-deshacer" type="button" class="secundario" disabled>
+          Deshacer <span class="tecla">Z</span>
+        </button>
+        <button id="btn-restaurar" type="button" class="secundario" disabled>
+          Restaurar la original
+        </button>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Clip</h2>
+      <dl id="datos-clip" class="metadata">
+        <div><dt>Clip</dt><dd>—</dd></div>
+      </dl>
+    </section>
+
+    <section class="bloque">
+      <h2>Atajos de teclado</h2>
+      <dl class="atajos">
+        <div><dt>1 / 2 / 3</dt><dd>escalamiento / nado / inmovilidad</dd></div>
+        <div><dt>D</dt><dd>descartar el clip</dd></div>
+        <div><dt>Enter</dt><dd>guardar y pasar al siguiente pendiente</dd></div>
+        <div><dt>Espacio</dt><dd>reproducir el clip en bucle o pausar</dd></div>
+        <div><dt>&larr; / &rarr;</dt><dd>cuadro anterior / siguiente</dd></div>
+        <div><dt>Shift + &larr; / &rarr;</dt><dd>salto de varios cuadros</dd></div>
+        <div><dt>Inicio / Fin</dt><dd>primer / último cuadro del clip</dd></div>
+        <div><dt>W</dt><dd>redibujar la línea de agua</dd></div>
+        <div><dt>Z</dt><dd>deshacer</dd></div>
+        <div><dt>Esc</dt><dd>cancelar el dibujo o salir de las notas</dd></div>
+      </dl>
+    </section>
+
+  </aside>
+</main>
+
+<footer class="pie">
+  Módulo 9 de 9 — revisión humana de la cola de discrepancias. Las decisiones
+  se guardan en sqlite; el suavizado temporal y la exportación final a CSV
+  están en /exportacion.
+</footer>
+
+<script type="module" src="/static/js/revision.js"></script>
+</body>
+</html>
