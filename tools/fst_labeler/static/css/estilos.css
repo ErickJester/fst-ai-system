@@ -546,3 +546,40 @@ a.boton.principal:hover { background: var(--acento-fuerte); }
 }
 .tabla-datos th { color: var(--texto-tenue); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .tabla-datos tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+
+/* --------------------------------------- Modulo 1 (ampliado): subir video */
+
+.zona-subida {
+  margin: 0 1.2rem 0.8rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo-panel);
+  transition: border-color 0.15s, background 0.15s;
+}
+.zona-subida.arrastrando {
+  border-color: var(--acento);
+  background: rgba(74, 157, 216, 0.08);
+}
+.zona-subida-texto { margin: 0 0 0.35rem; }
+.zona-subida .nota { margin: 0; }
+
+.lista-subidas {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+.subida-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px dotted rgba(152, 161, 176, 0.18);
+}
+.subida-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subida-estado { flex: 0 0 auto; color: var(--texto-tenue); font-variant-numeric: tabular-nums; }
+.subida-estado.bien { color: #8fd9a8; }
+.subida-estado.error { color: var(--error); }

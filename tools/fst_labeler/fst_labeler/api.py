@@ -5,6 +5,7 @@ Rutas:
   GET /api/salud
   GET /api/preferencias
   GET /api/videos
+  POST /api/videos (multipart, campo 'video': sube un video nuevo)
   GET /api/videos/<video_id>/metadata[?conteo_exacto=1]
   GET /api/videos/<video_id>/frame/<n>[?calidad=1..100][&max_ancho=px]
   POST /api/videos/<video_id>/deteccion-movimiento
@@ -33,8 +34,10 @@ from .deteccion_movimiento import Parametros, analizar
 from .video_source import (
     CuadroNoDisponible,
     ErrorVideo,
+    NombreInvalido,
     VideoNoAbierto,
     VideoNoEncontrado,
+    VideoYaExiste,
 )
 
 
@@ -76,6 +79,7 @@ def crear_blueprint(catalogo, cfg, revision: BaseRevision) -> Blueprint:
                     "salud": "/api/salud",
                     "preferencias": "/api/preferencias",
                     "listar_videos": "/api/videos",
+                    "subir_video": "POST /api/videos (multipart, campo 'video')",
                     "metadata": "/api/videos/<video_id>/metadata?conteo_exacto=1",
                     "cuadro": "/api/videos/<video_id>/frame/<n>?calidad=85&max_ancho=960",
                     "deteccion_movimiento": "POST /api/videos/<video_id>/deteccion-movimiento",
@@ -125,6 +129,26 @@ def crear_blueprint(catalogo, cfg, revision: BaseRevision) -> Blueprint:
                 "videos": videos,
             }
         )
+
+    @bp.post("/videos")
+    def subir_video():
+        """Sube un video nuevo a la carpeta configurada.
+
+        Multipart, campo `video`. Rechaza sobrescribir un nombre existente
+        (ver `CatalogoVideos.guardar_subida`). Si OpenCV no puede abrir lo
+        que se subio -archivo a medias, formato que no decodifica-, se borra
+        en vez de dejarlo en la carpeta como un video que nunca funciona.
+        """
+        archivo = request.files.get("video")
+        if archivo is None or not archivo.filename:
+            raise ValueError("Falta el archivo en el campo 'video'.")
+        video_id = catalogo.guardar_subida(archivo.filename, archivo)
+        try:
+            lector = catalogo.lector(video_id)
+        except VideoNoAbierto:
+            catalogo.borrar(video_id)
+            raise
+        return jsonify({"video_id": video_id, "metadata": lector.metadatos.to_dict()}), 201
 
     @bp.get("/videos/<path:video_id>/metadata")
     def metadata(video_id: str):
@@ -596,6 +620,18 @@ def crear_blueprint(catalogo, cfg, revision: BaseRevision) -> Blueprint:
     @bp.errorhandler(VideoNoEncontrado)
     def _no_encontrado(error):
         return jsonify({"error": str(error), "tipo": "video_no_encontrado"}), 404
+
+    @bp.errorhandler(VideoYaExiste)
+    def _ya_existe(error):
+        return jsonify({"error": str(error), "tipo": "video_ya_existe"}), 409
+
+    @bp.errorhandler(NombreInvalido)
+    def _nombre_invalido(error):
+        return jsonify({"error": str(error), "tipo": "nombre_invalido"}), 400
+
+    @bp.errorhandler(ErrorVideo)
+    def _error_video(error):
+        return jsonify({"error": str(error), "tipo": "error_video"}), 500
 
     @bp.errorhandler(CuadroNoDisponible)
     def _sin_cuadro(error):
