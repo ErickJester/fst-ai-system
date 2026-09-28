@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Mi perfil</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="app" style="max-width:720px">
+  <!-- 2j · Mi perfil -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand"><a href="experimentos.html" style="font-size:inherit">FST</a><span class="nav-sub">Mi perfil</span></span>
+  </nav>
+  <div class="page" style="padding-bottom:32px">
+    <h3 style="margin:0 0 20px">Mi perfil</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider);border:1px solid var(--color-divider)">
+      <form id="fDatos" novalidate style="background:var(--color-bg);padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+        <div class="k">Datos de la cuenta</div>
+        <div class="field"><label for="pNombre">Nombre</label><input class="input" id="pNombre" value="Mariana"></div>
+        <div class="field"><label for="pApe">Apellidos</label><input class="input" id="pApe" value="Rivera Alcántara"></div>
+        <div class="field"><label for="pCorreo">Correo institucional</label><input class="input num" id="pCorreo" type="email" value="mrivera@ipn.mx"></div>
+        <div class="field"><label for="pId">Identificador institucional · solo lectura</label><input class="input num" id="pId" value="2019630871" readonly style="background:var(--color-surface);color:color-mix(in srgb,var(--color-text) 60%,transparent)"></div>
+        <div class="field-error hidden" id="dErr" style="margin:0"></div>
+        <button type="submit" class="btn btn-primary" id="btnDatos" disabled style="align-self:flex-start;justify-content:flex-start">Guardar cambios</button>
+      </form>
+      <form id="fPass" novalidate style="background:var(--color-bg);padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+        <div class="k">Cambiar contraseña</div>
+        <div class="field"><label for="pAct">Contraseña actual</label><input class="input num" id="pAct" type="password" autocomplete="current-password"></div>
+        <div class="field"><label for="pNew">Nueva contraseña</label><input class="input num" id="pNew" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="pRep">Confirmar nueva contraseña</label><input class="input num" id="pRep" type="password" autocomplete="new-password"></div>
+        <div class="field-error hidden" id="pErr" style="margin:0"></div>
+        <button type="submit" class="btn btn-secondary" style="align-self:flex-start;justify-content:flex-start">Cambiar contraseña</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  function fail(errId, ids, bad, msg) {
+    ids.forEach(i => $(i).classList.remove('error'));
+    if (bad) { $(bad).classList.add('error'); $(bad).focus(); }
+    $(errId).textContent = msg; $(errId).classList.toggle('hidden', !msg);
+  }
+
+  // Datos: «Guardar cambios» se habilita al modificar algo.
+  const datos = ['pNombre', 'pApe', 'pCorreo'];
+  let original = datos.map(i => $(i).value);
+  const dirty = () => datos.some((i, k) => $(i).value !== original[k]);
+  datos.forEach(i => $(i).addEventListener('input', () => { $('btnDatos').disabled = !dirty(); }));
+  $('fDatos').onsubmit = e => {
+    e.preventDefault();
+    if (!$('pNombre').value.trim()) return fail('dErr', datos, 'pNombre', 'Escribe el nombre.');
+    if (!$('pApe').value.trim()) return fail('dErr', datos, 'pApe', 'Escribe los apellidos.');
+    if (!/^[^\s@]+@ipn\.mx$/i.test($('pCorreo').value.trim())) return fail('dErr', datos, 'pCorreo', 'El correo debe ser institucional (@ipn.mx).');
+    fail('dErr', datos, null, '');
+    original = datos.map(i => $(i).value);
+    $('btnDatos').disabled = true;
+  };
+
+  const pass = ['pAct', 'pNew', 'pRep'];
+  $('fPass').onsubmit = e => {
+    e.preventDefault();
+    const a = $('pAct').value, n = $('pNew').value, r = $('pRep').value;
+    if (!a) return fail('pErr', pass, 'pAct', 'Escribe tu contraseña actual.');
+    if (n.length < 8) return fail('pErr', pass, 'pNew', 'La nueva contraseña debe tener mínimo 8 caracteres.');
+    if (n === a) return fail('pErr', pass, 'pNew', 'La nueva contraseña debe ser distinta de la actual.');
+    if (n !== r) return fail('pErr', pass, 'pRep', 'Las contraseñas no coinciden.');
+    fail('pErr', pass, null, '');
+    $('fPass').reset();
+  };
+</script>
+</body>
+</html>
