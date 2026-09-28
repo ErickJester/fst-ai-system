@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fst-labeler",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/fst_labeler/app.py"],
+      "port": 5055
+    }
+  ]
+}

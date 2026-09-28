@@ -12,6 +12,7 @@ import { PanelDeteccion } from "./deteccion.js";
 import { PanelModelo } from "./modelo.js";
 import { PanelReglas } from "./reglas.js";
 import { PanelConsenso } from "./consenso.js";
+import { PanelSubida } from "./subida.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -20,6 +21,11 @@ const nodos = {
   selectorVideo: el("selector-video"),
   btnRecargar: el("btn-recargar"),
   aviso: el("aviso"),
+
+  zonaSubida: el("zona-subida"),
+  btnElegirVideo: el("btn-elegir-video"),
+  archivoVideo: el("archivo-video"),
+  listaSubidas: el("lista-subidas"),
 
   cuadro: el("cuadro"),
   capaDibujo: el("capa-dibujo"),
@@ -137,6 +143,18 @@ const consenso = new PanelConsenso(nodos, {
 // aparte de los que produce el motor del visor.
 let avisoInterfaz = null;
 let verificandoTotal = false;
+// Nombres de los videos que ya existen, para que la subida avise de un
+// duplicado sin gastar la subida completa. Se actualiza en cada recarga.
+let videosConocidos = [];
+
+const subida = new PanelSubida(nodos, {
+  videosConocidos: () => videosConocidos,
+  alSubir: async (videoId) => {
+    await cargarListaDeVideos();
+    nodos.selectorVideo.value = videoId;
+    nodos.selectorVideo.dispatchEvent(new Event("change"));
+  },
+});
 
 /* ------------------------------------------------------------- arranque */
 
@@ -176,11 +194,12 @@ async function cargarListaDeVideos() {
   nodos.selectorVideo.innerHTML = "";
   try {
     const datos = await cliente.listarVideos();
+    videosConocidos = datos.videos.map((v) => v.video_id);
     if (!datos.total) {
       agregarOpcion("", "— no hay videos en " + datos.videos_dir + " —");
       avisoInterfaz =
         "La carpeta de videos está vacía: " + datos.videos_dir +
-        "\nColoca ahí los videos, o genera uno sintético de prueba con:" +
+        "\nArrastra uno arriba, o genera uno sintético de prueba con:" +
         "\n    python scripts/generar_video_prueba.py --fps 30 --segundos 60";
       dibujar(visor);
       return;

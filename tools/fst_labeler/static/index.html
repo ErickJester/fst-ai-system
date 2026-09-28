@@ -30,6 +30,22 @@
 
 <div id="aviso" class="aviso oculto" role="status"></div>
 
+<section id="zona-subida" class="zona-subida">
+  <p class="zona-subida-texto">
+    Arrastra uno o más videos aquí, o
+    <button id="btn-elegir-video" type="button" class="secundario">elige un archivo…</button>
+    <input id="archivo-video" type="file"
+           accept=".mp4,.avi,.mov,.mkv,.mpg,.mpeg,.m4v,.wmv" multiple hidden>
+  </p>
+  <p class="nota">
+    Formatos aceptados: .mp4, .avi, .mov, .mkv, .mpg, .mpeg, .m4v, .wmv. Un
+    archivo con el mismo nombre que uno ya existente en la carpeta se
+    rechaza en vez de sobrescribirlo: cambia el nombre o borra el anterior a
+    mano antes de volver a subirlo.
+  </p>
+  <ul id="lista-subidas" class="lista-subidas"></ul>
+</section>
+
 <main class="disposicion">
 
   <!-- ------------------------------------------------------ escenario -->

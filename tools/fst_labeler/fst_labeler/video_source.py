@@ -11,13 +11,26 @@ from __future__ import annotations
 
 import math
 import threading
+import uuid
 from collections import OrderedDict
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
+from typing import Protocol
 
 import cv2
 
 from .config import EXTENSIONES_VIDEO
+
+
+class _AlmacenableEnDisco(Protocol):
+    """Lo minimo que hace falta de un `FileStorage` de Flask para guardarlo.
+
+    No importa Flask aqui a proposito: este modulo no sabe que existe HTTP.
+    Cualquier objeto con `save(ruta)` sirve, lo que facilita probarlo sin
+    levantar el servidor (ver scripts/verificar_subida.py).
+    """
+
+    def save(self, destino: str) -> None: ...
 
 
 AVISO_FPS = (
@@ -49,6 +62,14 @@ class VideoNoAbierto(ErrorVideo):
 
 class CuadroNoDisponible(ErrorVideo):
     """El cuadro pedido no existe o no se pudo decodificar."""
+
+
+class VideoYaExiste(ErrorVideo):
+    """Ya hay un archivo con ese nombre en la carpeta de videos."""
+
+
+class NombreInvalido(ErrorVideo):
+    """El nombre del archivo subido no se puede guardar tal cual."""
 
 
 @dataclass(frozen=True)
@@ -336,3 +357,77 @@ class CatalogoVideos:
             for lector in self._lectores.values():
                 lector.cerrar()
             self._lectores.clear()
+
+    # ------------------------------------------------------------- subida
+
+    def guardar_subida(self, nombre_original: str, archivo: _AlmacenableEnDisco) -> str:
+        """Guarda un video subido por el navegador y devuelve su `video_id`.
+
+        No sabe nada de HTTP: `archivo` es cualquier objeto con `.save(ruta)`,
+        que es lo unico que este metodo necesita de un `FileStorage` de Flask.
+
+        Se rechaza sobrescribir un nombre existente en vez de reemplazarlo o
+        renombrarlo solo: el nombre del archivo es parte del `clip_id` de las
+        corridas del Modulo 8, y reemplazar los bytes detras de un nombre que
+        ya tiene revision guardada corromperia esa referencia en silencio.
+
+        El archivo se escribe primero con un nombre temporal y se renombra al
+        final: si la subida se corta a medias --el navegador se cierra, se
+        pierde la red-- no queda un archivo con el nombre final a medio
+        escribir que despues se sirva como si fuera un video completo.
+        """
+        nombre = _nombre_seguro(nombre_original)
+        self.raiz.mkdir(parents=True, exist_ok=True)
+        destino = self.raiz / nombre
+        if destino.exists():
+            raise VideoYaExiste(
+                f"Ya existe un video llamado '{nombre}'. Cambia el nombre del "
+                "archivo o borra el existente antes de volver a subirlo."
+            )
+
+        temporal = self.raiz / f"{nombre}.subiendo-{uuid.uuid4().hex[:8]}"
+        try:
+            archivo.save(str(temporal))
+            if temporal.stat().st_size == 0:
+                raise ErrorVideo(f"El archivo subido para '{nombre}' llego vacio.")
+            temporal.rename(destino)
+        except OSError as error:
+            raise ErrorVideo(f"No se pudo guardar '{nombre}': {error}") from error
+        finally:
+            temporal.unlink(missing_ok=True)  # ya se renombro; no queda nada que borrar
+
+        return destino.relative_to(self.raiz).as_posix()
+
+    def borrar(self, video_id: str) -> None:
+        """Quita un video del catalogo y borra el archivo.
+
+        Solo se usa para limpiar una subida que OpenCV no pudo abrir: dejar
+        el archivo ahi lo mostraria para siempre en la lista como un video
+        que nunca se puede analizar.
+        """
+        ruta = self.ruta_de(video_id)
+        with self._lock:
+            lector = self._lectores.pop(video_id, None)
+        if lector is not None:
+            lector.cerrar()
+        ruta.unlink()
+
+
+def _nombre_seguro(nombre_original: str) -> str:
+    """El nombre de archivo tal cual, sin la ruta que lo acompañe.
+
+    A proposito no se usa `werkzeug.utils.secure_filename`: mangla acentos y
+    espacios ("ratón_03.mp4" -> "raton_03.mp4"), y `Path(...).name` ya quita
+    lo unico que importa por seguridad -- cualquier componente de carpeta,
+    incluido `..`--, sin desfigurar nombres en español.
+    """
+    nombre = Path(nombre_original or "").name.strip()
+    if not nombre or nombre in (".", ".."):
+        raise NombreInvalido("El archivo subido no tiene un nombre valido.")
+    extension = Path(nombre).suffix.lower()
+    if extension not in EXTENSIONES_VIDEO:
+        raise NombreInvalido(
+            f"Extension '{extension or '(ninguna)'}' no reconocida. Extensiones "
+            "aceptadas: " + ", ".join(EXTENSIONES_VIDEO) + "."
+        )
+    return nombre
