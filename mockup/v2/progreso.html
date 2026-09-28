@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Análisis en curso</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="app narrow">
+  <!-- 2e · Progreso de análisis -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand"><a href="experimentos.html" style="font-size:inherit">FST</a><span class="nav-sub">Análisis en curso</span></span>
+  </nav>
+
+  <div class="page" style="padding-bottom:34px">
+    <h3 style="margin:0 0 8px">Análisis en curso</h3>
+    <p class="lead" style="margin:0 0 22px;max-width:600px">El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: no hay iniciar, pausar, cancelar ni reiniciar desde aquí.</p>
+
+    <div style="border:2px solid var(--color-text)">
+      <div style="padding:18px 20px;border-bottom:2px solid var(--color-divider)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:17px">Compuesto CSR-14 · Experimental A · Tanda B</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-accent" style="white-space:nowrap">Procesando</span>
+        </div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · 4 especímenes</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+          <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:2px" id="barra"></div>
+          <span class="num nd" style="font-size:15px;white-space:nowrap" id="pctTotal"></span>
+        </div>
+      </div>
+      <div id="etapas"></div>
+      <div style="padding:14px 20px;background:var(--color-surface);font-size:12px">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span>Confianza de detección:</span>
+          <span class="num nd" style="font-size:15px">0.86</span>
+          <span class="num" style="color:color-mix(in srgb,var(--color-text) 60%,transparent)">(mínimo 0.70)</span>
+        </div>
+        <div class="hint" style="margin-top:4px">Es la confianza de la detección de cilindros. Por debajo de 0.70, el análisis se detiene completo.</div>
+      </div>
+    </div>
+
+    <div style="border:2px solid var(--color-accent);margin-top:18px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--color-divider)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:15px">Compuesto CSR-14 · Experimental B · Tanda B</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-800);color:var(--color-bg)">Error</span>
+        </div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · detenido en Detección de cilindros (50 %)</div>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:14px;align-items:baseline">
+          <span class="num nd" style="font-size:13px;color:var(--color-accent-700);white-space:nowrap">E-DET-070</span>
+          <span style="font-size:13px;line-height:1.55">Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.</span>
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px">
+          <button type="button" class="btn btn-primary" id="btnDiag" style="justify-content:flex-start">Descargar reporte de diagnóstico (PDF)</button>
+          <span class="hint">El investigador no puede reiniciar el análisis.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="k" style="margin:26px 0 12px" id="colaK"></div>
+    <table class="table"><tbody id="cola"></tbody></table>
+    <p class="hint" style="margin:14px 0 0">Al terminar cada trabajo llega una notificación en el sistema con el enlace a resultados. Si un video falla, el trabajo se marca con la causa y la cola sigue con el siguiente.</p>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const INK = 'var(--color-text)', ACC = 'var(--color-accent)', MUT = 'var(--muted)';
+  const etapas = [
+    { nombre: 'Preprocesamiento', detalle: 'CLAHE (realce local de contraste)', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '25 %' },
+    { nombre: 'Detección de cilindros', detalle: '4 cilindros detectados', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '50 %' },
+    { nombre: 'Seguimiento de especímenes', detalle: 'tracking (seguimiento) de 4 especímenes', icono: '3', dotBg: ACC, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'en curso', pct: '75 %' },
+    { nombre: 'Clasificación de conducta', detalle: 'nado activo, inmovilidad, escalamiento', icono: '4', dotBg: 'transparent', dotFg: MUT, titleFg: MUT, estado: 'pendiente', pct: '100 %' }
+  ];
+  const cola = [
+    { n: '1', nombre: 'Compuesto CSR-14 · Experimental A · Tanda B', dia: 'Día 2', estado: 'Procesando', tagClass: 'tag-accent' },
+    { n: '2', nombre: 'Compuesto CSR-14 · Control · Tanda B', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' },
+    { n: '3', nombre: 'Compuesto CSR-14 · Experimental B · Tanda A', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' }
+  ];
+
+  $('barra').innerHTML = etapas.map(s => {
+    const bg = s.estado === 'hecha' ? INK : s.estado === 'en curso' ? ACC : 'color-mix(in srgb,var(--color-text) 12%,transparent)';
+    return '<div style="height:10px;background:' + bg + '"></div>';
+  }).join('');
+  const actual = etapas.find(s => s.estado === 'en curso');
+  $('pctTotal').textContent = actual ? actual.pct : '100 %';
+
+  $('etapas').innerHTML = etapas.map(s =>
+    '<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--color-divider)">' +
+      '<span class="num nd" style="width:26px;height:26px;flex:none;background:' + s.dotBg + ';color:' + s.dotFg + ';border:1px solid var(--color-divider);display:flex;align-items:center;justify-content:center;font-size:11px">' + s.icono + '</span>' +
+      '<div style="width:250px">' +
+        '<div class="nd" style="font-size:13.5px;color:' + s.titleFg + '">' + s.nombre + '</div>' +
+        '<div style="font-size:11.5px;margin-top:2px;color:var(--muted)">' + s.detalle + '</div>' +
+      '</div>' +
+      '<div style="flex:1"></div>' +
+      '<span style="font-size:12px;white-space:nowrap;color:' + s.titleFg + '">' + s.estado + '</span>' +
+      '<span class="num nd" style="width:56px;text-align:right;font-size:13px;color:' + s.titleFg + '">' + s.pct + '</span>' +
+    '</div>').join('');
+
+  const proc = cola.filter(c => c.estado === 'Procesando').length;
+  $('colaK').textContent = 'Cola · ' + proc + ' procesando, ' + (cola.length - proc) + ' en cola';
+  $('cola').innerHTML = cola.map(c =>
+    '<tr>' +
+      '<td class="num" style="width:30px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">' + c.n + '</td>' +
+      '<td>' + c.nombre + '</td>' +
+      '<td class="num" style="width:70px">' + c.dia + '</td>' +
+      '<td style="width:130px;text-align:right"><span class="tag ' + c.tagClass + '" style="white-space:nowrap">' + c.estado + '</span></td>' +
+    '</tr>').join('');
+
+  // Reporte de diagnóstico: se imprime/guarda como PDF desde el navegador.
+  $('btnDiag').onclick = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(
+      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte de diagnóstico · E-DET-070</title>' +
+      '<link rel="stylesheet" href="' + new URL('assets/modernist.css', location.href) + '">' +
+      '<link rel="stylesheet" href="' + new URL('assets/fst.css', location.href) + '"></head>' +
+      '<body style="padding:32px;background:#fff"><h3>Reporte de diagnóstico</h3>' +
+      '<p><strong>Compuesto CSR-14 · Experimental B · Tanda B</strong><br>Día 2 · 5 min · detenido en Detección de cilindros (50 %)</p>' +
+      '<p><strong>E-DET-070</strong> · Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.</p>' +
+      '<script>onload=()=>print()<\/script></body></html>');
+    w.document.close();
+  };
+</script>
+</body>
+</html>

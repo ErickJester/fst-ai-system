@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Resultados</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+<style>
+  .tab{font-family:var(--font-heading);font-weight:800;font-size:13.5px;padding:11px 16px;border:0;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;color:var(--color-text);cursor:pointer}
+  .tab.on{background:var(--color-accent);color:var(--color-bg);border-bottom-color:var(--color-accent)}
+  .tab:not(.on):hover{background:color-mix(in srgb,var(--color-text) 7%,transparent)}
+  .tab[disabled]{cursor:default}
+  .tab[disabled]:hover{background:transparent}
+  .sw{width:11px;height:11px;flex:none;border:1px solid var(--color-divider);display:inline-block}
+  .bar-de{position:absolute;top:-3px;height:16px;width:2px;background:var(--color-text)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 2f · Resultados -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand" style="margin-right:0"><a href="experimentos.html" style="font-size:inherit">FST</a></span>
+    <span class="crumbs"><a href="experimentos.html">Experimentos</a> / <a href="experimento.html">Compuesto CSR-14 · curva de dosis</a> / <a href="grupo.html?g=G-02">Referencia</a> / <span class="here">Tanda A · Día 2</span></span>
+  </nav>
+
+  <div class="page">
+    <div style="display:flex;align-items:flex-end;gap:24px">
+      <div style="flex:1">
+        <h2 style="margin:0 0 9px">Resultados · Grupo referencia, Tanda A</h2>
+        <div class="num" style="font-size:12.5px;color:var(--muted-2)">Fluoxetina 10 mg/kg · Día 2, 300 s de evaluación · analizado 24 feb 2026, 15:02 · modelo clf-cascada v2.1</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+          <span class="tag tag-accent" style="white-space:nowrap">Nivel: preciso (3 conductas)</span>
+          <span class="hint">El otro nivel posible es <strong>agrupado</strong>: nado activo y escalamiento se juntan en «conducta activa».</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px" class="no-print">
+        <button type="button" class="btn btn-secondary" id="xCSV">CSV</button>
+        <button type="button" class="btn btn-secondary" id="xXLSX">XLSX</button>
+        <button type="button" class="btn btn-primary" id="xPDF" style="justify-content:flex-start">PDF · resumen ejecutivo</button>
+      </div>
+    </div>
+
+    <div id="tabs" class="no-print" style="display:flex;border-bottom:2px solid var(--color-divider);margin:22px 0 24px">
+      <button type="button" class="tab on" data-target="secEspecimen">Por espécimen</button>
+      <button type="button" class="tab" data-target="secComparacion">Comparación entre grupos</button>
+      <button type="button" class="tab" data-target="secTimeline">Línea de tiempo por minuto</button>
+      <button type="button" class="tab" disabled>Episodios</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 330px;gap:2px;background:var(--color-divider)">
+      <div style="background:var(--color-bg);padding-right:26px">
+        <div id="secEspecimen" style="display:flex;align-items:center;gap:18px;margin-bottom:14px">
+          <div class="k">Tiempo por conducta · min:seg</div>
+          <div style="flex:1"></div>
+          <span id="legendTop" style="display:flex;gap:18px"></span>
+        </div>
+
+        <table class="table">
+          <thead><tr>
+            <th style="width:24%">Espécimen</th><th style="text-align:right">Nado activo</th><th style="text-align:right">Inmovilidad</th><th style="text-align:right">Escalamiento</th><th style="width:30%">Distribución</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+
+        <p class="hint" style="margin:14px 0 0">Un episodio requiere 3 segundos consecutivos de la misma conducta; el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.</p>
+
+        <div class="k" id="secTimeline" style="margin:26px 0 12px">Rata 1 · Cilindro P1</div>
+        <div style="border:1px solid var(--color-divider);padding:16px 18px">
+          <div id="timeline" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+
+      <div style="background:var(--color-bg);padding-left:26px;display:flex;flex-direction:column;gap:24px">
+        <div>
+          <div class="k" style="margin-bottom:12px">Calidad del análisis</div>
+          <div class="num nd" style="font-size:20px;line-height:1.2;margin-bottom:9px">Confianza de detección: 0.83</div>
+          <div style="height:8px;background:color-mix(in srgb,var(--color-text) 12%,transparent);margin-bottom:9px"><div style="height:8px;background:var(--color-text);width:83%"></div></div>
+          <p style="margin:0;font-size:11.5px;line-height:1.6;color:color-mix(in srgb,var(--color-text) 70%,transparent)">Es la confianza de la detección de cilindros, por arriba del mínimo de 0.70.</p>
+          <div style="margin-top:13px;border-top:1px solid var(--color-divider)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--color-divider);font-size:11.5px">
+              <span style="color:color-mix(in srgb,var(--color-text) 70%,transparent)">Duración analizada</span>
+              <span class="num">5:00 / 5:00</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="secComparacion">
+          <div class="k" style="margin-bottom:12px">Inmovilidad por grupo · Día 2 (5 min)</div>
+          <div id="comparacion" style="display:flex;flex-direction:column;gap:15px"></div>
+          <p class="hint" style="margin:12px 0 0">Promedio por espécimen de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los especímenes sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio.</p>
+        </div>
+
+        <div>
+          <div class="k" style="margin-bottom:12px">Leyenda de conductas</div>
+          <div id="legend" style="border-top:1px solid var(--color-divider)"></div>
+          <p class="hint" style="margin:11px 0 0">El buceo cuenta como nado activo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const { mean, variance, fmt, r1 } = FST;
+  const INK = 'var(--color-text)', ACC = 'var(--color-accent)', N400 = 'var(--color-neutral-400)';
+  const MUT = 'var(--muted)', PEND = 'var(--color-accent-700)';
+
+  const behaviors = [
+    { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
+    { id: 'inmov', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' },
+    { id: 'escal', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' }
+  ];
+  const raw = [
+    { pos: '1', label: 'Rata 1 · Cilindro P1', nado: 171, inmov: 88, escal: 41 },
+    { pos: '2', label: 'Rata 2 · Cilindro P2', nado: 158, inmov: 104, escal: 38 },
+    { pos: '3', label: 'Rata 3 · Cilindro P3', nado: 182, inmov: 76, escal: 42 },
+    { pos: '4', label: 'Rata 4 · Cilindro P4', nado: 149, inmov: 118, escal: 33 }
+  ];
+  const col = k => raw.map(r => r[k]);
+  const stats = [
+    { nombre: 'Media', f: a => r1(mean(a)) + ' s', nota: 'sobre 300 s de evaluación' },
+    { nombre: 'Desviación estándar', f: a => r1(Math.sqrt(variance(a))), nota: 'muestral, n − 1' },
+    { nombre: 'Varianza', f: a => r1(variance(a)), nota: 'RF-31' }
+  ];
+
+  // ── leyendas ────────────────────────────────────────────────────────────
+  $('legendTop').innerHTML = behaviors.map(b =>
+    '<span style="display:inline-flex;align-items:center;gap:7px;font-size:11.5px"><span class="sw" style="background:' + b.color + '"></span>' + b.label + '</span>').join('');
+  $('legend').innerHTML = behaviors.map(b =>
+    '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--color-divider)">' +
+      '<span class="sw" style="margin-top:4px;background:' + b.color + '"></span>' +
+      '<div><div class="nd" style="font-size:12.5px">' + b.label + '</div><div style="font-size:11.5px;line-height:1.5;color:color-mix(in srgb,var(--color-text) 60%,transparent)">' + b.nota + '</div></div>' +
+    '</div>').join('');
+
+  // ── tabla por espécimen + estadísticos ──────────────────────────────────
+  $('rows').innerHTML = raw.map(r =>
+    '<tr>' +
+      '<td><div style="display:flex;align-items:center;gap:10px">' +
+        '<span class="num nd" style="width:24px;height:24px;flex:none;border:2px solid var(--color-accent);color:var(--color-accent-700);display:flex;align-items:center;justify-content:center;font-size:10px">' + r.pos + '</span>' +
+        '<span style="font-size:13px">' + r.label + '</span></div></td>' +
+      '<td class="num" style="text-align:right">' + fmt(r.nado) + '</td>' +
+      '<td class="num" style="text-align:right">' + fmt(r.inmov) + '</td>' +
+      '<td class="num" style="text-align:right">' + fmt(r.escal) + '</td>' +
+      '<td><div style="display:flex;height:16px;border:1px solid var(--color-divider)">' +
+        '<div title="Nado activo" style="background:' + INK + ';width:' + (r.nado / 3) + '%"></div>' +
+        '<div title="Inmovilidad" style="background:' + ACC + ';width:' + (r.inmov / 3) + '%"></div>' +
+        '<div title="Escalamiento" style="background:' + N400 + ';width:' + (r.escal / 3) + '%"></div>' +
+      '</div></td>' +
+    '</tr>').join('') +
+    stats.map(s =>
+    '<tr style="background:var(--color-surface)">' +
+      '<td class="k" style="color:color-mix(in srgb,var(--color-text) 70%,transparent)">' + s.nombre + '</td>' +
+      ['nado', 'inmov', 'escal'].map(k => '<td class="num nd" style="text-align:right">' + s.f(col(k)) + '</td>').join('') +
+      '<td style="font-size:11.5px;color:var(--muted)">' + s.nota + '</td>' +
+    '</tr>').join('');
+
+  // ── línea de tiempo por minuto (Rata 1) ─────────────────────────────────
+  const patron = [
+    [['nado', 38], ['escal', 8], ['nado', 10], ['inmov', 4]],
+    [['nado', 30], ['inmov', 12], ['escal', 6], ['nado', 8], ['inmov', 4]],
+    [['inmov', 10], ['nado', 22], ['escal', 9], ['inmov', 8], ['nado', 11]],
+    [['nado', 16], ['inmov', 20], ['nado', 12], ['escal', 7], ['inmov', 5]],
+    [['inmov', 14], ['nado', 24], ['inmov', 11], ['escal', 11]]
+  ];
+  const cmap = { nado: INK, inmov: ACC, escal: N400 };
+  const lbl = { nado: 'Nado activo', inmov: 'Inmovilidad', escal: 'Escalamiento' };
+  $('timeline').innerHTML = patron.map((segs, i) =>
+    '<div style="display:flex;align-items:center;gap:12px">' +
+      '<span class="num" style="width:74px;font-size:11.5px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">' + fmt(i * 60) + '–' + fmt(i * 60 + 60) + '</span>' +
+      '<div style="flex:1;display:flex;height:18px;border:1px solid var(--color-divider)">' +
+        segs.map(s => '<div title="' + lbl[s[0]] + ' · ' + s[1] + ' s" style="background:' + cmap[s[0]] + ';width:' + (s[1] / 60 * 100) + '%"></div>').join('') +
+      '</div>' +
+    '</div>').join('');
+
+  // ── comparación entre grupos ────────────────────────────────────────────
+  const pct = v => (v / 300 * 100) + '%';
+  const barra = (m, de, color, h) =>
+    '<div style="height:' + h + 'px;background:color-mix(in srgb,var(--color-text) 10%,transparent);position:relative">' +
+      '<div style="height:' + h + 'px;background:' + color + ';width:' + pct(m) + '"></div>' +
+      '<div class="bar-de" style="height:' + (h + 6) + 'px;left:' + pct(Math.max(0, m - de)) + '"></div>' +
+      '<div class="bar-de" style="height:' + (h + 6) + 'px;left:' + pct(Math.min(300, m + de)) + '"></div>' +
+    '</div>';
+  const val = (m, de) => r1(m) + ' ± ' + r1(de) + ' s';
+  const inmM = mean(col('inmov')), inmDE = Math.sqrt(variance(col('inmov')));
+  const comparacion = [
+    { nombre: 'Control · placebo', valor: val(168.4, 21.3), valorFg: INK, body: barra(168.4, 21.3, INK, 10), nota: 'n = 4 de 8 · 4 especímenes pendientes (Tanda B en cola)', notaFg: PEND },
+    { nombre: 'Referencia · fluoxetina', valor: 'por nivel', valorFg: MUT, nota: 'n = 8 de 8', notaFg: MUT,
+      body: '<div class="note-bar" style="font-size:11.5px;line-height:1.5;margin-bottom:8px">Este grupo mezcla niveles de clasificación; se muestran por separado.</div>' +
+        '<div style="display:flex;flex-direction:column;gap:9px">' +
+          [{ n: 'preciso · Tanda A · n = 4', m: inmM, de: inmDE, c: ACC }, { n: 'agrupado · Tanda B · n = 4', m: 101.3, de: 15.2, c: 'var(--color-accent-300)' }].map(u =>
+            '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px">' +
+              '<span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 70%,transparent)">' + u.n + '</span>' +
+              '<span class="num nd" style="font-size:11px;white-space:nowrap">' + val(u.m, u.de) + '</span></div>' + barra(u.m, u.de, u.c, 8) + '</div>').join('') +
+        '</div>' },
+    { nombre: 'Experimental A · CSR-14, 5 mg/kg', valor: val(121.2, 19.4), valorFg: INK, body: barra(121.2, 19.4, N400, 10), nota: 'n = 4 de 8 · 4 especímenes pendientes (Tanda B procesando)', notaFg: PEND },
+    { nombre: 'Experimental B · CSR-14, 15 mg/kg', valor: 'sin datos', valorFg: PEND,
+      body: '<div style="height:10px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 18%,transparent) 0 3px,transparent 3px 6px);border:1px solid var(--color-divider)"></div>',
+      nota: '8 de 8 especímenes pendientes (Tanda A en cola, Tanda B con error)', notaFg: PEND }
+  ];
+  $('comparacion').innerHTML = comparacion.map(c =>
+    '<div>' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px">' +
+        '<span style="font-size:12px">' + c.nombre + '</span>' +
+        '<span class="num nd" style="font-size:11.5px;white-space:nowrap;color:' + c.valorFg + '">' + c.valor + '</span>' +
+      '</div>' + c.body +
+      '<div class="num" style="font-size:11px;margin-top:5px;color:' + c.notaFg + '">' + c.nota + '</div>' +
+    '</div>').join('');
+
+  // ── pestañas: llevan a su sección de la vista ───────────────────────────
+  $('tabs').addEventListener('click', e => {
+    const t = e.target.closest('.tab'); if (!t || t.disabled) return;
+    $('tabs').querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+    $(t.dataset.target).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ── exportación (segundos, no porcentaje) ───────────────────────────────
+  function tabla() {
+    const out = [['Espécimen', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']];
+    raw.forEach(r => out.push([r.label, r.nado, r.inmov, r.escal]));
+    stats.forEach(s => out.push([s.nombre].concat(['nado', 'inmov', 'escal'].map(k => s.f(col(k)).replace(' s', '')))));
+    out.push([]);
+    out.push(['Rata 1 · Cilindro P1 · minuto', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']);
+    patron.forEach((segs, i) => {
+      const sum = k => segs.filter(s => s[0] === k).reduce((a, s) => a + s[1], 0);
+      out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), sum('nado'), sum('inmov'), sum('escal')]);
+    });
+    return out;
+  }
+  const base = 'resultados_CSR-14_referencia_tandaA_dia2';
+  $('xCSV').onclick = () => FST.download(base + '.csv', FST.toCSV(tabla()));
+  $('xXLSX').onclick = () => {
+    if (!window.XLSX) return alert('No se pudo cargar el generador de XLSX (requiere conexión).');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tabla()), 'Resultados');
+    XLSX.writeFile(wb, base + '.xlsx');
+  };
+  $('xPDF').onclick = () => window.print();
+</script>
+</body>
+</html>
