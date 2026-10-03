@@ -44,7 +44,7 @@ enum PipelineStage <<enum>> {
     PREPROCESSING
     ROI_DETECTION
     TRACKING
-    CLASSIFICATION
+    BEHAVIOR
     DONE
 }
 
@@ -156,11 +156,13 @@ entity "analysis_configs" as analysis_configs {
     * model_hash : VARCHAR(64)
     * pipeline_version : VARCHAR(30)
     * conf_threshold : FLOAT
-    * skip_seconds : FLOAT = 0.0
-    * immobile_thr : FLOAT = 6.5
-    * disp_thr : FLOAT = 8.0
-    * pos_std_thr : FLOAT = 20.0
-    * climb_aspect_thr : FLOAT = 1.6
+    * tracker_yaml : VARCHAR(60) = bytetrack.yaml
+    * skip_frames : INTEGER = 0
+    * max_freeze_frames : INTEGER = 20
+    * stabilize : BOOLEAN = false
+    yolo_available : BOOLEAN
+    behavior_plugin : VARCHAR(120)
+    behavior_plugin_version : VARCHAR(60)
 }
 
 note right of analysis_configs
@@ -168,6 +170,8 @@ note right of analysis_configs
   Reproducibilidad exacta, no solo nombre.
   layout NO se duplica aqui; autoridad
   es experiments.layout.
+  behavior_plugin NULL = sin clasificacion
+  (solo tracking).
 end note
 
 entity "jobs" as jobs {
@@ -182,6 +186,8 @@ entity "jobs" as jobs {
     stage : PipelineStage
     * progress_pct : INTEGER = 0
     error : TEXT
+    output_video_path : VARCHAR(512)
+    output_json_path : VARCHAR(512)
 }
 
 entity "animals" as animals {
@@ -199,32 +205,42 @@ note right of animals
   Cero duplicidad conceptual.
 end note
 
-entity "behavior_results" as behavior_results {
+entity "tracking_results" as tracking_results {
     * id : INTEGER <<PK>>
     --
-    * animal_id : INTEGER <<FK→animals>>
-    * swim_s : FLOAT = 0.0
-    * immobile_s : FLOAT = 0.0
-    * escape_s : FLOAT = 0.0
-    * total_analyzed_s : FLOAT = 0.0
+    * animal_id : INTEGER <<FK→animals>> <<UNIQUE>>
+    * frames_total : INTEGER
+    * frames_yolo : INTEGER
+    * frames_track : INTEGER
+    * frames_classic : INTEGER
+    * frames_freeze : INTEGER
+    * frames_lost : INTEGER
+    * frames_none : INTEGER
     --
-    <<CHECK: swim_s >= 0 AND immobile_s >= 0>>
-    <<        AND escape_s >= 0>>
-    <<CHECK: swim_s + immobile_s + escape_s>>
-    <<        <= total_analyzed_s + 0.01>>
+    <<CHECK: yolo + track + classic + freeze>>
+    <<        + lost + none = frames_total>>
 }
 
-entity "behavior_per_minute" as behavior_per_minute {
+entity "behavior_segments" as behavior_segments {
     * id : INTEGER <<PK>>
     --
     * animal_id : INTEGER <<FK→animals>>
-    * minute : INTEGER
-    * swim_s : FLOAT = 0.0
-    * immobile_s : FLOAT = 0.0
-    * escape_s : FLOAT = 0.0
+    * start_s : FLOAT
+    * end_s : FLOAT
+    * label : VARCHAR(60)
+    confidence : FLOAT
     --
-    <<UNIQUE (animal_id, minute)>>
+    <<CHECK: start_s >= 0 AND end_s > start_s>>
+    <<CHECK: confidence IS NULL OR 0..1>>
 }
+
+note right of behavior_segments
+  Hueco para el plugin de conducta externo
+  (pipeline/behavior_plugin.py). label es
+  texto libre definido por el plugin.
+  Totales y desglose por minuto se derivan
+  en consulta, no se almacenan.
+end note
 
 entity "reports" as reports {
     * id : INTEGER <<PK>>
@@ -274,8 +290,8 @@ analysis_configs    ||--o{ jobs                : "config_id"
 
 jobs                ||--o{ animals             : "job_id"
 
-animals             ||--o{ behavior_results    : "animal_id"
-animals             ||--o{ behavior_per_minute : "animal_id"
+animals             ||--o| tracking_results    : "animal_id"
+animals             ||--o{ behavior_segments   : "animal_id"
 
 ' ─────────────────────────────────────────────
 '  NOTAS GENERALES
