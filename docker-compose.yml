@@ -35,28 +35,16 @@ services:
 
   worker:
     build: ./backend
-    # Instala las dependencias de los plugins de conducta montados en /plugins
-    # (si los hay) y arranca el worker. Ver plugins/README.md.
-    command:
-      - sh
-      - -c
-      - |
-        for r in /plugins/*/requirements.txt; do
-          [ -f "$$r" ] && pip install --no-cache-dir -q -r "$$r"
-        done
-        exec python -m worker.worker
+    # Placeholder: aquí irá el pipeline de análisis (ver backend/worker/worker.py)
+    command: ["python", "-m", "worker.worker"]
     environment:
       DATABASE_URL: postgresql+psycopg2://fst:fst@db:5432/fst
       DATA_DIR: /data
-      PYTHONPATH: /app:/plugins
-      # Vacío = solo tracking. Ej.: "fst_etiquetador_plugin:create"
-      FST_BEHAVIOR_PLUGIN: ${FST_BEHAVIOR_PLUGIN:-}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - data:/data
-      - ./plugins:/plugins:ro
     restart: on-failure
 
   frontend:

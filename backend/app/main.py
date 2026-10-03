@@ -12,30 +12,9 @@ from .models import (
 from .storage import ensure_dirs, video_path
 
 
-def _tracking_row(animal: Animal) -> dict:
-    """Calidad del tracking de un animal: frames por fuente y % detectado."""
-    t = animal.tracking
-    row = {"rat_idx": animal.subject.rat_idx}
-    if t is None:
-        return row
-    detected = t.frames_yolo + t.frames_track + t.frames_classic
-    row.update({
-        "frames_total": t.frames_total,
-        "frames_detected": detected,
-        "frames_yolo": t.frames_yolo,
-        "frames_track": t.frames_track,
-        "frames_classic": t.frames_classic,
-        "frames_freeze": t.frames_freeze,
-        "frames_lost": t.frames_lost,
-        "frames_none": t.frames_none,
-        "detected_pct": round(detected / t.frames_total * 100, 1) if t.frames_total else 0.0,
-    })
-    return row
-
-
 def _behavior_row(animal: Animal) -> dict:
     """Segundos por conducta (total y por minuto) a partir de los segmentos
-    del plugin. Las etiquetas son las que defina el plugin."""
+    del pipeline. Las etiquetas son las que defina el pipeline."""
     totals: dict[str, float] = {}
     per_minute: dict[int, dict[str, float]] = {}
     for seg in animal.behavior_segments:
@@ -323,17 +302,19 @@ def create_app() -> Flask:
                     })
             return {"experiment_id": exp_id, "jobs": jobs_info}
 
-    # ── Results: calidad del tracking (RF-18) ────────────────────
+    # ── Results (RF-18, RF-19) ───────────────────────────────────
 
     @app.get("/experiments/<int:exp_id>/results")
     def experiment_results(exp_id: int):
-        """Calidad del tracking por animal y por sesión, del último job DONE."""
+        """Resultados del pipeline de análisis por día y por animal, del último
+        job DONE de cada video. Las etiquetas de conducta las define el
+        pipeline; aquí solo se suman segundos (total y por minuto)."""
         with SessionLocal() as db:
             exp = db.get(Experiment, exp_id)
             if not exp:
                 return jsonify({"error": "experiment not found"}), 404
 
-            results_by_day = {}
+            by_day = {}
             for v in exp.videos:
                 latest_job = db.execute(
                     select(Job).where(Job.video_id == v.id, Job.status == JobStatus.DONE)
@@ -346,60 +327,31 @@ def create_app() -> Flask:
                     .where(Animal.job_id == latest_job.id)
                     .order_by(Subject.rat_idx)
                 ).scalars().all()
-                results_by_day[v.day.value] = {
+                rows = [_behavior_row(a) for a in animals]
+                by_day[v.day.value] = {
                     "video_id": v.id,
                     "job_id": latest_job.id,
-                    "has_tracked_video": bool(
+                    "pipeline": latest_job.config.pipeline_name if latest_job.config else None,
+                    "pipeline_version": latest_job.config.pipeline_version if latest_job.config else None,
+                    "labels": sorted({lbl for r in rows for lbl in r["totals_s"]}),
+                    "has_annotated_video": bool(
                         latest_job.output_video_path
                         and os.path.isfile(latest_job.output_video_path)
                     ),
-                    "animals": [_tracking_row(a) for a in animals],
-                }
-            return {"experiment_id": exp_id, "results": results_by_day}
-
-    @app.get("/experiments/<int:exp_id>/behavior")
-    def experiment_behavior(exp_id: int):
-        """Resultados del plugin de conducta, si hubo uno en el último job DONE.
-        available=False cuando ningún análisis usó plugin."""
-        with SessionLocal() as db:
-            exp = db.get(Experiment, exp_id)
-            if not exp:
-                return jsonify({"error": "experiment not found"}), 404
-
-            by_day = {}
-            for v in exp.videos:
-                latest_job = db.execute(
-                    select(Job).where(Job.video_id == v.id, Job.status == JobStatus.DONE)
-                    .order_by(Job.id.desc()).limit(1)
-                ).scalars().first()
-                if not latest_job or not latest_job.config or not latest_job.config.behavior_plugin:
-                    continue
-                animals = db.execute(
-                    select(Animal).join(Subject)
-                    .where(Animal.job_id == latest_job.id)
-                    .order_by(Subject.rat_idx)
-                ).scalars().all()
-                rows = [_behavior_row(a) for a in animals]
-                labels = sorted({lbl for r in rows for lbl in r["totals_s"]})
-                by_day[v.day.value] = {
-                    "job_id": latest_job.id,
-                    "plugin": latest_job.config.behavior_plugin,
-                    "plugin_version": latest_job.config.behavior_plugin_version,
-                    "labels": labels,
                     "animals": rows,
                 }
-            return {"experiment_id": exp_id, "available": bool(by_day), "results": by_day}
+            return {"experiment_id": exp_id, "results": by_day}
 
     @app.get("/api/jobs/<int:job_id>/video")
-    def job_tracked_video(job_id: int):
-        """Video anotado con las bboxes del tracking."""
+    def job_annotated_video(job_id: int):
+        """Video anotado que generó el pipeline, si lo hay."""
         with SessionLocal() as db:
             j = db.get(Job, job_id)
             if not j:
                 return jsonify({"error": "job not found"}), 404
             path = j.output_video_path
         if not path or not os.path.isfile(path):
-            return jsonify({"error": "tracked video not available"}), 404
+            return jsonify({"error": "annotated video not available"}), 404
         return send_file(path, mimetype="video/mp4", conditional=True)
 
     # ── Reports (RF-21) ──────────────────────────────────────────
@@ -614,7 +566,7 @@ def create_app() -> Flask:
                 .where(Animal.job_id == job_id)
                 .order_by(Subject.rat_idx)
             ).scalars().all()
-            return [_tracking_row(a) for a in animals]
+            return [_behavior_row(a) for a in animals]
 
     return app
 

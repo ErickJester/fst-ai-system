@@ -29,9 +29,8 @@ class JobStatus(enum.Enum):
 
 class PipelineStage(enum.Enum):
     PREPROCESSING = "PREPROCESSING"
-    ROI_DETECTION = "ROI_DETECTION"
-    TRACKING = "TRACKING"
-    BEHAVIOR = "BEHAVIOR"   # solo si hay plugin de conducta (pipeline/behavior_plugin.py)
+    ANALYSIS = "ANALYSIS"
+    SAVING = "SAVING"
     DONE = "DONE"
 
 
@@ -175,27 +174,16 @@ class ROI(Base):
 # ── Analysis configs ─────────────────────────────────────────────────
 
 class AnalysisConfig(Base):
-    """Parámetros exactos usados en una ejecución del pipeline.
+    """Qué pipeline de análisis y qué versión produjeron un resultado.
     layout NO se duplica aquí — la autoridad es experiments.layout
     (el job hereda vía video → experiment).
-    model_hash (SHA-256) permite reproducibilidad exacta de los pesos.
     """
     __tablename__ = "analysis_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    model_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    pipeline_version: Mapped[str] = mapped_column(String(30), nullable=False)
-    conf_threshold: Mapped[float] = mapped_column(Float, nullable=False)
-    tracker_yaml: Mapped[str] = mapped_column(String(60), nullable=False, default="bytetrack.yaml")
-    skip_frames: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    max_freeze_frames: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
-    stabilize: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    yolo_available: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    # Plugin de conducta usado (NULL = sin clasificación)
-    behavior_plugin: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    behavior_plugin_version: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    pipeline_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    pipeline_version: Mapped[str] = mapped_column(String(60), nullable=False)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="config")
 
@@ -219,8 +207,8 @@ class Job(Base):
     stage: Mapped[PipelineStage | None] = mapped_column(Enum(PipelineStage), nullable=True)
     progress_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Video anotado que genere el pipeline (opcional)
     output_video_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    output_json_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     video: Mapped["Video"] = relationship(back_populates="jobs")
     config: Mapped["AnalysisConfig | None"] = relationship(back_populates="jobs")
@@ -243,9 +231,6 @@ class Animal(Base):
 
     job: Mapped["Job"] = relationship(back_populates="animals")
     subject: Mapped["Subject"] = relationship(back_populates="animals")
-    tracking: Mapped["TrackingResult | None"] = relationship(
-        back_populates="animal", cascade="all, delete-orphan", uselist=False,
-    )
     behavior_segments: Mapped[list["BehaviorSegment"]] = relationship(
         back_populates="animal", cascade="all, delete-orphan",
         order_by="BehaviorSegment.start_s",
@@ -256,45 +241,12 @@ class Animal(Base):
     )
 
 
-# ── Tracking results ─────────────────────────────────────────────────
-
-class TrackingResult(Base):
-    """Calidad del tracking de un animal en una ejecución (1:1 con animals).
-    Conteo de frames procesados según la fuente de la bbox:
-      detected = yolo + track + classic (detección real)
-      freeze / lost = bbox congelada por política de continuidad
-      none = sin bbox
-    detected + freeze + lost + none = frames_total.
-    """
-    __tablename__ = "tracking_results"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, unique=True)
-    frames_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_yolo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_track: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_classic: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_freeze: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_lost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    frames_none: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-    animal: Mapped["Animal"] = relationship(back_populates="tracking")
-
-    __table_args__ = (
-        CheckConstraint(
-            "frames_yolo + frames_track + frames_classic + frames_freeze"
-            " + frames_lost + frames_none = frames_total",
-            name="ck_tracking_frames_sum",
-        ),
-    )
-
-
-# ── Behavior segments (plugin externo) ───────────────────────────────
+# ── Behavior segments ───────────────────────────────
 
 class BehaviorSegment(Base):
-    """Intervalo [start_s, end_s) con una conducta, producido por el plugin
-    de conducta (pipeline/behavior_plugin.py). label es texto libre definido
-    por el plugin: el sistema no fija las clases. Los totales por conducta y
+    """Intervalo [start_s, end_s) con una conducta, producido por el pipeline
+    de análisis. label es texto libre definido
+    por el pipeline: el sistema no fija las clases. Los totales por conducta y
     por minuto se derivan en consulta, no se almacenan.
     """
     __tablename__ = "behavior_segments"

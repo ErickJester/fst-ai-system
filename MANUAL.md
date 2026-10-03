@@ -1,4 +1,4 @@
-# FST Rat Tracker — Manual de Usuario
+# Sistema FST — Manual de Usuario
 
 ---
 
@@ -108,17 +108,11 @@ docker-compose down -v
 
 ---
 
-### Instalación del modelo custom (opcional)
+### Pipeline de análisis (pendiente)
 
-Si tienes un modelo YOLO custom entrenado (`weights/rat.pt`):
-
-1. Coloca el archivo en `./weights/rat.pt`
-2. Reinicia los contenedores:
-   ```bash
-   docker-compose restart api worker
-   ```
-
-Si NO existe `weights/rat.pt`, el sistema usa `yolov8n.pt` (modelo genérico de COCO).
+El análisis de video todavía no está implementado. El servicio `worker` solo
+muestra en su log que ahí irá el pipeline; los videos subidos quedan en cola
+(estado **QUEUED**) hasta que se implemente. Ver `backend/worker/worker.py`.
 
 ---
 
@@ -181,13 +175,6 @@ docker-compose exec -T db psql -U fst -d fst < backup.sql
 | `FLASK_ENV` | Modo Flask | `development` |
 | `UPLOAD_MAX_MB` | Tamaño máximo de video | `2048` |
 | `VITE_API_BASE` | URL base de la API (frontend) | `http://localhost:8000` |
-| `FST_BEHAVIOR_PLUGIN` | Plugin de conducta `modulo:fabrica` (en `.env`) | vacío = solo tracking |
-
-#### Plugin de conducta
-
-El sistema solo hace **tracking**. La clasificación de conducta es un plugin
-externo que se monta en `./plugins` y se activa con `FST_BEHAVIOR_PLUGIN`.
-Contrato e instrucciones en [`plugins/README.md`](plugins/README.md).
 
 ---
 
@@ -228,7 +215,10 @@ Contrato e instrucciones en [`plugins/README.md`](plugins/README.md).
 1. En tu experimento, haz clic en **"+ Subir video"**
 2. Selecciona el día: **DAY1**
 3. Carga el archivo `.mp4` (máx. 2 GB por defecto)
-4. El sistema **inicia automáticamente** el análisis
+4. El video queda **en cola** para análisis
+
+> ⚠️ El pipeline de análisis aún no está implementado: por ahora los videos
+> se quedan en estado **QUEUED**.
 
 **Estado del análisis:**
 - En la columna "Estado", ves:
@@ -244,13 +234,13 @@ Contrato e instrucciones en [`plugins/README.md`](plugins/README.md).
 Una vez que el análisis esté **DONE**:
 
 1. En tu experimento, haz clic en **"Ver resultados"**
-2. Verás, por día y por rata, la **calidad del tracking**:
-   - **Detectado**: % de frames con detección real (YOLO, tracker o detector clásico)
-   - **Congelado**: % de frames donde se mantuvo la última bbox (freeze / lost)
-   - **Sin bbox**: % de frames sin detección
-   - **Video anotado**: el video con las bboxes dibujadas
-3. Si el sistema tiene instalado un plugin de conducta, aparece además la
-   pestaña **"Conducta"** con los segundos por conducta de cada rata.
+2. Verás, por día y por rata, los segundos de cada conducta:
+   - **Resumen**: total por conducta
+   - **Por minuto**: desglose minuto a minuto
+   - **Video anotado**: si el análisis generó uno
+
+Mientras el pipeline no esté implementado, esta página indica que aún no hay
+resultados.
 
 ---
 
@@ -311,43 +301,19 @@ Abre el ícono 🔔 en la esquina superior.
 
 ---
 
-### Parámetros de análisis y qué significan
-
-El tracking usa estos parámetros (quedan registrados en cada análisis, tabla
-`analysis_configs`):
-
-| Parámetro | Significado | Valor por defecto |
-|-----------|-------------|-------------------|
-| `conf_threshold` | Confianza mínima de YOLO | 0.25 |
-| `tracker_yaml` | Tracker de ultralytics | `bytetrack.yaml` |
-| `max_freeze_frames` | Frames que se mantiene la última bbox si se pierde la rata | 20 |
-| `skip_frames` | Frames iniciales ignorados | 0 |
-| `stabilize` | Estabilización de cámara | `false` |
-
-Las ROIs (un cilindro por rata) se calculan del primer frame según el
-`layout` del experimento.
-
----
-
 ### Preguntas frecuentes
 
-**P: ¿Cuánto tarda el análisis de un video?**
-R: Típicamente 2-10 minutos según la duración y resolución. Videos de 6 minutos ~5 min de análisis.
+**P: ¿Por qué mi video sigue en QUEUED?**
+R: El pipeline de análisis aún no está implementado. Los videos se guardan y quedan en cola.
 
-**P: ¿Puedo subir un video mientras se procesa otro?**
-R: Sí, se encolan. El worker procesa uno por uno en orden.
+**P: ¿Puedo subir varios videos?**
+R: Sí, se encolan en orden.
 
 **P: ¿Se eliminan los videos después de cierto tiempo?**
 R: Sí, 30 días después de que termina el análisis. Los resultados se conservan indefinidamente.
 
 **P: ¿Qué formato de video necesito?**
 R: Obligatorio `.mp4`. Recomendado: H.264/H.265, 30 FPS, resolución ≥ 640x480.
-
-**P: ¿Puedo ver el video anotado?**
-R: Sí, en Resultados → **"Video anotado"**. También queda como `*_tracked.mp4` en la carpeta de datos.
-
-**P: ¿El sistema clasifica conducta (nado, inmovilidad, escalamiento)?**
-R: No por sí mismo. Solo si el técnico instaló un plugin de conducta (ver `plugins/README.md`).
 
 **P: ¿Dónde está el archivo de log detallado?**
 R: En `/data/` del contenedor, o pídele al técnico que revise `docker-compose logs worker`.

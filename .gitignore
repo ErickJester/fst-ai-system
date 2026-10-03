@@ -14,7 +14,3 @@ CLAUDE.md
 
 # restos locales de la herramienta de etiquetado (ahora en su propio repo)
 /tools/
-
-# plugins de conducta: viven en su propio repo, aquí solo se montan
-/plugins/*
-!/plugins/README.md
