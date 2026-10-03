@@ -5,9 +5,8 @@ import { usePolling } from '../hooks/usePolling'
 
 const STAGES = [
   { key: 'upload', name: 'Carga de video', desc: 'Verificación de integridad y formato del archivo de video.' },
-  { key: 'roi', name: 'Detección de ROI', desc: 'Identificación automática de la región de interés (tanque de nado).' },
-  { key: 'tracking', name: 'Tracking de animales', desc: 'Seguimiento frame a frame de cada animal en el campo de visión.' },
-  { key: 'summary', name: 'Resumen de resultados', desc: 'Cálculo de la calidad del tracking y video anotado por animal.' },
+  { key: 'analysis', name: 'Análisis de video', desc: 'Pipeline de análisis (pendiente de implementar: el video queda en cola).' },
+  { key: 'summary', name: 'Resumen de resultados', desc: 'Guardado de resultados por animal.' },
 ]
 
 function deriveStages(jobStatus) {
@@ -21,8 +20,8 @@ function deriveStages(jobStatus) {
   }
   if (jobStatus === 'RUNNING') {
     return STAGES.map((s, i) => {
-      if (i < 2) return { ...s, state: 'done', pct: 100 }
-      if (i === 2) return { ...s, state: 'active', pct: 65 }
+      if (i < 1) return { ...s, state: 'done', pct: 100 }
+      if (i === 1) return { ...s, state: 'active', pct: 65 }
       return { ...s, state: 'wait', pct: 0 }
     })
   }

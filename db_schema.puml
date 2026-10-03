@@ -42,9 +42,8 @@ enum JobStatus <<enum>> {
 
 enum PipelineStage <<enum>> {
     PREPROCESSING
-    ROI_DETECTION
-    TRACKING
-    BEHAVIOR
+    ANALYSIS
+    SAVING
     DONE
 }
 
@@ -152,26 +151,15 @@ entity "analysis_configs" as analysis_configs {
     * id : INTEGER <<PK>>
     --
     * created_at : DATETIME
-    * model_name : VARCHAR(120)
-    * model_hash : VARCHAR(64)
-    * pipeline_version : VARCHAR(30)
-    * conf_threshold : FLOAT
-    * tracker_yaml : VARCHAR(60) = bytetrack.yaml
-    * skip_frames : INTEGER = 0
-    * max_freeze_frames : INTEGER = 20
-    * stabilize : BOOLEAN = false
-    yolo_available : BOOLEAN
-    behavior_plugin : VARCHAR(120)
-    behavior_plugin_version : VARCHAR(60)
+    * pipeline_name : VARCHAR(120)
+    * pipeline_version : VARCHAR(60)
 }
 
 note right of analysis_configs
-  model_hash: SHA-256 de los weights.
-  Reproducibilidad exacta, no solo nombre.
+  Que pipeline de analisis y que version
+  produjeron el resultado.
   layout NO se duplica aqui; autoridad
   es experiments.layout.
-  behavior_plugin NULL = sin clasificacion
-  (solo tracking).
 end note
 
 entity "jobs" as jobs {
@@ -187,7 +175,6 @@ entity "jobs" as jobs {
     * progress_pct : INTEGER = 0
     error : TEXT
     output_video_path : VARCHAR(512)
-    output_json_path : VARCHAR(512)
 }
 
 entity "animals" as animals {
@@ -205,22 +192,6 @@ note right of animals
   Cero duplicidad conceptual.
 end note
 
-entity "tracking_results" as tracking_results {
-    * id : INTEGER <<PK>>
-    --
-    * animal_id : INTEGER <<FK→animals>> <<UNIQUE>>
-    * frames_total : INTEGER
-    * frames_yolo : INTEGER
-    * frames_track : INTEGER
-    * frames_classic : INTEGER
-    * frames_freeze : INTEGER
-    * frames_lost : INTEGER
-    * frames_none : INTEGER
-    --
-    <<CHECK: yolo + track + classic + freeze>>
-    <<        + lost + none = frames_total>>
-}
-
 entity "behavior_segments" as behavior_segments {
     * id : INTEGER <<PK>>
     --
@@ -235,9 +206,9 @@ entity "behavior_segments" as behavior_segments {
 }
 
 note right of behavior_segments
-  Hueco para el plugin de conducta externo
-  (pipeline/behavior_plugin.py). label es
-  texto libre definido por el plugin.
+  Los escribe el pipeline de analisis
+  (pendiente). label es texto libre
+  definido por el pipeline.
   Totales y desglose por minuto se derivan
   en consulta, no se almacenan.
 end note
@@ -290,7 +261,6 @@ analysis_configs    ||--o{ jobs                : "config_id"
 
 jobs                ||--o{ animals             : "job_id"
 
-animals             ||--o| tracking_results    : "animal_id"
 animals             ||--o{ behavior_segments   : "animal_id"
 
 ' ─────────────────────────────────────────────
