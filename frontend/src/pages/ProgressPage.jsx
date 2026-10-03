@@ -7,8 +7,7 @@ const STAGES = [
   { key: 'upload', name: 'Carga de video', desc: 'Verificación de integridad y formato del archivo de video.' },
   { key: 'roi', name: 'Detección de ROI', desc: 'Identificación automática de la región de interés (tanque de nado).' },
   { key: 'tracking', name: 'Tracking de animales', desc: 'Seguimiento frame a frame de cada animal en el campo de visión.' },
-  { key: 'classify', name: 'Clasificación de conducta', desc: 'Asignación de conducta (nado, inmovilidad, escape) por frame y animal.' },
-  { key: 'summary', name: 'Resumen de resultados', desc: 'Cálculo de tiempos totales y generación del reporte por animal.' },
+  { key: 'summary', name: 'Resumen de resultados', desc: 'Cálculo de la calidad del tracking y video anotado por animal.' },
 ]
 
 function deriveStages(jobStatus) {

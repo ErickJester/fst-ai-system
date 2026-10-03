@@ -181,6 +181,13 @@ docker-compose exec -T db psql -U fst -d fst < backup.sql
 | `FLASK_ENV` | Modo Flask | `development` |
 | `UPLOAD_MAX_MB` | Tamaño máximo de video | `2048` |
 | `VITE_API_BASE` | URL base de la API (frontend) | `http://localhost:8000` |
+| `FST_BEHAVIOR_PLUGIN` | Plugin de conducta `modulo:fabrica` (en `.env`) | vacío = solo tracking |
+
+#### Plugin de conducta
+
+El sistema solo hace **tracking**. La clasificación de conducta es un plugin
+externo que se monta en `./plugins` y se activa con `FST_BEHAVIOR_PLUGIN`.
+Contrato e instrucciones en [`plugins/README.md`](plugins/README.md).
 
 ---
 
@@ -237,14 +244,13 @@ docker-compose exec -T db psql -U fst -d fst < backup.sql
 Una vez que el análisis esté **DONE**:
 
 1. En tu experimento, haz clic en **"Ver resultados"**
-2. Verás:
-   - **Tiempos totales** por rata:
-     - Nado (segundos)
-     - Inmovilidad (segundos)
-     - Escape (segundos)
-   - **Desglose por minuto**: tablas detalladas de cada minuto
-
-3. Exporta a CSV si lo necesitas (botón **"Descargar CSV"**)
+2. Verás, por día y por rata, la **calidad del tracking**:
+   - **Detectado**: % de frames con detección real (YOLO, tracker o detector clásico)
+   - **Congelado**: % de frames donde se mantuvo la última bbox (freeze / lost)
+   - **Sin bbox**: % de frames sin detección
+   - **Video anotado**: el video con las bboxes dibujadas
+3. Si el sistema tiene instalado un plugin de conducta, aparece además la
+   pestaña **"Conducta"** con los segundos por conducta de cada rata.
 
 ---
 
@@ -252,19 +258,7 @@ Una vez que el análisis esté **DONE**:
 
 1. En el mismo experimento, sube el video de **DAY2**
 2. Espera a que termine el análisis
-3. Ahora puedes hacer **comparación DAY1 vs DAY2**
-
----
-
-### Comparación DAY1 vs DAY2
-
-Una vez que ambos videos estén analizados:
-
-1. En tu experimento, haz clic en **"Comparación"**
-2. Verás un lado a lado:
-   - Tiempos totales por día
-   - Porcentajes de cada conducta
-   - Cambios relativo (↑ más nado en DAY2, ↓ menos inmovilidad, etc.)
+3. En resultados, cambia entre **Día 1** y **Día 2**
 
 ---
 
@@ -319,19 +313,19 @@ Abre el ícono 🔔 en la esquina superior.
 
 ### Parámetros de análisis y qué significan
 
-El sistema usa estos umbrales para clasificar conducta:
+El tracking usa estos parámetros (quedan registrados en cada análisis, tabla
+`analysis_configs`):
 
 | Parámetro | Significado | Valor por defecto |
 |-----------|-------------|-------------------|
-| `immobile_thr` | Movimiento mínimo para dejar de ser inmóvil (px) | 6.5 |
-| `disp_thr` | Desplazamiento máximo del centro (px/frame) | 8.0 |
-| `pos_std_thr` | Dispersión espacial máxima (px) | 20.0 |
-| `climb_aspect_thr` | Ratio altura/ancho para detectar escape | 1.6 |
+| `conf_threshold` | Confianza mínima de YOLO | 0.25 |
+| `tracker_yaml` | Tracker de ultralytics | `bytetrack.yaml` |
+| `max_freeze_frames` | Frames que se mantiene la última bbox si se pierde la rata | 20 |
+| `skip_frames` | Frames iniciales ignorados | 0 |
+| `stabilize` | Estabilización de cámara | `false` |
 
-**Conducta clasificada como:**
-- **Escape**: aspect_ratio > 1.6 Y movimiento ≥ 6.5 px (postura vertical + movimiento)
-- **Inmovilidad**: movimiento < 6.5 Y desplazamiento < 8.0 Y dispersión < 20.0
-- **Nado**: todo lo demás
+Las ROIs (un cilindro por rata) se calculan del primer frame según el
+`layout` del experimento.
 
 ---
 
@@ -350,10 +344,10 @@ R: Sí, 30 días después de que termina el análisis. Los resultados se conserv
 R: Obligatorio `.mp4`. Recomendado: H.264/H.265, 30 FPS, resolución ≥ 640x480.
 
 **P: ¿Puedo ver el video anotado?**
-R: Sí, cuando termina el análisis se genera `*_tracked.mp4` en la carpeta de datos.
+R: Sí, en Resultados → **"Video anotado"**. También queda como `*_tracked.mp4` en la carpeta de datos.
 
-**P: ¿Puedo editar los umbrales de clasificación?**
-R: Actualmente están fijos. Contacta con el administrador si necesitas ajustarlos.
+**P: ¿El sistema clasifica conducta (nado, inmovilidad, escalamiento)?**
+R: No por sí mismo. Solo si el técnico instaló un plugin de conducta (ver `plugins/README.md`).
 
 **P: ¿Dónde está el archivo de log detallado?**
 R: En `/data/` del contenedor, o pídele al técnico que revise `docker-compose logs worker`.
