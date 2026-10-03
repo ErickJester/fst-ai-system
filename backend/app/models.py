@@ -31,7 +31,7 @@ class PipelineStage(enum.Enum):
     PREPROCESSING = "PREPROCESSING"
     ROI_DETECTION = "ROI_DETECTION"
     TRACKING = "TRACKING"
-    CLASSIFICATION = "CLASSIFICATION"
+    BEHAVIOR = "BEHAVIOR"   # solo si hay plugin de conducta (pipeline/behavior_plugin.py)
     DONE = "DONE"
 
 
@@ -188,11 +188,14 @@ class AnalysisConfig(Base):
     model_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     pipeline_version: Mapped[str] = mapped_column(String(30), nullable=False)
     conf_threshold: Mapped[float] = mapped_column(Float, nullable=False)
-    skip_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    immobile_thr: Mapped[float] = mapped_column(Float, nullable=False, default=6.5)
-    disp_thr: Mapped[float] = mapped_column(Float, nullable=False, default=8.0)
-    pos_std_thr: Mapped[float] = mapped_column(Float, nullable=False, default=20.0)
-    climb_aspect_thr: Mapped[float] = mapped_column(Float, nullable=False, default=1.6)
+    tracker_yaml: Mapped[str] = mapped_column(String(60), nullable=False, default="bytetrack.yaml")
+    skip_frames: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_freeze_frames: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    stabilize: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    yolo_available: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Plugin de conducta usado (NULL = sin clasificación)
+    behavior_plugin: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    behavior_plugin_version: Mapped[str | None] = mapped_column(String(60), nullable=True)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="config")
 
@@ -216,6 +219,8 @@ class Job(Base):
     stage: Mapped[PipelineStage | None] = mapped_column(Enum(PipelineStage), nullable=True)
     progress_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_video_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    output_json_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     video: Mapped["Video"] = relationship(back_populates="jobs")
     config: Mapped["AnalysisConfig | None"] = relationship(back_populates="jobs")
@@ -238,64 +243,77 @@ class Animal(Base):
 
     job: Mapped["Job"] = relationship(back_populates="animals")
     subject: Mapped["Subject"] = relationship(back_populates="animals")
-    results: Mapped[list["BehaviorResult"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
-    per_minute: Mapped[list["BehaviorPerMinute"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
+    tracking: Mapped["TrackingResult | None"] = relationship(
+        back_populates="animal", cascade="all, delete-orphan", uselist=False,
+    )
+    behavior_segments: Mapped[list["BehaviorSegment"]] = relationship(
+        back_populates="animal", cascade="all, delete-orphan",
+        order_by="BehaviorSegment.start_s",
+    )
 
     __table_args__ = (
         UniqueConstraint("job_id", "subject_id", name="uq_job_subject"),
     )
 
 
-# ── Behavior results (antes "result_summary") ────────────────────────
+# ── Tracking results ─────────────────────────────────────────────────
 
-class BehaviorResult(Base):
-    """Tiempo total en segundos de cada conducta para un animal en una sesión.
-    total_analyzed_s captura la duración efectivamente analizada para este
-    animal, permitiendo validar que swim + immobile + escape no la excedan.
+class TrackingResult(Base):
+    """Calidad del tracking de un animal en una ejecución (1:1 con animals).
+    Conteo de frames procesados según la fuente de la bbox:
+      detected = yolo + track + classic (detección real)
+      freeze / lost = bbox congelada por política de continuidad
+      none = sin bbox
+    detected + freeze + lost + none = frames_total.
     """
-    __tablename__ = "behavior_results"
+    __tablename__ = "tracking_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, index=True)
-    swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    total_analyzed_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, unique=True)
+    frames_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_yolo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_track: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_classic: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_freeze: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_lost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    frames_none: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    animal: Mapped["Animal"] = relationship(back_populates="results")
+    animal: Mapped["Animal"] = relationship(back_populates="tracking")
 
     __table_args__ = (
         CheckConstraint(
-            "swim_s >= 0 AND immobile_s >= 0 AND escape_s >= 0",
-            name="ck_behavior_non_negative",
-        ),
-        CheckConstraint(
-            "swim_s + immobile_s + escape_s <= total_analyzed_s + 0.01",
-            name="ck_behavior_within_duration",
+            "frames_yolo + frames_track + frames_classic + frames_freeze"
+            " + frames_lost + frames_none = frames_total",
+            name="ck_tracking_frames_sum",
         ),
     )
 
 
-# ── Behavior per minute (RF-19) ───────────────────────────────────────
+# ── Behavior segments (plugin externo) ───────────────────────────────
 
-class BehaviorPerMinute(Base):
-    """Desglose por minuto de la conducta de un animal (RF-19).
-    Normalizado en tabla propia para permitir consultas SQL directas
-    en lugar de parsear blobs JSON.
+class BehaviorSegment(Base):
+    """Intervalo [start_s, end_s) con una conducta, producido por el plugin
+    de conducta (pipeline/behavior_plugin.py). label es texto libre definido
+    por el plugin: el sistema no fija las clases. Los totales por conducta y
+    por minuto se derivan en consulta, no se almacenan.
     """
-    __tablename__ = "behavior_per_minute"
+    __tablename__ = "behavior_segments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, index=True)
-    minute: Mapped[int] = mapped_column(Integer, nullable=False)
-    swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    start_s: Mapped[float] = mapped_column(Float, nullable=False)
+    end_s: Mapped[float] = mapped_column(Float, nullable=False)
+    label: Mapped[str] = mapped_column(String(60), nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    animal: Mapped["Animal"] = relationship(back_populates="per_minute")
+    animal: Mapped["Animal"] = relationship(back_populates="behavior_segments")
 
     __table_args__ = (
-        UniqueConstraint("animal_id", "minute", name="uq_animal_minute"),
+        CheckConstraint("start_s >= 0 AND end_s > start_s", name="ck_segment_interval"),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="ck_segment_confidence",
+        ),
     )
 
 

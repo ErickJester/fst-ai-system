@@ -5,12 +5,16 @@ from pathlib import Path
 from sqlalchemy import text, select
 from app.db import SessionLocal
 from app.models import (
-    JobStatus, Job, Video, Animal, BehaviorResult,
+    JobStatus, Job, Video, Animal, TrackingResult,
     PipelineStage, Notification, NotificationType,
-    Subject, ROI, AnalysisConfig, BehaviorPerMinute,
+    Subject, ROI, AnalysisConfig, BehaviorSegment,
 )
-from pipeline.run_analysis import run_analysis, VERSION
-from pipeline.tracker import DEFAULT_MODEL, DEFAULT_CONF
+from pipeline.tracker import (
+    track_video, VERSION, DEFAULT_MODEL, DEFAULT_CONF, MAX_FREEZE,
+)
+from pipeline.behavior_plugin import load_classifier, validate_segments
+
+TRACKER_YAML = "bytetrack.yaml"
 
 POLL_SECONDS = 2
 VIDEO_RETENTION_DAYS = 30
@@ -40,6 +44,15 @@ def claim_next_job_id(db):
 
 
 def main():
+    # Plugin de conducta opcional (FST_BEHAVIOR_PLUGIN). Si está configurado
+    # pero no carga, el worker no arranca: mejor fallar que analizar sin él.
+    classifier = load_classifier()
+    print(
+        f"[worker] plugin de conducta: {classifier.name} {classifier.version}"
+        if classifier else "[worker] sin plugin de conducta: solo tracking",
+        flush=True,
+    )
+
     while True:
         job_id = None
         try:
@@ -77,39 +90,53 @@ def main():
                     model_hash=_model_hash(DEFAULT_MODEL),
                     pipeline_version=VERSION,
                     conf_threshold=DEFAULT_CONF,
-                    skip_seconds=0.0,
-                    immobile_thr=6.5,
-                    disp_thr=8.0,
-                    pos_std_thr=20.0,
-                    climb_aspect_thr=1.6,
+                    tracker_yaml=TRACKER_YAML,
+                    skip_frames=0,
+                    max_freeze_frames=MAX_FREEZE,
+                    stabilize=False,
+                    behavior_plugin=classifier.name if classifier else None,
+                    behavior_plugin_version=classifier.version if classifier else None,
                 )
                 db.add(config)
                 db.flush()
                 job.config_id = config.id
+                job.stage = PipelineStage.TRACKING
                 db.add(job)
-                db.flush()
+                db.commit()
 
-                summaries = run_analysis(
+                result = track_video(
                     video.path,
-                    layout=layout,
                     output_video=tracked_video,
                     output_json=tracked_json,
+                    layout=layout,
+                    show_progress=False,
+                    model_path=DEFAULT_MODEL,
+                    conf=DEFAULT_CONF,
+                    tracker_yaml=TRACKER_YAML,
+                    max_freeze_frames=MAX_FREEZE,
                 )
+                config.yolo_available = result["yolo_available"]
+                job.output_video_path = tracked_video
+                job.output_json_path = tracked_json
 
                 # Limpiar animales previos de este job (re-run)
                 db.query(Animal).filter(Animal.job_id == job_id).delete()
                 db.flush()
 
-                for s in summaries:
+                stats = result["stats"]
+                animal_by_rat = {}
+                for roi in result["rois"]:
+                    rat_idx = roi["rat_idx"]
+
                     # Upsert Subject — identidad persistente del animal
                     subject = db.execute(
                         select(Subject).where(
                             Subject.experiment_id == experiment.id,
-                            Subject.rat_idx == s.rat_idx,
+                            Subject.rat_idx == rat_idx,
                         )
                     ).scalars().first()
                     if not subject:
-                        subject = Subject(experiment_id=experiment.id, rat_idx=s.rat_idx)
+                        subject = Subject(experiment_id=experiment.id, rat_idx=rat_idx)
                         db.add(subject)
                         db.flush()
 
@@ -120,17 +147,16 @@ def main():
                             ROI.subject_id == subject.id,
                         )
                     ).scalars().first()
-                    roi_coords = s.roi
                     if roi_rec:
-                        roi_rec.x, roi_rec.y, roi_rec.w, roi_rec.h = roi_coords
+                        roi_rec.x, roi_rec.y, roi_rec.w, roi_rec.h = roi["x"], roi["y"], roi["w"], roi["h"]
                     else:
                         roi_rec = ROI(
                             video_id=video.id,
                             subject_id=subject.id,
-                            x=roi_coords[0],
-                            y=roi_coords[1],
-                            w=roi_coords[2],
-                            h=roi_coords[3],
+                            x=roi["x"],
+                            y=roi["y"],
+                            w=roi["w"],
+                            h=roi["h"],
                         )
                         db.add(roi_rec)
                     db.flush()
@@ -143,23 +169,31 @@ def main():
                     db.add(animal)
                     db.flush()
 
-                    total_analyzed = s.swim_s + s.immobile_s + s.escape_s
-                    result = BehaviorResult(
+                    db.add(TrackingResult(
                         animal_id=animal.id,
-                        swim_s=s.swim_s,
-                        immobile_s=s.immobile_s,
-                        escape_s=s.escape_s,
-                        total_analyzed_s=total_analyzed,
-                    )
-                    db.add(result)
+                        frames_total=stats["total"],
+                        frames_yolo=stats["yolo"][rat_idx],
+                        frames_track=stats["track"][rat_idx],
+                        frames_classic=stats["classic"][rat_idx],
+                        frames_freeze=stats["freeze"][rat_idx],
+                        frames_lost=stats["lost"][rat_idx],
+                        frames_none=stats["none"][rat_idx],
+                    ))
+                    animal_by_rat[rat_idx] = animal
 
-                    for pm in s.per_minute:
-                        db.add(BehaviorPerMinute(
-                            animal_id=animal.id,
-                            minute=pm["minute"],
-                            swim_s=pm["swim_s"],
-                            immobile_s=pm["immobile_s"],
-                            escape_s=pm["escape_s"],
+                # Plugin de conducta (hueco para el clasificador externo)
+                if classifier is not None:
+                    job.stage = PipelineStage.BEHAVIOR
+                    db.commit()
+                    segments = classifier.classify(video.path, result)
+                    validate_segments(segments, n_rats=len(animal_by_rat))
+                    for seg in segments:
+                        db.add(BehaviorSegment(
+                            animal_id=animal_by_rat[seg.rat_idx].id,
+                            start_s=seg.start_s,
+                            end_s=seg.end_s,
+                            label=seg.label,
+                            confidence=seg.confidence,
                         ))
 
                 job.status = JobStatus.DONE
@@ -171,10 +205,9 @@ def main():
                 # RF-24/RN-05: programar borrado del video a 30 días
                 video.deletion_date = datetime.utcnow() + timedelta(days=VIDEO_RETENTION_DAYS)
 
-                # Duración del video derivada del total de ventanas analizadas
-                if summaries and summaries[0].per_minute:
-                    last_minute = summaries[0].per_minute[-1]
-                    video.duration_s = last_minute["minute"] * 60.0
+                # Duración: frames procesados / fps (track_video procesa todos los frames por defecto)
+                if result["fps"] > 0:
+                    video.duration_s = result["total_frames_processed"] / result["fps"]
 
                 db.add(job)
                 db.commit()

@@ -36,6 +36,8 @@ from dataclasses import dataclass, asdict
 from typing import Optional, Tuple, List, Dict
 
 
+VERSION = "tracker-v6"
+
 RAT_COLORS = [(0, 255, 0), (255, 100, 0), (0, 180, 255), (255, 0, 180)]
 RAT_LABELS = ["Rata 1", "Rata 2", "Rata 3", "Rata 4"]
 
@@ -845,23 +847,25 @@ def track_video(
     if writer:
         writer.release()
 
+    payload = {
+        "video": str(input_path),
+        "fps": float(fps),
+        "frame_size": [fw, fh],
+        "layout": layout,
+        "model": str(model_path),
+        "yolo_available": bool(use_yolo),
+        "tracker": tracker_yaml,
+        "stabilize": bool(stabilize),
+        "conf": float(conf),
+        "recovery_conf": float(RECOVERY_CONF),
+        "rois": [{"rat_idx": i, "x": r[0], "y": r[1], "w": r[2], "h": r[3], "waterline_y": int(last_cur_wl[i])} for i, r in enumerate(rois)],
+        "total_frames_processed": int(stats["total"]),
+        "detections": all_dets,
+        "stats": stats,
+    }
+
     # json
     if output_json:
-        payload = {
-            "video": str(input_path),
-            "fps": float(fps),
-            "frame_size": [fw, fh],
-            "layout": layout,
-            "model": str(model_path),
-            "tracker": tracker_yaml,
-            "stabilize": bool(stabilize),
-            "conf": float(conf),
-            "recovery_conf": float(RECOVERY_CONF),
-            "rois": [{"rat_idx": i, "x": r[0], "y": r[1], "w": r[2], "h": r[3], "waterline_y": int(last_cur_wl[i])} for i, r in enumerate(rois)],
-            "total_frames_processed": int(stats["total"]),
-            "detections": all_dets,
-            "stats": stats,
-        }
         with open(str(output_json), "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
@@ -882,5 +886,7 @@ def track_video(
                 continue
             print(f"  {RAT_LABELS[i]}: real={real}/{t} ({real/t*100:.0f}%)  freeze={fr}  lost={lo}  none={nn}")
         print("═" * 60 + "\n")
+
+    return payload
 
     return stats
