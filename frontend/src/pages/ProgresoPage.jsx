@@ -4,8 +4,8 @@ import { getQueue } from '../services/queue'
 import { usePolling } from '../hooks/usePolling'
 import { DIA, ETAPA } from '../lib/fst'
 import { Cargando } from '../components/ui'
+import { MUT60, btnLeft } from '../lib/estilos'
 
-const MUT60 = 'color-mix(in srgb,var(--color-text) 60%,transparent)'
 const INK = 'var(--color-text)'
 const CONFIANZA_MIN = 0.7
 const ETAPAS = Object.keys(ETAPA)
@@ -167,7 +167,7 @@ function TrabajoFallido({ j }) {
           <span style={{ fontSize: 13, lineHeight: 1.55 }}>{j.error.mensaje}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-          <button type="button" className="btn btn-primary" style={{ justifyContent: 'flex-start' }} onClick={() => descargarDiagnostico(j, detalle)}>Descargar reporte de diagnóstico (PDF)</button>
+          <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => descargarDiagnostico(j, detalle)}>Descargar reporte de diagnóstico (PDF)</button>
           <span className="hint">El investigador no puede reiniciar el análisis.</span>
         </div>
       </div>

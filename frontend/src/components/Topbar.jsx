@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { listNotifications, setRead, markAllRead } from '../services/notifications'
 import { fechaCorta } from '../lib/fst'
+import { MUT60, MUT70 } from '../lib/estilos'
 
 // 2k · Barra superior: lo que cada pantalla pone a la izquierda (children),
 // más la campana de notificaciones y el menú de usuario.
@@ -112,7 +113,7 @@ export default function Topbar({ children }) {
                 <span style={{ width: 8, height: 8, marginTop: 5, background: n.is_read ? 'transparent' : 'var(--color-accent)', border: '1px solid var(--color-divider)' }} />
                 <div>
                   <div className="nd" style={{ fontSize: 13 }}>{n.titulo}</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 2, color: 'color-mix(in srgb,var(--color-text) 70%,transparent)' }}>{n.texto}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 2, color: MUT70 }}>{n.texto}</div>
                   <a href={n.enlace} style={{ display: 'inline-block', marginTop: 5 }} onClick={(e) => { e.preventDefault(); abrirNotif(n) }}>{ENLACE[n.tipo]}</a>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
@@ -131,7 +132,7 @@ export default function Topbar({ children }) {
           <div className="dropdown" style={{ width: 230 }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-divider)' }}>
               <div className="nd" style={{ fontSize: 13 }}>{(user.nombre + ' ' + user.apellidos).trim()}</div>
-              <div className="num" style={{ fontSize: 11.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>{user.correo} · {user.rol}</div>
+              <div className="num" style={{ fontSize: 11.5, color: MUT60 }}>{user.correo} · {user.rol}</div>
             </div>
             <Link className="menu-item" to="/perfil" style={{ borderBottom: '1px solid var(--color-divider)' }}>Mi perfil</Link>
             <a className="menu-item" href="/login" onClick={salir}>Cerrar sesión</a>

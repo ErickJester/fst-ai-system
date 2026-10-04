@@ -4,12 +4,12 @@ import Topbar, { Brand } from '../components/Topbar'
 import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
 import { getExperiment } from '../services/experiments'
 import { createGroup, uploadBatchVideo } from '../services/groups'
+import { mensajeError } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
 import { norm } from '../lib/fst'
+import { MUT60, btnLeft, mutedSub } from '../lib/estilos'
 
 const nextLetter = (arr) => (arr.length ? String.fromCharCode(arr[arr.length - 1].charCodeAt(0) + 1) : 'A')
-const mutedSub = { fontSize: 12, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }
-const btnLeft = { justifyContent: 'flex-start' }
 
 // Grupo del experimento → sugerencia del autocompletado.
 const sugerencia = (g) => ({
@@ -156,7 +156,7 @@ export default function CargarVideoPage() {
       if (fileRef.current) fileRef.current.value = ''
       reload()
     } catch (err) {
-      setErrGuardar(err.response?.data?.error || 'No se pudo guardar el video. Inténtalo de nuevo.')
+      setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
     } finally {
       setSubiendo(null)
     }
@@ -193,7 +193,7 @@ export default function CargarVideoPage() {
                         <span className="nd" style={{ fontSize: 13 }}><Hi label={g.nombre} q={qt} /></span>
                         <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
                         <div style={{ flex: 1 }} />
-                        <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>
+                        <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: MUT60 }}>
                           tandas cargadas: {g.cargadas.join(', ') || '—'}
                         </span>
                       </div>
