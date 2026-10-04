@@ -38,29 +38,6 @@ export const GRUPOS_CARGA = [
   { nombre: 'Experimental B · CSR-14, 15 mg/kg', tipo: 'tratamiento experimental', tag: 'tag-accent', cargadas: ['A', 'B'] },
 ]
 
-// ── resultados (2f): Grupo referencia, Tanda A, Día 2 ──────────────────────
-export const BEHAVIORS = [
-  { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
-  { id: 'inmov', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' },
-  { id: 'escal', label: 'Escalamiento', color: 'var(--color-neutral-400)', nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
-]
-
-export const RESULTADOS = [
-  { pos: '1', label: 'Rata 1 · Cilindro P1', nado: 171, inmov: 88, escal: 41 },
-  { pos: '2', label: 'Rata 2 · Cilindro P2', nado: 158, inmov: 104, escal: 38 },
-  { pos: '3', label: 'Rata 3 · Cilindro P3', nado: 182, inmov: 76, escal: 42 },
-  { pos: '4', label: 'Rata 4 · Cilindro P4', nado: 149, inmov: 118, escal: 33 },
-]
-
-// Línea de tiempo por minuto de la Rata 1: [conducta, segundos].
-export const PATRON_RATA1 = [
-  [['nado', 38], ['escal', 8], ['nado', 10], ['inmov', 4]],
-  [['nado', 30], ['inmov', 12], ['escal', 6], ['nado', 8], ['inmov', 4]],
-  [['inmov', 10], ['nado', 22], ['escal', 9], ['inmov', 8], ['nado', 11]],
-  [['nado', 16], ['inmov', 20], ['nado', 12], ['escal', 7], ['inmov', 5]],
-  [['inmov', 14], ['nado', 24], ['inmov', 11], ['escal', 11]],
-]
-
 // ── administración (2g) ────────────────────────────────────────────────────
 export const CUENTAS = [
   { nombre: 'M. Rivera Alcántara', correo: 'mrivera@ipn.mx', rol: 'Investigador', activa: true },
