@@ -105,6 +105,11 @@ export default function ExperimentoPage() {
           </div>
         </div>
 
+        {groups.length === 0 && (
+          <div className="note-bar" style={{ marginBottom: 22 }}>
+            Todavía no hay grupos. Se crean al cargar el primer video de cada tanda: <Link to={`/experimentos/${exp.clave}/cargar`}>cargar videos</Link>.
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
           {groups.map((g) => (
             <div key={g.id} style={{ background: 'var(--color-bg)', padding: '18px 20px' }}>

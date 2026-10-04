@@ -27,13 +27,14 @@ function videosDia2(e) {
   const n = incompleta ? e.videos_dia2_cargados : e.videos_dia2_listos
   return {
     texto: n + ' / ' + e.videos_dia2_total + (incompleta ? ' cargados' : ''),
-    pct: Math.round((n / e.videos_dia2_total) * 100) + '%',
+    pct: (e.videos_dia2_total ? Math.round((n / e.videos_dia2_total) * 100) : 0) + '%',
   }
 }
 
 // Retención del video crudo: la última semana se resalta.
 function retencion(e) {
   if (e.videos_borrados) return { texto: 'Videos borrados', color: 'var(--muted)' }
+  if (e.retencion_dias == null) return { texto: '—', color: 'var(--muted)' } // todavía sin videos
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
 
@@ -73,7 +74,7 @@ export default function ExperimentosPage() {
               Prueba de nado forzado (<em>Forced Swim Test</em>, FST). El archivo completo del laboratorio, visible para cualquier cuenta activa.
             </p>
           </div>
-          <Link className="btn btn-primary" to={`/experimentos/${EXPERIMENTO.clave}/cargar`} style={{ justifyContent: 'flex-start' }}>Nuevo experimento</Link>
+          <Link className="btn btn-primary" to="/experimentos/nuevo" style={{ justifyContent: 'flex-start' }}>Nuevo experimento</Link>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)' }}>
