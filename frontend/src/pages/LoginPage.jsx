@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import '../styles/pages/login.css'
 
 export default function LoginPage() {
   const { user, login } = useAuth()
@@ -8,7 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState(false)
 
   if (user) {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />
@@ -16,21 +17,19 @@ export default function LoginPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    setError(null)
     const result = login(email, password)
     if (result.ok) {
       const u = JSON.parse(localStorage.getItem('fst_user'))
       navigate(u.role === 'admin' ? '/admin' : '/dashboard')
     } else {
-      setError(result.error)
+      setError(true)
     }
   }
 
   return (
-    <>
-      {/* Topbar */}
+    <div className="pg-login">
       <header className="topbar">
-        <div className="topbar-brand" style={{ gap: 10, display: 'flex', alignItems: 'center' }}>
+        <div className="topbar-logo">
           <div className="topbar-icon">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M6 1v5.5L2.5 13a1 1 0 00.9 1.5h9.2a1 1 0 00.9-1.5L10 6.5V1" stroke="#c8d8f0" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -44,27 +43,22 @@ export default function LoginPage() {
             <div className="topbar-sub">Análisis conductual automatizado</div>
           </div>
         </div>
-        <div className="topbar-divider" style={{ marginLeft: 12 }} />
-        <div className="topbar-badge" style={{ marginLeft: 12 }}>TT 2026-B066 · ESCOM-IPN</div>
+        <div className="topbar-divider"></div>
+        <div className="topbar-badge">TT 2026-B066 · ESCOM-IPN</div>
       </header>
 
-      {/* Page */}
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
-        <div style={{ width: '100%', maxWidth: 440 }}>
-          <div className="card" style={{ boxShadow: '0 4px 16px rgba(0,0,0,.10)' }}>
-            <div className="card-header" style={{ padding: '28px 32px 22px', display: 'block' }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--c-text)', marginBottom: 3 }}>
-                Iniciar sesión
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--c-text-muted)' }}>
-                Ingresa tus credenciales institucionales para continuar.
-              </div>
+      <main className="page">
+        <div className="card-wrap">
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Iniciar sesión</div>
+              <div className="card-subtitle">Ingresa tus credenciales institucionales para continuar.</div>
             </div>
 
-            <div style={{ padding: '28px 32px 32px' }}>
+            <div className="card-body">
               {error && (
-                <div className="error-banner">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                <div className="error-banner" style={{ display: 'flex' }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="8" r="7" stroke="#f87171" strokeWidth="1.4"/>
                     <path d="M8 5v3.5" stroke="#f87171" strokeWidth="1.5" strokeLinecap="round"/>
                     <circle cx="8" cy="11" r=".7" fill="#f87171"/>
@@ -79,7 +73,7 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label className="form-label" htmlFor="email">
-                    Correo electrónico <span className="req">*</span>
+                    Correo electrónico <span className="required">*</span>
                   </label>
                   <div className="input-wrap">
                     <span className="input-icon">
@@ -96,13 +90,14 @@ export default function LoginPage() {
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label" htmlFor="password">
-                    Contraseña <span className="req">*</span>
+                    Contraseña <span className="required">*</span>
                   </label>
                   <div className="input-wrap">
                     <span className="input-icon">
@@ -120,12 +115,14 @@ export default function LoginPage() {
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      required
                     />
                     <button
                       type="button"
                       className="input-toggle"
                       title="Mostrar contraseña"
-                      onClick={() => setShowPwd(!showPwd)}
+                      aria-label="Mostrar u ocultar contraseña"
+                      onClick={() => setShowPwd((v) => !v)}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="#9ca3af" strokeWidth="1.3"/>
@@ -135,16 +132,18 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -10, marginBottom: 22 }}>
-                  <span className="link" style={{ cursor: 'pointer' }}>¿Olvidé mi contraseña?</span>
+                <div className="forgot-row">
+                  <a href="#" className="link" onClick={(e) => e.preventDefault()}>¿Olvidé mi contraseña?</a>
                 </div>
 
-                <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <path d="M2 7.5h11M8.5 3l4.5 4.5L8.5 12" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Ingresar
-                </button>
+                <div>
+                  <button type="submit" className="btn-primary">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <path d="M2 7.5h11M8.5 3l4.5 4.5L8.5 12" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Ingresar
+                  </button>
+                </div>
               </form>
             </div>
 
@@ -155,11 +154,11 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p style={{ marginTop: 20, textAlign: 'center', fontSize: '11.5px', color: '#9ca3af' }}>
+          <p className="page-note">
             Sistema de análisis conductual FST · ESCOM-IPN · TT 2026-B066
           </p>
         </div>
       </main>
-    </>
+    </div>
   )
 }
