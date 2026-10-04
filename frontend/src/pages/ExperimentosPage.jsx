@@ -5,6 +5,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { Seg } from '../components/ui'
 import { listExperiments } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
+import { useAviso } from '../hooks/useAviso'
 import { norm, fechaCorta } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
@@ -45,6 +46,7 @@ const RESULTADOS = '/experimentos/EXP-2026-02/resultados'
 export default function ExperimentosPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
+  const sinPermiso = useAviso('sin-permiso')
   const [filtro, setFiltro] = useState('todos')
   const [q, setQ] = useState('')
   const { data, error, loading } = useAsync(listExperiments)
@@ -67,6 +69,7 @@ export default function ExperimentosPage() {
       </Topbar>
 
       <div className="page" style={{ paddingBottom: 34 }}>
+        {sinPermiso && <div className="note-bar" style={{ marginBottom: 18 }}>No tienes permiso para esa sección.</div>}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28, marginBottom: 22 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 8px' }}>Experimentos</h2>
