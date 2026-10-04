@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import { useApi } from '../../hooks/useApi'
 
 function StepIndicator({ current }) {
   const labels = ['Datos básicos', 'Videos', 'Confirmar']
