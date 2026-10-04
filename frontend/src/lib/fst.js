@@ -39,11 +39,12 @@ export const fechaCorta = (iso) => {
 // Dos fechas del mismo mes → '18–19 feb 2026'.
 export const fechaRango = (desde, hasta) => {
   const [a, b] = [fechaCorta(desde), fechaCorta(hasta)]
+  if (a === b) return a
   return a.slice(a.indexOf(' ')) === b.slice(b.indexOf(' ')) ? a.split(' ')[0] + '–' + b : a + ' – ' + b
 }
 
 // ── valores de la API → etiquetas de los mockups ───────────────────────────
-export const ESTADO_TANDA = { QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
+export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
 export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
 export const DIA = { DAY1: 'Día 1', DAY2: 'Día 2' }
 // En el orden en que las recorre el pipeline.
