@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
 import { getQueue } from '../services/queue'
 import { usePolling } from '../hooks/usePolling'
@@ -41,10 +41,18 @@ function descargarDiagnostico(j, detalle) {
   w.document.close()
 }
 
+// La cola se consulta cada 5 s mientras haya análisis activos (en cola o procesando);
+// sin ninguno, cada 30 s, solo para ver si llega uno nuevo.
+const CADA_ACTIVO_MS = 5000
+const CADA_INACTIVO_MS = 30000
+
 // 2e · Progreso de análisis: cuatro etapas del pipeline, cola secuencial sin controles.
-// La cola se vuelve a consultar cada 5 s.
 export default function ProgresoPage() {
-  const { data, error } = usePolling(getQueue, 5000)
+  const [activos, setActivos] = useState(true)
+  const { data, error } = usePolling(getQueue, activos ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
+  useEffect(() => {
+    if (data) setActivos(data.cola.length > 0)
+  }, [data])
 
   if (!data && !error) return <Cargando />
 

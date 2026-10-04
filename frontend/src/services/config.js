@@ -5,3 +5,6 @@ export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
 
 // Token de la sesión en sessionStorage: lo guarda AuthContext y lo envía api.js.
 export const TOKEN_KEY = 'fst.token'
+
+// Aviso para la pantalla de login cuando el servidor rechaza una sesión vencida (401).
+export const AVISO_KEY = 'fst.aviso'
