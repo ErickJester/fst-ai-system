@@ -112,7 +112,9 @@ export const groupComparison = {
 
 // Cuentas (2g, 2h, 2i, 2j). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
 // must_change_password: la cuenta entró con contraseña temporal y debe cambiarla (2i).
-// Sin backend no hay contraseñas reales: cualquier contraseña no vacía entra.
+// password: solo en datos de ejemplo (el servidor guarda únicamente el hash). Las cuentas
+// sin password entran con cualquier contraseña no vacía; las creadas en Admin, con su
+// contraseña temporal, y después con la que pongan en el primer acceso o al restablecerla.
 export const users = [
   { id: 1, nombre: 'Mariana', apellidos: 'Rivera Alcántara', email: 'mrivera@ipn.mx', identificador: '2019630871', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
   { id: 2, nombre: 'C. S.', apellidos: 'Reyes López', email: 'creyesl@ipn.mx', identificador: '2008630412', role: 'ADMIN', is_active: true, must_change_password: false },
@@ -146,3 +148,7 @@ export const notifications = [
   { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
   { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
 ]
+
+// Enlaces de recuperación pendientes (2h): token → { userId, vence (ms), usado }.
+// Un token que no está aquí, como «vencido», responde igual que un enlace vencido.
+export const resetTokens = {}

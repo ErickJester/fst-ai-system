@@ -28,6 +28,7 @@ export default function AdminPage() {
   const [guardando, setGuardando] = useState(false)
   const [crear, setCrear] = useState(false)
   const [okCrear, setOkCrear] = useState(false)
+  const [temporal, setTemporal] = useState(null) // { nombre, email, password } de la cuenta recién creada
   const [form, setForm] = useState(VACIO)
   const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
 
@@ -77,10 +78,10 @@ export default function AdminPage() {
     fail(null, '')
     setGuardando(true)
     try {
-      await createUser({ nombre: v.nombre, apellidos: v.apellidos, email: v.correo, identificador: v.id })
+      const u = await createUser({ nombre: v.nombre, apellidos: v.apellidos, email: v.correo, identificador: v.id })
       setForm(VACIO)
       setCrear(false)
-      setOkCrear(true)
+      setTemporal({ nombre: nombreCorto(u), email: u.email, password: u.password_temporal })
       reload()
     } catch (e) {
       // El correo repetido lo detecta el servidor.
@@ -155,9 +156,11 @@ export default function AdminPage() {
         )}
         {okCrear && (
           <div className="ok-bar" style={{ marginTop: 18, border: '2px solid var(--color-text)', borderLeft: '4px solid var(--color-text)' }}>
-            <strong>Cuenta creada · se envió la contraseña temporal al correo</strong>
+            <strong>Cuenta creada.</strong> La persona entra con su contraseña temporal y la cambia en su primer acceso.
           </div>
         )}
+
+        {temporal && <DialogoTemporal cuenta={temporal} onListo={() => { setTemporal(null); setOkCrear(true) }} />}
 
         <hr className="hr" />
 
@@ -255,3 +258,39 @@ const catalogos = (s) => [
   { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: c.nombre, m: '≥ ' + c.minimo_s + ' s' })) },
   { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: ' + s.modelo, m: '' }] },
 ]
+
+// La contraseña temporal se muestra una sola vez: no se cierra con Escape ni al hacer clic
+// fuera, solo con «Listo», para que no se pierda sin querer.
+function DialogoTemporal({ cuenta, onListo }) {
+  const [copiada, setCopiada] = useState(false)
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(cuenta.password)
+      setCopiada(true)
+    } catch {
+      /* sin portapapeles: queda a la vista para copiarla a mano */
+    }
+  }
+
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTmp">
+        <div className="dialog-title" id="dlgTmp">Cuenta creada</div>
+        <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+          {cuenta.nombre} · <span className="num">{cuenta.email}</span>. Dale esta contraseña temporal; la cambia en su primer acceso.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0 14px', padding: '12px 14px', border: '2px solid var(--color-text)' }}>
+          <span className="num nd" style={{ flex: 1, fontSize: 18, letterSpacing: 1 }}>{cuenta.password}</span>
+          <button type="button" className="btn btn-secondary" style={btnLeft} onClick={copiar}>{copiada ? 'Copiada' : 'Copiar'}</button>
+        </div>
+        <div className="note-bar" style={{ marginBottom: 14 }}>
+          Anótala o cópiala ahora: <strong>no se volverá a mostrar</strong>. El sistema solo guarda una versión cifrada.
+        </div>
+        <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
+          <button type="button" className="btn btn-primary" style={btnLeft} onClick={onListo} autoFocus>Listo</button>
+        </div>
+      </div>
+    </div>
+  )
+}

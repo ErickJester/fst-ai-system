@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext'
 
 import LoginPage from './pages/LoginPage'
 import PrimerAccesoPage from './pages/PrimerAccesoPage'
+import RestablecerPage from './pages/RestablecerPage'
 import PerfilPage from './pages/PerfilPage'
 import ExperimentosPage from './pages/ExperimentosPage'
 import ExperimentoPage from './pages/ExperimentoPage'
@@ -45,6 +46,7 @@ export default function AppRouter() {
       <ScrollArriba />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/restablecer" element={<RestablecerPage />} />
         <Route path="/primer-acceso" element={<SoloTemporal><PrimerAccesoPage /></SoloTemporal>} />
 
         <Route path="/experimentos" element={p(<ExperimentosPage />)} />

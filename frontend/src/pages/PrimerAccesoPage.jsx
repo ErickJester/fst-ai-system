@@ -29,7 +29,9 @@ export default function PrimerAccesoPage() {
       await cambiarPassword(v.tmp, v.nw)
       navigate('/experimentos')
     } catch (e) {
-      fail(null, mensajeError(e, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'))
+      // 400: la contraseña «actual» que revisa el servidor aquí es la temporal.
+      if (e.response?.status === 400) fail('tmp', 'La contraseña temporal no es correcta.')
+      else fail(null, mensajeError(e, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'))
       setGuardando(false)
     }
   }
