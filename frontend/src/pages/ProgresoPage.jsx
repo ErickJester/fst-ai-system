@@ -3,7 +3,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { getQueue } from '../services/queue'
 import { usePolling } from '../hooks/usePolling'
 import { DIA, ETAPA } from '../lib/fst'
-import { Cargando } from './ExperimentoPage'
+import { Cargando } from '../components/ui'
 
 const MUT60 = 'color-mix(in srgb,var(--color-text) 60%,transparent)'
 const INK = 'var(--color-text)'

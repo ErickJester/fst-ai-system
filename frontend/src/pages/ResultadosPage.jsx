@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison } from '../services/results'
 import { useAsync } from '../hooks/useAsync'
 import { mean, variance, fmt, r1, download, toCSV, loadScript, fechaCorta, norm } from '../lib/fst'
-import { NoEncontrado, Cargando } from './ExperimentoPage'
+import { Migas, Cargando, NoEncontrado } from '../components/ui'
 
 const INK = 'var(--color-text)'
 const ACC = 'var(--color-accent)'
@@ -176,9 +176,12 @@ export default function ResultadosPage() {
     <div className="app">
       <Topbar>
         <Brand inline />
-        <span className="crumbs">
-          <Link to="/experimentos">Experimentos</Link> / <Link to={`/experimentos/${exp.clave}`}>{exp.titulo}</Link> / <Link to={`/experimentos/${exp.clave}/grupos/${r.grupo.id}`}>{r.grupo.nombre}</Link> / <span className="here">Tanda {r.letra} · Día 2</span>
-        </span>
+        <Migas items={[
+          { to: '/experimentos', label: 'Experimentos' },
+          { to: `/experimentos/${exp.clave}`, label: exp.titulo },
+          { to: `/experimentos/${exp.clave}/grupos/${r.grupo.id}`, label: r.grupo.nombre },
+          { label: `Tanda ${r.letra} · Día 2` },
+        ]} />
       </Topbar>
 
       <div className="page">

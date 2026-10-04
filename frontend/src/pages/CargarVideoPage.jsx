@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { Seg, FieldError } from '../components/ui'
-import { TIPO_TAG } from '../data/mock'
+import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
 import { getExperiment } from '../services/experiments'
 import { createGroup, uploadBatchVideo } from '../services/groups'
 import { useAsync } from '../hooks/useAsync'
-import { norm, TIPO_GRUPO } from '../lib/fst'
-import { NoEncontrado, Cargando } from './ExperimentoPage'
+import { norm } from '../lib/fst'
 
 const nextLetter = (arr) => (arr.length ? String.fromCharCode(arr[arr.length - 1].charCodeAt(0) + 1) : 'A')
 const mutedSub = { fontSize: 12, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }
@@ -17,8 +15,7 @@ const btnLeft = { justifyContent: 'flex-start' }
 const sugerencia = (g) => ({
   id: g.id,
   nombre: g.nombre + ' · ' + g.tratamiento,
-  tipo: TIPO_GRUPO[g.tipo],
-  tag: TIPO_TAG[TIPO_GRUPO[g.tipo]],
+  tipo: g.tipo,
   cargadas: g.tandas.map((t) => t.letra),
 })
 
@@ -174,14 +171,7 @@ export default function CargarVideoPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 430px' }}>
         <div style={{ padding: '28px 32px 36px', borderRight: '2px solid var(--color-divider)' }}>
-          <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--color-divider)', marginBottom: 28 }}>
-            <div style={{ flex: 1, padding: '11px 14px', background: 'var(--color-surface)', borderRight: '1px solid var(--color-divider)' }}>
-              <div className="k">Paso 1</div><div className="nd" style={{ fontSize: 13, marginTop: 3, color: 'var(--muted)' }}>Datos generales</div>
-            </div>
-            <div style={{ flex: 1, padding: '11px 14px', background: 'var(--color-accent)', color: 'var(--color-bg)' }}>
-              <div className="k" style={{ color: 'color-mix(in srgb,#fff 70%,transparent)' }}>Paso 2</div><div className="nd" style={{ fontSize: 13, marginTop: 3 }}>Cargar video por tanda</div>
-            </div>
-          </div>
+          <Pasos actual={2} />
 
           <h3 style={{ margin: '0 0 8px' }}>Cargar video por tanda</h3>
           <p className="lead" style={{ margin: '0 0 24px', maxWidth: 620 }}>Un video corresponde a una tanda de un solo grupo. Indica el grupo, confirma qué tanda es y suelta el archivo.</p>
@@ -191,18 +181,17 @@ export default function CargarVideoPage() {
             <div className="step">
               <span className="step-n num">1</span>
               <div>
-                <div className="field">
-                  <label htmlFor="grupo">Grupo o tratamiento</label>
+                <Campo id="grupo" label="Grupo o tratamiento">
                   <input className="input" id="grupo" autoComplete="off" placeholder="Escribe el grupo o el tratamiento"
                     style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
                     value={q} onChange={(e) => onGrupo(e.target.value)} />
-                </div>
+                </Campo>
                 {sugOpen && (
                   <div style={{ border: '2px solid var(--color-text)', borderTop: 0, background: 'var(--color-bg)' }}>
                     {matches.map((g) => (
                       <div key={g.nombre} className="sug" onClick={() => pick(g)}>
                         <span className="nd" style={{ fontSize: 13 }}><Hi label={g.nombre} q={qt} /></span>
-                        <span className={'tag ' + g.tag} style={{ whiteSpace: 'nowrap', flex: 'none' }}>{g.tipo}</span>
+                        <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
                         <div style={{ flex: 1 }} />
                         <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>
                           tandas cargadas: {g.cargadas.join(', ') || '—'}
@@ -220,16 +209,14 @@ export default function CargarVideoPage() {
               <span className="step-n num">2</span>
               <div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
-                  <div className="field" style={{ width: 120 }}>
-                    <label htmlFor="tanda">Tanda</label>
+                  <Campo id="tanda" label="Tanda" style={{ width: 120 }}>
                     <input ref={tandaRef} className="input num" id="tanda" maxLength={1}
                       style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 16, textTransform: 'uppercase' }}
                       value={tanda} onChange={(e) => onTanda(e.target.value)} />
-                  </div>
-                  <div className="field">
-                    <label>Cilindros en el cuadro</label>
+                  </Campo>
+                  <Campo label="Cilindros en el cuadro">
                     <Seg options={[{ v: '3', label: '3' }, { v: '4', label: '4' }]} value={cil} onChange={setCil} />
-                  </div>
+                  </Campo>
                   <p style={{ margin: '0 0 10px', ...mutedSub }}>Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
                 </div>
                 {showConfirm && (
@@ -248,10 +235,9 @@ export default function CargarVideoPage() {
             {/* 3 · sesión */}
             <div className="step">
               <span className="step-n num">3</span>
-              <div className="field">
-                <label>Sesión</label>
+              <Campo label="Sesión">
                 <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
-              </div>
+              </Campo>
             </div>
 
             {/* 4 · archivo */}
@@ -290,15 +276,14 @@ export default function CargarVideoPage() {
             <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)' }}>
               <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Grupo nuevo · el nombre no coincide</div>
               <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="field"><label>Grupo o tratamiento</label><div className="input">{qt}</div></div>
+                <Campo label="Grupo o tratamiento"><div className="input">{qt}</div></Campo>
                 <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Sin coincidencias en este experimento. Completa los datos del grupo nuevo:</div>
-                <div className="field">
-                  <label>Tipo</label>
+                <Campo label="Tipo">
                   <Seg
                     options={[{ v: 'CONTROL', label: 'control' }, { v: 'REFERENCIA', label: 'referencia' }, { v: 'EXPERIMENTAL', label: 'tratamiento exp.' }]}
                     value={tipo} onChange={setTipo} />
-                </div>
-                <div className="field"><label htmlFor="trat">Tratamiento</label><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></div>
+                </Campo>
+                <Campo id="trat" label="Tratamiento"><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></Campo>
                 <div className="note-bar">La primera tanda de un grupo nuevo siempre es A.</div>
               </div>
             </div>

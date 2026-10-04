@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { EstadoTag, FieldError } from '../components/ui'
-import { ESTADO, TIPO_TAG } from '../data/mock'
+import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA, TIPO_GRUPO as TIPO } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA } from '../lib/fst'
 
 const posiciones = (t) => 'Ratas ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
 
@@ -70,7 +69,7 @@ export default function ExperimentoPage() {
     <div className="app">
       <Topbar>
         <Brand inline />
-        <span className="crumbs"><Link to="/experimentos">Experimentos</Link> / <span className="here">{exp.titulo}</span></span>
+        <Migas items={[{ to: '/experimentos', label: 'Experimentos' }, { label: exp.titulo }]} />
       </Topbar>
 
       <div className="page">
@@ -96,7 +95,7 @@ export default function ExperimentoPage() {
             <div className="k" style={{ marginBottom: 8 }}>Avance · {completas} de {tandas.length} tandas con Día 2 completado</div>
             <div style={{ display: 'flex', gap: 2 }}>
               {tandas.map((t, i) => (
-                <div key={i} title={ESTADO_TANDA[t.estado]} style={{ flex: 1, height: 12, background: ESTADO[ESTADO_TANDA[t.estado]].fill, border: '1px solid var(--color-divider)' }} />
+                <div key={i} title={ESTADO_TANDA[t.estado]} style={{ flex: 1, height: 12, background: rellenoTanda(t.estado), border: '1px solid var(--color-divider)' }} />
               ))}
             </div>
           </div>
@@ -115,7 +114,7 @@ export default function ExperimentoPage() {
             <div key={g.id} style={{ background: 'var(--color-bg)', padding: '18px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 14 }}>
                 <span className="nd" style={{ fontSize: 17 }}>{g.nombre}</span>
-                <span className={'tag ' + TIPO_TAG[TIPO[g.tipo]]}>{TIPO[g.tipo]}</span>
+                <TipoTag tipo={g.tipo} />
                 <div style={{ flex: 1 }} />
                 <span className="num" style={{ fontSize: 11, color: 'color-mix(in srgb,var(--color-text) 50%,transparent)' }}>{g.id}</span>
               </div>
@@ -128,7 +127,7 @@ export default function ExperimentoPage() {
                   <span className="nd" style={{ fontSize: 13 }}>Tanda {t.letra}</span>
                   <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{posiciones(t)}</span>
                   <div style={{ flex: 1 }} />
-                  <EstadoTag estado={ESTADO_TANDA[t.estado]} />
+                  <EstadoTag estado={t.estado} />
                 </div>
               ))}
               <Link className="btn btn-ghost" to={`/experimentos/${exp.clave}/grupos/${g.id}`} style={{ marginTop: 12 }}>Abrir grupo →</Link>
@@ -149,14 +148,12 @@ export default function ExperimentoPage() {
           <form className="dialog dlg-del" noValidate role="dialog" aria-modal="true" aria-labelledby="dlgT" onSubmit={eliminar}>
             <div className="dialog-title" id="dlgT">Eliminar experimento</div>
             <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
-            <div className="field">
-              <label htmlFor="dNombre">Escribe el nombre del experimento, «{exp.titulo}»</label>
+            <Campo id="dNombre" label={<>Escribe el nombre del experimento, «{exp.titulo}»</>}>
               <input ref={nombreRef} className="input" id="dNombre" autoComplete="off" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="dPass">Contraseña de la cuenta</label>
+            </Campo>
+            <Campo id="dPass" label="Contraseña de la cuenta">
               <input className="input num" id="dPass" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
-            </div>
+            </Campo>
             <FieldError msg={errBorrar} style={{ marginBottom: 12 }} />
             <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
               <button type="submit" className="btn btn-primary" disabled={!puedeBorrar}>Eliminar experimento</button>
@@ -165,28 +162,6 @@ export default function ExperimentoPage() {
           </form>
         </div>
       )}
-    </div>
-  )
-}
-
-export function Cargando() {
-  return (
-    <div className="app">
-      <Topbar><Brand /></Topbar>
-      <div className="page"><p className="hint">Cargando…</p></div>
-    </div>
-  )
-}
-
-export function NoEncontrado() {
-  return (
-    <div className="app">
-      <Topbar><Brand /></Topbar>
-      <div className="page">
-        <h3 style={{ margin: '0 0 8px' }}>No encontrado</h3>
-        <p className="lead" style={{ marginBottom: 16 }}>Solo el experimento de ejemplo tiene detalle mientras no hay backend.</p>
-        <Link className="btn btn-secondary" to="/experimentos">Volver a experimentos</Link>
-      </div>
     </div>
   )
 }
