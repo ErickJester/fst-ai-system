@@ -1,5 +1,5 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { USE_MOCKS, TOKEN_KEY } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 
@@ -7,6 +7,36 @@ import * as db from './mocks/data'
 export async function listExperiments() {
   if (USE_MOCKS) return reply(db.experiments)
   return (await api.get('/experiments')).data
+}
+
+// POST /experiments → paso 1, «Datos generales»: { titulo, fecha_inicio, especie, notas }.
+// El servidor asigna la clave y pone como responsable a la cuenta de la sesión.
+export async function createExperiment(data) {
+  if (USE_MOCKS) {
+    const anio = data.fecha_inicio.slice(0, 4)
+    const n = db.experiments.filter((e) => e.clave.startsWith('EXP-' + anio)).length + 1
+    const clave = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
+    const u = usuarioDeLaSesion()
+    const responsable = u ? u.nombre[0] + '. ' + u.apellidos.split(' ')[0] : ''
+    db.experiments.unshift({
+      clave, titulo: data.titulo, tratamientos: '', fecha_inicio: data.fecha_inicio, n_grupos: 0, n_especimenes: 0,
+      videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'CARGA_INCOMPLETA',
+      responsable, retencion_dias: null, videos_borrados: false, con_detalle: true,
+    })
+    db.experimentDetail[clave] = { clave, titulo: data.titulo, fecha_inicio: data.fecha_inicio, responsable, especie: data.especie, notas: data.notas, grupos: [] }
+    return reply({ clave })
+  }
+  return (await api.post('/experiments', data)).data
+}
+
+// Sin backend, la cuenta sale del token simulado «mock-token-<id>».
+function usuarioDeLaSesion() {
+  try {
+    const id = Number((sessionStorage.getItem(TOKEN_KEY) || '').replace('mock-token-', ''))
+    return db.users.find((u) => u.id === id) || null
+  } catch {
+    return null
+  }
 }
 
 // GET /experiments/:clave → datos generales + grupos → tandas (pantalla 2c)

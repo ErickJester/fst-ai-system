@@ -7,6 +7,7 @@ import PrimerAccesoPage from './pages/PrimerAccesoPage'
 import PerfilPage from './pages/PerfilPage'
 import ExperimentosPage from './pages/ExperimentosPage'
 import ExperimentoPage from './pages/ExperimentoPage'
+import NuevoExperimentoPage from './pages/NuevoExperimentoPage'
 import GrupoPage from './pages/GrupoPage'
 import CargarVideoPage from './pages/CargarVideoPage'
 import ProgresoPage from './pages/ProgresoPage'
@@ -47,6 +48,7 @@ export default function AppRouter() {
         <Route path="/primer-acceso" element={<SoloTemporal><PrimerAccesoPage /></SoloTemporal>} />
 
         <Route path="/experimentos" element={p(<ExperimentosPage />)} />
+        <Route path="/experimentos/nuevo" element={p(<NuevoExperimentoPage />)} />
         <Route path="/experimentos/:clave" element={p(<ExperimentoPage />)} />
         <Route path="/experimentos/:clave/grupos/:gid" element={p(<GrupoPage />)} />
         <Route path="/experimentos/:clave/cargar" element={p(<CargarVideoPage />)} />
