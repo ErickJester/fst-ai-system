@@ -6,22 +6,30 @@ import { FieldError } from '../components/ui'
 // 2i · Cambiar contraseña en el primer acceso. Hasta cambiarla no hay acceso
 // a ninguna otra pantalla (lo impone el router).
 export default function PrimerAccesoPage() {
-  const { logout, updateUser } = useAuth()
+  const { logout, cambiarPassword } = useAuth()
   const navigate = useNavigate()
   const [v, setV] = useState({ tmp: '', nw: '', rep: '' })
   const [err, setErr] = useState({ msg: '', campo: null })
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value })
+  const [guardando, setGuardando] = useState(false)
   const fail = (campo, msg) => setErr({ campo, msg })
 
-  function guardar(e) {
+  async function guardar(e) {
     e.preventDefault()
+    if (guardando) return
     if (!v.tmp) return fail('tmp', 'Escribe la contraseña temporal.')
     if (v.nw.length < 8) return fail('nw', 'La nueva contraseña debe tener mínimo 8 caracteres.')
     if (v.nw === v.tmp) return fail('nw', 'La nueva contraseña debe ser distinta de la temporal.')
     if (v.nw !== v.rep) return fail('rep', 'Las contraseñas no coinciden.')
     fail(null, '')
-    updateUser({ temporal: false })
-    navigate('/experimentos')
+    setGuardando(true)
+    try {
+      await cambiarPassword(v.tmp, v.nw)
+      navigate('/experimentos')
+    } catch (e) {
+      fail(null, e.response?.data?.error || 'No se pudo cambiar la contraseña. Inténtalo de nuevo.')
+      setGuardando(false)
+    }
   }
 
   const cls = (k) => 'input num' + (err.campo === k ? ' error' : '')
@@ -43,7 +51,7 @@ export default function PrimerAccesoPage() {
             <div className="field"><label htmlFor="pRep">Confirmar nueva contraseña</label><input className={cls('rep')} id="pRep" type="password" autoComplete="new-password" value={v.rep} onChange={set('rep')} /></div>
             <div className="hint">Mínimo 8 caracteres, distinta de la temporal.</div>
             <FieldError msg={err.msg} />
-            <button className="btn btn-primary btn-block" type="submit">Guardar y entrar</button>
+            <button className="btn btn-primary btn-block" type="submit" disabled={guardando}>Guardar y entrar</button>
           </div>
           <hr className="hr" />
           <a href="/login" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); logout(); navigate('/login') }}>Cerrar sesión</a>

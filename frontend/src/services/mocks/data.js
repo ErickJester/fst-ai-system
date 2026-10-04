@@ -110,12 +110,14 @@ export const groupComparison = {
   ],
 }
 
-// Cuentas (2g). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
+// Cuentas (2g, 2h, 2i, 2j). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
+// must_change_password: la cuenta entró con contraseña temporal y debe cambiarla (2i).
+// Sin backend no hay contraseñas reales: cualquier contraseña no vacía entra.
 export const users = [
-  { id: 1, nombre: 'Mariana', apellidos: 'Rivera Alcántara', email: 'mrivera@ipn.mx', identificador: '2019630871', role: 'INVESTIGADOR', is_active: true },
-  { id: 2, nombre: 'C. S.', apellidos: 'Reyes López', email: 'creyesl@ipn.mx', identificador: '2008630412', role: 'ADMIN', is_active: true },
-  { id: 3, nombre: 'J.', apellidos: 'Domínguez Vera', email: 'jdominguez@ipn.mx', identificador: '2015630322', role: 'INVESTIGADOR', is_active: true },
-  { id: 4, nombre: 'L.', apellidos: 'Ortega Camacho', email: 'lortega@ipn.mx', identificador: '2020630417', role: 'INVESTIGADOR', is_active: true },
+  { id: 1, nombre: 'Mariana', apellidos: 'Rivera Alcántara', email: 'mrivera@ipn.mx', identificador: '2019630871', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
+  { id: 2, nombre: 'C. S.', apellidos: 'Reyes López', email: 'creyesl@ipn.mx', identificador: '2008630412', role: 'ADMIN', is_active: true, must_change_password: false },
+  { id: 3, nombre: 'J.', apellidos: 'Domínguez Vera', email: 'jdominguez@ipn.mx', identificador: '2015630322', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
+  { id: 4, nombre: 'L.', apellidos: 'Ortega Camacho', email: 'lortega@ipn.mx', identificador: '2020630417', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
 ]
 
 // Estado del sistema (2g): disco en GB, catálogo de conductas y modelo en uso.

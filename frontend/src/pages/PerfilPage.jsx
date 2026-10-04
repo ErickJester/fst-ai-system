@@ -9,13 +9,14 @@ const btnStyle = { alignSelf: 'flex-start', justifyContent: 'flex-start' }
 
 // 2j · Mi perfil: datos de la cuenta y cambio de contraseña.
 export default function PerfilPage() {
-  const { user, updateUser } = useAuth()
+  const { user, actualizarPerfil, cambiarPassword } = useAuth()
 
   // Datos: «Guardar cambios» se habilita al modificar algo.
   const inicial = { nombre: user.nombre, apellidos: user.apellidos, correo: user.correo }
   const [original, setOriginal] = useState(inicial)
   const [datos, setDatos] = useState(inicial)
   const [dErr, setDErr] = useState({ msg: '', campo: null })
+  const [guardandoD, setGuardandoD] = useState(false)
   const dirty = Object.keys(datos).some((k) => datos[k] !== original[k])
   const refs = { nombre: useRef(), apellidos: useRef(), correo: useRef() }
 
@@ -24,19 +25,29 @@ export default function PerfilPage() {
     if (campo) refs[campo].current.focus()
   }
 
-  function guardarDatos(e) {
+  async function guardarDatos(e) {
     e.preventDefault()
+    if (guardandoD) return
     if (!datos.nombre.trim()) return failD('nombre', 'Escribe el nombre.')
     if (!datos.apellidos.trim()) return failD('apellidos', 'Escribe los apellidos.')
     if (!isIpn(datos.correo)) return failD('correo', 'El correo debe ser institucional (@ipn.mx).')
     failD(null, '')
-    setOriginal(datos)
-    updateUser(datos)
+    setGuardandoD(true)
+    try {
+      await actualizarPerfil(datos)
+      setOriginal(datos)
+    } catch (e) {
+      // El correo repetido lo detecta el servidor.
+      failD(e.response?.status === 409 ? 'correo' : null, e.response?.data?.error || 'No se pudieron guardar los cambios.')
+    } finally {
+      setGuardandoD(false)
+    }
   }
 
   const vacio = { act: '', nw: '', rep: '' }
   const [pass, setPass] = useState(vacio)
   const [pErr, setPErr] = useState({ msg: '', campo: null })
+  const [guardandoP, setGuardandoP] = useState(false)
   const prefs = { act: useRef(), nw: useRef(), rep: useRef() }
 
   function failP(campo, msg) {
@@ -44,14 +55,23 @@ export default function PerfilPage() {
     if (campo) prefs[campo].current.focus()
   }
 
-  function cambiarPass(e) {
+  async function cambiarPass(e) {
     e.preventDefault()
+    if (guardandoP) return
     if (!pass.act) return failP('act', 'Escribe tu contraseña actual.')
     if (pass.nw.length < 8) return failP('nw', 'La nueva contraseña debe tener mínimo 8 caracteres.')
     if (pass.nw === pass.act) return failP('nw', 'La nueva contraseña debe ser distinta de la actual.')
     if (pass.nw !== pass.rep) return failP('rep', 'Las contraseñas no coinciden.')
     failP(null, '')
-    setPass(vacio)
+    setGuardandoP(true)
+    try {
+      await cambiarPassword(pass.act, pass.nw)
+      setPass(vacio)
+    } catch (e) {
+      failP(null, e.response?.data?.error || 'No se pudo cambiar la contraseña.')
+    } finally {
+      setGuardandoP(false)
+    }
   }
 
   const dCls = (k, extra = '') => 'input' + extra + (dErr.campo === k ? ' error' : '')
@@ -75,7 +95,7 @@ export default function PerfilPage() {
               <input className="input num" id="pId" value={user.idInst} readOnly style={{ background: 'var(--color-surface)', color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }} />
             </div>
             <FieldError msg={dErr.msg} style={{ margin: 0 }} />
-            <button type="submit" className="btn btn-primary" disabled={!dirty} style={btnStyle}>Guardar cambios</button>
+            <button type="submit" className="btn btn-primary" disabled={!dirty || guardandoD} style={btnStyle}>Guardar cambios</button>
           </form>
           <form noValidate onSubmit={cambiarPass} style={formStyle}>
             <div className="k">Cambiar contraseña</div>
@@ -83,7 +103,7 @@ export default function PerfilPage() {
             <div className="field"><label htmlFor="pNew">Nueva contraseña</label><input ref={prefs.nw} className={pCls('nw')} id="pNew" type="password" autoComplete="new-password" value={pass.nw} onChange={setP('nw')} /></div>
             <div className="field"><label htmlFor="pRep">Confirmar nueva contraseña</label><input ref={prefs.rep} className={pCls('rep')} id="pRep" type="password" autoComplete="new-password" value={pass.rep} onChange={setP('rep')} /></div>
             <FieldError msg={pErr.msg} style={{ margin: 0 }} />
-            <button type="submit" className="btn btn-secondary" style={btnStyle}>Cambiar contraseña</button>
+            <button type="submit" className="btn btn-secondary" style={btnStyle} disabled={guardandoP}>Cambiar contraseña</button>
           </form>
         </div>
       </div>
