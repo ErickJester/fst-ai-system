@@ -25,6 +25,11 @@ api.interceptors.response.use(
       sessionStorage.setItem(AVISO_KEY, 'sesion-caducada')
       window.location.href = '/login'
     }
+    // Sin permiso para esa sección (por ejemplo, /admin sin ser administrador).
+    if (err.response?.status === 403 && conSesion) {
+      sessionStorage.setItem(AVISO_KEY, 'sin-permiso')
+      window.location.href = '/experimentos'
+    }
     return Promise.reject(err)
   }
 )

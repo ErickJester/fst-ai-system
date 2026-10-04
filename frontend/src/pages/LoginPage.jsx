@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { FieldError, Campo, Acceso } from '../components/ui'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { forgotPassword } from '../services/auth'
 import { mensajeError } from '../services/api'
-import { AVISO_KEY } from '../services/config'
+import { useAviso } from '../hooks/useAviso'
 import { isIpn } from '../lib/fst'
 import { textoTarjeta } from '../lib/estilos'
 
@@ -13,22 +13,14 @@ import { textoTarjeta } from '../lib/estilos'
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [vista, setVista] = useState('login')
+  const [params] = useSearchParams()
+  const [vista, setVista] = useState(params.get('recuperar') ? 'recuperar' : 'login')
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [rEmail, setREmail] = useState('')
   const [enviado, setEnviado] = useState(false)
-  // Aviso que deja api.js al vencer la sesión; se muestra una vez.
-  const [caducada] = useState(() => {
-    try {
-      return sessionStorage.getItem(AVISO_KEY) === 'sesion-caducada'
-    } catch {
-      return false
-    }
-  })
-  useEffect(() => {
-    try { sessionStorage.removeItem(AVISO_KEY) } catch { /* sin almacenamiento */ }
-  }, [])
+  const [demoEnlace, setDemoEnlace] = useState('') // solo con datos de ejemplo: el enlace que llegaría por correo
+  const caducada = useAviso('sesion-caducada')
   const [enviando, setEnviando] = useState(false)
   const entrada = useErrorDeCampo()
   const recuperacion = useErrorDeCampo()
@@ -57,8 +49,9 @@ export default function LoginPage() {
     recuperacion.fail(null, '')
     setEnviando(true)
     try {
-      await forgotPassword(rEmail.trim())
+      const r = await forgotPassword(rEmail.trim())
       setEnviado(true)
+      setDemoEnlace(r.demo_enlace || '')
     } catch (e) {
       recuperacion.fail('rEmail', mensajeError(e, 'No se pudo enviar el enlace. Inténtalo de nuevo.'))
     } finally {
@@ -90,6 +83,11 @@ export default function LoginPage() {
               <div className="ok-bar" style={{ padding: '13px 15px', lineHeight: 1.6 }}>
                 Si el correo está registrado, recibirás un enlace.
               </div>
+              {demoEnlace && (
+                <div className="hint" style={{ marginTop: 10 }}>
+                  Modo demo, sin correo: <Link to={demoEnlace}>abrir el enlace que llegaría por correo</Link>.
+                </div>
+              )}
             </div>
           )}
         </form>
