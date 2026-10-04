@@ -1,48 +1,62 @@
-import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
-import MainLayout from './components/layout/MainLayout'
-import AdminLayout from './components/layout/AdminLayout'
-
 import LoginPage from './pages/LoginPage'
-import DashboardPage from './pages/DashboardPage'
-import NewExperimentPage from './pages/NewExperimentPage'
-import ProgressPage from './pages/ProgressPage'
-import ResultsPage from './pages/ResultsPage'
+import PrimerAccesoPage from './pages/PrimerAccesoPage'
+import PerfilPage from './pages/PerfilPage'
+import ExperimentosPage from './pages/ExperimentosPage'
+import ExperimentoPage from './pages/ExperimentoPage'
+import GrupoPage from './pages/GrupoPage'
+import CargarVideoPage from './pages/CargarVideoPage'
+import ProgresoPage from './pages/ProgresoPage'
+import ResultadosPage from './pages/ResultadosPage'
 import AdminPage from './pages/AdminPage'
 
-function ProtectedRoute({ children, role }) {
+// Sin sesión → login. Con contraseña temporal → solo primer acceso (2i).
+function Protegida({ children, admin }) {
   const { user } = useAuth()
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (role && user.role !== role) {
-    return <Navigate to="/dashboard" replace />
-  }
-
+  if (!user) return <Navigate to="/login" replace />
+  if (user.temporal) return <Navigate to="/primer-acceso" replace />
+  if (admin && !user.admin) return <Navigate to="/experimentos" replace />
   return children
 }
 
+function SoloTemporal({ children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.temporal) return <Navigate to="/experimentos" replace />
+  return children
+}
+
+// Cada pantalla empieza arriba, como al abrir un mockup.
+function ScrollArriba() {
+  const { pathname } = useLocation()
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  return null
+}
+
+const p = (el, admin) => <Protegida admin={admin}>{el}</Protegida>
+
 export default function AppRouter() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <>
+      <ScrollArriba />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/primer-acceso" element={<SoloTemporal><PrimerAccesoPage /></SoloTemporal>} />
 
-      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/experiments/new" element={<NewExperimentPage />} />
-        <Route path="/experiments/:id/progress" element={<ProgressPage />} />
-        <Route path="/experiments/:id/results" element={<ResultsPage />} />
-      </Route>
+        <Route path="/experimentos" element={p(<ExperimentosPage />)} />
+        <Route path="/experimentos/:clave" element={p(<ExperimentoPage />)} />
+        <Route path="/experimentos/:clave/grupos/:gid" element={p(<GrupoPage />)} />
+        <Route path="/experimentos/:clave/cargar" element={p(<CargarVideoPage />)} />
+        <Route path="/experimentos/:clave/resultados" element={p(<ResultadosPage />)} />
+        <Route path="/analisis" element={p(<ProgresoPage />)} />
+        <Route path="/perfil" element={p(<PerfilPage />)} />
+        <Route path="/admin" element={p(<AdminPage />, true)} />
 
-      <Route element={<ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>}>
-        <Route path="/admin" element={<AdminPage />} />
-      </Route>
-
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   )
 }

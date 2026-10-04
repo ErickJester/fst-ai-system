@@ -1,14 +1,40 @@
-from flask import Flask, request, jsonify
+import os
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from sqlalchemy import select
 from .schema import init_db
 from .db import SessionLocal
 from .models import (
     User, Role, Experiment, Video, Day, Job, JobStatus,
-    Animal, Subject, BehaviorResult, BehaviorPerMinute, Report, ReportFormat,
+    Animal, Subject, Report, ReportFormat,
     Notification, NotificationType, PipelineStage,
 )
 from .storage import ensure_dirs, video_path
+
+
+def _behavior_row(animal: Animal) -> dict:
+    """Segundos por conducta (total y por minuto) a partir de los segmentos
+    del pipeline. Las etiquetas son las que defina el pipeline."""
+    totals: dict[str, float] = {}
+    per_minute: dict[int, dict[str, float]] = {}
+    for seg in animal.behavior_segments:
+        totals[seg.label] = totals.get(seg.label, 0.0) + (seg.end_s - seg.start_s)
+        # repartir el segmento entre los minutos que cruza
+        t = seg.start_s
+        while t < seg.end_s:
+            minute = int(t // 60)
+            chunk_end = min(seg.end_s, (minute + 1) * 60.0)
+            bucket = per_minute.setdefault(minute + 1, {})
+            bucket[seg.label] = bucket.get(seg.label, 0.0) + (chunk_end - t)
+            t = chunk_end
+    return {
+        "rat_idx": animal.subject.rat_idx,
+        "totals_s": {k: round(v, 2) for k, v in totals.items()},
+        "per_minute": [
+            {"minute": m, "seconds": {k: round(v, 2) for k, v in per_minute[m].items()}}
+            for m in sorted(per_minute)
+        ],
+    }
 
 
 def create_app() -> Flask:
@@ -276,17 +302,19 @@ def create_app() -> Flask:
                     })
             return {"experiment_id": exp_id, "jobs": jobs_info}
 
-    # ── Results (RF-18) ──────────────────────────────────────────
+    # ── Results (RF-18, RF-19) ───────────────────────────────────
 
     @app.get("/experiments/<int:exp_id>/results")
     def experiment_results(exp_id: int):
-        """Tiempos totales por animal y por sesión (RF-18)."""
+        """Resultados del pipeline de análisis por día y por animal, del último
+        job DONE de cada video. Las etiquetas de conducta las define el
+        pipeline; aquí solo se suman segundos (total y por minuto)."""
         with SessionLocal() as db:
             exp = db.get(Experiment, exp_id)
             if not exp:
                 return jsonify({"error": "experiment not found"}), 404
 
-            results_by_day = {}
+            by_day = {}
             for v in exp.videos:
                 latest_job = db.execute(
                     select(Job).where(Job.video_id == v.id, Job.status == JobStatus.DONE)
@@ -299,105 +327,32 @@ def create_app() -> Flask:
                     .where(Animal.job_id == latest_job.id)
                     .order_by(Subject.rat_idx)
                 ).scalars().all()
-                day_results = []
-                for a in animals:
-                    for br in a.results:
-                        day_results.append({
-                            "rat_idx": a.subject.rat_idx,
-                            "swim_s": br.swim_s,
-                            "immobile_s": br.immobile_s,
-                            "escape_s": br.escape_s,
-                        })
-                results_by_day[v.day.value] = day_results
-            return {"experiment_id": exp_id, "results": results_by_day}
+                rows = [_behavior_row(a) for a in animals]
+                by_day[v.day.value] = {
+                    "video_id": v.id,
+                    "job_id": latest_job.id,
+                    "pipeline": latest_job.config.pipeline_name if latest_job.config else None,
+                    "pipeline_version": latest_job.config.pipeline_version if latest_job.config else None,
+                    "labels": sorted({lbl for r in rows for lbl in r["totals_s"]}),
+                    "has_annotated_video": bool(
+                        latest_job.output_video_path
+                        and os.path.isfile(latest_job.output_video_path)
+                    ),
+                    "animals": rows,
+                }
+            return {"experiment_id": exp_id, "results": by_day}
 
-    # ── Results per minute (RF-19) ───────────────────────────────
-
-    @app.get("/experiments/<int:exp_id>/results/by-minute")
-    def experiment_results_by_minute(exp_id: int):
-        """Desglose por minuto para cada animal (RF-19)."""
+    @app.get("/api/jobs/<int:job_id>/video")
+    def job_annotated_video(job_id: int):
+        """Video anotado que generó el pipeline, si lo hay."""
         with SessionLocal() as db:
-            exp = db.get(Experiment, exp_id)
-            if not exp:
-                return jsonify({"error": "experiment not found"}), 404
-
-            per_minute = {}
-            for v in exp.videos:
-                latest_job = db.execute(
-                    select(Job).where(Job.video_id == v.id, Job.status == JobStatus.DONE)
-                    .order_by(Job.id.desc()).limit(1)
-                ).scalars().first()
-                if not latest_job:
-                    continue
-                animals = db.execute(
-                    select(Animal).join(Subject)
-                    .where(Animal.job_id == latest_job.id)
-                    .order_by(Subject.rat_idx)
-                ).scalars().all()
-                day_data = []
-                for a in animals:
-                    minutes = db.execute(
-                        select(BehaviorPerMinute)
-                        .where(BehaviorPerMinute.animal_id == a.id)
-                        .order_by(BehaviorPerMinute.minute)
-                    ).scalars().all()
-                    day_data.append({
-                        "rat_idx": a.subject.rat_idx,
-                        "per_minute": [
-                            {
-                                "minute": m.minute,
-                                "swim_s": m.swim_s,
-                                "immobile_s": m.immobile_s,
-                                "escape_s": m.escape_s,
-                            }
-                            for m in minutes
-                        ],
-                    })
-                per_minute[v.day.value] = day_data
-            return {"experiment_id": exp_id, "per_minute": per_minute}
-
-    # ── Comparison Day1 vs Day2 (RF-20) ──────────────────────────
-
-    @app.get("/experiments/<int:exp_id>/comparison")
-    def experiment_comparison(exp_id: int):
-        """Comparación Día 1 vs Día 2 (RF-20, RN-12)."""
-        with SessionLocal() as db:
-            exp = db.get(Experiment, exp_id)
-            if not exp:
-                return jsonify({"error": "experiment not found"}), 404
-
-            days_data = {}
-            for v in exp.videos:
-                latest_job = db.execute(
-                    select(Job).where(Job.video_id == v.id, Job.status == JobStatus.DONE)
-                    .order_by(Job.id.desc()).limit(1)
-                ).scalars().first()
-                if not latest_job:
-                    continue
-                animals = db.execute(
-                    select(Animal).join(Subject)
-                    .where(Animal.job_id == latest_job.id)
-                    .order_by(Subject.rat_idx)
-                ).scalars().all()
-                day_results = []
-                for a in animals:
-                    for br in a.results:
-                        total = br.swim_s + br.immobile_s + br.escape_s
-                        day_results.append({
-                            "rat_idx": a.subject.rat_idx,
-                            "swim_s": br.swim_s,
-                            "immobile_s": br.immobile_s,
-                            "escape_s": br.escape_s,
-                            "swim_pct": round(br.swim_s / total * 100, 1) if total > 0 else 0,
-                            "immobile_pct": round(br.immobile_s / total * 100, 1) if total > 0 else 0,
-                            "escape_pct": round(br.escape_s / total * 100, 1) if total > 0 else 0,
-                        })
-                days_data[v.day.value] = day_results
-
-            if "DAY1" not in days_data or "DAY2" not in days_data:
-                return jsonify({"error": "Se requieren ambos días procesados para la comparación (RN-12)"}), 400
-
-            return {"experiment_id": exp_id, "comparison": days_data}
+            j = db.get(Job, job_id)
+            if not j:
+                return jsonify({"error": "job not found"}), 404
+            path = j.output_video_path
+        if not path or not os.path.isfile(path):
+            return jsonify({"error": "annotated video not available"}), 404
+        return send_file(path, mimetype="video/mp4", conditional=True)
 
     # ── Reports (RF-21) ──────────────────────────────────────────
 
@@ -611,16 +566,7 @@ def create_app() -> Flask:
                 .where(Animal.job_id == job_id)
                 .order_by(Subject.rat_idx)
             ).scalars().all()
-            result = []
-            for a in animals:
-                for br in a.results:
-                    result.append({
-                        "rat_idx": a.subject.rat_idx,
-                        "swim_s": br.swim_s,
-                        "immobile_s": br.immobile_s,
-                        "escape_s": br.escape_s,
-                    })
-            return result
+            return [_behavior_row(a) for a in animals]
 
     return app
 
