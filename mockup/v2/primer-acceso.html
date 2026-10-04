@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Cambiar contraseña</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<style>
+  body{background:#d8d8da;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px}
+  .acc-card{width:480px;max-width:100%;background:var(--color-bg);border:2px solid var(--color-text)}
+</style>
+</head>
+<body>
+
+<!-- 2i · Cambiar contraseña · primer acceso -->
+<div class="acc-card">
+  <div style="background:var(--color-accent);color:var(--color-bg);padding:22px 34px">
+    <div class="nd" style="font-size:24px">FST</div>
+  </div>
+  <form id="f" novalidate style="padding:30px 34px 32px">
+    <h3 style="margin:0 0 10px">Cambiar contraseña</h3>
+    <p style="margin:0 0 22px;font-size:13px;line-height:1.6;color:color-mix(in srgb,var(--color-text) 70%,transparent);text-wrap:pretty">Entraste con una contraseña temporal. Debes cambiarla antes de usar el sistema; hasta entonces no hay acceso a ninguna otra pantalla.</p>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="field"><label for="pTmp">Contraseña temporal</label><input class="input num" id="pTmp" type="password" autocomplete="current-password"></div>
+      <div class="field"><label for="pNew">Nueva contraseña</label><input class="input num" id="pNew" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="pRep">Confirmar nueva contraseña</label><input class="input num" id="pRep" type="password" autocomplete="new-password"></div>
+      <div class="hint">Mínimo 8 caracteres, distinta de la temporal.</div>
+      <div class="field-error hidden" id="err"></div>
+      <button class="btn btn-primary btn-block" type="submit">Guardar y entrar</button>
+    </div>
+    <hr class="hr">
+    <a href="login.html" style="font-size:12.5px">Cerrar sesión</a>
+  </form>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  function fail(input, msg) {
+    ['pTmp', 'pNew', 'pRep'].forEach(i => $(i).classList.remove('error'));
+    if (input) $(input).classList.add('error');
+    $('err').textContent = msg; $('err').classList.toggle('hidden', !msg);
+  }
+  $('f').onsubmit = e => {
+    e.preventDefault();
+    const tmp = $('pTmp').value, nw = $('pNew').value, rep = $('pRep').value;
+    if (!tmp) return fail('pTmp', 'Escribe la contraseña temporal.');
+    if (nw.length < 8) return fail('pNew', 'La nueva contraseña debe tener mínimo 8 caracteres.');
+    if (nw === tmp) return fail('pNew', 'La nueva contraseña debe ser distinta de la temporal.');
+    if (nw !== rep) return fail('pRep', 'Las contraseñas no coinciden.');
+    fail(null, '');
+    location.href = 'experimentos.html';
+  };
+</script>
+</body>
+</html>
