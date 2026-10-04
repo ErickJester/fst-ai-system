@@ -26,3 +26,6 @@ api.interceptors.response.use(
 )
 
 export default api
+
+// Mensaje de error que manda el servidor, o el de respaldo si no hay.
+export const mensajeError = (e, respaldo) => e.response?.data?.error || respaldo

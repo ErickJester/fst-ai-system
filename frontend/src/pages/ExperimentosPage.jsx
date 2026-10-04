@@ -3,7 +3,6 @@ import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { Seg } from '../components/ui'
-import { EXPERIMENTO } from '../data/mock'
 import { listExperiments } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { norm, fechaCorta } from '../lib/fst'
@@ -38,8 +37,8 @@ function retencion(e) {
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
 
-// Los reportes del mockup apuntan todos a los resultados de ejemplo.
-const RESULTADOS = `/experimentos/${EXPERIMENTO.clave}/resultados`
+// Los reportes del mockup apuntan todos a los resultados del experimento de ejemplo.
+const RESULTADOS = '/experimentos/EXP-2026-02/resultados'
 
 // 2a · Experimentos: lista a nivel experimento con estado agregado.
 export default function ExperimentosPage() {

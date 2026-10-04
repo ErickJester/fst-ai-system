@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { FieldError } from '../components/ui'
+import { FieldError, Campo } from '../components/ui'
 
 // 2i · Cambiar contraseña en el primer acceso. Hasta cambiarla no hay acceso
 // a ninguna otra pantalla (lo impone el router).
@@ -46,9 +46,9 @@ export default function PrimerAccesoPage() {
             Entraste con una contraseña temporal. Debes cambiarla antes de usar el sistema; hasta entonces no hay acceso a ninguna otra pantalla.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="field"><label htmlFor="pTmp">Contraseña temporal</label><input className={cls('tmp')} id="pTmp" type="password" autoComplete="current-password" value={v.tmp} onChange={set('tmp')} /></div>
-            <div className="field"><label htmlFor="pNew">Nueva contraseña</label><input className={cls('nw')} id="pNew" type="password" autoComplete="new-password" value={v.nw} onChange={set('nw')} /></div>
-            <div className="field"><label htmlFor="pRep">Confirmar nueva contraseña</label><input className={cls('rep')} id="pRep" type="password" autoComplete="new-password" value={v.rep} onChange={set('rep')} /></div>
+            <Campo id="pTmp" label="Contraseña temporal"><input className={cls('tmp')} id="pTmp" type="password" autoComplete="current-password" value={v.tmp} onChange={set('tmp')} /></Campo>
+            <Campo id="pNew" label="Nueva contraseña"><input className={cls('nw')} id="pNew" type="password" autoComplete="new-password" value={v.nw} onChange={set('nw')} /></Campo>
+            <Campo id="pRep" label="Confirmar nueva contraseña"><input className={cls('rep')} id="pRep" type="password" autoComplete="new-password" value={v.rep} onChange={set('rep')} /></Campo>
             <div className="hint">Mínimo 8 caracteres, distinta de la temporal.</div>
             <FieldError msg={err.msg} />
             <button className="btn btn-primary btn-block" type="submit" disabled={guardando}>Guardar y entrar</button>

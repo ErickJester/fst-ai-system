@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { FieldError } from '../components/ui'
+import { FieldError, Campo } from '../components/ui'
 import { isIpn } from '../lib/fst'
 
 const formStyle = { background: 'var(--color-bg)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }
@@ -87,21 +87,20 @@ export default function PerfilPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
           <form noValidate onSubmit={guardarDatos} style={formStyle}>
             <div className="k">Datos de la cuenta</div>
-            <div className="field"><label htmlFor="pNombre">Nombre</label><input ref={refs.nombre} className={dCls('nombre')} id="pNombre" value={datos.nombre} onChange={setD('nombre')} /></div>
-            <div className="field"><label htmlFor="pApe">Apellidos</label><input ref={refs.apellidos} className={dCls('apellidos')} id="pApe" value={datos.apellidos} onChange={setD('apellidos')} /></div>
-            <div className="field"><label htmlFor="pCorreo">Correo institucional</label><input ref={refs.correo} className={dCls('correo', ' num')} id="pCorreo" type="email" value={datos.correo} onChange={setD('correo')} /></div>
-            <div className="field">
-              <label htmlFor="pId">Identificador institucional · solo lectura</label>
+            <Campo id="pNombre" label="Nombre"><input ref={refs.nombre} className={dCls('nombre')} id="pNombre" value={datos.nombre} onChange={setD('nombre')} /></Campo>
+            <Campo id="pApe" label="Apellidos"><input ref={refs.apellidos} className={dCls('apellidos')} id="pApe" value={datos.apellidos} onChange={setD('apellidos')} /></Campo>
+            <Campo id="pCorreo" label="Correo institucional"><input ref={refs.correo} className={dCls('correo', ' num')} id="pCorreo" type="email" value={datos.correo} onChange={setD('correo')} /></Campo>
+            <Campo id="pId" label="Identificador institucional · solo lectura">
               <input className="input num" id="pId" value={user.idInst} readOnly style={{ background: 'var(--color-surface)', color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }} />
-            </div>
+            </Campo>
             <FieldError msg={dErr.msg} style={{ margin: 0 }} />
             <button type="submit" className="btn btn-primary" disabled={!dirty || guardandoD} style={btnStyle}>Guardar cambios</button>
           </form>
           <form noValidate onSubmit={cambiarPass} style={formStyle}>
             <div className="k">Cambiar contraseña</div>
-            <div className="field"><label htmlFor="pAct">Contraseña actual</label><input ref={prefs.act} className={pCls('act')} id="pAct" type="password" autoComplete="current-password" value={pass.act} onChange={setP('act')} /></div>
-            <div className="field"><label htmlFor="pNew">Nueva contraseña</label><input ref={prefs.nw} className={pCls('nw')} id="pNew" type="password" autoComplete="new-password" value={pass.nw} onChange={setP('nw')} /></div>
-            <div className="field"><label htmlFor="pRep">Confirmar nueva contraseña</label><input ref={prefs.rep} className={pCls('rep')} id="pRep" type="password" autoComplete="new-password" value={pass.rep} onChange={setP('rep')} /></div>
+            <Campo id="pAct" label="Contraseña actual"><input ref={prefs.act} className={pCls('act')} id="pAct" type="password" autoComplete="current-password" value={pass.act} onChange={setP('act')} /></Campo>
+            <Campo id="pNew" label="Nueva contraseña"><input ref={prefs.nw} className={pCls('nw')} id="pNew" type="password" autoComplete="new-password" value={pass.nw} onChange={setP('nw')} /></Campo>
+            <Campo id="pRep" label="Confirmar nueva contraseña"><input ref={prefs.rep} className={pCls('rep')} id="pRep" type="password" autoComplete="new-password" value={pass.rep} onChange={setP('rep')} /></Campo>
             <FieldError msg={pErr.msg} style={{ margin: 0 }} />
             <button type="submit" className="btn btn-secondary" style={btnStyle} disabled={guardandoP}>Cambiar contraseña</button>
           </form>

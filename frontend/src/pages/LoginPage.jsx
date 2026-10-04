@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { FieldError } from '../components/ui'
+import { FieldError, Campo } from '../components/ui'
 import { forgotPassword } from '../services/auth'
 import { isIpn } from '../lib/fst'
 
@@ -61,11 +61,10 @@ export default function LoginPage() {
               Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 30 minutos.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="field">
-                <label htmlFor="rEmail">Correo institucional</label>
+              <Campo id="rEmail" label="Correo institucional">
                 <input className={'input num' + (rErr ? ' error' : '')} id="rEmail" type="email" placeholder="nombre@ipn.mx" autoFocus
                   value={rEmail} onChange={(e) => setREmail(e.target.value)} />
-              </div>
+              </Campo>
               <FieldError msg={rErr} />
               <button className="btn btn-primary btn-block" type="submit" disabled={enviando}>Enviar enlace</button>
               <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setEnviado(''); setVista('login') }}>Volver a iniciar sesión</a>
@@ -96,16 +95,14 @@ export default function LoginPage() {
         <form noValidate onSubmit={entrar} style={{ padding: '30px 34px 32px' }}>
           <h3 style={{ margin: '0 0 22px' }}>Iniciar sesión</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="field">
-              <label htmlFor="lEmail">Correo institucional</label>
+            <Campo id="lEmail" label="Correo institucional">
               <input className={'input num' + (err.campo === 'email' ? ' error' : '')} id="lEmail" type="email" placeholder="nombre@ipn.mx" autoComplete="username"
                 value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="lPass">Contraseña</label>
+            </Campo>
+            <Campo id="lPass" label="Contraseña">
               <input className={'input num' + (err.campo === 'pass' ? ' error' : '')} id="lPass" type="password" placeholder="••••••••••" autoComplete="current-password"
                 value={pass} onChange={(e) => setPass(e.target.value)} />
-            </div>
+            </Campo>
             <FieldError msg={err.msg} />
             <button className="btn btn-primary btn-block" type="submit" disabled={enviando}>Entrar</button>
             <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setREmail(email); setVista('recuperar') }}>Olvidé mi contraseña</a>
