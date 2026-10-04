@@ -73,7 +73,7 @@ export default function LoginPage() {
           <div className="nd" style={{ fontSize: 24, color: 'var(--color-accent)', marginBottom: 26 }}>FST</div>
           <h3 style={{ margin: '0 0 10px' }}>Recuperar contraseña</h3>
           <p style={textoTarjeta}>
-            Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 30 minutos.
+            Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 60 minutos.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Campo id="rEmail" label="Correo institucional">
