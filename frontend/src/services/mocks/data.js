@@ -61,3 +61,51 @@ export const queue = [
 export const failedJobs = [
   { job_id: 498, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50, confianza: 0.54, error: ERROR_DET },
 ]
+
+// Resultados de una tanda (2f). Solo la Tanda A del grupo Referencia, Día 2, tiene.
+// Tiempos en segundos. nivel: PRECISO (3 conductas) | AGRUPADO (nado activo y
+// escalamiento juntos como «conducta activa»).
+export const batchResults = {
+  'EXP-2026-02/G-02/A/DAY2': {
+    experimento: { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' },
+    grupo: { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' },
+    letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
+    nivel: 'PRECISO', confianza: 0.83,
+    especimenes: [
+      { rata: 1, cilindro: 'P1', nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
+      { rata: 2, cilindro: 'P2', nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
+      { rata: 3, cilindro: 'P3', nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
+      { rata: 4, cilindro: 'P4', nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
+    ],
+    // Desglose por minuto de un espécimen: segmentos [conducta, segundos].
+    linea_tiempo: {
+      rata: 1, cilindro: 'P1',
+      minutos: [
+        [['nado', 38], ['escalamiento', 8], ['nado', 10], ['inmovilidad', 4]],
+        [['nado', 30], ['inmovilidad', 12], ['escalamiento', 6], ['nado', 8], ['inmovilidad', 4]],
+        [['inmovilidad', 10], ['nado', 22], ['escalamiento', 9], ['inmovilidad', 8], ['nado', 11]],
+        [['nado', 16], ['inmovilidad', 20], ['nado', 12], ['escalamiento', 7], ['inmovilidad', 5]],
+        [['inmovilidad', 14], ['nado', 24], ['inmovilidad', 11], ['escalamiento', 11]],
+      ],
+    },
+  },
+}
+
+// Inmovilidad media ± DE por grupo, Día 2 (2f). Solo entran los especímenes con
+// Día 2 analizado; pendientes dice qué tandas faltan y por qué (JobStatus, o null si no se ha subido).
+// Si un grupo mezcla niveles de clasificación, viene por_nivel en vez de una sola media.
+export const groupComparison = {
+  'EXP-2026-02': [
+    { grupo: 'Control · placebo', tipo: 'CONTROL', media_s: 168.4, de_s: 21.3, n: 4, n_total: 8,
+      pendientes: [{ tanda: 'B', n: 4, estado: 'QUEUED' }] },
+    { grupo: 'Referencia · fluoxetina', tipo: 'REFERENCIA', n: 8, n_total: 8, pendientes: [],
+      por_nivel: [
+        { tanda: 'A', nivel: 'PRECISO', n: 4, media_s: 96.5, de_s: 18.4 },
+        { tanda: 'B', nivel: 'AGRUPADO', n: 4, media_s: 101.3, de_s: 15.2 },
+      ] },
+    { grupo: 'Experimental A · CSR-14, 5 mg/kg', tipo: 'EXPERIMENTAL', media_s: 121.2, de_s: 19.4, n: 4, n_total: 8,
+      pendientes: [{ tanda: 'B', n: 4, estado: 'RUNNING' }] },
+    { grupo: 'Experimental B · CSR-14, 15 mg/kg', tipo: 'EXPERIMENTAL', media_s: null, de_s: null, n: 0, n_total: 8,
+      pendientes: [{ tanda: 'A', n: 4, estado: 'QUEUED' }, { tanda: 'B', n: 4, estado: 'FAILED' }] },
+  ],
+}
