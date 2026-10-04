@@ -29,9 +29,8 @@ class JobStatus(enum.Enum):
 
 class PipelineStage(enum.Enum):
     PREPROCESSING = "PREPROCESSING"
-    ROI_DETECTION = "ROI_DETECTION"
-    TRACKING = "TRACKING"
-    CLASSIFICATION = "CLASSIFICATION"
+    ANALYSIS = "ANALYSIS"
+    SAVING = "SAVING"
     DONE = "DONE"
 
 
@@ -175,24 +174,16 @@ class ROI(Base):
 # ── Analysis configs ─────────────────────────────────────────────────
 
 class AnalysisConfig(Base):
-    """Parámetros exactos usados en una ejecución del pipeline.
+    """Qué pipeline de análisis y qué versión produjeron un resultado.
     layout NO se duplica aquí — la autoridad es experiments.layout
     (el job hereda vía video → experiment).
-    model_hash (SHA-256) permite reproducibilidad exacta de los pesos.
     """
     __tablename__ = "analysis_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    model_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    pipeline_version: Mapped[str] = mapped_column(String(30), nullable=False)
-    conf_threshold: Mapped[float] = mapped_column(Float, nullable=False)
-    skip_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    immobile_thr: Mapped[float] = mapped_column(Float, nullable=False, default=6.5)
-    disp_thr: Mapped[float] = mapped_column(Float, nullable=False, default=8.0)
-    pos_std_thr: Mapped[float] = mapped_column(Float, nullable=False, default=20.0)
-    climb_aspect_thr: Mapped[float] = mapped_column(Float, nullable=False, default=1.6)
+    pipeline_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    pipeline_version: Mapped[str] = mapped_column(String(60), nullable=False)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="config")
 
@@ -216,6 +207,8 @@ class Job(Base):
     stage: Mapped[PipelineStage | None] = mapped_column(Enum(PipelineStage), nullable=True)
     progress_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Video anotado que genere el pipeline (opcional)
+    output_video_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     video: Mapped["Video"] = relationship(back_populates="jobs")
     config: Mapped["AnalysisConfig | None"] = relationship(back_populates="jobs")
@@ -238,64 +231,41 @@ class Animal(Base):
 
     job: Mapped["Job"] = relationship(back_populates="animals")
     subject: Mapped["Subject"] = relationship(back_populates="animals")
-    results: Mapped[list["BehaviorResult"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
-    per_minute: Mapped[list["BehaviorPerMinute"]] = relationship(back_populates="animal", cascade="all, delete-orphan")
+    behavior_segments: Mapped[list["BehaviorSegment"]] = relationship(
+        back_populates="animal", cascade="all, delete-orphan",
+        order_by="BehaviorSegment.start_s",
+    )
 
     __table_args__ = (
         UniqueConstraint("job_id", "subject_id", name="uq_job_subject"),
     )
 
 
-# ── Behavior results (antes "result_summary") ────────────────────────
+# ── Behavior segments ───────────────────────────────
 
-class BehaviorResult(Base):
-    """Tiempo total en segundos de cada conducta para un animal en una sesión.
-    total_analyzed_s captura la duración efectivamente analizada para este
-    animal, permitiendo validar que swim + immobile + escape no la excedan.
+class BehaviorSegment(Base):
+    """Intervalo [start_s, end_s) con una conducta, producido por el pipeline
+    de análisis. label es texto libre definido
+    por el pipeline: el sistema no fija las clases. Los totales por conducta y
+    por minuto se derivan en consulta, no se almacenan.
     """
-    __tablename__ = "behavior_results"
+    __tablename__ = "behavior_segments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, index=True)
-    swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    total_analyzed_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    start_s: Mapped[float] = mapped_column(Float, nullable=False)
+    end_s: Mapped[float] = mapped_column(Float, nullable=False)
+    label: Mapped[str] = mapped_column(String(60), nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    animal: Mapped["Animal"] = relationship(back_populates="results")
-
-    __table_args__ = (
-        CheckConstraint(
-            "swim_s >= 0 AND immobile_s >= 0 AND escape_s >= 0",
-            name="ck_behavior_non_negative",
-        ),
-        CheckConstraint(
-            "swim_s + immobile_s + escape_s <= total_analyzed_s + 0.01",
-            name="ck_behavior_within_duration",
-        ),
-    )
-
-
-# ── Behavior per minute (RF-19) ───────────────────────────────────────
-
-class BehaviorPerMinute(Base):
-    """Desglose por minuto de la conducta de un animal (RF-19).
-    Normalizado en tabla propia para permitir consultas SQL directas
-    en lugar de parsear blobs JSON.
-    """
-    __tablename__ = "behavior_per_minute"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id"), nullable=False, index=True)
-    minute: Mapped[int] = mapped_column(Integer, nullable=False)
-    swim_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    immobile_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    escape_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-
-    animal: Mapped["Animal"] = relationship(back_populates="per_minute")
+    animal: Mapped["Animal"] = relationship(back_populates="behavior_segments")
 
     __table_args__ = (
-        UniqueConstraint("animal_id", "minute", name="uq_animal_minute"),
+        CheckConstraint("start_s >= 0 AND end_s > start_s", name="ck_segment_interval"),
+        CheckConstraint(
+            "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+            name="ck_segment_confidence",
+        ),
     )
 
 

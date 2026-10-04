@@ -11,3 +11,10 @@ __pycache__/
 
 # AI context — local only, not for the repo
 CLAUDE.md
+
+# restos locales de la herramienta de etiquetado (ahora en su propio repo)
+/tools/
+
+# frontend: dependencias (se reinstalan con npm install) y salida del build
+node_modules/
+/frontend/dist/

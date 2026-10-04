@@ -42,9 +42,8 @@ enum JobStatus <<enum>> {
 
 enum PipelineStage <<enum>> {
     PREPROCESSING
-    ROI_DETECTION
-    TRACKING
-    CLASSIFICATION
+    ANALYSIS
+    SAVING
     DONE
 }
 
@@ -152,20 +151,13 @@ entity "analysis_configs" as analysis_configs {
     * id : INTEGER <<PK>>
     --
     * created_at : DATETIME
-    * model_name : VARCHAR(120)
-    * model_hash : VARCHAR(64)
-    * pipeline_version : VARCHAR(30)
-    * conf_threshold : FLOAT
-    * skip_seconds : FLOAT = 0.0
-    * immobile_thr : FLOAT = 6.5
-    * disp_thr : FLOAT = 8.0
-    * pos_std_thr : FLOAT = 20.0
-    * climb_aspect_thr : FLOAT = 1.6
+    * pipeline_name : VARCHAR(120)
+    * pipeline_version : VARCHAR(60)
 }
 
 note right of analysis_configs
-  model_hash: SHA-256 de los weights.
-  Reproducibilidad exacta, no solo nombre.
+  Que pipeline de analisis y que version
+  produjeron el resultado.
   layout NO se duplica aqui; autoridad
   es experiments.layout.
 end note
@@ -182,6 +174,7 @@ entity "jobs" as jobs {
     stage : PipelineStage
     * progress_pct : INTEGER = 0
     error : TEXT
+    output_video_path : VARCHAR(512)
 }
 
 entity "animals" as animals {
@@ -199,32 +192,26 @@ note right of animals
   Cero duplicidad conceptual.
 end note
 
-entity "behavior_results" as behavior_results {
+entity "behavior_segments" as behavior_segments {
     * id : INTEGER <<PK>>
     --
     * animal_id : INTEGER <<FK→animals>>
-    * swim_s : FLOAT = 0.0
-    * immobile_s : FLOAT = 0.0
-    * escape_s : FLOAT = 0.0
-    * total_analyzed_s : FLOAT = 0.0
+    * start_s : FLOAT
+    * end_s : FLOAT
+    * label : VARCHAR(60)
+    confidence : FLOAT
     --
-    <<CHECK: swim_s >= 0 AND immobile_s >= 0>>
-    <<        AND escape_s >= 0>>
-    <<CHECK: swim_s + immobile_s + escape_s>>
-    <<        <= total_analyzed_s + 0.01>>
+    <<CHECK: start_s >= 0 AND end_s > start_s>>
+    <<CHECK: confidence IS NULL OR 0..1>>
 }
 
-entity "behavior_per_minute" as behavior_per_minute {
-    * id : INTEGER <<PK>>
-    --
-    * animal_id : INTEGER <<FK→animals>>
-    * minute : INTEGER
-    * swim_s : FLOAT = 0.0
-    * immobile_s : FLOAT = 0.0
-    * escape_s : FLOAT = 0.0
-    --
-    <<UNIQUE (animal_id, minute)>>
-}
+note right of behavior_segments
+  Los escribe el pipeline de analisis
+  (pendiente). label es texto libre
+  definido por el pipeline.
+  Totales y desglose por minuto se derivan
+  en consulta, no se almacenan.
+end note
 
 entity "reports" as reports {
     * id : INTEGER <<PK>>
@@ -274,8 +261,7 @@ analysis_configs    ||--o{ jobs                : "config_id"
 
 jobs                ||--o{ animals             : "job_id"
 
-animals             ||--o{ behavior_results    : "animal_id"
-animals             ||--o{ behavior_per_minute : "animal_id"
+animals             ||--o{ behavior_segments   : "animal_id"
 
 ' ─────────────────────────────────────────────
 '  NOTAS GENERALES

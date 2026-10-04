@@ -1,0 +1,39 @@
+/* FST · piezas que cada mockup v2 define en su propio <style>.
+   El sistema de diseño vive en modernist.css y fst.css (copias de mockup/v2/assets). */
+
+/* — franja de modo demo, fija arriba de todas las pantallas — */
+:root{--demo-h:30px}
+.demo-banner{position:sticky;top:0;z-index:100;height:var(--demo-h);display:flex;align-items:center;justify-content:center;gap:.6em;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+@media print{.demo-banner{display:none}}
+
+/* — login, recuperar contraseña y primer acceso (2h, 2i) — */
+.acc-page{min-height:calc(100vh - var(--demo-h));display:flex;align-items:center;justify-content:center;padding:32px 16px;background:#d8d8da}
+.acc-card{width:480px;max-width:100%;background:var(--color-bg);border:2px solid var(--color-text)}
+
+/* — segmentados como botones — */
+button.seg-opt{border:0;background:transparent;font:inherit;font-size:13px;color:inherit}
+
+/* — detalle de experimento (2c) — */
+.legend{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;display:inline-block}
+.dialog.dlg-del{border:2px solid var(--color-text);width:min(520px,100%)}
+
+/* — detalle de grupo (2d) — */
+.thumb{width:82px;height:48px;flex:none;display:flex;align-items:center;justify-content:center;font-size:8.5px;text-align:center}
+
+/* — cargar video por tanda (2b) — */
+.step{display:grid;grid-template-columns:34px 1fr;gap:14px;padding:18px 0;border-bottom:1px solid var(--color-divider)}
+.step-n{font-family:var(--font-heading);font-weight:800;font-size:18px}
+.sug{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--color-divider)}
+.sug:hover,.sug.active{background:var(--color-accent-100)}
+.drop{border:2px dashed var(--color-divider);background:var(--color-surface);padding:28px 22px;display:flex;align-items:center;gap:20px}
+.drop.over{border-color:var(--color-accent);background:var(--color-accent-100)}
+
+/* — resultados (2f) — */
+.tab{font-family:var(--font-heading);font-weight:800;font-size:13.5px;padding:11px 16px;border:0;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;color:var(--color-text);cursor:pointer}
+.tab.on{background:var(--color-accent);color:var(--color-bg);border-bottom-color:var(--color-accent)}
+.tab:not(.on):hover{background:color-mix(in srgb,var(--color-text) 7%,transparent)}
+.tab[disabled]{cursor:default}
+.tab[disabled]:hover{background:transparent}
+.sw{width:11px;height:11px;flex:none;border:1px solid var(--color-divider);display:inline-block}
+.bar-de{position:absolute;top:-3px;height:16px;width:2px;background:var(--color-text)}

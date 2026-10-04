@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "fst-labeler",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/fst_labeler/app.py"],
+      "port": 5055
+    },
+    {
       "name": "mockups-v2",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--directory", "mockup/v2"],
