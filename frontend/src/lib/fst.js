@@ -45,6 +45,8 @@ export const fechaRango = (desde, hasta) => {
 // ── valores de la API → etiquetas de los mockups ───────────────────────────
 export const ESTADO_TANDA = { QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
 export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
+export const DIA = { DAY1: 'Día 1', DAY2: 'Día 2' }
+// En el orden en que las recorre el pipeline.
 export const ETAPA = {
   PREPROCESSING: 'Preprocesamiento',
   ROI_DETECTION: 'Detección de cilindros',

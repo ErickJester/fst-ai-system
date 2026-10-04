@@ -3,7 +3,6 @@
 
 const INK = 'var(--color-text)'
 const ACC = 'var(--color-accent)'
-const MUT = 'var(--muted)'
 
 // ── cuentas (barra superior 2k, perfil 2j, administración 2g) ──────────────
 export const USERS = [
@@ -38,27 +37,6 @@ export const GRUPOS_CARGA = [
   { nombre: 'Experimental A · CSR-14, 5 mg/kg', tipo: 'tratamiento experimental', tag: 'tag-accent', cargadas: ['A', 'B'] },
   { nombre: 'Experimental B · CSR-14, 15 mg/kg', tipo: 'tratamiento experimental', tag: 'tag-accent', cargadas: ['A', 'B'] },
 ]
-
-// ── progreso de análisis (2e) y cola (2g) ──────────────────────────────────
-export const ETAPAS = [
-  { nombre: 'Preprocesamiento', detalle: 'CLAHE (realce local de contraste)', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '25 %' },
-  { nombre: 'Detección de cilindros', detalle: '4 cilindros detectados', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '50 %' },
-  { nombre: 'Seguimiento de especímenes', detalle: 'tracking (seguimiento) de 4 especímenes', icono: '3', dotBg: ACC, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'en curso', pct: '75 %' },
-  { nombre: 'Clasificación de conducta', detalle: 'nado activo, inmovilidad, escalamiento', icono: '4', dotBg: 'transparent', dotFg: MUT, titleFg: MUT, estado: 'pendiente', pct: '100 %' },
-]
-
-export const COLA = [
-  { n: '1', nombre: 'Compuesto CSR-14 · Experimental A · Tanda B', dia: 'Día 2', estado: 'Procesando', tagClass: 'tag-accent' },
-  { n: '2', nombre: 'Compuesto CSR-14 · Control · Tanda B', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' },
-  { n: '3', nombre: 'Compuesto CSR-14 · Experimental B · Tanda A', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' },
-]
-
-export const ERROR_ANALISIS = {
-  titulo: 'Compuesto CSR-14 · Experimental B · Tanda B',
-  detalle: 'Día 2 · 5 min · detenido en Detección de cilindros (50 %)',
-  codigo: 'E-DET-070',
-  causa: 'Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.',
-}
 
 // ── resultados (2f): Grupo referencia, Tanda A, Día 2 ──────────────────────
 export const BEHAVIORS = [
