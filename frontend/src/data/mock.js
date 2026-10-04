@@ -65,15 +65,6 @@ export const D2_NOTA = {
   'Error': { nota: 'E-DET-070 · Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.', analisis: 'Sin análisis todavía' },
 }
 
-// ── lista de experimentos (2a) ─────────────────────────────────────────────
-export const EXPERIMENTOS = [
-  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', trat: 'Compuesto CSR-14 Fluoxetina Placebo', fecha: '18 feb 2026', grupos: 4, especimenes: 32, videosTexto: '4 / 8', pct: '50%', estado: 'En análisis', tagClass: 'tag-accent', responsable: 'M. Rivera', retencion: '30 d', retFg: 'inherit', detalle: true },
-  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', trat: 'Salvia', fecha: '9 ene 2026', grupos: 4, especimenes: 32, videosTexto: '8 / 8', pct: '100%', estado: 'Concluido', tagClass: 'tag-neutral', responsable: 'J. Domínguez', retencion: '12 d', retFg: 'inherit' },
-  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', trat: 'Valeriana officinalis', fecha: '14 nov 2025', grupos: 5, especimenes: 38, videosTexto: '10 / 10', pct: '100%', estado: 'Concluido', tagClass: 'tag-neutral', responsable: 'M. Rivera', retencion: '4 d', retFg: 'var(--color-accent-700)' },
-  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', trat: '', fecha: '2 oct 2025', grupos: 4, especimenes: 24, videosTexto: '3 / 6 cargados', pct: '50%', estado: 'Carga incompleta', tagClass: 'tag-outline', responsable: 'C. Reyes', retencion: 'Videos borrados', retFg: MUT },
-  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', trat: 'Fluoxetina', fecha: '19 ago 2025', grupos: 4, especimenes: 32, videosTexto: '8 / 8', pct: '100%', estado: 'Concluido', tagClass: 'tag-neutral', responsable: 'C. Reyes', retencion: 'Videos borrados', retFg: MUT },
-]
-
 // ── cargar video por tanda (2b) ────────────────────────────────────────────
 export const GRUPOS_CARGA = [
   { nombre: 'Control · placebo', tipo: 'control', tag: 'tag-neutral', cargadas: ['A', 'B'] },
