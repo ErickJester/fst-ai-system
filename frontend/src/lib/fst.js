@@ -29,6 +29,13 @@ export const variance = (a) => {
 export const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')
 export const r1 = (n) => (Math.round(n * 10) / 10).toFixed(1)
 
+// '2026-02-18' → '18 feb 2026' (sin pasar por Date, para no depender de la zona horaria).
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+export const fechaCorta = (iso) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return d + ' ' + MESES[m - 1] + ' ' + y
+}
+
 // Búsqueda sin acentos ni mayúsculas.
 export const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
