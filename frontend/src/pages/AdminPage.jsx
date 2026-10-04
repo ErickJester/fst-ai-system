@@ -5,10 +5,11 @@ import { FieldError, Campo, Cargando } from '../components/ui'
 import { listUsers, createUser, setUserActive, getSystem } from '../services/admin'
 import { getQueue } from '../services/queue'
 import { useAsync } from '../hooks/useAsync'
+import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
+import { mensajeError } from '../services/api'
 import { isIpn, DIA } from '../lib/fst'
+import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
-const MUT70 = 'color-mix(in srgb,var(--color-text) 70%,transparent)'
-const btnLeft = { justifyContent: 'flex-start' }
 const VACIO = { nombre: '', apellidos: '', correo: '', id: '' }
 const ROL = { INVESTIGADOR: 'Investigador', ADMIN: 'Administrador' }
 const AVISO_DISCO_PCT = 80
@@ -28,8 +29,7 @@ export default function AdminPage() {
   const [crear, setCrear] = useState(false)
   const [okCrear, setOkCrear] = useState(false)
   const [form, setForm] = useState(VACIO)
-  const [err, setErr] = useState({ msg: '', campo: null })
-  const refs = { nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() }
+  const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
 
   if (errUsuarios) {
     return (
@@ -50,13 +50,8 @@ export default function AdminPage() {
       await setUserActive(u.id, false)
       reload()
     } catch (e) {
-      setErrAccion(e.response?.data?.error || 'No se pudo desactivar la cuenta.')
+      setErrAccion(mensajeError(e, 'No se pudo desactivar la cuenta.'))
     }
-  }
-
-  function fail(campo, msg) {
-    setErr({ campo, msg })
-    if (campo) refs[campo].current.focus()
   }
 
   function abrir() {
@@ -89,13 +84,13 @@ export default function AdminPage() {
       reload()
     } catch (e) {
       // El correo repetido lo detecta el servidor.
-      fail(e.response?.status === 409 ? 'correo' : null, e.response?.data?.error || 'No se pudo crear la cuenta.')
+      fail(e.response?.status === 409 ? 'correo' : null, mensajeError(e, 'No se pudo crear la cuenta.'))
     } finally {
       setGuardando(false)
     }
   }
 
-  const cls = (k, extra = '') => 'input' + extra + (err.campo === k ? ' error' : '')
+  const cls = (k, extra = '') => clase(k, 'input' + extra)
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
   return (
@@ -149,7 +144,7 @@ export default function AdminPage() {
               <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
               <Campo id="cCorreo" label="Correo institucional (@ipn.mx)"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
               <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></Campo>
-              <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 11.5, lineHeight: 1.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>La cuenta se crea como Investigador.</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 11.5, lineHeight: 1.5, color: MUT60 }}>La cuenta se crea como Investigador.</div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
                 <button type="submit" className="btn btn-primary" style={btnLeft} disabled={guardando}>Guardar</button>
                 <button type="button" className="btn btn-secondary" style={btnLeft} onClick={cancelar}>Cancelar</button>

@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { FieldError, Campo, Pasos } from '../components/ui'
 import { createExperiment } from '../services/experiments'
+import { mensajeError } from '../services/api'
+import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
+import { btnLeft, mutedSub } from '../lib/estilos'
 
-const btnLeft = { justifyContent: 'flex-start' }
-const mutedSub = { fontSize: 12, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }
 const MAX_NOMBRE = 120
 
 const hoy = () => {
@@ -20,17 +21,10 @@ export default function NuevoExperimentoPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ titulo: '', fecha_inicio: hoy(), especie: 'Rata Wistar', notas: '' })
-  const [err, setErr] = useState({ msg: '', campo: null })
   const [guardando, setGuardando] = useState(false)
-  const refs = { titulo: useRef(), fecha_inicio: useRef() }
+  const { err, fail, clase: cls, refs } = useErrorDeCampo({ titulo: useRef(), fecha_inicio: useRef() })
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
-  const cls = (k) => 'input' + (err.campo === k ? ' error' : '')
-
-  function fail(campo, msg) {
-    setErr({ campo, msg })
-    if (campo) refs[campo].current.focus()
-  }
 
   async function continuar(e) {
     e.preventDefault()
@@ -45,7 +39,7 @@ export default function NuevoExperimentoPage() {
       const { clave } = await createExperiment({ titulo, fecha_inicio: form.fecha_inicio, especie: form.especie.trim(), notas: form.notas.trim() })
       navigate(`/experimentos/${clave}/cargar`)
     } catch (e) {
-      fail(null, e.response?.data?.error || 'No se pudo crear el experimento. Inténtalo de nuevo.')
+      fail(null, mensajeError(e, 'No se pudo crear el experimento. Inténtalo de nuevo.'))
       setGuardando(false)
     }
   }

@@ -5,8 +5,9 @@ import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components
 import { getGroup } from '../services/groups'
 import { useAsync } from '../hooks/useAsync'
 import { fechaCorta, fechaRango, ETAPA } from '../lib/fst'
+import { MUT60, MUT70 } from '../lib/estilos'
 
-const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: 'color-mix(in srgb,var(--color-text) 70%,transparent)' }
+const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
 const dur = { fontWeight: 400, fontFamily: 'var(--font-body)', color: 'var(--muted)' }
 
 // Nota del video de Día 2 según el estado de su análisis.
@@ -85,7 +86,7 @@ export default function GrupoPage() {
                     <div className="k" style={{ marginBottom: 13 }}>Videos de la tanda</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
                       <div style={{ background: d1 ? 'var(--color-bg)' : 'var(--color-surface)', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 15px', opacity: d1 ? 1 : 0.55 }}>
-                        <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 16%,transparent) 0 5px,transparent 5px 10px)', color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>cuadro<br />día 1</div>
+                        <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 16%,transparent) 0 5px,transparent 5px 10px)', color: MUT60 }}>cuadro<br />día 1</div>
                         <div style={{ flex: 1 }}>
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 1 · sesión de estrés <span style={dur}>20 min</span></div>
                           <div style={sub}>{d1 ? 'Se analizan sus primeros 5 minutos.' : 'Sin video de Día 1 (opcional)'}</div>
@@ -101,7 +102,7 @@ export default function GrupoPage() {
                         <EstadoTag estado={t.estado} />
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, fontSize: 11.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, fontSize: 11.5, color: MUT60 }}>
                       <span>{t.analisis_fecha ? 'Análisis vigente: ' + fechaCorta(t.analisis_fecha) : 'Sin análisis todavía'}</span>
                       <div style={{ flex: 1 }} />
                       {t.estado === 'DONE'

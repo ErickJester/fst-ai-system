@@ -5,14 +5,13 @@ import { getBatchResults, getGroupComparison } from '../services/results'
 import { useAsync } from '../hooks/useAsync'
 import { mean, variance, fmt, r1, download, toCSV, loadScript, fechaCorta, norm } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
+import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
 const INK = 'var(--color-text)'
 const ACC = 'var(--color-accent)'
 const N400 = 'var(--color-neutral-400)'
 const MUT = 'var(--muted)'
 const PEND = 'var(--color-accent-700)'
-const MUT60 = 'color-mix(in srgb,var(--color-text) 60%,transparent)'
-const MUT70 = 'color-mix(in srgb,var(--color-text) 70%,transparent)'
 const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 
 // Sin ?grupo=&tanda= se abre la tanda de ejemplo de los mockups.
@@ -197,7 +196,7 @@ export default function ResultadosPage() {
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
             <button type="button" className="btn btn-secondary" onClick={() => download(archivo(r) + '.csv', toCSV(tabla(r)))}>CSV</button>
             <button type="button" className="btn btn-secondary" onClick={() => exportarXLSX(r)}>XLSX</button>
-            <button type="button" className="btn btn-primary" style={{ justifyContent: 'flex-start' }} onClick={() => window.print()}>PDF · resumen ejecutivo</button>
+            <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => window.print()}>PDF · resumen ejecutivo</button>
           </div>
         </div>
 

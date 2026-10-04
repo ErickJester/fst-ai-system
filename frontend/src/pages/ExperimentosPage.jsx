@@ -6,6 +6,7 @@ import { Seg } from '../components/ui'
 import { listExperiments } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { norm, fechaCorta } from '../lib/fst'
+import { btnLeft } from '../lib/estilos'
 
 const ESTADO = {
   EN_ANALISIS: { label: 'En análisis', tag: 'tag-accent' },
@@ -73,7 +74,7 @@ export default function ExperimentosPage() {
               Prueba de nado forzado (<em>Forced Swim Test</em>, FST). El archivo completo del laboratorio, visible para cualquier cuenta activa.
             </p>
           </div>
-          <Link className="btn btn-primary" to="/experimentos/nuevo" style={{ justifyContent: 'flex-start' }}>Nuevo experimento</Link>
+          <Link className="btn btn-primary" to="/experimentos/nuevo" style={btnLeft}>Nuevo experimento</Link>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)' }}>
