@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { FieldError, Campo, Acceso } from '../components/ui'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { forgotPassword } from '../services/auth'
 import { mensajeError } from '../services/api'
+import { AVISO_KEY } from '../services/config'
 import { isIpn } from '../lib/fst'
 import { textoTarjeta } from '../lib/estilos'
 
@@ -16,7 +17,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
   const [rEmail, setREmail] = useState('')
-  const [enviado, setEnviado] = useState('')
+  const [enviado, setEnviado] = useState(false)
+  // Aviso que deja api.js al vencer la sesión; se muestra una vez.
+  const [caducada] = useState(() => {
+    try {
+      return sessionStorage.getItem(AVISO_KEY) === 'sesion-caducada'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try { sessionStorage.removeItem(AVISO_KEY) } catch { /* sin almacenamiento */ }
+  }, [])
   const [enviando, setEnviando] = useState(false)
   const entrada = useErrorDeCampo()
   const recuperacion = useErrorDeCampo()
@@ -46,7 +58,7 @@ export default function LoginPage() {
     setEnviando(true)
     try {
       await forgotPassword(rEmail.trim())
-      setEnviado(rEmail.trim())
+      setEnviado(true)
     } catch (e) {
       recuperacion.fail('rEmail', mensajeError(e, 'No se pudo enviar el enlace. Inténtalo de nuevo.'))
     } finally {
@@ -70,13 +82,13 @@ export default function LoginPage() {
             </Campo>
             <FieldError msg={recuperacion.err.msg} />
             <button className="btn btn-primary btn-block" type="submit" disabled={enviando}>Enviar enlace</button>
-            <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setEnviado(''); setVista('login') }}>Volver a iniciar sesión</a>
+            <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setEnviado(false); setVista('login') }}>Volver a iniciar sesión</a>
           </div>
           {enviado && (
             <div>
               <hr className="hr" />
               <div className="ok-bar" style={{ padding: '13px 15px', lineHeight: 1.6 }}>
-                <strong>Enviado.</strong> Revisa {enviado}. Por seguridad este mensaje aparece igual exista o no la cuenta.
+                Si el correo está registrado, recibirás un enlace.
               </div>
             </div>
           )}
@@ -88,6 +100,7 @@ export default function LoginPage() {
   return (
     <Acceso encabezado sub={<>Análisis de la prueba de nado forzado (<em>Forced Swim Test</em>, FST)<br />Laboratorio de Bioquímica Estructural · ENMyH-IPN</>}>
       <form noValidate onSubmit={entrar} style={{ padding: '30px 34px 32px' }}>
+        {caducada && <div className="note-bar" style={{ marginBottom: 18 }}>Tu sesión caducó. Vuelve a iniciar sesión.</div>}
         <h3 style={{ margin: '0 0 22px' }}>Iniciar sesión</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Campo id="lEmail" label="Correo institucional">

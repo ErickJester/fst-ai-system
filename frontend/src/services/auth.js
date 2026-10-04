@@ -25,12 +25,6 @@ export async function login(email, password) {
   return (await api.post('/auth/login', { email, password })).data
 }
 
-// POST /auth/logout
-export async function logout() {
-  if (USE_MOCKS) return reply({ ok: true }, 0)
-  return (await api.post('/auth/logout')).data
-}
-
 // POST /auth/forgot → misma respuesta exista o no la cuenta
 export async function forgotPassword(email) {
   if (USE_MOCKS) return reply({ ok: true })

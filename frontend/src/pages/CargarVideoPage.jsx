@@ -112,9 +112,13 @@ export default function CargarVideoPage() {
     setOk('')
   }
 
+  // Se aceptan .mp4 y .mov, y se rechazan los videos verticales leyendo los metadatos
+  // (el servidor repite ambas comprobaciones). Algunos .mov usan códecs que el
+  // navegador no lee: esos pasan y la orientación la comprueba el servidor.
   function takeFile(f) {
     setRechazo(null)
-    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4 (RF-08).')
+    const ext = (f.name.match(/\.(mp4|mov)$/i) || [])[1]?.toLowerCase()
+    if (!ext) return reject('El archivo no es .mp4 ni .mov', f.name + ' · solo se aceptan archivos .mp4 o .mov (RF-08).')
     const v = document.createElement('video')
     const url = URL.createObjectURL(f)
     const dañado = () => reject('El video no se puede reproducir', f.name + ' · el archivo está dañado o incompleto.')
@@ -122,9 +126,16 @@ export default function CargarVideoPage() {
     v.onloadedmetadata = () => {
       URL.revokeObjectURL(url)
       if (!isFinite(v.duration) || v.duration <= 0) return dañado()
+      if (v.videoHeight > v.videoWidth) {
+        return reject('El video es vertical', f.name + ' · ' + v.videoWidth + ' × ' + v.videoHeight + ' px · se necesita un video horizontal, con los cilindros de lado a lado.')
+      }
       setArchivo(f)
     }
-    v.onerror = () => { URL.revokeObjectURL(url); dañado() }
+    v.onerror = () => {
+      URL.revokeObjectURL(url)
+      if (ext === 'mov') setArchivo(f)
+      else dañado()
+    }
     v.src = url
   }
 
@@ -251,16 +262,24 @@ export default function CargarVideoPage() {
                   onDragLeave={(e) => { e.preventDefault(); setOver(false) }}
                   onDrop={onDrop}>
                   <div style={{ flex: 1 }}>
-                    <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4'}</div>
-                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión. Se valida el formato y que el video se pueda reproducir.</div>
+                    <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4 o .mov'}</div>
+                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión. Se valida el formato, que el video se pueda reproducir y que sea horizontal.</div>
                   </div>
                   <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
-                  <input ref={fileRef} type="file" accept="video/mp4,.mp4" className="hidden"
+                  <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden"
                     onChange={(e) => { if (e.target.files[0]) takeFile(e.target.files[0]) }} />
                 </div>
+                {subiendo != null && (
+                  <div style={{ marginTop: 18 }}>
+                    <div className="num" style={{ fontSize: 12, marginBottom: 5 }}>Subiendo {archivo?.name} · {subiendo} %</div>
+                    <div className="meter" role="progressbar" aria-label="Avance de la subida" aria-valuenow={subiendo} aria-valuemin={0} aria-valuemax={100}>
+                      <div style={{ width: subiendo + '%' }} />
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
                   <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
-                    {subiendo == null ? 'Guardar y encolar análisis' : 'Subiendo… ' + subiendo + ' %'}
+                    {subiendo == null ? 'Guardar y encolar análisis' : 'Subiendo…'}
                   </button>
                   <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
                 </div>

@@ -65,10 +65,8 @@ export function AuthProvider({ children }) {
     return u
   }, [setUser])
 
-  const logout = useCallback(() => {
-    auth.logout().catch(() => {})
-    setUser(null)
-  }, [setUser])
+  // Cerrar sesión es solo del frontend: el servidor no guarda sesiones.
+  const logout = useCallback(() => setUser(null), [setUser])
 
   // Cambia la contraseña (también la temporal del primer acceso).
   const cambiarPassword = useCallback(async (actual, nueva) => {

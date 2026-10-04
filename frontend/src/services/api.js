@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { TOKEN_KEY } from './config'
+import { TOKEN_KEY, AVISO_KEY } from './config'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:8000',
@@ -16,9 +16,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // Sesión vencida o inválida: se borra y se vuelve al login con aviso. El 401 del
+    // propio login (contraseña incorrecta) lo muestra la pantalla de login.
+    const conSesion = !!sessionStorage.getItem(TOKEN_KEY)
+    if (err.response?.status === 401 && conSesion && !err.config?.url?.startsWith('/auth/login')) {
       sessionStorage.removeItem(TOKEN_KEY)
       sessionStorage.removeItem('fst.user')
+      sessionStorage.setItem(AVISO_KEY, 'sesion-caducada')
       window.location.href = '/login'
     }
     return Promise.reject(err)
