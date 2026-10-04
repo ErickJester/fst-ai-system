@@ -1,0 +1,4 @@
+# Las dependencias se instalan dentro de la imagen (Linux); las del host no sirven.
+node_modules
+dist
+npm-debug.log*
