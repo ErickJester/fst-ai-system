@@ -5,11 +5,7 @@ import { EstadoTag, FieldError } from '../components/ui'
 import { ESTADO, TIPO_TAG } from '../data/mock'
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { fechaCorta } from '../lib/fst'
-
-// Estado de la tanda (JobStatus) → etiqueta de los mockups.
-const ESTADO_TANDA = { QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
-const TIPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
+import { fechaCorta, ESTADO_TANDA, TIPO_GRUPO as TIPO } from '../lib/fst'
 
 const posiciones = (t) => 'Ratas ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
 
@@ -168,11 +164,11 @@ export default function ExperimentoPage() {
   )
 }
 
-function Cargando() {
+export function Cargando() {
   return (
     <div className="app">
       <Topbar><Brand /></Topbar>
-      <div className="page"><p className="hint">Cargando experimento…</p></div>
+      <div className="page"><p className="hint">Cargando…</p></div>
     </div>
   )
 }
