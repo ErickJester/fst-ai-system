@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Cargar video por tanda</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+<style>
+  .step{display:grid;grid-template-columns:34px 1fr;gap:14px;padding:18px 0;border-bottom:1px solid var(--color-divider)}
+  .step-n{font-family:var(--font-heading);font-weight:800;font-size:18px}
+  .sug{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--color-divider)}
+  .sug:hover,.sug.active{background:var(--color-accent-100)}
+  .drop{border:2px dashed var(--color-divider);background:var(--color-surface);padding:28px 22px;display:flex;align-items:center;gap:20px}
+  .drop.over{border-color:var(--color-accent);background:var(--color-accent-100)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 2b · Cargar video por tanda -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand"><a href="experimentos.html" style="font-size:inherit">FST</a><span class="nav-sub">Compuesto CSR-14 · curva de dosis</span></span>
+    <a href="experimentos.html">Salir</a>
+  </nav>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 430px">
+    <div style="padding:28px 32px 36px;border-right:2px solid var(--color-divider)">
+      <div style="display:flex;align-items:stretch;border:1px solid var(--color-divider);margin-bottom:28px">
+        <div style="flex:1;padding:11px 14px;background:var(--color-surface);border-right:1px solid var(--color-divider)"><div class="k">Paso 1</div><div class="nd" style="font-size:13px;margin-top:3px;color:var(--muted)">Datos generales</div></div>
+        <div style="flex:1;padding:11px 14px;background:var(--color-accent);color:var(--color-bg)"><div class="k" style="color:color-mix(in srgb,#fff 70%,transparent)">Paso 2</div><div class="nd" style="font-size:13px;margin-top:3px">Cargar video por tanda</div></div>
+      </div>
+
+      <h3 style="margin:0 0 8px">Cargar video por tanda</h3>
+      <p class="lead" style="margin:0 0 24px;max-width:620px">Un video corresponde a una tanda de un solo grupo. Indica el grupo, confirma qué tanda es y suelta el archivo.</p>
+
+      <div style="border-top:2px solid var(--color-divider)">
+
+        <!-- 1 · grupo -->
+        <div class="step">
+          <span class="step-n num">1</span>
+          <div>
+            <div class="field">
+              <label for="grupo">Grupo o tratamiento</label>
+              <input class="input" id="grupo" autocomplete="off" placeholder="Escribe el grupo o el tratamiento">
+            </div>
+            <div id="sugBox" class="hidden" style="border:2px solid var(--color-text);border-top:0;background:var(--color-bg)">
+              <div id="sugList"></div>
+              <div style="padding:8px 12px;font-size:11.5px;color:var(--muted)">Solo se sugieren los 4 grupos de este experimento, nunca los de otros experimentos.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 · tanda -->
+        <div class="step">
+          <span class="step-n num">2</span>
+          <div>
+            <div style="display:flex;align-items:flex-end;gap:16px">
+              <div class="field" style="width:120px"><label for="tanda">Tanda</label><input class="input num" id="tanda" maxlength="1" style="font-family:var(--font-heading);font-weight:800;font-size:16px;text-transform:uppercase"></div>
+              <div class="field"><label>Cilindros en el cuadro</label><span class="seg" id="cil" style="display:inline-flex"><span class="seg-opt" data-v="3">3</span><span class="seg-opt on" data-v="4">4</span></span></div>
+              <p style="margin:0 0 10px;font-size:12px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
+            </div>
+            <div id="confirmBox" class="hidden" style="margin-top:14px;border:2px solid var(--color-accent);padding:14px 16px">
+              <div class="nd" id="confirmQ" style="font-size:15px;margin-bottom:12px"></div>
+              <div style="display:flex;gap:8px">
+                <button type="button" class="btn btn-primary" id="btnSi" style="justify-content:flex-start"></button>
+                <button type="button" class="btn btn-secondary" id="btnCorregir" style="justify-content:flex-start">Corregir</button>
+              </div>
+              <div id="confirmWarn" style="margin-top:11px;font-size:11.5px;color:var(--color-accent-700)">No se puede guardar sin confirmar la tanda.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 · sesión -->
+        <div class="step">
+          <span class="step-n num">3</span>
+          <div class="field">
+            <label>Sesión</label>
+            <span class="seg" id="sesion" style="display:inline-flex">
+              <span class="seg-opt" data-v="1">Día 1 (20 min)</span>
+              <span class="seg-opt on" data-v="2">Día 2 (5 min)</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 4 · archivo -->
+        <div class="step" style="border-bottom:0;padding-bottom:0">
+          <span class="step-n num">4</span>
+          <div>
+            <div class="k" style="margin-bottom:8px">Archivo de video</div>
+            <div class="drop" id="drop">
+              <div style="flex:1">
+                <div class="nd" id="dropTitle" style="font-size:15px">Suelta aquí el archivo .mp4</div>
+                <div style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Un solo archivo por tanda y sesión. Se valida el formato y que el video se pueda reproducir.</div>
+              </div>
+              <button type="button" class="btn btn-secondary" id="btnFile" style="justify-content:flex-start">Elegir archivo</button>
+              <input type="file" id="file" accept="video/mp4,.mp4" class="hidden">
+            </div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:18px">
+              <button type="button" class="btn btn-primary" id="btnSave" disabled style="justify-content:flex-start">Guardar y encolar análisis</button>
+              <span style="font-size:11.5px;color:var(--muted)">Se habilita al confirmar la tanda y adjuntar el archivo.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- estados del flujo -->
+    <div style="background:var(--color-surface);padding:28px 24px;display:flex;flex-direction:column;gap:20px">
+
+      <div id="cardNuevo" class="hidden" style="background:var(--color-bg);border:2px solid var(--color-text)">
+        <div class="k" style="padding:10px 14px;border-bottom:1px solid var(--color-divider)">Grupo nuevo · el nombre no coincide</div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div class="field"><label>Grupo o tratamiento</label><div class="input" id="nuevoNombre"></div></div>
+          <div style="font-size:12px;color:var(--muted-2)">Sin coincidencias en este experimento. Completa los datos del grupo nuevo:</div>
+          <div class="field"><label>Tipo</label>
+            <span class="seg" id="tipo" style="display:inline-flex"><span class="seg-opt" data-v="control">control</span><span class="seg-opt" data-v="referencia">referencia</span><span class="seg-opt on" data-v="tratamiento experimental">tratamiento exp.</span></span>
+          </div>
+          <div class="field"><label for="trat">Tratamiento</label><input class="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg"></div>
+          <div class="note-bar">La primera tanda de un grupo nuevo siempre es A.</div>
+        </div>
+      </div>
+
+      <div id="cardRechazo" class="hidden" style="background:var(--color-bg);border:2px solid var(--color-accent)">
+        <div class="nd" style="padding:10px 14px;background:var(--color-accent);color:var(--color-bg);font-size:14px">Video rechazado</div>
+        <div style="padding:12px 14px;border-bottom:1px solid var(--color-divider)">
+          <div class="nd" id="rechazoT" style="font-size:13px"></div>
+          <div class="num" id="rechazoD" style="font-size:11.5px;margin-top:3px;color:var(--muted-2)"></div>
+        </div>
+        <div style="padding:12px 14px;display:flex;align-items:center;gap:12px">
+          <button type="button" class="btn btn-secondary" id="btnRetry" style="justify-content:flex-start">Reintentar</button>
+          <span id="rechazoTanda" style="font-size:11.5px;color:var(--color-accent-700)"></span>
+        </div>
+      </div>
+
+      <div id="cardOk" class="hidden" style="background:var(--color-bg);border:2px solid var(--color-text);border-left:6px solid var(--color-text)">
+        <div style="padding:14px">
+          <div class="nd" style="font-size:14px">Video almacenado · análisis en cola</div>
+          <div class="num" id="okD" style="font-size:12px;margin-top:4px;color:var(--muted-2)"></div>
+          <a href="progreso.html" style="display:inline-block;margin-top:10px;font-size:12.5px;white-space:nowrap">Ver progreso del análisis →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const GRUPOS = [
+    { nombre: 'Control · placebo', tipo: 'control', tag: 'tag-neutral', cargadas: ['A', 'B'] },
+    { nombre: 'Referencia · fluoxetina', tipo: 'referencia', tag: 'tag-outline', cargadas: ['A'] },
+    { nombre: 'Experimental A · CSR-14, 5 mg/kg', tipo: 'tratamiento experimental', tag: 'tag-accent', cargadas: ['A', 'B'] },
+    { nombre: 'Experimental B · CSR-14, 15 mg/kg', tipo: 'tratamiento experimental', tag: 'tag-accent', cargadas: ['A', 'B'] }
+  ];
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const nextLetter = arr => arr.length ? String.fromCharCode(arr[arr.length - 1].charCodeAt(0) + 1) : 'A';
+
+  const st = { grupo: null, nuevo: false, confirmada: false, archivo: null, cola: 3 };
+
+  function hi(label, q) {
+    const i = norm(label).indexOf(norm(q));
+    if (!q || i < 0) return FST.esc(label);
+    return FST.esc(label.slice(0, i)) + '<span style="color:var(--color-accent-700)">' + FST.esc(label.slice(i, i + q.length)) + '</span>' + FST.esc(label.slice(i + q.length));
+  }
+
+  // ── 1 · grupo ───────────────────────────────────────────────────────────
+  $('grupo').addEventListener('input', () => {
+    const q = $('grupo').value.trim();
+    st.grupo = null; st.nuevo = false;
+    const matches = q ? GRUPOS.filter(g => norm(g.nombre).includes(norm(q))) : [];
+    $('sugList').innerHTML = matches.map((g, i) =>
+      '<div class="sug" data-i="' + GRUPOS.indexOf(g) + '">' +
+        '<span class="nd" style="font-size:13px">' + hi(g.nombre, q) + '</span>' +
+        '<span class="tag ' + g.tag + '" style="white-space:nowrap;flex:none">' + g.tipo + '</span>' +
+        '<div style="flex:1"></div>' +
+        '<span class="num" style="white-space:nowrap;flex:none;font-size:11.5px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">tandas cargadas: ' + (g.cargadas.join(', ') || '—') + '</span>' +
+      '</div>').join('');
+    $('sugBox').classList.toggle('hidden', matches.length === 0);
+    $('grupo').style.borderColor = q ? 'var(--color-accent)' : '';
+    if (q && matches.length === 0) {
+      st.nuevo = true;
+      $('nuevoNombre').textContent = q;
+      $('tanda').value = 'A';
+    } else {
+      $('tanda').value = '';
+    }
+    $('cardNuevo').classList.toggle('hidden', !st.nuevo);
+    resetConfirm();
+  });
+  $('sugList').addEventListener('click', e => {
+    const s = e.target.closest('.sug'); if (!s) return;
+    const g = GRUPOS[+s.dataset.i];
+    st.grupo = g; st.nuevo = false;
+    $('grupo').value = g.nombre;
+    $('sugBox').classList.add('hidden');
+    $('cardNuevo').classList.add('hidden');
+    $('tanda').value = nextLetter(g.cargadas);
+    resetConfirm();
+  });
+  FST.bindSeg($('tipo'));
+  $('trat').addEventListener('input', update);
+
+  // ── 2 · tanda ───────────────────────────────────────────────────────────
+  function grupoNombre() { return st.grupo ? st.grupo.nombre : $('grupo').value.trim(); }
+  function resetConfirm() {
+    st.confirmada = false;
+    const t = $('tanda').value.trim().toUpperCase();
+    const show = (st.grupo || st.nuevo) && /^[A-Z]$/.test(t);
+    $('confirmBox').classList.toggle('hidden', !show);
+    if (show) {
+      $('confirmQ').textContent = '¿Esta es la tanda ' + t + ' de ' + grupoNombre() + '?';
+      $('btnSi').textContent = 'Sí, es la ' + t;
+    }
+    $('btnSi').disabled = false;
+    $('confirmWarn').classList.remove('hidden');
+    $('confirmBox').style.borderColor = 'var(--color-accent)';
+    update();
+  }
+  $('tanda').addEventListener('input', () => { $('tanda').value = $('tanda').value.toUpperCase().replace(/[^A-Z]/g, ''); resetConfirm(); });
+  $('btnSi').onclick = () => {
+    st.confirmada = true;
+    $('btnSi').disabled = true;
+    $('confirmWarn').classList.add('hidden');
+    $('confirmBox').style.borderColor = 'var(--color-text)';
+    update();
+  };
+  $('btnCorregir').onclick = () => { resetConfirm(); $('tanda').focus(); $('tanda').select(); };
+  FST.bindSeg($('cil'));
+  FST.bindSeg($('sesion'));
+
+  // ── 4 · archivo ─────────────────────────────────────────────────────────
+  $('btnFile').onclick = () => $('file').click();
+  $('btnRetry').onclick = () => { clearFile(); $('file').click(); };
+  $('file').addEventListener('change', () => { if ($('file').files[0]) takeFile($('file').files[0]); });
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) takeFile(f); });
+
+  function clearFile() {
+    st.archivo = null; $('file').value = '';
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    $('cardRechazo').classList.add('hidden');
+    update();
+  }
+  function reject(titulo, detalle) {
+    st.archivo = null;
+    $('rechazoT').textContent = titulo;
+    $('rechazoD').textContent = detalle;
+    const t = $('tanda').value.trim();
+    $('rechazoTanda').textContent = t ? 'La tanda ' + t + ' no avanza.' : '';
+    $('cardRechazo').classList.remove('hidden');
+    $('cardOk').classList.add('hidden');
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    update();
+  }
+  function takeFile(f) {
+    $('cardRechazo').classList.add('hidden');
+    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4 (RF-08).');
+    const v = document.createElement('video');
+    const url = URL.createObjectURL(f);
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (!isFinite(v.duration) || v.duration <= 0) return reject('El video no se puede reproducir', f.name + ' · el archivo está dañado o incompleto.');
+      st.archivo = f;
+      $('dropTitle').textContent = f.name;
+      update();
+    };
+    v.onerror = () => { URL.revokeObjectURL(url); reject('El video no se puede reproducir', f.name + ' · el archivo está dañado o incompleto.'); };
+    v.src = url;
+  }
+
+  // ── guardar ─────────────────────────────────────────────────────────────
+  function update() {
+    const grupoOk = st.grupo || (st.nuevo && $('trat').value.trim());
+    $('btnSave').disabled = !(grupoOk && st.confirmada && st.archivo);
+  }
+  $('btnSave').onclick = () => {
+    const dia = FST.segValue($('sesion')) === '1' ? 'Día 1' : 'Día 2';
+    const t = $('tanda').value.trim();
+    $('okD').textContent = grupoNombre() + ' · Tanda ' + t + ' · ' + dia + ' · posición ' + st.cola + ' en la cola.';
+    st.cola++;
+    $('cardOk').classList.remove('hidden');
+    if (st.grupo && !st.grupo.cargadas.includes(t)) st.grupo.cargadas.push(t);
+    st.archivo = null; $('file').value = '';
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    update();
+  };
+</script>
+</body>
+</html>
