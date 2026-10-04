@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage'
 import NewExperimentPage from './pages/NewExperimentPage'
 import ProgressPage from './pages/ProgressPage'
 import ResultsPage from './pages/ResultsPage'
+import ReviewPage from './pages/ReviewPage'
 import AdminPage from './pages/AdminPage'
 
 function ProtectedRoute({ children, role }) {
@@ -36,6 +37,7 @@ export default function AppRouter() {
         <Route path="/experiments/new" element={<NewExperimentPage />} />
         <Route path="/experiments/:id/progress" element={<ProgressPage />} />
         <Route path="/experiments/:id/results" element={<ResultsPage />} />
+        <Route path="/experiments/:id/review" element={<ReviewPage />} />
       </Route>
 
       <Route element={<ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>}>
