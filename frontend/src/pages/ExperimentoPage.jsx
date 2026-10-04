@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
 import { getExperiment, deleteExperiment } from '../services/experiments'
+import { mensajeError } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
 import { fechaCorta, ESTADO_TANDA } from '../lib/fst'
+import { btnLeft } from '../lib/estilos'
 
 const posiciones = (t) => 'Ratas ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
 
@@ -60,7 +62,7 @@ export default function ExperimentoPage() {
       await deleteExperiment(exp.clave, { titulo: nombre, password: pass })
       navigate('/experimentos?eliminado=' + encodeURIComponent(exp.clave))
     } catch (err) {
-      setErrBorrar(err.response?.data?.error || 'No se pudo eliminar el experimento.')
+      setErrBorrar(mensajeError(err, 'No se pudo eliminar el experimento.'))
       setBorrando(false)
     }
   }
@@ -155,7 +157,7 @@ export default function ExperimentoPage() {
               <input className="input num" id="dPass" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
             </Campo>
             <FieldError msg={errBorrar} style={{ marginBottom: 12 }} />
-            <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
+            <div className="dialog-actions" style={btnLeft}>
               <button type="submit" className="btn btn-primary" disabled={!puedeBorrar}>Eliminar experimento</button>
               <button type="button" className="btn btn-secondary" onClick={cerrar}>Cancelar</button>
             </div>
