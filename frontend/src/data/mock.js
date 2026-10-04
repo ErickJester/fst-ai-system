@@ -1,15 +1,8 @@
-// FST · datos de ejemplo de los mockups v2 (mockup/v2). No hay backend:
-// cada pantalla muestra exactamente lo que muestra su mockup.
+// FST · apariencia de los mockups v2 (mockup/v2): colores y clases de cada
+// estado y tipo. Los datos salen de la capa de servicios (services/).
 
 const INK = 'var(--color-text)'
 const ACC = 'var(--color-accent)'
-
-// ── notificaciones (2k) ────────────────────────────────────────────────────
-export const NOTIFS = [
-  { id: 'n1', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. Confianza de detección 0.54, menor a 0.70.', enlace: 'Ver detalle del error', to: '/analisis', hora: '15:41', leida: false },
-  { id: 'n2', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: 'Ver resultados', to: '/experimentos/EXP-2026-02/resultados', hora: '15:02', leida: false },
-  { id: 'n3', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: 'Ver resultados', to: '/experimentos/EXP-2026-02/resultados', hora: 'ayer', leida: true },
-]
 
 // ── estados de una tanda ───────────────────────────────────────────────────
 export const ESTADO = {

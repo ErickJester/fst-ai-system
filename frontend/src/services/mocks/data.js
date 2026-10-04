@@ -130,3 +130,19 @@ export const system = {
   ],
   modelo: 'clf-cascada v2.1',
 }
+
+// Notificaciones de la cuenta (2k). tipo: ANALYSIS_DONE | ANALYSIS_FAILED.
+// creada es relativa a hoy para que la barra muestre «15:41» y «ayer» como el mockup.
+const hace = (dias, hora) => {
+  const d = new Date()
+  d.setDate(d.getDate() - dias)
+  const [h, m] = hora.split(':').map(Number)
+  d.setHours(h, m, 0, 0)
+  return d.toISOString()
+}
+
+export const notifications = [
+  { id: 1, tipo: 'ANALYSIS_FAILED', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. Confianza de detección 0.54, menor a 0.70.', enlace: '/analisis', creada: hace(0, '15:41'), is_read: false },
+  { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
+  { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
+]
