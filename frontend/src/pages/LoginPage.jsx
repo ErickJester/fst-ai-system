@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { FieldError } from '../components/ui'
+import { forgotPassword } from '../services/auth'
 import { isIpn } from '../lib/fst'
 
 // 2h · Iniciar sesión y recuperar contraseña.
@@ -15,21 +16,38 @@ export default function LoginPage() {
   const [rEmail, setREmail] = useState('')
   const [rErr, setRErr] = useState('')
   const [enviado, setEnviado] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
-  function entrar(e) {
+  async function entrar(e) {
     e.preventDefault()
+    if (enviando) return
     if (!isIpn(email)) return setErr({ msg: 'Usa tu correo institucional @ipn.mx.', campo: 'email' })
     if (!pass) return setErr({ msg: 'Escribe tu contraseña.', campo: 'pass' })
     setErr({ msg: '', campo: null })
-    const u = login(email)
-    navigate(u.temporal ? '/primer-acceso' : '/experimentos')
+    setEnviando(true)
+    try {
+      const u = await login(email, pass)
+      navigate(u.temporal ? '/primer-acceso' : '/experimentos')
+    } catch (e) {
+      setErr({ msg: e.response?.data?.error || 'No se pudo iniciar sesión. Inténtalo de nuevo.', campo: null })
+      setEnviando(false)
+    }
   }
 
-  function recuperar(e) {
+  async function recuperar(e) {
     e.preventDefault()
+    if (enviando) return
     if (!isIpn(rEmail)) return setRErr('Usa tu correo institucional @ipn.mx.')
     setRErr('')
-    setEnviado(rEmail.trim())
+    setEnviando(true)
+    try {
+      await forgotPassword(rEmail.trim())
+      setEnviado(rEmail.trim())
+    } catch (e) {
+      setRErr(e.response?.data?.error || 'No se pudo enviar el enlace. Inténtalo de nuevo.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   if (vista === 'recuperar') {
@@ -49,7 +67,7 @@ export default function LoginPage() {
                   value={rEmail} onChange={(e) => setREmail(e.target.value)} />
               </div>
               <FieldError msg={rErr} />
-              <button className="btn btn-primary btn-block" type="submit">Enviar enlace</button>
+              <button className="btn btn-primary btn-block" type="submit" disabled={enviando}>Enviar enlace</button>
               <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setEnviado(''); setVista('login') }}>Volver a iniciar sesión</a>
             </div>
             {enviado && (
@@ -89,7 +107,7 @@ export default function LoginPage() {
                 value={pass} onChange={(e) => setPass(e.target.value)} />
             </div>
             <FieldError msg={err.msg} />
-            <button className="btn btn-primary btn-block" type="submit">Entrar</button>
+            <button className="btn btn-primary btn-block" type="submit" disabled={enviando}>Entrar</button>
             <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setREmail(email); setVista('recuperar') }}>Olvidé mi contraseña</a>
           </div>
         </form>
