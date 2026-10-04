@@ -18,7 +18,7 @@ export const experiments = [
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
 // tipo: CONTROL | REFERENCIA | EXPERIMENTAL
 // estado de tanda = estado del análisis de Día 2: QUEUED | RUNNING | DONE | FAILED,
-//   como JobStatus en backend/app/models.py.
+//   como JobStatus en backend/app/models.py, o SIN_VIDEO si aún no se sube el Día 2.
 // Cada tanda ocupa los cilindros P1…Pn con las ratas desde…desde+n−1.
 // dia1: el video de Día 1 es opcional (null si no se cargó).
 // progreso: etapa (PipelineStage) y avance mientras corre; error: si falló.

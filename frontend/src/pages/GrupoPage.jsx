@@ -18,6 +18,7 @@ function notaDia2(t) {
     case 'QUEUED': return 'En espera de turno en la cola: un trabajo a la vez.'
     case 'RUNNING': return ETAPA[t.progreso.etapa] + ' · en curso · ' + t.progreso.pct + ' %'
     case 'FAILED': return t.error.codigo + ' · ' + t.error.mensaje
+    case 'SIN_VIDEO': return 'Todavía no se sube el video de Día 2.'
     default: return ''
   }
 }
