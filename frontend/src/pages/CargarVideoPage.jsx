@@ -1,14 +1,26 @@
 import React, { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { Seg } from '../components/ui'
-import { EXPERIMENTO as exp, GRUPOS_CARGA } from '../data/mock'
-import { norm } from '../lib/fst'
-import { NoEncontrado } from './ExperimentoPage'
+import { Seg, FieldError } from '../components/ui'
+import { TIPO_TAG } from '../data/mock'
+import { getExperiment } from '../services/experiments'
+import { createGroup, uploadBatchVideo } from '../services/groups'
+import { useAsync } from '../hooks/useAsync'
+import { norm, TIPO_GRUPO } from '../lib/fst'
+import { NoEncontrado, Cargando } from './ExperimentoPage'
 
 const nextLetter = (arr) => (arr.length ? String.fromCharCode(arr[arr.length - 1].charCodeAt(0) + 1) : 'A')
 const mutedSub = { fontSize: 12, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }
 const btnLeft = { justifyContent: 'flex-start' }
+
+// Grupo del experimento → sugerencia del autocompletado.
+const sugerencia = (g) => ({
+  id: g.id,
+  nombre: g.nombre + ' · ' + g.tratamiento,
+  tipo: TIPO_GRUPO[g.tipo],
+  tag: TIPO_TAG[TIPO_GRUPO[g.tipo]],
+  cargadas: g.tandas.map((t) => t.letra),
+})
 
 // Resalta en la sugerencia la parte que coincide con lo escrito.
 function Hi({ label, q }) {
@@ -27,34 +39,37 @@ function Hi({ label, q }) {
 // y validación del archivo.
 export default function CargarVideoPage() {
   const { clave } = useParams()
-  const [grupos, setGrupos] = useState(() => GRUPOS_CARGA.map((g) => ({ ...g, cargadas: [...g.cargadas] })))
+  const { data: exp, error, reload } = useAsync(() => getExperiment(clave), [clave])
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)
   const [sugOpen, setSugOpen] = useState(false)
   const [tanda, setTanda] = useState('')
   const [cil, setCil] = useState('4')
   const [sesion, setSesion] = useState('2')
-  const [tipo, setTipo] = useState('tratamiento experimental')
+  const [tipo, setTipo] = useState('EXPERIMENTAL')
   const [trat, setTrat] = useState('')
   const [confirmada, setConfirmada] = useState(false)
   const [archivo, setArchivo] = useState(null)
   const [rechazo, setRechazo] = useState(null)
   const [ok, setOk] = useState('')
-  const [cola, setCola] = useState(3)
+  const [subiendo, setSubiendo] = useState(null) // avance en % mientras se sube
+  const [errGuardar, setErrGuardar] = useState('')
   const [over, setOver] = useState(false)
   const fileRef = useRef(null)
   const tandaRef = useRef(null)
 
-  if (clave !== exp.clave) return <NoEncontrado />
+  if (error) return <NoEncontrado />
+  if (!exp) return <Cargando />
 
+  const grupos = exp.grupos.map(sugerencia)
   const qt = q.trim()
-  const grupo = sel != null ? grupos[sel] : null
+  const grupo = sel != null ? grupos.find((g) => g.id === sel) : null
   const matches = qt ? grupos.filter((g) => norm(g.nombre).includes(norm(qt))) : []
   const nuevo = !grupo && !!qt && matches.length === 0
   const grupoNombre = grupo ? grupo.nombre : qt
   const showConfirm = (grupo || nuevo) && /^[A-Z]$/.test(tanda)
   const grupoOk = grupo || (nuevo && trat.trim())
-  const canSave = !!(grupoOk && confirmada && archivo)
+  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
   function onGrupo(v) {
@@ -68,7 +83,7 @@ export default function CargarVideoPage() {
   }
 
   function pick(g) {
-    setSel(grupos.indexOf(g))
+    setSel(g.id)
     setQ(g.nombre)
     setSugOpen(false)
     setTanda(nextLetter(g.cargadas))
@@ -124,15 +139,30 @@ export default function CargarVideoPage() {
   }
 
   // ── guardar ───────────────────────────────────────────────────────────────
-  function guardar() {
-    const dia = sesion === '1' ? 'Día 1' : 'Día 2'
-    setOk(grupoNombre + ' · Tanda ' + tanda + ' · ' + dia + ' · posición ' + cola + ' en la cola.')
-    setCola(cola + 1)
-    if (grupo && !grupo.cargadas.includes(tanda)) {
-      setGrupos(grupos.map((g) => (g === grupo ? { ...g, cargadas: [...g.cargadas, tanda] } : g)))
+  // Un grupo nuevo se crea antes de subir su primera tanda.
+  async function guardar() {
+    setOk('')
+    setErrGuardar('')
+    setSubiendo(0)
+    try {
+      let gid = grupo?.id
+      if (!gid) {
+        const g = await createGroup(clave, { nombre: qt, tipo, tratamiento: trat.trim() })
+        gid = g.id
+        setSel(gid)
+        setQ(sugerencia(g).nombre)
+      }
+      const dia = sesion === '1' ? 'DAY1' : 'DAY2'
+      const r = await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil) }, setSubiendo)
+      setOk(grupoNombre + ' · Tanda ' + tanda + ' · ' + (dia === 'DAY1' ? 'Día 1' : 'Día 2') + ' · posición ' + r.posicion_cola + ' en la cola.')
+      setArchivo(null)
+      if (fileRef.current) fileRef.current.value = ''
+      reload()
+    } catch (err) {
+      setErrGuardar(err.response?.data?.error || 'No se pudo guardar el video. Inténtalo de nuevo.')
+    } finally {
+      setSubiendo(null)
     }
-    setArchivo(null)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   return (
@@ -243,9 +273,12 @@ export default function CargarVideoPage() {
                     onChange={(e) => { if (e.target.files[0]) takeFile(e.target.files[0]) }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
-                  <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>Guardar y encolar análisis</button>
+                  <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
+                    {subiendo == null ? 'Guardar y encolar análisis' : 'Subiendo… ' + subiendo + ' %'}
+                  </button>
                   <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
                 </div>
+                <FieldError msg={errGuardar} style={{ marginTop: 10 }} />
               </div>
             </div>
           </div>
@@ -262,7 +295,7 @@ export default function CargarVideoPage() {
                 <div className="field">
                   <label>Tipo</label>
                   <Seg
-                    options={[{ v: 'control', label: 'control' }, { v: 'referencia', label: 'referencia' }, { v: 'tratamiento experimental', label: 'tratamiento exp.' }]}
+                    options={[{ v: 'CONTROL', label: 'control' }, { v: 'REFERENCIA', label: 'referencia' }, { v: 'EXPERIMENTAL', label: 'tratamiento exp.' }]}
                     value={tipo} onChange={setTipo} />
                 </div>
                 <div className="field"><label htmlFor="trat">Tratamiento</label><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></div>
