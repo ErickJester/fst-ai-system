@@ -19,7 +19,7 @@ export const experiments = [
 // tipo: CONTROL | REFERENCIA | EXPERIMENTAL
 // estado de tanda = estado del análisis de Día 2: QUEUED | RUNNING | DONE | FAILED,
 //   como JobStatus en backend/app/models.py, o SIN_VIDEO si aún no se sube el Día 2.
-// Cada tanda ocupa los cilindros P1…Pn con las ratas desde…desde+n−1.
+// Cada tanda ocupa los cilindros P1…Pn con los especímenes desde…desde+n−1.
 // dia1: el video de Día 1 es opcional (null si no se cargó).
 // progreso: etapa (PipelineStage) y avance mientras corre; error: si falló.
 const tanda = (letra, estado, extra = {}) => ({
@@ -72,14 +72,14 @@ export const batchResults = {
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
     nivel: 'PRECISO', confianza: 0.83,
     especimenes: [
-      { rata: 1, cilindro: 'P1', nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
-      { rata: 2, cilindro: 'P2', nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
-      { rata: 3, cilindro: 'P3', nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
-      { rata: 4, cilindro: 'P4', nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
+      { especimen: 1, cilindro: 'P1', nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
+      { especimen: 2, cilindro: 'P2', nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
+      { especimen: 3, cilindro: 'P3', nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
+      { especimen: 4, cilindro: 'P4', nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
     ],
     // Desglose por minuto de un espécimen: segmentos [conducta, segundos].
     linea_tiempo: {
-      rata: 1, cilindro: 'P1',
+      especimen: 1, cilindro: 'P1',
       minutos: [
         [['nado', 38], ['escalamiento', 8], ['nado', 10], ['inmovilidad', 4]],
         [['nado', 30], ['inmovilidad', 12], ['escalamiento', 6], ['nado', 8], ['inmovilidad', 4]],

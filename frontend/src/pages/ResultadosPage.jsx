@@ -27,7 +27,7 @@ const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
 const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
 const NIVEL = { PRECISO: 'preciso (3 conductas)', AGRUPADO: 'agrupado (2 conductas)' }
 
-const etiqueta = (e) => 'Rata ' + e.rata + ' · Cilindro ' + e.cilindro
+const etiqueta = (e) => 'Espécimen ' + e.especimen + ' · Cilindro ' + e.cilindro
 const nombreGrupo = (g) => (g.tipo === 'CONTROL' ? 'Grupo control' : 'Grupo ' + g.nombre[0].toLowerCase() + g.nombre.slice(1))
 const hora = (iso) => iso.slice(11, 16)
 
@@ -228,10 +228,10 @@ export default function ResultadosPage() {
               </thead>
               <tbody>
                 {r.especimenes.map((e) => (
-                  <tr key={e.rata}>
+                  <tr key={e.especimen}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.rata}</span>
+                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.especimen}</span>
                         <span style={{ fontSize: 13 }}>{etiqueta(e)}</span>
                       </div>
                     </td>
