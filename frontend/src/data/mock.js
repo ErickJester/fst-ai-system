@@ -50,7 +50,7 @@ export const GROUPS = RAW.map((g) => {
       nombre: 'Tanda ' + letra,
       desde,
       cuantos,
-      posiciones: 'Ratas ' + desde + '–' + (desde + cuantos - 1) + ' · cilindros P1–P' + cuantos,
+      posiciones: 'Cilindros P1–P' + cuantos,
       estado: g.estados[i],
     }
   })
@@ -111,13 +111,13 @@ export const BEHAVIORS = [
 ]
 
 export const RESULTADOS = [
-  { pos: '1', label: 'Rata 1 · Cilindro P1', nado: 171, inmov: 88, escal: 41 },
-  { pos: '2', label: 'Rata 2 · Cilindro P2', nado: 158, inmov: 104, escal: 38 },
-  { pos: '3', label: 'Rata 3 · Cilindro P3', nado: 182, inmov: 76, escal: 42 },
-  { pos: '4', label: 'Rata 4 · Cilindro P4', nado: 149, inmov: 118, escal: 33 },
+  { pos: '1', label: 'Cilindro P1', nado: 171, inmov: 88, escal: 41 },
+  { pos: '2', label: 'Cilindro P2', nado: 158, inmov: 104, escal: 38 },
+  { pos: '3', label: 'Cilindro P3', nado: 182, inmov: 76, escal: 42 },
+  { pos: '4', label: 'Cilindro P4', nado: 149, inmov: 118, escal: 33 },
 ]
 
-// Línea de tiempo por minuto de la Rata 1: [conducta, segundos].
+// Línea de tiempo por minuto del Cilindro P1: [conducta, segundos].
 export const PATRON_RATA1 = [
   [['nado', 38], ['escal', 8], ['nado', 10], ['inmov', 4]],
   [['nado', 30], ['inmov', 12], ['escal', 6], ['nado', 8], ['inmov', 4]],

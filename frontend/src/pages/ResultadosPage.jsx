@@ -22,7 +22,7 @@ const col = (k) => raw.map((r) => r[k])
 const STATS = [
   { nombre: 'Media', f: (a) => r1(mean(a)) + ' s', nota: 'sobre 300 s de evaluación' },
   { nombre: 'Desviación estándar', f: (a) => r1(Math.sqrt(variance(a))), nota: 'muestral, n − 1' },
-  { nombre: 'Varianza', f: (a) => r1(variance(a)), nota: 'RF-31' },
+  { nombre: 'Varianza', f: (a) => r1(variance(a)), nota: '' },
 ]
 
 // ── comparación entre grupos ───────────────────────────────────────────────
@@ -73,11 +73,11 @@ const COMPARACION = [
 
 // ── exportación (segundos, no porcentaje) ──────────────────────────────────
 function tabla() {
-  const out = [['Espécimen', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']]
+  const out = [['Cilindro', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']]
   raw.forEach((r) => out.push([r.label, r.nado, r.inmov, r.escal]))
   STATS.forEach((s) => out.push([s.nombre, ...KEYS.map((k) => s.f(col(k)).replace(' s', ''))]))
   out.push([])
-  out.push(['Rata 1 · Cilindro P1 · minuto', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)'])
+  out.push(['Cilindro P1 · minuto', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)'])
   patron.forEach((segs, i) => {
     const sum = (k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
     out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), sum('nado'), sum('inmov'), sum('escal')])
@@ -100,7 +100,7 @@ async function exportarXLSX() {
 }
 
 const TABS = [
-  { id: 'especimen', label: 'Por espécimen' },
+  { id: 'especimen', label: 'Por cilindro' },
   { id: 'comparacion', label: 'Comparación entre grupos' },
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
 ]
@@ -167,7 +167,7 @@ export default function ResultadosPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '24%' }}>Espécimen</th><th style={{ textAlign: 'right' }}>Nado activo</th><th style={{ textAlign: 'right' }}>Inmovilidad</th>
+                  <th style={{ width: '24%' }}>Cilindro</th><th style={{ textAlign: 'right' }}>Nado activo</th><th style={{ textAlign: 'right' }}>Inmovilidad</th>
                   <th style={{ textAlign: 'right' }}>Escalamiento</th><th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
@@ -199,10 +199,10 @@ export default function ResultadosPage() {
             </table>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
-              Un episodio requiere 3 segundos consecutivos de la misma conducta; el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+              Un episodio requiere 3 segundos consecutivos de la misma conducta; el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
-            <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>Rata 1 · Cilindro P1</div>
+            <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>Cilindro P1</div>
             <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {patron.map((segs, i) => (

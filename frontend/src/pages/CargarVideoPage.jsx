@@ -102,7 +102,7 @@ export default function CargarVideoPage() {
 
   function takeFile(f) {
     setRechazo(null)
-    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4 (RF-08).')
+    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4.')
     const v = document.createElement('video')
     const url = URL.createObjectURL(f)
     const dañado = () => reject('El video no se puede reproducir', f.name + ' · el archivo está dañado o incompleto.')

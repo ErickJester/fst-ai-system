@@ -256,7 +256,7 @@
   }
   function takeFile(f) {
     $('cardRechazo').classList.add('hidden');
-    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4 (RF-08).');
+    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4.');
     const v = document.createElement('video');
     const url = URL.createObjectURL(f);
     v.preload = 'metadata';

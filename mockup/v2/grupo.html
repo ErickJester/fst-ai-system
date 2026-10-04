@@ -64,8 +64,8 @@
     const d1 = conD1(g, t), d2 = D2[t.estado];
     const esp = Array.from({ length: t.cuantos }, (_, i) =>
       '<div style="background:var(--color-bg);display:flex;align-items:center;gap:11px;padding:11px 12px">' +
-        '<span class="num nd" style="width:28px;height:28px;flex:none;border:2px solid var(--color-accent);color:var(--color-accent-700);display:flex;align-items:center;justify-content:center;font-size:11px">' + (t.desde + i) + '</span>' +
-        '<div class="nd" style="font-size:12.5px;white-space:nowrap">Rata ' + (t.desde + i) + ' · Cilindro P' + (i + 1) + '</div>' +
+        '<span class="num nd" style="width:28px;height:28px;flex:none;border:2px solid var(--color-accent);color:var(--color-accent-700);display:flex;align-items:center;justify-content:center;font-size:11px">P' + (i + 1) + '</span>' +
+        '<div class="nd" style="font-size:12.5px;white-space:nowrap">Cilindro P' + (i + 1) + '</div>' +
       '</div>').join('');
     return '<div style="background:var(--color-bg)">' +
       '<div style="display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--color-surface);border-bottom:1px solid var(--color-divider)">' +
@@ -75,7 +75,7 @@
       '</div>' +
       '<div style="display:grid;grid-template-columns:410px 1fr">' +
         '<div style="padding:18px 20px;border-right:2px solid var(--color-divider)">' +
-          '<div class="k" style="margin-bottom:13px">Especímenes · rata n.º (marca en la cola) y cilindro</div>' +
+          '<div class="k" style="margin-bottom:13px">Cilindros de la tanda</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider);border:1px solid var(--color-divider)">' + esp + '</div>' +
         '</div>' +
         '<div style="padding:18px 20px">' +

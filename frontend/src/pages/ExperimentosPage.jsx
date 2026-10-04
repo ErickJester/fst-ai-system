@@ -52,7 +52,6 @@ export default function ExperimentosPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)' }}>
-          <span className="trace">RN-06</span>
           <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.55 }}>
             Los 10 videos crudos de <strong>Extracto de <em>Valeriana officinalis</em></strong> se eliminan en 4 días (retención de 30 días). Resultados y reportes se conservan indefinidamente; el video crudo no.
           </span>
