@@ -1,8 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { EstadoTag } from '../components/ui'
-import { EXPERIMENTO as exp, GROUPS as groups, ESTADO } from '../data/mock'
+import { EstadoTag, FieldError } from '../components/ui'
+import { ESTADO, TIPO_TAG } from '../data/mock'
+import { getExperiment, deleteExperiment } from '../services/experiments'
+import { useAsync } from '../hooks/useAsync'
+import { fechaCorta } from '../lib/fst'
+
+// Estado de la tanda (JobStatus) → etiqueta de los mockups.
+const ESTADO_TANDA = { QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
+const TIPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
+
+const posiciones = (t) => 'Ratas ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
 
 const LEGEND = [
   { label: 'En cola', style: { background: 'var(--color-accent-200)', border: '1px solid var(--color-divider)' } },
@@ -18,17 +27,16 @@ export default function ExperimentoPage() {
   const [dlg, setDlg] = useState(false)
   const [nombre, setNombre] = useState('')
   const [pass, setPass] = useState('')
+  const [borrando, setBorrando] = useState(false)
+  const [errBorrar, setErrBorrar] = useState('')
   const nombreRef = useRef(null)
-
-  const tandas = groups.flatMap((g) => g.tandas)
-  const completas = tandas.filter((t) => t.estado === 'Completado').length
-  const esp = groups.reduce((a, g) => a + g.n, 0)
-  const puedeBorrar = nombre === exp.titulo && pass.length > 0
+  const { data: exp, error, loading } = useAsync(() => getExperiment(clave), [clave])
 
   function cerrar() {
     setDlg(false)
     setNombre('')
     setPass('')
+    setErrBorrar('')
   }
 
   useEffect(() => {
@@ -39,12 +47,27 @@ export default function ExperimentoPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [dlg])
 
-  if (clave !== exp.clave) return <NoEncontrado />
+  if (loading) return <Cargando />
+  if (error) return <NoEncontrado />
 
-  function eliminar(e) {
+  const groups = exp.grupos
+  const tandas = groups.flatMap((g) => g.tandas)
+  const completas = tandas.filter((t) => t.estado === 'DONE').length
+  const esp = groups.reduce((a, g) => a + g.n_especimenes, 0)
+  const puedeBorrar = nombre === exp.titulo && pass.length > 0 && !borrando
+
+  async function eliminar(e) {
     e.preventDefault()
     if (!puedeBorrar) return
-    navigate('/experimentos?eliminado=' + encodeURIComponent(exp.clave))
+    setBorrando(true)
+    setErrBorrar('')
+    try {
+      await deleteExperiment(exp.clave, { titulo: nombre, password: pass })
+      navigate('/experimentos?eliminado=' + encodeURIComponent(exp.clave))
+    } catch (err) {
+      setErrBorrar(err.response?.data?.error || 'No se pudo eliminar el experimento.')
+      setBorrando(false)
+    }
   }
 
   return (
@@ -59,7 +82,7 @@ export default function ExperimentoPage() {
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 10px' }}>{exp.titulo}</h2>
             <div style={{ display: 'flex', gap: 26, fontSize: 13, color: 'var(--muted-2)' }}>
-              <span>Inicio <strong style={{ color: 'var(--color-text)' }}>{exp.inicio}</strong></span>
+              <span>Inicio <strong style={{ color: 'var(--color-text)' }}>{fechaCorta(exp.fecha_inicio)}</strong></span>
               <span className="num">{groups.length} grupos · {esp} especímenes · {tandas.length} tandas</span>
               <span>Responsable <strong style={{ color: 'var(--color-text)' }}>{exp.responsable}</strong></span>
             </div>
@@ -77,7 +100,7 @@ export default function ExperimentoPage() {
             <div className="k" style={{ marginBottom: 8 }}>Avance · {completas} de {tandas.length} tandas con Día 2 completado</div>
             <div style={{ display: 'flex', gap: 2 }}>
               {tandas.map((t, i) => (
-                <div key={i} title={t.estado} style={{ flex: 1, height: 12, background: ESTADO[t.estado].fill, border: '1px solid var(--color-divider)' }} />
+                <div key={i} title={ESTADO_TANDA[t.estado]} style={{ flex: 1, height: 12, background: ESTADO[ESTADO_TANDA[t.estado]].fill, border: '1px solid var(--color-divider)' }} />
               ))}
             </div>
           </div>
@@ -91,20 +114,20 @@ export default function ExperimentoPage() {
             <div key={g.id} style={{ background: 'var(--color-bg)', padding: '18px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 14 }}>
                 <span className="nd" style={{ fontSize: 17 }}>{g.nombre}</span>
-                <span className={'tag ' + g.tipoTag}>{g.tipo}</span>
+                <span className={'tag ' + TIPO_TAG[TIPO[g.tipo]]}>{TIPO[g.tipo]}</span>
                 <div style={{ flex: 1 }} />
                 <span className="num" style={{ fontSize: 11, color: 'color-mix(in srgb,var(--color-text) 50%,transparent)' }}>{g.id}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1.6fr .4fr', gap: 14, paddingBottom: 14, borderBottom: '1px solid var(--color-divider)' }}>
-                <div><div className="k">Tratamiento</div><div style={{ fontSize: 13, marginTop: 3 }}>{g.trat}</div></div>
-                <div><div className="k">n</div><div className="num" style={{ fontSize: 13, marginTop: 3 }}>{g.n}</div></div>
+                <div><div className="k">Tratamiento</div><div style={{ fontSize: 13, marginTop: 3 }}>{g.tratamiento}</div></div>
+                <div><div className="k">n</div><div className="num" style={{ fontSize: 13, marginTop: 3 }}>{g.n_especimenes}</div></div>
               </div>
               {g.tandas.map((t) => (
                 <div key={t.letra} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: '1px solid var(--color-divider)' }}>
-                  <span className="nd" style={{ fontSize: 13 }}>{t.nombre}</span>
-                  <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{t.posiciones}</span>
+                  <span className="nd" style={{ fontSize: 13 }}>Tanda {t.letra}</span>
+                  <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{posiciones(t)}</span>
                   <div style={{ flex: 1 }} />
-                  <EstadoTag estado={t.estado} />
+                  <EstadoTag estado={ESTADO_TANDA[t.estado]} />
                 </div>
               ))}
               <Link className="btn btn-ghost" to={`/experimentos/${exp.clave}/grupos/${g.id}`} style={{ marginTop: 12 }}>Abrir grupo →</Link>
@@ -133,6 +156,7 @@ export default function ExperimentoPage() {
               <label htmlFor="dPass">Contraseña de la cuenta</label>
               <input className="input num" id="dPass" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
             </div>
+            <FieldError msg={errBorrar} style={{ marginBottom: 12 }} />
             <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
               <button type="submit" className="btn btn-primary" disabled={!puedeBorrar}>Eliminar experimento</button>
               <button type="button" className="btn btn-secondary" onClick={cerrar}>Cancelar</button>
@@ -140,6 +164,15 @@ export default function ExperimentoPage() {
           </form>
         </div>
       )}
+    </div>
+  )
+}
+
+function Cargando() {
+  return (
+    <div className="app">
+      <Topbar><Brand /></Topbar>
+      <div className="page"><p className="hint">Cargando experimento…</p></div>
     </div>
   )
 }
