@@ -30,28 +30,3 @@ export const TIPO_TAG = { control: 'tag-neutral', referencia: 'tag-outline', 'tr
 
 // ── experimento de ejemplo (enlaces de 2a) ───────────────────────────────────
 export const EXPERIMENTO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', inicio: '18 feb 2026', responsable: 'M. Rivera' }
-
-// ── administración (2g) ────────────────────────────────────────────────────
-export const CUENTAS = [
-  { nombre: 'M. Rivera Alcántara', correo: 'mrivera@ipn.mx', rol: 'Investigador', activa: true },
-  { nombre: 'C. S. Reyes López', correo: 'creyesl@ipn.mx', rol: 'Administrador', activa: true },
-  { nombre: 'J. Domínguez Vera', correo: 'jdominguez@ipn.mx', rol: 'Investigador', activa: true },
-  { nombre: 'L. Ortega Camacho', correo: 'lortega@ipn.mx', rol: 'Investigador', activa: true },
-]
-
-export const COLA_ADMIN = [
-  { nombre: 'Compuesto CSR-14 · Experimental A · Tanda B · Día 2', t: 'Procesando', dot: ACC },
-  { nombre: 'Compuesto CSR-14 · Control · Tanda B · Día 2', t: 'En cola', dot: 'transparent' },
-  { nombre: 'Compuesto CSR-14 · Experimental B · Tanda A · Día 2', t: 'En cola', dot: 'transparent' },
-]
-
-export const DISCO = [
-  { k: 'Videos crudos (se borran a los 30 días)', v: '381 GB' },
-  { k: 'Resultados y reportes (permanentes)', v: '2.4 GB' },
-  { k: 'Se liberan en los próximos 7 días', v: '48 GB' },
-]
-
-export const CATALOGOS = [
-  { titulo: 'Conductas', items: [{ n: 'Nado activo', m: '≥ 3 s' }, { n: 'Inmovilidad', m: '≥ 3 s' }, { n: 'Escalamiento', m: '≥ 3 s' }] },
-  { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: clf-cascada v2.1', m: '' }] },
-]

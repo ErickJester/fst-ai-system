@@ -109,3 +109,22 @@ export const groupComparison = {
       pendientes: [{ tanda: 'A', n: 4, estado: 'QUEUED' }, { tanda: 'B', n: 4, estado: 'FAILED' }] },
   ],
 }
+
+// Cuentas (2g). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
+export const users = [
+  { id: 1, nombre: 'Mariana', apellidos: 'Rivera Alcántara', email: 'mrivera@ipn.mx', identificador: '2019630871', role: 'INVESTIGADOR', is_active: true },
+  { id: 2, nombre: 'C. S.', apellidos: 'Reyes López', email: 'creyesl@ipn.mx', identificador: '2008630412', role: 'ADMIN', is_active: true },
+  { id: 3, nombre: 'J.', apellidos: 'Domínguez Vera', email: 'jdominguez@ipn.mx', identificador: '2015630322', role: 'INVESTIGADOR', is_active: true },
+  { id: 4, nombre: 'L.', apellidos: 'Ortega Camacho', email: 'lortega@ipn.mx', identificador: '2020630417', role: 'INVESTIGADOR', is_active: true },
+]
+
+// Estado del sistema (2g): disco en GB, catálogo de conductas y modelo en uso.
+export const system = {
+  disco: { usado_gb: 412, total_gb: 500, videos_gb: 381, resultados_gb: 2.4, por_liberar_7d_gb: 48 },
+  conductas: [
+    { nombre: 'Nado activo', minimo_s: 3 },
+    { nombre: 'Inmovilidad', minimo_s: 3 },
+    { nombre: 'Escalamiento', minimo_s: 3 },
+  ],
+  modelo: 'clf-cascada v2.1',
+}
