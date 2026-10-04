@@ -28,42 +28,8 @@ export const ESTADO = {
 
 export const TIPO_TAG = { control: 'tag-neutral', referencia: 'tag-outline', 'tratamiento experimental': 'tag-accent' }
 
-// ── experimento de ejemplo: Compuesto CSR-14 · curva de dosis (2c, 2d) ─────
+// ── experimento de ejemplo (enlaces de 2a, 2b y 2f) ──────────────────────────
 export const EXPERIMENTO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', inicio: '18 feb 2026', responsable: 'M. Rivera' }
-
-const RAW = [
-  { id: 'G-01', nombre: 'Control', tipo: 'control', trat: 'Placebo (solución salina)', n: 8, porCuadro: 4, estados: ['Completado', 'En cola'] },
-  { id: 'G-02', nombre: 'Referencia', tipo: 'referencia', trat: 'Fluoxetina 10 mg/kg', n: 8, porCuadro: 4, estados: ['Completado', 'Completado'] },
-  { id: 'G-03', nombre: 'Experimental A', tipo: 'tratamiento experimental', trat: 'Compuesto CSR-14, 5 mg/kg', n: 8, porCuadro: 4, estados: ['Completado', 'Procesando'] },
-  { id: 'G-04', nombre: 'Experimental B', tipo: 'tratamiento experimental', trat: 'Compuesto CSR-14, 15 mg/kg', n: 8, porCuadro: 4, estados: ['En cola', 'Error'] },
-]
-
-export const GROUPS = RAW.map((g) => {
-  const nt = Math.ceil(g.n / g.porCuadro)
-  const reparto = []
-  for (let i = 0; i < nt; i++) reparto.push(i === nt - 1 ? g.n - g.porCuadro * (nt - 1) : g.porCuadro)
-  const tandas = reparto.map((cuantos, i) => {
-    const desde = reparto.slice(0, i).reduce((a, b) => a + b, 0) + 1
-    const letra = String.fromCharCode(65 + i)
-    return {
-      letra,
-      nombre: 'Tanda ' + letra,
-      desde,
-      cuantos,
-      posiciones: 'Ratas ' + desde + '–' + (desde + cuantos - 1) + ' · cilindros P1–P' + cuantos,
-      estado: g.estados[i],
-    }
-  })
-  return { ...g, tipoTag: TIPO_TAG[g.tipo], reparto, tandas }
-})
-
-// Notas de Día 2 según el estado de la tanda (2d).
-export const D2_NOTA = {
-  'Completado': { nota: 'Video principal del sistema. Analizado completo.', analisis: 'Análisis vigente: 24 feb 2026' },
-  'En cola': { nota: 'En espera de turno en la cola: un trabajo a la vez.', analisis: 'Sin análisis todavía' },
-  'Procesando': { nota: 'Seguimiento de especímenes · en curso · 75 %', analisis: 'Sin análisis todavía' },
-  'Error': { nota: 'E-DET-070 · Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.', analisis: 'Sin análisis todavía' },
-}
 
 // ── cargar video por tanda (2b) ────────────────────────────────────────────
 export const GRUPOS_CARGA = [
