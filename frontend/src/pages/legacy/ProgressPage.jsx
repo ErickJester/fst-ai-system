@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
-import { usePolling } from '../hooks/usePolling'
+import { useApi } from '../../hooks/useApi'
+import { usePolling } from '../../hooks/usePolling'
 
 const STAGES = [
   { key: 'upload', name: 'Carga de video', desc: 'Verificación de integridad y formato del archivo de video.' },

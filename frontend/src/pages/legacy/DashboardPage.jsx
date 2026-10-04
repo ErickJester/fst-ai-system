@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import { useApi } from '../../hooks/useApi'
 
 function StatCard({ label, value, sub, color }) {
   return (

@@ -11,3 +11,7 @@ __pycache__/
 
 # AI context — local only, not for the repo
 CLAUDE.md
+
+# frontend
+node_modules/
+frontend/dist/

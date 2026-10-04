@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import { useApi } from '../../hooks/useApi'
 
 function SummaryCards({ data }) {
   const avg = (key) => {
