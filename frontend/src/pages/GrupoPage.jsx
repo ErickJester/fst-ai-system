@@ -1,12 +1,10 @@
 import React, { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { EstadoTag } from '../components/ui'
-import { TIPO_TAG } from '../data/mock'
+import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsync } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ESTADO_TANDA, TIPO_GRUPO, ETAPA } from '../lib/fst'
-import { NoEncontrado, Cargando } from './ExperimentoPage'
+import { fechaCorta, fechaRango, ETAPA } from '../lib/fst'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: 'color-mix(in srgb,var(--color-text) 70%,transparent)' }
 const dur = { fontWeight: 400, fontFamily: 'var(--font-body)', color: 'var(--muted)' }
@@ -38,21 +36,18 @@ export default function GrupoPage() {
   if (error) return <NoEncontrado />
 
   const exp = g.experimento
-  const tipo = TIPO_GRUPO[g.tipo]
 
   return (
     <div className="app">
       <Topbar>
         <Brand inline />
-        <span className="crumbs">
-          <Link to="/experimentos">Experimentos</Link> / <Link to={`/experimentos/${exp.clave}`}>{exp.titulo}</Link> / <span className="here">{nombreGrupo}</span>
-        </span>
+        <Migas items={[{ to: '/experimentos', label: 'Experimentos' }, { to: `/experimentos/${exp.clave}`, label: exp.titulo }, { label: nombreGrupo }]} />
       </Topbar>
 
       <div className="page">
         <div style={{ marginBottom: 6 }}>
           <h2 style={{ margin: '0 0 9px' }}>
-            {nombreGrupo} <span className={'tag ' + TIPO_TAG[tipo]} style={{ verticalAlign: 'middle', marginLeft: 8 }}>{tipo}</span>
+            {nombreGrupo} <TipoTag tipo={g.tipo} style={{ verticalAlign: 'middle', marginLeft: 8 }} />
           </h2>
           <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--muted-2)' }}>
             <span>{g.tratamiento}</span>
@@ -66,14 +61,13 @@ export default function GrupoPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
           {g.tandas.map((t) => {
             const d1 = !!t.dia1
-            const estado = ESTADO_TANDA[t.estado]
             return (
               <div key={t.letra} style={{ background: 'var(--color-bg)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 20px', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-divider)' }}>
                   <span className="nd" style={{ fontSize: 16 }}>Tanda {t.letra}</span>
                   <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{fechaRango(t.fecha_dia1, t.fecha_dia2)}</span>
                   <div style={{ flex: 1 }} />
-                  <EstadoTag estado={estado} />
+                  <EstadoTag estado={t.estado} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '410px 1fr' }}>
                   <div style={{ padding: '18px 20px', borderRight: '2px solid var(--color-divider)' }}>
@@ -96,7 +90,7 @@ export default function GrupoPage() {
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 1 · sesión de estrés <span style={dur}>20 min</span></div>
                           <div style={sub}>{d1 ? 'Se analizan sus primeros 5 minutos.' : 'Sin video de Día 1 (opcional)'}</div>
                         </div>
-                        {d1 && <EstadoTag estado={ESTADO_TANDA[t.dia1.estado]} />}
+                        {d1 && <EstadoTag estado={t.dia1.estado} />}
                       </div>
                       <div style={{ background: 'var(--color-accent-100)', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 15px', borderLeft: '4px solid var(--color-accent)' }}>
                         <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-accent) 34%,transparent) 0 5px,transparent 5px 10px)', color: 'var(--color-accent-800)' }}>cuadro<br />día 2</div>
@@ -104,7 +98,7 @@ export default function GrupoPage() {
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 2 · evaluación <span style={dur}>5 min · 24 h después</span></div>
                           <div style={sub}>{notaDia2(t)}</div>
                         </div>
-                        <EstadoTag estado={estado} />
+                        <EstadoTag estado={t.estado} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, fontSize: 11.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>

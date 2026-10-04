@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { FieldError } from '../components/ui'
+import { FieldError, Campo, Pasos } from '../components/ui'
 import { createExperiment } from '../services/experiments'
 
 const btnLeft = { justifyContent: 'flex-start' }
@@ -59,14 +59,7 @@ export default function NuevoExperimentoPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 430px' }}>
         <form noValidate onSubmit={continuar} style={{ padding: '28px 32px 36px', borderRight: '2px solid var(--color-divider)' }}>
-          <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--color-divider)', marginBottom: 28 }}>
-            <div style={{ flex: 1, padding: '11px 14px', background: 'var(--color-accent)', color: 'var(--color-bg)', borderRight: '1px solid var(--color-divider)' }}>
-              <div className="k" style={{ color: 'color-mix(in srgb,#fff 70%,transparent)' }}>Paso 1</div><div className="nd" style={{ fontSize: 13, marginTop: 3 }}>Datos generales</div>
-            </div>
-            <div style={{ flex: 1, padding: '11px 14px', background: 'var(--color-surface)' }}>
-              <div className="k">Paso 2</div><div className="nd" style={{ fontSize: 13, marginTop: 3, color: 'var(--muted)' }}>Cargar video por tanda</div>
-            </div>
-          </div>
+          <Pasos actual={1} />
 
           <h3 style={{ margin: '0 0 8px' }}>Datos generales</h3>
           <p className="lead" style={{ margin: '0 0 24px', maxWidth: 620 }}>Nombre y fecha del experimento. Los grupos y sus tratamientos se definen en el siguiente paso, al cargar el video de cada tanda.</p>
@@ -74,35 +67,31 @@ export default function NuevoExperimentoPage() {
           <div style={{ borderTop: '2px solid var(--color-divider)' }}>
             <div className="step">
               <span className="step-n num">1</span>
-              <div className="field">
-                <label htmlFor="nTitulo">Nombre del experimento</label>
+              <Campo id="nTitulo" label="Nombre del experimento">
                 <input ref={refs.titulo} className={cls('titulo')} id="nTitulo" autoComplete="off" autoFocus maxLength={MAX_NOMBRE}
                   placeholder="Compuesto CSR-14 · curva de dosis" value={form.titulo} onChange={set('titulo')} />
                 <div style={{ marginTop: 6, ...mutedSub }}>Así aparece en la lista de experimentos y en los reportes.</div>
-              </div>
+              </Campo>
             </div>
 
             <div className="step">
               <span className="step-n num">2</span>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <div className="field" style={{ width: 200 }}>
-                  <label htmlFor="nFecha">Fecha de inicio</label>
+                <Campo id="nFecha" label="Fecha de inicio" style={{ width: 200 }}>
                   <input ref={refs.fecha_inicio} className={cls('fecha_inicio') + ' num'} id="nFecha" type="date" value={form.fecha_inicio} onChange={set('fecha_inicio')} />
-                </div>
-                <div className="field" style={{ flex: 1, minWidth: 200 }}>
-                  <label htmlFor="nEspecie">Especie o cepa</label>
+                </Campo>
+                <Campo id="nEspecie" label="Especie o cepa" style={{ flex: 1, minWidth: 200 }}>
                   <input className="input" id="nEspecie" value={form.especie} onChange={set('especie')} />
-                </div>
+                </Campo>
               </div>
             </div>
 
             <div className="step" style={{ borderBottom: 0, paddingBottom: 0 }}>
               <span className="step-n num">3</span>
               <div>
-                <div className="field">
-                  <label htmlFor="nNotas">Notas · opcional</label>
+                <Campo id="nNotas" label="Notas · opcional">
                   <textarea className="input" id="nNotas" placeholder="Condiciones especiales, referencias internas…" value={form.notas} onChange={set('notas')} />
-                </div>
+                </Campo>
                 <FieldError msg={err.msg} style={{ marginTop: 10 }} />
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
                   <button type="submit" className="btn btn-primary" style={btnLeft} disabled={guardando}>Crear y cargar videos</button>

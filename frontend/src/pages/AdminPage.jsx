@@ -1,12 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { FieldError } from '../components/ui'
+import { FieldError, Campo, Cargando } from '../components/ui'
 import { listUsers, createUser, setUserActive, getSystem } from '../services/admin'
 import { getQueue } from '../services/queue'
 import { useAsync } from '../hooks/useAsync'
 import { isIpn, DIA } from '../lib/fst'
-import { Cargando } from './ExperimentoPage'
 
 const MUT70 = 'color-mix(in srgb,var(--color-text) 70%,transparent)'
 const btnLeft = { justifyContent: 'flex-start' }
@@ -146,10 +145,10 @@ export default function AdminPage() {
           <form noValidate onSubmit={guardar} style={{ marginTop: 18, border: '2px solid var(--color-text)' }}>
             <div className="nd" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-divider)', fontSize: 14 }}>Crear cuenta</div>
             <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <div className="field"><label htmlFor="cNombre">Nombre</label><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></div>
-              <div className="field"><label htmlFor="cApe">Apellidos</label><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></div>
-              <div className="field"><label htmlFor="cCorreo">Correo institucional (@ipn.mx)</label><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></div>
-              <div className="field"><label htmlFor="cId">Identificador institucional (boleta o número de empleado)</label><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></div>
+              <Campo id="cNombre" label="Nombre"><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></Campo>
+              <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
+              <Campo id="cCorreo" label="Correo institucional (@ipn.mx)"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
+              <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></Campo>
               <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 11.5, lineHeight: 1.5, color: 'color-mix(in srgb,var(--color-text) 60%,transparent)' }}>La cuenta se crea como Investigador.</div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
                 <button type="submit" className="btn btn-primary" style={btnLeft} disabled={guardando}>Guardar</button>
