@@ -6,9 +6,7 @@ export default function AdminLayout() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="layout">
-        <Outlet />
-      </div>
+      <Outlet />
     </>
   )
 }

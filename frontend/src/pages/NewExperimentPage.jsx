@@ -1,446 +1,399 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import DemoBar from '../components/DemoBar'
+import '../styles/pages/nuevo.css'
 
-function StepIndicator({ current }) {
-  const labels = ['Datos básicos', 'Videos', 'Confirmar']
-  return (
-    <div className="steps">
-      {labels.map((label, i) => {
-        const n = i + 1
-        const isDone = n < current
-        const isActive = n === current
-        return (
-          <React.Fragment key={n}>
-            <div className={`step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}>
-              <div className="step-circle">
-                {isDone ? (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5L9.5 4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                ) : n}
-              </div>
-              <span className="step-label">{label}</span>
-            </div>
-            {i < labels.length - 1 && <div className={`step-line ${isDone ? 'done' : ''}`} />}
-          </React.Fragment>
-        )
-      })}
-    </div>
-  )
+const DEMO_STATES = [
+  { key: 'empty', label: 'Formulario vacío' },
+  { key: 'filled', label: 'Datos ingresados' },
+  { key: 'uploading', label: 'Subiendo video' },
+  { key: 'fileerror', label: 'Error de formato' },
+  { key: 'success', label: 'Carga exitosa' },
+  { key: 'validation', label: 'Errores de validación' },
+]
+
+const FORM_VACIO = { nombre: '', fecha: '2025-03-22', especimenes: '', tratamiento: '', notas: '' }
+const FORM_LLENO = {
+  nombre: 'Ketamina 30 mg/kg — Grupo A',
+  fecha: '2025-03-22',
+  especimenes: '4',
+  tratamiento: 'Ketamina sub-anestésica 30 mg/kg i.p., 30 min antes de la sesión Día 2.',
+  notas: '',
+}
+const ZONA_VACIA = { estado: 'idle' }
+const SIN_ERRORES = { nombre: false, especimenes: false, tratamiento: false }
+
+const FORMATO_VALIDO = /\.(mp4|mov)$/i
+
+// Lee ancho y alto del video en el navegador para rechazar videos en vertical.
+function leerOrientacion(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.videoWidth >= v.videoHeight ? 'horizontal' : 'vertical') }
+    v.onerror = () => { URL.revokeObjectURL(url); resolve('desconocida') }
+    v.src = url
+  })
 }
 
-function UploadZone({ day, label, required, file, onFile, uploading, progress }) {
+const IconoError = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.1"/><path d="M6 4v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="6" cy="8.5" r=".6" fill="currentColor"/></svg>
+)
+const IconoFlecha = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5h9M7 2.5l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+)
+
+function UploadZone({ dia, titulo, zona, opcional, onPick, onRemove }) {
   const inputRef = useRef(null)
-  const [dragover, setDragover] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const clases = ['upload-zone']
+  if (opcional) clases.push('optional')
+  if (drag) clases.push('dragover')
+  if (zona.estado === 'uploading') clases.push('uploading')
+  if (zona.estado === 'ok') clases.push('has-file')
+  if (zona.estado === 'error') clases.push('file-error')
 
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragover(false)
-    const f = e.dataTransfer.files?.[0]
-    if (f) onFile(f)
-  }
-
-  const cls = [
-    'upload-zone',
-    dragover ? 'dragover' : '',
-    file ? 'has-file' : '',
-    uploading ? 'uploading' : '',
-  ].filter(Boolean).join(' ')
+  const abrir = () => { if (zona.estado === 'idle') inputRef.current?.click() }
 
   return (
     <div
-      className={cls}
-      onClick={() => !file && !uploading && inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragover(true) }}
-      onDragLeave={() => setDragover(false)}
-      onDrop={handleDrop}
+      className={clases.join(' ')}
+      onClick={abrir}
+      onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) onPick(f) }}
     >
       <input
         ref={inputRef}
         type="file"
-        accept="video/*"
+        accept=".mp4,.mov,video/mp4,video/quicktime"
         style={{ display: 'none' }}
-        onChange={(e) => { if (e.target.files?.[0]) onFile(e.target.files[0]) }}
+        onChange={(e) => { const f = e.target.files[0]; if (f) onPick(f); e.target.value = '' }}
       />
+      {opcional ? <span className="upload-optional-tag">Opcional</span> : <span className="upload-req-tag">Opcional</span>}
 
-      {required ? (
-        <span className="upload-req-tag">Obligatorio</span>
-      ) : (
-        <span className="upload-optional-tag">Opcional</span>
+      {zona.estado === 'idle' && (
+        <div>
+          <div className="upload-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <rect x="4" y="6" width="24" height="20" rx="3" stroke="#9ca3af" strokeWidth="1.5"/>
+              <path d="M13 22l3-3 3 3M16 19v-6" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M13 14h-2a1 1 0 00-1 1v4a1 1 0 001 1h10a1 1 0 001-1v-4a1 1 0 00-1-1h-2" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeDasharray="2 1.5"/>
+            </svg>
+          </div>
+          <div className="upload-label-day">{dia}</div>
+          <div className="upload-title">{titulo}</div>
+          <div className="upload-sub">Arrastra o haz clic para seleccionar<br /><span className="format-chip">.mp4</span> o <span className="format-chip">.mov</span></div>
+          <div className="upload-cta">Seleccionar archivo</div>
+        </div>
       )}
 
-      {uploading ? (
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#93c5fd" strokeWidth="2"/><path d="M12 6v6l3 3" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/></svg>
-          <div className="upload-progress-bar-wrap">
-            <div className="upload-progress-bar" style={{ width: `${progress}%` }} />
+      {zona.estado === 'uploading' && (
+        <div className="upload-progress" style={{ display: 'flex' }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="12" stroke="#93c5fd" strokeWidth="2"/><path d="M14 14 l0-7" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"><animateTransform attributeName="transform" type="rotate" from="0 14 14" to="360 14 14" dur="1s" repeatCount="indefinite"/></path></svg>
+          <div className="progress-label">Subiendo… {Math.round(zona.pct)}%</div>
+          <div className="progress-bar-wrap" style={{ width: '100%' }}>
+            <div className="progress-bar" style={{ width: `${zona.pct}%` }}></div>
           </div>
-          <span className="upload-progress-label">Subiendo… {progress}%</span>
+          <div style={{ fontSize: '11.5px', color: 'var(--c-text-muted)' }}>{zona.nombre}</div>
         </div>
-      ) : file ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#6ee7b7" strokeWidth="2"/><path d="M8 12l3 3 5-5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          <span className="file-name">{file.name}</span>
-          <span className="file-size">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
-          <button type="button" className="file-remove" onClick={(e) => { e.stopPropagation(); onFile(null) }}>Eliminar</button>
+      )}
+
+      {zona.estado === 'ok' && (
+        <div className="file-info" style={{ display: 'flex', flexDirection: 'column' }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="12" stroke="#6ee7b7" strokeWidth="1.5" fill="#ecfdf5"/><path d="M8 14l4 4 8-8" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <div className="upload-label-day" style={{ color: '#065f46' }}>{dia} cargado</div>
+          <div className="file-name">{zona.nombre}</div>
+          <div className="file-size">{zona.tamano}</div>
+          <button className="file-remove" onClick={(e) => { e.stopPropagation(); onRemove() }}>Eliminar y subir otro</button>
         </div>
-      ) : (
-        <>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect x="2" y="5" width="18" height="14" rx="2" stroke="#9ca3af" strokeWidth="1.5"/>
-            <path d="M20 10l6-3v14l-6-3V10z" stroke="#9ca3af" strokeWidth="1.5" strokeLinejoin="round"/>
-          </svg>
-          <span className="upload-label-day">{day}</span>
-          <span className="upload-title">{label}</span>
-          <span className="upload-sub">
-            Arrastra un archivo o haz clic · <span className="format-chip">.mp4</span> <span className="format-chip">.avi</span>
-          </span>
-          <span className="upload-cta">Seleccionar archivo</span>
-        </>
+      )}
+
+      {zona.estado === 'error' && (
+        <div className="file-error-msg" style={{ display: 'flex', flexDirection: 'column' }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="12" stroke="#fca5a5" strokeWidth="1.5" fill="#fef2f2"/><path d="M9 9l10 10M19 9L9 19" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          <div className="file-error-title">{zona.vertical ? 'Video en vertical' : 'Formato no válido'}</div>
+          <div className="file-error-detail">
+            {zona.vertical ? (
+              <>El archivo <strong>{zona.nombre}</strong> está en vertical.<br />Solo se pueden procesar videos en horizontal.</>
+            ) : (
+              <>El archivo <strong>{zona.nombre}</strong> no es un .mp4 ni .mov válido.<br />Convierte el video antes de subirlo.</>
+            )}
+          </div>
+          <button className="file-retry" onClick={(e) => { e.stopPropagation(); onRemove() }}>Intentar con otro archivo</button>
+        </div>
       )}
     </div>
   )
 }
 
-const INITIAL_FORM = {
-  name: '',
-  treatment: '',
-  species: 'Rata Wistar',
-  animals: 4,
-  duration: 300,
-  notes: '',
-}
-
 export default function NewExperimentPage() {
-  const api = useApi()
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState(INITIAL_FORM)
-  const [errors, setErrors] = useState({})
-  const [fileDay1, setFileDay1] = useState(null)
-  const [fileDay2, setFileDay2] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({ day1: 0, day2: 0 })
-  const [submitting, setSubmitting] = useState(false)
+  const [demo, setDemo] = useState('empty')
+  const [form, setForm] = useState(FORM_VACIO)
+  const [errores, setErrores] = useState(SIN_ERRORES)
+  const [zona1, setZona1] = useState(ZONA_VACIA)
+  const [zona2, setZona2] = useState(ZONA_VACIA)
+  const [exito, setExito] = useState(false)
+  const timers = useRef([])
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  useEffect(() => () => timers.current.forEach(clearInterval), [])
 
-  const validateStep1 = () => {
-    const errs = {}
-    if (!form.name.trim()) errs.name = 'El nombre es obligatorio'
-    if (!form.treatment.trim()) errs.treatment = 'El tratamiento es obligatorio'
-    if (form.animals < 1 || form.animals > 10) errs.animals = 'Entre 1 y 10 animales'
-    setErrors(errs)
-    return Object.keys(errs).length === 0
+  const set = (campo) => (e) => {
+    setForm((f) => ({ ...f, [campo]: e.target.value }))
+    setErrores((er) => ({ ...er, [campo]: false }))
   }
 
-  const validateStep2 = () => {
-    if (!fileDay1) {
-      setErrors({ fileDay1: 'El video del Día 1 es obligatorio' })
-      return false
+  const simularSubida = (setZona, nombre, tamano) => {
+    let pct = 0
+    setZona({ estado: 'uploading', nombre, tamano, pct })
+    const iv = setInterval(() => {
+      pct = Math.min(pct + Math.random() * 12 + 4, 100)
+      if (pct >= 100) {
+        clearInterval(iv)
+        setZona({ estado: 'ok', nombre, tamano })
+      } else {
+        setZona({ estado: 'uploading', nombre, tamano, pct })
+      }
+    }, 160)
+    timers.current.push(iv)
+  }
+
+  const elegir = (setZona) => async (file) => {
+    if (!FORMATO_VALIDO.test(file.name)) {
+      setZona({ estado: 'error', nombre: file.name })
+      return
     }
-    setErrors({})
-    return true
+    if (await leerOrientacion(file) === 'vertical') {
+      setZona({ estado: 'error', nombre: file.name, vertical: true })
+      return
+    }
+    simularSubida(setZona, file.name, `${(file.size / 1024 / 1024).toFixed(0)} MB`)
   }
 
-  const nextStep = () => {
-    if (step === 1 && !validateStep1()) return
-    if (step === 2 && !validateStep2()) return
-    setStep((s) => Math.min(s + 1, 3))
-  }
-
-  const prevStep = () => setStep((s) => Math.max(s - 1, 1))
-
-  const handleSubmit = async () => {
-    setSubmitting(true)
-    try {
-      const notesJson = JSON.stringify({
-        treatment: form.treatment,
-        species: form.species,
-        animals: form.animals,
-        duration: form.duration,
-        notes: form.notes,
-      })
-
-      const sessionRes = await api.post('/api/sessions', { name: form.name, notes: notesJson })
-      const sessionId = sessionRes.data.id
-
-      const uploadVideo = async (file, day, progressKey) => {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('session_id', sessionId)
-        fd.append('day', day)
-        const res = await api.post('/api/videos/upload', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (e) => {
-            const pct = Math.round((e.loaded / e.total) * 100)
-            setUploadProgress((p) => ({ ...p, [progressKey]: pct }))
-          },
-        })
-        return res.data.video_id
-      }
-
-      setUploading(true)
-      const videoId1 = await uploadVideo(fileDay1, 'DAY1', 'day1')
-
-      if (fileDay2) {
-        await uploadVideo(fileDay2, 'DAY2', 'day2')
-      }
-
-      await api.post('/api/jobs', { video_id: videoId1 })
-
-      navigate(`/experiments/${sessionId}/progress`)
-    } catch (err) {
-      console.error('Error creating experiment:', err)
-      setErrors({ submit: 'Error al crear el experimento. Inténtalo de nuevo.' })
-    } finally {
-      setSubmitting(false)
-      setUploading(false)
+  const cambiarDemo = (s) => {
+    timers.current.forEach(clearInterval)
+    setDemo(s)
+    setExito(false)
+    setErrores(SIN_ERRORES)
+    setZona1(ZONA_VACIA)
+    setZona2(ZONA_VACIA)
+    setForm(FORM_VACIO)
+    if (s === 'filled') setForm(FORM_LLENO)
+    if (s === 'uploading') {
+      setForm(FORM_LLENO)
+      setZona1({ estado: 'uploading', nombre: 'dia1_baseline_20min.mp4', tamano: '312 MB', pct: 47 })
+      setZona2({ estado: 'uploading', nombre: 'dia2_posttreatment_5min.mp4', tamano: '78 MB', pct: 8 })
+    }
+    if (s === 'fileerror') {
+      setForm(FORM_LLENO)
+      setZona1({ estado: 'ok', nombre: 'dia1_baseline_20min.mp4', tamano: '312 MB' })
+      setZona2({ estado: 'error', nombre: 'grabacion_dia2.avi' })
+    }
+    if (s === 'success') setExito(true)
+    if (s === 'validation') {
+      setForm({ ...FORM_VACIO, especimenes: '7' })
+      setErrores({ nombre: true, especimenes: true, tratamiento: true })
     }
   }
+
+  const enviar = () => {
+    const n = Number(form.especimenes)
+    const er = {
+      nombre: !form.nombre.trim(),
+      especimenes: !(n >= 2 && n <= 4),
+      tratamiento: !form.tratamiento.trim(),
+    }
+    setErrores(er)
+    if (!er.nombre && !er.especimenes && !er.tratamiento) setExito(true)
+  }
+
+  const paso = exito ? 3 : 1
+  const Paso = ({ n, label }) => (
+    <div className={`step ${n < paso ? 'done' : n === paso ? 'active' : ''}`}>
+      <div className="step-circle">
+        {n < paso ? (
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-5.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        ) : n}
+      </div>
+      <div className="step-label">{label}</div>
+    </div>
+  )
 
   return (
-    <main className="page page--narrow">
-      <nav className="breadcrumb">
-        <Link to="/dashboard">Mis experimentos</Link>
-        <span className="breadcrumb-sep">›</span>
-        <span>Nuevo experimento</span>
-      </nav>
+    <div className="pg-nuevo">
+      <DemoBar states={DEMO_STATES} value={demo} onChange={cambiarDemo} />
 
-      <div className="page-header" style={{ marginBottom: 24 }}>
-        <div>
+      <main className="page">
+        <nav className="breadcrumb">
+          <Link to="/dashboard">Mis experimentos</Link>
+          <span className="breadcrumb-sep">›</span>
+          <span>Nuevo experimento</span>
+        </nav>
+
+        <div className="page-header">
           <div className="page-title">Nuevo experimento</div>
-          <div className="page-subtitle">Registra los datos del experimento y sube los videos para análisis.</div>
+          <div className="page-subtitle">Ingresa los metadatos y sube los videos del FST. El análisis comenzará automáticamente.</div>
         </div>
-      </div>
 
-      <StepIndicator current={step} />
-
-      {/* Step 1: Metadata */}
-      {step === 1 && (
-        <div className="card">
-          <div className="card-header">
-            <div className="card-header-icon">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="1.5" width="11" height="12" rx="1.5" stroke="#4b6490" strokeWidth="1.1"/><path d="M5 5h5M5 7.5h5M5 10h3" stroke="#4b6490" strokeWidth="1.1" strokeLinecap="round"/></svg>
-            </div>
-            <div>
-              <div className="card-title">Datos del experimento</div>
-              <div className="card-subtitle">Información general del estudio FST</div>
-            </div>
-          </div>
-          <div className="card-body">
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">Nombre del experimento <span className="req">*</span></label>
-                <input
-                  className={`form-input form-input--plain ${errors.name ? 'error' : ''}`}
-                  placeholder="Ej: Ketamina 30 mg/kg — Grupo A"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
-                />
-                {errors.name && <span className="field-error">{errors.name}</span>}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Tratamiento / fármaco <span className="req">*</span></label>
-                <input
-                  className={`form-input form-input--plain ${errors.treatment ? 'error' : ''}`}
-                  placeholder="Ej: Ketamina 30 mg/kg"
-                  value={form.treatment}
-                  onChange={(e) => set('treatment', e.target.value)}
-                />
-                {errors.treatment && <span className="field-error">{errors.treatment}</span>}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Especie / cepa</label>
-                <select className="form-select" value={form.species} onChange={(e) => set('species', e.target.value)}>
-                  <option>Rata Wistar</option>
-                  <option>Rata Sprague-Dawley</option>
-                  <option>Ratón CD-1</option>
-                  <option>Ratón C57BL/6</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Número de animales <span className="req">*</span></label>
-                <input
-                  className={`form-input form-input--plain ${errors.animals ? 'error' : ''}`}
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={form.animals}
-                  onChange={(e) => set('animals', parseInt(e.target.value) || 0)}
-                />
-                {errors.animals && <span className="field-error">{errors.animals}</span>}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Duración de sesión (s)</label>
-                <select className="form-select" value={form.duration} onChange={(e) => set('duration', parseInt(e.target.value))}>
-                  <option value="300">300 s (5 min) — estándar</option>
-                  <option value="360">360 s (6 min)</option>
-                  <option value="600">600 s (10 min)</option>
-                </select>
-                <span className="form-hint">Duración estándar del protocolo FST</span>
-              </div>
-
-              <div className="form-group span2">
-                <label className="form-label">Notas adicionales</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="Información complementaria del experimento (opcional)"
-                  value={form.notes}
-                  onChange={(e) => set('notes', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
+        <div className="steps">
+          <Paso n={1} label="Metadatos" />
+          <div className={`step-line ${paso > 1 ? 'done' : ''}`}></div>
+          <Paso n={2} label="Videos" />
+          <div className={`step-line ${paso > 2 ? 'done' : ''}`}></div>
+          <Paso n={3} label="Confirmación" />
         </div>
-      )}
 
-      {/* Step 2: Video Upload */}
-      {step === 2 && (
-        <div className="card">
-          <div className="card-header">
-            <div className="card-header-icon">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="3" width="10" height="8" rx="1.5" stroke="#4b6490" strokeWidth="1.1"/><path d="M11 6l3-2v6l-3-2V6z" stroke="#4b6490" strokeWidth="1.1" strokeLinejoin="round"/></svg>
-            </div>
-            <div>
-              <div className="card-title">Videos del experimento</div>
-              <div className="card-subtitle">Sube los videos de las sesiones de nado forzado</div>
-            </div>
-          </div>
-          <div className="card-body">
-            <div className="upload-grid">
-              <UploadZone
-                day="DÍA 1"
-                label="Sesión basal (habituación)"
-                required
-                file={fileDay1}
-                onFile={setFileDay1}
-                uploading={uploading}
-                progress={uploadProgress.day1}
-              />
-              <UploadZone
-                day="DÍA 2"
-                label="Sesión post-tratamiento"
-                required={false}
-                file={fileDay2}
-                onFile={setFileDay2}
-                uploading={uploading}
-                progress={uploadProgress.day2}
-              />
-            </div>
-
-            {errors.fileDay1 && (
-              <div className="error-banner" style={{ marginTop: 12 }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#f87171" strokeWidth="1.4"/></svg>
-                <div className="error-banner-text">{errors.fileDay1}</div>
-              </div>
-            )}
-
-            <div className="format-note" style={{ marginTop: 16 }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-                <circle cx="7" cy="7" r="6" stroke="#3b6fb6" strokeWidth="1.1"/>
-                <path d="M7 4v4" stroke="#3b6fb6" strokeWidth="1.2" strokeLinecap="round"/>
-                <circle cx="7" cy="10" r=".6" fill="#3b6fb6"/>
-              </svg>
-              <span>Formatos aceptados: <strong>.mp4, .avi, .mov</strong>. Tamaño máximo: 2 GB. El video debe mostrar claramente el tanque de nado con todos los animales visibles.</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Confirm */}
-      {step === 3 && (
-        <>
+        {exito ? (
           <div className="card">
-            <div className="card-header">
-              <div className="card-header-icon">
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="#4b6490" strokeWidth="1.1"/><path d="M5 7.5l2 2 3.5-3.5" stroke="#4b6490" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div className="success-panel">
+              <div className="success-icon">
+                <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                  <path d="M5 13l6 6 10-10" stroke="#10b981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
-              <div>
-                <div className="card-title">Confirmar experimento</div>
-                <div className="card-subtitle">Revisa los datos antes de iniciar el análisis</div>
+              <div className="success-title">Experimento creado exitosamente</div>
+              <div className="success-sub">
+                Los videos se cargaron correctamente. El sistema ha iniciado el análisis conductual de forma automática — no es necesaria ninguna acción adicional.
               </div>
-            </div>
-            <div className="card-body">
-              <div className="form-grid">
-                <div className="form-group">
-                  <span className="form-label">Nombre</span>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{form.name}</span>
-                </div>
-                <div className="form-group">
-                  <span className="form-label">Tratamiento</span>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{form.treatment}</span>
-                </div>
-                <div className="form-group">
-                  <span className="form-label">Especie / cepa</span>
-                  <span style={{ fontSize: 14 }}>{form.species}</span>
-                </div>
-                <div className="form-group">
-                  <span className="form-label">Animales</span>
-                  <span style={{ fontSize: 14 }}>{form.animals}</span>
-                </div>
-                <div className="form-group">
-                  <span className="form-label">Duración</span>
-                  <span style={{ fontSize: 14 }}>{form.duration} s ({form.duration / 60} min)</span>
-                </div>
-                <div className="form-group">
-                  <span className="form-label">Videos</span>
-                  <span style={{ fontSize: 14 }}>
-                    Día 1: {fileDay1?.name || '—'}
-                    {fileDay2 && <><br />Día 2: {fileDay2.name}</>}
-                  </span>
-                </div>
+              <div className="success-chip">
+                <span className="chip-dot"></span>
+                Análisis en proceso — FST-2024-036 "{form.nombre || 'Ketamina 30 mg/kg'}"
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button className="btn-ghost" onClick={() => navigate('/dashboard')}>← Volver al dashboard</button>
+                <button className="btn-primary" onClick={() => navigate('/experiments/36/progress')}>
+                  Ver progreso del análisis
+                  <IconoFlecha />
+                </button>
               </div>
             </div>
           </div>
+        ) : (
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <div className="card-header-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="2" width="12" height="12" rx="2" stroke="#4b6490" strokeWidth="1.2"/>
+                    <path d="M5 6h6M5 9h4" stroke="#4b6490" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="card-title">Información del experimento</div>
+                  <div className="card-subtitle">Todos los campos marcados con * son obligatorios.</div>
+                </div>
+              </div>
+              <div className="card-body">
+                <div className="form-grid">
+                  <div className="form-group span2">
+                    <label className="form-label" htmlFor="expName">Nombre del experimento <span className="req">*</span></label>
+                    <div className="input-wrap">
+                      <span className="input-icon">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M2 7h7M2 10h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      </span>
+                      <input id="expName" className={`form-input ${errores.nombre ? 'error' : ''}`} type="text" placeholder="Ej. Ketamina 30 mg/kg — Grupo A" value={form.nombre} onChange={set('nombre')} />
+                    </div>
+                    {errores.nombre && <div className="field-error" style={{ display: 'flex' }}><IconoError />Este campo es obligatorio.</div>}
+                  </div>
 
-          <div className="auto-notice" style={{ marginBottom: 16 }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-              <circle cx="8" cy="8" r="6.5" stroke="#0ea5e9" strokeWidth="1.2"/>
-              <path d="M8 5v4" stroke="#0ea5e9" strokeWidth="1.3" strokeLinecap="round"/>
-              <circle cx="8" cy="11" r=".6" fill="#0ea5e9"/>
-            </svg>
-            <div className="auto-notice-text">
-              <strong>Análisis automático</strong>
-              Al confirmar, el análisis se iniciará automáticamente. Puedes cerrar el navegador; el proceso continuará en segundo plano.
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="expFecha">Fecha del experimento <span className="req">*</span></label>
+                    <div className="input-wrap">
+                      <span className="input-icon">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 6h11M5 1v3M9 1v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      </span>
+                      <input id="expFecha" className="form-input" type="date" value={form.fecha} onChange={set('fecha')} />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="expEspecimenes">Especímenes de la primera tanda (2 a 4) <span className="req">*</span></label>
+                    <div className="input-wrap">
+                      <span className="input-icon">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 12.5c0-2.2 1.6-3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="10" cy="5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M12.5 12.5c0-2.2-1.6-3.5-3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      </span>
+                      <input id="expEspecimenes" className={`form-input form-input-plain ${errores.especimenes ? 'error' : ''}`} type="number" min="2" max="4" placeholder="4" style={{ paddingLeft: '34px' }} value={form.especimenes} onChange={set('especimenes')} />
+                    </div>
+                    <div className="form-hint">Entre 2 y 4, uno por cada cilindro visible en el video.</div>
+                    {errores.especimenes && <div className="field-error" style={{ display: 'flex' }}><IconoError />Ingresa un número entre 2 y 4.</div>}
+                  </div>
+
+                  <div className="form-group span2">
+                    <label className="form-label" htmlFor="expTrat">Tratamiento / condición experimental <span className="req">*</span></label>
+                    <div className="input-wrap">
+                      <span className="input-icon" style={{ top: '14px', transform: 'none' }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 2h4l1 4H4L5 2z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/><rect x="2" y="6" width="10" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      </span>
+                      <textarea id="expTrat" className={`form-textarea ${errores.tratamiento ? 'error' : ''}`} style={{ paddingLeft: '34px' }} placeholder="Ej. Ketamina sub-anestésica 30 mg/kg i.p., 30 min antes de la sesión Día 2. Grupo control recibió vehículo (solución salina 0.9%)." value={form.tratamiento} onChange={set('tratamiento')}></textarea>
+                    </div>
+                    {errores.tratamiento && <div className="field-error" style={{ display: 'flex' }}><IconoError />Describe el tratamiento o condición experimental.</div>}
+                  </div>
+
+                  <div className="form-group span2">
+                    <label className="form-label" htmlFor="expNotas">Notas adicionales <span style={{ fontWeight: '400', color: 'var(--c-text-muted)' }}>(opcional)</span></label>
+                    <textarea id="expNotas" className="form-textarea" placeholder="Observaciones, condiciones especiales, referencias internas…" value={form.notas} onChange={set('notas')}></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <div className="card-header-icon">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="1.5" y="3.5" width="11" height="9" rx="1.5" stroke="#4b6490" strokeWidth="1.2"/>
+                    <path d="M12.5 7l2.5-2v6l-2.5-2V7z" stroke="#4b6490" strokeWidth="1.2" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="card-title">Videos del experimento</div>
+                  <div className="card-subtitle">Puedes subir uno o ambos videos; el análisis usará los que proporciones.</div>
+                </div>
+              </div>
+              <div className="card-body">
+                <div className="upload-grid">
+                  <div>
+                    <UploadZone dia="Día 1" titulo="Sesión basal (20 min)" zona={zona1} opcional onPick={elegir(setZona1)} onRemove={() => setZona1(ZONA_VACIA)} />
+                  </div>
+                  <div>
+                    <UploadZone dia="Día 2" titulo="Sesión post-tratamiento (5 min)" zona={zona2} onPick={elegir(setZona2)} onRemove={() => setZona2(ZONA_VACIA)} />
+                  </div>
+                </div>
+
+                <div className="format-note">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: '1px' }}><circle cx="8" cy="8" r="6.5" stroke="#3b6fb6" strokeWidth="1.2"/><path d="M8 7v4" stroke="#3b6fb6" strokeWidth="1.3" strokeLinecap="round"/><circle cx="8" cy="5.5" r=".7" fill="#3b6fb6"/></svg>
+                  <span><strong>Solo se aceptan archivos .mp4 o .mov en horizontal.</strong> Si tu video está en otro formato o en vertical, conviértelo antes de subirlo. El sistema validará el formato antes de iniciar la carga.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-body">
+                <div className="auto-notice">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, marginTop: '1px' }}>
+                    <path d="M9 2L2 7v9h5v-4h4v4h5V7L9 2z" stroke="#0284c7" strokeWidth="1.3" strokeLinejoin="round"/>
+                    <path d="M11 4l4 2.5" stroke="#0284c7" strokeWidth="1.1" strokeLinecap="round"/>
+                  </svg>
+                  <div className="auto-notice-text">
+                    <strong>El análisis inicia automáticamente</strong>
+                    Una vez completada la carga, el sistema procesará los videos sin necesidad de ninguna acción adicional. Puedes cerrar esta pantalla y revisar el progreso desde el dashboard.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="action-bar">
+              <button className="btn-ghost" onClick={() => navigate('/dashboard')}>← Cancelar</button>
+              <button className="btn-primary" onClick={enviar}>
+                Crear experimento y cargar videos
+                <IconoFlecha />
+              </button>
             </div>
           </div>
-
-          {errors.submit && (
-            <div className="error-banner">
-              <div className="error-banner-text">{errors.submit}</div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Action bar */}
-      <div className="action-bar" style={{ marginTop: 16 }}>
-        <div>
-          {step > 1 && (
-            <button type="button" className="btn-ghost" onClick={prevStep} disabled={submitting}>
-              ← Anterior
-            </button>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn-ghost" onClick={() => navigate('/dashboard')} disabled={submitting}>
-            Cancelar
-          </button>
-          {step < 3 ? (
-            <button type="button" className="btn-primary" onClick={nextStep}>
-              Siguiente →
-            </button>
-          ) : (
-            <button type="button" className="btn-primary" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Creando…' : 'Crear y analizar'}
-            </button>
-          )}
-        </div>
-      </div>
-    </main>
+        )}
+      </main>
+    </div>
   )
 }
