@@ -47,3 +47,17 @@ export const experimentDetail = {
     ],
   },
 }
+
+// Cola de análisis (2e). Un trabajo a la vez, en orden de llegada.
+// status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo);
+// confianza: de la detección de cilindros (mínimo 0.70).
+export const queue = [
+  { job_id: 501, posicion: 1, experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, confianza: 0.86, error: null },
+  { job_id: 502, posicion: 2, experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
+  { job_id: 503, posicion: 3, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
+]
+
+// Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
+export const failedJobs = [
+  { job_id: 498, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50, confianza: 0.54, error: ERROR_DET },
+]
