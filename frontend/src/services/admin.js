@@ -15,7 +15,7 @@ export async function createUser(data) {
   if (USE_MOCKS) {
     const email = data.email.toLowerCase()
     if (db.users.some((u) => u.email === email)) return fail(409, 'Ya existe una cuenta con ese correo.')
-    const u = { id: Date.now(), role: 'INVESTIGADOR', is_active: true, ...data, email }
+    const u = { id: Date.now(), role: 'INVESTIGADOR', is_active: true, must_change_password: true, ...data, email }
     db.users.push(u)
     return reply(u)
   }

@@ -4,12 +4,6 @@
 const INK = 'var(--color-text)'
 const ACC = 'var(--color-accent)'
 
-// ── cuentas (barra superior 2k, perfil 2j, administración 2g) ──────────────
-export const USERS = [
-  { ini: 'MR', nombre: 'Mariana', apellidos: 'Rivera Alcántara', correo: 'mrivera@ipn.mx', idInst: '2019630871', rol: 'Investigador', admin: false },
-  { ini: 'CR', nombre: 'C. S.', apellidos: 'Reyes López', correo: 'creyesl@ipn.mx', idInst: '2008630412', rol: 'Administrador', admin: true },
-]
-
 // ── notificaciones (2k) ────────────────────────────────────────────────────
 export const NOTIFS = [
   { id: 'n1', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. Confianza de detección 0.54, menor a 0.70.', enlace: 'Ver detalle del error', to: '/analisis', hora: '15:41', leida: false },

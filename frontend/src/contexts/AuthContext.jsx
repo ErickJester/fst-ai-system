@@ -1,87 +1,86 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
-import { USERS } from '../data/mock'
-import { store } from '../lib/fst'
+import * as auth from '../services/auth'
+import { TOKEN_KEY } from '../services/config'
 
-// Sesión simulada: no hay backend. Las cuentas de USERS entran directo; cualquier
-// otro correo @ipn.mx se trata como cuenta nueva con contraseña temporal (2i).
-// La sesión vive en sessionStorage: al cerrar el navegador se vuelve a pedir login.
+// Sesión de la cuenta. Las cuentas y contraseñas las resuelve services/auth.js
+// (datos de ejemplo mientras no haya backend). La sesión vive en sessionStorage:
+// al cerrar el navegador se vuelve a pedir login.
 const AuthContext = createContext(null)
 
 const KEY = 'fst.user'
+
 const session = {
   get() {
     try {
       localStorage.removeItem(KEY) // sesión que guardaba la versión anterior
       const v = sessionStorage.getItem(KEY)
-      return v ? JSON.parse(v) : null
+      const u = v ? JSON.parse(v) : null
+      return u?.id ? u : null // las sesiones sin id son de la versión sin servicios
     } catch {
       return null
     }
   },
-  set(u) {
+  set(u, token) {
     try {
       if (u) sessionStorage.setItem(KEY, JSON.stringify(u))
       else sessionStorage.removeItem(KEY)
-      localStorage.removeItem(KEY) // sesión que guardaba la versión anterior
+      if (token) sessionStorage.setItem(TOKEN_KEY, token)
+      if (!u) sessionStorage.removeItem(TOKEN_KEY)
     } catch {
       /* sin almacenamiento */
     }
   },
 }
 
-// Las cuentas modificadas (contraseña temporal ya cambiada, datos del perfil)
-// se recuerdan en localStorage, como lo haría el servidor.
-const cuentas = {
-  get: (correo) => store.get('cuentas', {})[correo] || null,
-  save(u) {
-    const all = store.get('cuentas', {})
-    all[u.correo] = u
-    store.set('cuentas', all)
-  },
-}
+const ROL = { INVESTIGADOR: 'Investigador', ADMIN: 'Administrador' }
 
-function cuentaNueva(correo) {
-  const local = correo.split('@')[0]
+// Usuario de la API → usuario de la sesión, con la forma que usan las pantallas.
+function aSesion(u) {
+  const ini = u.apellidos ? u.nombre[0] + u.apellidos[0] : u.nombre.slice(0, 2)
   return {
-    ini: local.slice(0, 2).toUpperCase(),
-    nombre: local,
-    apellidos: '',
-    correo,
-    idInst: '',
-    rol: 'Investigador',
-    admin: false,
-    temporal: true,
+    id: u.id,
+    ini: ini.toUpperCase(),
+    nombre: u.nombre,
+    apellidos: u.apellidos,
+    correo: u.email,
+    idInst: u.identificador,
+    rol: ROL[u.role],
+    admin: u.role === 'ADMIN',
+    temporal: u.must_change_password,
   }
 }
 
 export function AuthProvider({ children }) {
   const [user, setUserState] = useState(() => session.get())
 
-  const setUser = useCallback((u) => {
-    session.set(u)
+  const setUser = useCallback((u, token) => {
+    session.set(u, token)
     setUserState(u)
   }, [])
 
-  const login = useCallback((correo) => {
-    const c = correo.trim().toLowerCase()
-    const u = cuentas.get(c) || USERS.find((x) => x.correo === c) || cuentaNueva(c)
-    setUser(u)
+  const login = useCallback(async (correo, password) => {
+    const r = await auth.login(correo, password)
+    const u = aSesion(r.user)
+    setUser(u, r.token)
     return u
   }, [setUser])
 
-  const logout = useCallback(() => setUser(null), [setUser])
+  const logout = useCallback(() => {
+    auth.logout().catch(() => {})
+    setUser(null)
+  }, [setUser])
 
-  const updateUser = useCallback((cambios) => {
-    setUserState((prev) => {
-      const u = { ...prev, ...cambios }
-      session.set(u)
-      cuentas.save(u)
-      return u
-    })
-  }, [])
+  // Cambia la contraseña (también la temporal del primer acceso).
+  const cambiarPassword = useCallback(async (actual, nueva) => {
+    setUser(aSesion(await auth.changePassword(user.id, actual, nueva)))
+  }, [user, setUser])
+
+  const actualizarPerfil = useCallback(async ({ nombre, apellidos, correo }) => {
+    setUser(aSesion(await auth.updateMe(user.id, { nombre, apellidos, email: correo })))
+  }, [user, setUser])
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, logout, cambiarPassword, actualizarPerfil }}>
       {children}
     </AuthContext.Provider>
   )
