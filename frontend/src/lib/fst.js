@@ -36,6 +36,22 @@ export const fechaCorta = (iso) => {
   return d + ' ' + MESES[m - 1] + ' ' + y
 }
 
+// Dos fechas del mismo mes → '18–19 feb 2026'.
+export const fechaRango = (desde, hasta) => {
+  const [a, b] = [fechaCorta(desde), fechaCorta(hasta)]
+  return a.slice(a.indexOf(' ')) === b.slice(b.indexOf(' ')) ? a.split(' ')[0] + '–' + b : a + ' – ' + b
+}
+
+// ── valores de la API → etiquetas de los mockups ───────────────────────────
+export const ESTADO_TANDA = { QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
+export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
+export const ETAPA = {
+  PREPROCESSING: 'Preprocesamiento',
+  ROI_DETECTION: 'Detección de cilindros',
+  TRACKING: 'Seguimiento de especímenes',
+  CLASSIFICATION: 'Clasificación de conducta',
+}
+
 // Búsqueda sin acentos ni mayúsculas.
 export const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
