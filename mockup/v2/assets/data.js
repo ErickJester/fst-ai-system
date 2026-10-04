@@ -31,7 +31,7 @@
         letra: String.fromCharCode(65 + i),
         nombre: 'Tanda ' + String.fromCharCode(65 + i),
         desde: desde, cuantos: cuantos,
-        posiciones: 'Ratas ' + desde + '–' + (desde + cuantos - 1) + ' · cilindros P1–P' + cuantos,
+        posiciones: 'Cilindros P1–P' + cuantos,
         estado: est, e: ESTADO[est]
       };
     });

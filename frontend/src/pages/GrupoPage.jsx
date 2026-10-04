@@ -61,12 +61,12 @@ export default function GrupoPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '410px 1fr' }}>
                   <div style={{ padding: '18px 20px', borderRight: '2px solid var(--color-divider)' }}>
-                    <div className="k" style={{ marginBottom: 13 }}>Especímenes · rata n.º (marca en la cola) y cilindro</div>
+                    <div className="k" style={{ marginBottom: 13 }}>Cilindros de la tanda</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
                       {Array.from({ length: t.cuantos }, (_, i) => (
                         <div key={i} style={{ background: 'var(--color-bg)', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px' }}>
-                          <span className="num nd" style={{ width: 28, height: 28, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{t.desde + i}</span>
-                          <div className="nd" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>Rata {t.desde + i} · Cilindro P{i + 1}</div>
+                          <span className="num nd" style={{ width: 28, height: 28, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>P{i + 1}</span>
+                          <div className="nd" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>Cilindro P{i + 1}</div>
                         </div>
                       ))}
                     </div>

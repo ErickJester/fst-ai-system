@@ -146,7 +146,7 @@ export default function AdminPage() {
               ))}
             </div>
             <p style={{ margin: '12px 0 0', fontSize: 11.5, lineHeight: 1.6, color: 'var(--muted-2)' }}>
-              <span className="trace">T-06</span> La cola se atiende en orden de llegada; nadie la reordena. Reanalizar reemplaza el resultado anterior.
+              La cola se atiende en orden de llegada; nadie la reordena. Reanalizar reemplaza el resultado anterior.
             </p>
           </div>
 
