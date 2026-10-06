@@ -231,12 +231,13 @@ function ResultadosTanda({ clave, gid, letra }) {
           </div>
         </div>
 
-        <div className="no-print" style={{ display: 'flex', borderBottom: '2px solid var(--color-divider)', margin: '22px 0 24px' }}>
+        {/* Saltos a secciones de esta misma vista (no cambian el contenido): navegación, no pestañas. */}
+        <nav aria-label="Secciones de los resultados" className="no-print" style={{ display: 'flex', borderBottom: '2px solid var(--color-divider)', margin: '22px 0 24px' }}>
           {TABS.map((t) => (
-            <button key={t.id} type="button" className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => irA(t.id)}>{t.label}</button>
+            <button key={t.id} type="button" className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'true' : undefined} onClick={() => irA(t.id)}>{t.label}</button>
           ))}
-          <button type="button" className="tab" disabled>Episodios</button>
-        </div>
+          <button type="button" className="tab" disabled title="Disponible cuando exista el clasificador">Episodios</button>
+        </nav>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 26 }}>

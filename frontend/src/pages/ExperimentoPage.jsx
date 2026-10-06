@@ -5,6 +5,7 @@ import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, r
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { mensajeError } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
+import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
@@ -27,6 +28,7 @@ export default function ExperimentoPage() {
   const [borrando, setBorrando] = useState(false)
   const [errBorrar, setErrBorrar] = useState('')
   const nombreRef = useRef(null)
+  const dlgRef = useRef(null)
   const { data: exp, error, loading } = useAsync(() => getExperiment(clave), [clave])
 
   function cerrar() {
@@ -35,6 +37,9 @@ export default function ExperimentoPage() {
     setPass('')
     setErrBorrar('')
   }
+
+  // Antes del efecto que enfoca el nombre, para recordar el botón que abrió el diálogo.
+  useAtraparFoco(dlgRef, dlg)
 
   useEffect(() => {
     if (!dlg) return
@@ -152,7 +157,7 @@ export default function ExperimentoPage() {
 
       {dlg && (
         <div className="dialog-backdrop" onClick={(e) => { if (e.target === e.currentTarget) cerrar() }}>
-          <form className="dialog dlg-del" noValidate role="dialog" aria-modal="true" aria-labelledby="dlgT" onSubmit={eliminar}>
+          <form ref={dlgRef} className="dialog dlg-del" noValidate role="dialog" aria-modal="true" aria-labelledby="dlgT" onSubmit={eliminar}>
             <div className="dialog-title" id="dlgT">Eliminar experimento</div>
             <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
             <Campo id="dNombre" label={<>Escribe el nombre del experimento, «{exp.titulo}»</>}>
