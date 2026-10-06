@@ -24,6 +24,25 @@ function Protegida({ children, admin }) {
   return children
 }
 
+// Pantalla de inicio de cada cuenta: sin sesión, el login; con temporal, el primer acceso.
+function destino(user) {
+  if (!user) return '/login'
+  return user.temporal ? '/primer-acceso' : '/experimentos'
+}
+
+// Con la sesión abierta, el login no se vuelve a mostrar.
+function SinSesion({ children }) {
+  const { user } = useAuth()
+  if (user) return <Navigate to={destino(user)} replace />
+  return children
+}
+
+// Rutas que no existen (o «/»): a la pantalla de inicio de la cuenta.
+function Inicio() {
+  const { user } = useAuth()
+  return <Navigate to={destino(user)} replace />
+}
+
 function SoloTemporal({ children }) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
@@ -45,7 +64,7 @@ export default function AppRouter() {
     <>
       <ScrollArriba />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<SinSesion><LoginPage /></SinSesion>} />
         <Route path="/restablecer" element={<RestablecerPage />} />
         <Route path="/primer-acceso" element={<SoloTemporal><PrimerAccesoPage /></SoloTemporal>} />
 
@@ -59,7 +78,7 @@ export default function AppRouter() {
         <Route path="/perfil" element={p(<PerfilPage />)} />
         <Route path="/admin" element={p(<AdminPage />, true)} />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Inicio />} />
       </Routes>
     </>
   )
