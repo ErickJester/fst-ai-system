@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { FieldError, Campo, Cargando } from '../components/ui'
-import { listUsers, createUser, setUserActive, getSystem } from '../services/admin'
+import { FieldError, Campo, Cargando, Seg } from '../components/ui'
+import { listUsers, createUser, updateUser, resetTemporal, setUserActive, getSystem } from '../services/admin'
 import { getQueue } from '../services/queue'
 import { useAsync } from '../hooks/useAsync'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
@@ -10,7 +11,7 @@ import { mensajeError } from '../services/api'
 import { isIpn, DIA } from '../lib/fst'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
-const VACIO = { nombre: '', apellidos: '', correo: '', id: '' }
+const VACIO = { nombre: '', apellidos: '', correo: '', id: '', rol: 'INVESTIGADOR' }
 const ROL = { INVESTIGADOR: 'Investigador', ADMIN: 'Administrador' }
 const AVISO_DISCO_PCT = 80
 
@@ -27,8 +28,9 @@ export default function AdminPage() {
   const [errAccion, setErrAccion] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [crear, setCrear] = useState(false)
-  const [okCrear, setOkCrear] = useState(false)
-  const [temporal, setTemporal] = useState(null) // { nombre, email, password } de la cuenta recién creada
+  const [editando, setEditando] = useState(null) // cuenta que se edita; null = crear
+  const [aviso, setAviso] = useState(null) // 'creada' | 'editada' | 'temporal'
+  const [temporal, setTemporal] = useState(null) // { nombre, email, password, nueva } para mostrarla una vez
   const [form, setForm] = useState(VACIO)
   const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
 
@@ -43,20 +45,26 @@ export default function AdminPage() {
   if (!usuarios) return <Cargando />
 
   const adminsActivos = usuarios.filter((u) => u.role === 'ADMIN' && u.is_active).length
+  const ultimoAdmin = (u) => u.role === 'ADMIN' && u.is_active && adminsActivos <= 1
 
-  async function desactivar(u) {
-    if (!window.confirm('¿Desactivar la cuenta de ' + nombreCorto(u) + '?')) return
+  async function cambiarActiva(u, activa) {
+    const accion = activa ? 'Reactivar' : 'Desactivar'
+    if (!window.confirm('¿' + accion + ' la cuenta de ' + nombreCorto(u) + '?')) return
     setErrAccion('')
     try {
-      await setUserActive(u.id, false)
+      await setUserActive(u.id, activa)
       reload()
     } catch (e) {
-      setErrAccion(mensajeError(e, 'No se pudo desactivar la cuenta.'))
+      setErrAccion(mensajeError(e, 'No se pudo ' + accion.toLowerCase() + ' la cuenta.'))
     }
   }
 
-  function abrir() {
-    setOkCrear(false)
+  // Abre el formulario vacío (crear) o con los datos de una cuenta (editar).
+  function abrir(u = null) {
+    setAviso(null)
+    setEditando(u)
+    setForm(u ? { nombre: u.nombre, apellidos: u.apellidos, correo: u.email, id: u.identificador, rol: u.role } : VACIO)
+    fail(null, '')
     setCrear(true)
     setTimeout(() => refs.nombre.current?.focus())
   }
@@ -64,7 +72,22 @@ export default function AdminPage() {
   function cancelar() {
     setForm(VACIO)
     setCrear(false)
+    setEditando(null)
     fail(null, '')
+  }
+
+  async function nuevaTemporal() {
+    const u = editando
+    if (!window.confirm('¿Restablecer la contraseña temporal de ' + nombreCorto(u) + '? La contraseña actual deja de servir.')) return
+    fail(null, '')
+    try {
+      const r = await resetTemporal(u.id)
+      cancelar()
+      setTemporal({ nombre: nombreCorto(u), email: u.email, password: r.password_temporal, nueva: true })
+      reload()
+    } catch (e) {
+      fail(null, mensajeError(e, 'No se pudo restablecer la contraseña temporal.'))
+    }
   }
 
   async function guardar(e) {
@@ -77,15 +100,22 @@ export default function AdminPage() {
     if (!/^\d+$/.test(v.id)) return fail('id', 'El identificador institucional es numérico (boleta o número de empleado).')
     fail(null, '')
     setGuardando(true)
+    const datos = { nombre: v.nombre, apellidos: v.apellidos, email: v.correo, identificador: v.id }
     try {
-      const u = await createUser({ nombre: v.nombre, apellidos: v.apellidos, email: v.correo, identificador: v.id })
-      setForm(VACIO)
-      setCrear(false)
-      setTemporal({ nombre: nombreCorto(u), email: u.email, password: u.password_temporal })
+      if (editando) {
+        await updateUser(editando.id, { ...datos, role: form.rol })
+        cancelar()
+        setAviso('editada')
+      } else {
+        const u = await createUser(datos)
+        cancelar()
+        setTemporal({ nombre: nombreCorto(u), email: u.email, password: u.password_temporal })
+      }
       reload()
     } catch (e) {
-      // El correo repetido lo detecta el servidor.
-      fail(e.response?.status === 409 ? 'correo' : null, mensajeError(e, 'No se pudo crear la cuenta.'))
+      // El correo repetido lo detecta el servidor. El último administrador no llega aquí:
+      // su rol no se puede cambiar en el formulario.
+      fail(e.response?.status === 409 ? 'correo' : null, mensajeError(e, editando ? 'No se pudieron guardar los cambios.' : 'No se pudo crear la cuenta.'))
     } finally {
       setGuardando(false)
     }
@@ -107,13 +137,13 @@ export default function AdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
           <div className="k">Cuentas · {usuarios.filter((u) => u.is_active).length} activas</div>
           <div style={{ flex: 1 }} />
-          <button type="button" className="btn btn-primary" style={btnLeft} onClick={abrir}>Crear cuenta</button>
+          <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => abrir()}>Crear cuenta</button>
         </div>
         <table className="table">
           <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Estado</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
           <tbody>
             {usuarios.map((u) => {
-              const ultimoAdmin = u.role === 'ADMIN' && u.is_active && adminsActivos <= 1
+              const unico = ultimoAdmin(u)
               const yo = u.email === user.correo
               return (
                 <tr key={u.id}>
@@ -122,13 +152,16 @@ export default function AdminPage() {
                   <td style={{ fontSize: 12.5 }}>{ROL[u.role]}</td>
                   <td><span className="tag tag-neutral">{u.is_active ? 'Activa' : 'Inactiva'}{yo ? ' · tú' : ''}</span></td>
                   <td style={{ textAlign: 'right' }}>
-                    {u.is_active && ultimoAdmin && (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
-                        <button type="button" className="btn btn-ghost" disabled>Desactivar</button>
-                        <span style={{ fontSize: 11, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>Debe existir al menos un Administrador activo</span>
-                      </div>
-                    )}
-                    {u.is_active && !ultimoAdmin && <button type="button" className="btn btn-ghost" onClick={() => desactivar(u)}>Desactivar</button>}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                      {/* La cuenta propia se edita en Mi perfil, para que la sesión no quede desactualizada. */}
+                      {yo
+                        ? <Link className="btn btn-ghost" to="/perfil">Editar</Link>
+                        : <button type="button" className="btn btn-ghost" onClick={() => abrir(u)}>Editar</button>}
+                      {u.is_active
+                        ? <button type="button" className="btn btn-ghost" disabled={unico} onClick={() => cambiarActiva(u, false)}>Desactivar</button>
+                        : <button type="button" className="btn btn-ghost" onClick={() => cambiarActiva(u, true)}>Reactivar</button>}
+                    </div>
+                    {unico && <div style={{ fontSize: 11, marginTop: 3, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>Debe existir al menos un Administrador activo</div>}
                   </td>
                 </tr>
               )
@@ -139,28 +172,46 @@ export default function AdminPage() {
 
         {crear && (
           <form noValidate onSubmit={guardar} style={{ marginTop: 18, border: '2px solid var(--color-text)' }}>
-            <div className="nd" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-divider)', fontSize: 14 }}>Crear cuenta</div>
+            <div className="nd" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-divider)', fontSize: 14 }}>
+              {editando ? 'Editar cuenta · ' + nombreCorto(editando) : 'Crear cuenta'}
+            </div>
             <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Campo id="cNombre" label="Nombre"><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></Campo>
               <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
               <Campo id="cCorreo" label="Correo institucional (@ipn.mx)"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
               <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></Campo>
-              <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 11.5, lineHeight: 1.5, color: MUT60 }}>La cuenta se crea como Investigador.</div>
+              {editando
+                ? (
+                  <Campo label="Rol">
+                    <Seg options={[{ v: 'INVESTIGADOR', label: 'Investigador' }, { v: 'ADMIN', label: 'Administrador' }]}
+                      value={form.rol} onChange={(rol) => !ultimoAdmin(editando) && setForm({ ...form, rol })} />
+                    {ultimoAdmin(editando) && <div className="hint" style={{ marginTop: 5 }}>Es el único Administrador activo: su rol no se puede cambiar.</div>}
+                  </Campo>
+                )
+                : <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 11.5, lineHeight: 1.5, color: MUT60 }}>La cuenta se crea como Investigador.</div>}
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
                 <button type="submit" className="btn btn-primary" style={btnLeft} disabled={guardando}>Guardar</button>
                 <button type="button" className="btn btn-secondary" style={btnLeft} onClick={cancelar}>Cancelar</button>
               </div>
             </div>
+            {editando && (
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '0 16px 14px' }}>
+                <button type="button" className="btn btn-ghost" style={btnLeft} onClick={nuevaTemporal}>Restablecer contraseña temporal</button>
+                <span className="hint">Para quien perdió su contraseña temporal o no puede entrar: se genera otra y la anterior deja de servir.</span>
+              </div>
+            )}
             <FieldError msg={err.msg} style={{ padding: '0 16px 14px', margin: 0 }} />
           </form>
         )}
-        {okCrear && (
+        {aviso && (
           <div className="ok-bar" style={{ marginTop: 18, border: '2px solid var(--color-text)', borderLeft: '4px solid var(--color-text)' }}>
-            <strong>Cuenta creada.</strong> La persona entra con su contraseña temporal y la cambia en su primer acceso.
+            {aviso === 'creada' && <><strong>Cuenta creada.</strong> La persona entra con su contraseña temporal y la cambia en su primer acceso.</>}
+            {aviso === 'editada' && <><strong>Cambios guardados.</strong></>}
+            {aviso === 'temporal' && <><strong>Contraseña temporal restablecida.</strong> La persona la cambia en su próximo acceso.</>}
           </div>
         )}
 
-        {temporal && <DialogoTemporal cuenta={temporal} onListo={() => { setTemporal(null); setOkCrear(true) }} />}
+        {temporal && <DialogoTemporal cuenta={temporal} onListo={() => { setAviso(temporal.nueva ? 'temporal' : 'creada'); setTemporal(null) }} />}
 
         <hr className="hr" />
 
@@ -276,9 +327,12 @@ function DialogoTemporal({ cuenta, onListo }) {
   return (
     <div className="dialog-backdrop">
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTmp">
-        <div className="dialog-title" id="dlgTmp">Cuenta creada</div>
+        <div className="dialog-title" id="dlgTmp">{cuenta.nueva ? 'Contraseña temporal nueva' : 'Cuenta creada'}</div>
         <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
-          {cuenta.nombre} · <span className="num">{cuenta.email}</span>. Dale esta contraseña temporal; la cambia en su primer acceso.
+          {cuenta.nombre} · <span className="num">{cuenta.email}</span>.{' '}
+          {cuenta.nueva
+            ? 'Dale esta contraseña temporal nueva; la anterior ya no sirve y la cambia en su próximo acceso.'
+            : 'Dale esta contraseña temporal; la cambia en su primer acceso.'}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0 14px', padding: '12px 14px', border: '2px solid var(--color-text)' }}>
           <span className="num nd" style={{ flex: 1, fontSize: 18, letterSpacing: 1 }}>{cuenta.password}</span>
