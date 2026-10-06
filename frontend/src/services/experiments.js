@@ -54,13 +54,15 @@ export async function getExperiment(clave) {
 }
 
 // DELETE /experiments/:clave → exige el nombre exacto y la contraseña de la cuenta.
-// Sin backend no hay contraseñas que comprobar: basta con que no esté vacía.
+// Con datos de ejemplo se comprueba igual que en el login: las cuentas con contraseña
+// deben escribir la suya; las de ejemplo, cualquiera no vacía.
 export async function deleteExperiment(clave, { titulo, password }) {
   if (USE_MOCKS) {
     const i = db.experiments.findIndex((e) => e.clave === clave)
     if (i < 0) return fail(404, 'No existe ese experimento.')
     if (db.experiments[i].titulo !== titulo) return fail(400, 'El nombre no coincide.')
-    if (!password) return fail(400, 'Falta la contraseña.')
+    const u = usuarioDeLaSesion()
+    if (!password || (u?.password && password !== u.password)) return fail(400, 'La contraseña no es correcta.')
     db.experiments.splice(i, 1)
     delete db.experimentDetail[clave]
     return reply({ ok: true })

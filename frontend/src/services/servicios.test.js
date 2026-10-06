@@ -211,3 +211,19 @@ describe('simulación de la cola (modo demo)', () => {
     expect((await getQueue()).cola[0]).toMatchObject({ status: 'RUNNING', stage: 'ROI_DETECTION', progress_pct: 25 })
   })
 })
+
+describe('eliminar experimento con la contraseña de la cuenta', () => {
+  // La sesión simulada vive en sessionStorage, que Node no tiene.
+  const sesion = new Map()
+  globalThis.sessionStorage = { getItem: (k) => sesion.get(k) ?? null, setItem: (k, v) => sesion.set(k, String(v)), removeItem: (k) => sesion.delete(k) }
+
+  it('pide la contraseña real si la cuenta tiene una', async () => {
+    const u = await admin.createUser({ nombre: 'Ana', apellidos: 'Luna', email: 'aluna@ipn.mx', identificador: '1' })
+    await auth.changePassword(u.id, u.password_temporal, 'clave-de-ana-1')
+    sesion.set('fst.token', 'mock-token-' + u.id)
+    const datos = { titulo: 'Compuesto CSR-14 · curva de dosis' }
+    expect(await status(deleteExperiment('EXP-2026-02', { ...datos, password: 'otra' }))).toBe(400)
+    expect(await status(deleteExperiment('EXP-2026-02', { ...datos, password: 'clave-de-ana-1' }))).toBe('ok')
+    sesion.clear()
+  })
+})
