@@ -7,6 +7,7 @@ import { listUsers, createUser, updateUser, resetTemporal, setUserActive, getSys
 import { getQueue } from '../services/queue'
 import { useAsync } from '../hooks/useAsync'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
+import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { mensajeError } from '../services/api'
 import { isIpn, DIA } from '../lib/fst'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
@@ -32,6 +33,7 @@ export default function AdminPage() {
   const [aviso, setAviso] = useState(null) // 'creada' | 'editada' | 'temporal'
   const [temporal, setTemporal] = useState(null) // { nombre, email, password, nueva } para mostrarla una vez
   const [form, setForm] = useState(VACIO)
+  const crearRef = useRef(null)
   const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
 
   if (errUsuarios) {
@@ -137,7 +139,7 @@ export default function AdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
           <div className="k">Cuentas · {usuarios.filter((u) => u.is_active).length} activas</div>
           <div style={{ flex: 1 }} />
-          <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => abrir()}>Crear cuenta</button>
+          <button ref={crearRef} type="button" className="btn btn-primary" style={btnLeft} onClick={() => abrir()}>Crear cuenta</button>
         </div>
         <table className="table">
           <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Estado</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
@@ -211,7 +213,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {temporal && <DialogoTemporal cuenta={temporal} onListo={() => { setAviso(temporal.nueva ? 'temporal' : 'creada'); setTemporal(null) }} />}
+        {temporal && <DialogoTemporal cuenta={temporal} onListo={() => { setAviso(temporal.nueva ? 'temporal' : 'creada'); setTemporal(null); setTimeout(() => crearRef.current?.focus()) }} />}
 
         <hr className="hr" />
 
@@ -314,6 +316,8 @@ const catalogos = (s) => [
 // fuera, solo con «Listo», para que no se pierda sin querer.
 function DialogoTemporal({ cuenta, onListo }) {
   const [copiada, setCopiada] = useState(false)
+  const ref = useRef(null)
+  useAtraparFoco(ref, true)
 
   async function copiar() {
     try {
@@ -326,7 +330,7 @@ function DialogoTemporal({ cuenta, onListo }) {
 
   return (
     <div className="dialog-backdrop">
-      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTmp">
+      <div ref={ref} className="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTmp">
         <div className="dialog-title" id="dlgTmp">{cuenta.nueva ? 'Contraseña temporal nueva' : 'Cuenta creada'}</div>
         <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
           {cuenta.nombre} · <span className="num">{cuenta.email}</span>.{' '}
