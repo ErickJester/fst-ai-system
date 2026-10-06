@@ -2,7 +2,7 @@
 
 Documento de traspaso para que trabajemos organizados sobre el frontend. Está escrito para que lo lea una persona y también para dárselo como contexto a Claude Code («lee `PARA_ERICK.md` antes de empezar»).
 
-Autora de la rama: Vanesa · Fecha: 4 oct 2026 · Base: `main` en `a57356b` (tu merge del frontend v2).
+Autora de la rama: Vanesa · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `PARA_VANESA.md`) · Base: `main` en `a57356b` (tu merge del frontend v2) · Versión: **0.3.0**.
 
 ---
 
@@ -57,7 +57,7 @@ VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend r
 | Cualquier otro correo `@ipn.mx` | Investigador | entra como cuenta nueva con contraseña temporal (atajo de demo) |
 
 - **Recuperar contraseña**: como no hay correo, tras pedir el enlace aparece «Modo demo, sin correo: abrir el enlace que llegaría por correo». `/restablecer?token=vencido` muestra el caso de enlace vencido.
-- **Al recargar (F5) los datos de ejemplo vuelven al estado inicial** (viven en memoria). La sesión dura hasta cerrar la pestaña.
+- **Los datos de ejemplo sobreviven a la recarga** (se guardan en `localStorage`, clave `fst.demo`). Para volver a los originales: **«Reiniciar datos»** en la franja de MODO DEMO (también cierra la sesión). La sesión dura hasta cerrar la pestaña.
 
 ---
 
@@ -141,7 +141,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `PATCH /me` | `{ nombre, apellidos, email }` | usuario · 409 si el correo ya existe |
 | `GET /admin/users` | — | lista de cuentas (sin contraseñas) |
 | `POST /admin/users` | `{ nombre, apellidos, email, identificador }` | **201** con `password_temporal` (una sola vez) · 409 si el correo existe |
-| `PATCH /admin/users/:id` | `{ is_active }` | cuenta · 409 si deja el sistema sin administradores |
+| `PATCH /admin/users/:id` | `{ is_active }` o `{ nombre, apellidos, email, identificador, role }` | cuenta · 409 si el correo existe o si deja el sistema sin administradores |
+| `POST /admin/users/:id/reset-temporal` | — | `{ password_temporal }` (una sola vez); la anterior deja de servir y vuelve `cambioRequerido` |
 | `GET /admin/system` | — | `{ disco, conductas, modelo }` |
 | `GET /experiments` | — | lista con estado agregado |
 | `POST /experiments` | `{ titulo, fecha_inicio, especie, notas }` | `{ clave }` (el responsable sale de la sesión) |
@@ -161,7 +162,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 
 ---
 
-## 7. Qué se hizo en esta rama (16 commits)
+## 7. Qué se hizo en esta rama
 
 1. **Capa de servicios** en todas las pantallas: Experimentos, Experimento, Grupo, Progreso, Resultados, Cargar video, Admin, Login/Primer acceso/Perfil y notificaciones. Admin y el login comparten las mismas cuentas.
 2. **Nuevo experimento, paso 1** (`/experimentos/nuevo`): nombre, fecha, especie, notas; sigue al paso 2. No había mockup: se hizo con el estilo de Cargar video.
@@ -171,6 +172,9 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 6. **«Espécimen» en lugar de «Rata»** en Experimento, Grupo, Resultados y CSV. El campo de resultados pasó de `rata` a `especimen`.
 7. **El enlace de recuperación vale 60 minutos** (como `RESET_LINK_MINUTES`); el mockup decía 30.
 8. **Contraseñas y permisos**: modal en Admin que muestra la contraseña temporal una sola vez; pantalla `/restablecer` con caso de enlace vencido; los datos de ejemplo comprueban contraseñas de las cuentas creadas; 403 con aviso.
+9. **Versión 0.3.0**, como pediste en `PARA_VANESA.md`.
+10. **Datos de ejemplo persistentes** en `localStorage` y botón «Reiniciar datos» en la franja de MODO DEMO.
+11. **Admin**: editar cuenta (nombre, apellidos, correo, identificador, rol), restablecer la contraseña temporal (mismo modal, se muestra una vez) y reactivar cuentas inactivas. La cuenta propia se edita en Mi perfil y el rol del único Administrador activo no se puede cambiar.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -185,36 +189,63 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 
 | Tema | Decisión |
 |---|---|
-| Término para los sujetos | «Espécimen / Especímenes»; nunca «ratas». |
+| Término para los sujetos | «Espécimen / Especímenes»; nunca «ratas». En tablas y CSV: **«Espécimen 1 · Cilindro P1»** (se queda así; ver sección 12). |
 | Contraseña temporal | Se muestra una sola vez al crear la cuenta. Sin caducidad por ahora. |
 | Dónde guardar el token | `sessionStorage` (falta decidir si la sesión debe sobrevivir al cerrar la pestaña). |
 | Revisión segundo a segundo | Va en este frontend, construida al final (§12 del documento). Mientras, se usa `tools/fst_labeler`. |
 | Respuesta 403 | Mensaje «No tienes permiso para esa sección» y regreso a Experimentos. |
+| Backend | Congelado hasta terminar el etiquetador (tu `PARA_VANESA.md` §1). El frontend sigue con datos de ejemplo. |
+| Versiones | 0.x hasta que exista el clasificador; 1.0.0 cuando esté integrado. Esta rama: 0.3.0. |
 
 ---
 
 ## 9. Preguntas abiertas para el backend
 
+**En espera**: se contestan cuando empiece el backend, después del etiquetador y el clasificador. Mientras, el frontend usa las propuestas de cada pregunta.
+
 1. **Contraseña temporal en el 201**: ¿en qué campo? El frontend supone `password_temporal`.
-2. **Restablecer una temporal perdida**: ¿habrá algo como `POST /admin/users/:id/reset-temporal` que devuelva otra temporal y vuelva a poner `cambioRequerido = true`? Sin esto, una cuenta cuya temporal se perdió no puede entrar.
+2. **Restablecer una temporal perdida**: el frontend ya lo tiene con la propuesta `POST /admin/users/:id/reset-temporal` (devuelve otra temporal y vuelve a poner `cambioRequerido = true`). Falta que el backend lo confirme.
 3. **Duración de la sesión**: si no debe sobrevivir al cerrar la pestaña, se queda `sessionStorage` y conviene bajar `JWT_EXPIRES_HOURS` (168 h hoy) a algo como 12 h. Si debe sobrevivir, cookie HttpOnly (Set-Cookie, SameSite, CORS con credenciales, CSRF, y logout que borre la cookie).
 4. **Nombres de campos**: el documento dice `cambioRequerido`; el frontend usa `must_change_password`, `role`, `email`, `is_active`. Con la lista real de `/auth/login` y `/admin/users` se alinean los datos de ejemplo de una vez.
 5. **Recuperación**: ¿la ruta del enlace es `/restablecer?token=…` y el enlace vencido responde `400 { error }`?
-6. **Editar cuenta (§9.6)**: ¿qué campos puede cambiar el administrador (nombre, apellidos, correo, rol) y con qué ruta (`PATCH /admin/users/:id`)?
+6. **Editar cuenta (§9.6)**: el frontend ya lo tiene con `PATCH /admin/users/:id` y los campos nombre, apellidos, correo, identificador y rol. Falta que el backend confirme campos y ruta.
 
 ---
 
 ## 10. Pendiente en el frontend
 
-- **Editar cuenta** en Admin (espera la pregunta 6).
-- **Restablecer temporal** desde Admin (espera la pregunta 2; el modal ya existe y se reutiliza).
+- **Quitar los códigos de trazabilidad** de la interfaz (RN-06, T-06, RF-08, RF-31): lo hace tu rama `feat/sin-codigos-cilindro` (ver sección 12).
 - **PDF de diagnóstico desde el servidor** con reintento «preparando…» (hoy se arma en el navegador).
 - **Revisión segundo a segundo** (§9.7): al final; necesita `GET .../review`, `GET .../video` con Range y `PUT .../segundos`. El borrador local debe guardarse por usuario y borrarse al cerrar sesión.
 - **Conectar al backend**: cuando existan los endpoints, probar cada pantalla con `VITE_USE_MOCKS=false` y ajustar nombres de campos.
 
 ---
 
-## 11. Instrucciones para Claude Code
+## 11. Respuesta a tu `PARA_VANESA.md`
+
+- **Backend congelado hasta terminar el etiquetador**: de acuerdo. Todo lo nuevo de esta rama es interfaz con datos de ejemplo; el contrato de la sección 6 y las preguntas de la sección 9 siguen siendo propuesta.
+- **Versión**: ya está en 0.3.0 (`frontend/package.json`).
+- **Orden de entrada**: de acuerdo con que esta rama entre primero a `main`. Avísame cuando la revises para abrir el PR.
+- **Tu rama `feat/sin-codigos-cilindro`**: ver la sección 12.
+
+---
+
+## 12. Propuesta para `feat/sin-codigos-cilindro`
+
+Tu rama hace dos cosas; propongo tratarlas por separado:
+
+1. **Quitar los códigos de trazabilidad** (RN-06, T-06, RF-08, RF-31): de acuerdo, es tuyo y yo no los toco en esta rama para no chocar. Hoy siguen en Experimentos (aviso RN-06), Admin (T-06), Cargar video (RF-08) y Resultados (RF-31).
+2. **Nombre de los sujetos**: Vanesa decidió **mantener «Espécimen 1 · Cilindro P1»** (y «Especímenes 1–4» en los resúmenes). Al rehacer tu rama encima de esta, conserva ese texto y quita solo los códigos.
+
+Orden sugerido:
+
+1. Esta rama entra a `main` por PR.
+2. Rehaces `feat/sin-codigos-cilindro` encima del `main` nuevo, solo con lo de los códigos, y le subes la versión a **0.3.1**.
+3. Si al rehacerla hay conflictos en Experimento, Grupo, Resultados o los datos de ejemplo, gana el texto «Espécimen N · Cilindro PN».
+
+---
+
+## 13. Instrucciones para Claude Code
 
 Si eres Claude trabajando en este repo:
 
