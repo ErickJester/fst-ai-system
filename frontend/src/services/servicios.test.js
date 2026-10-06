@@ -144,13 +144,13 @@ describe('experimentos', () => {
 })
 
 describe('resultados por tanda', () => {
-  it('cada tanda terminada tiene los suyos, con su grupo y sus especímenes', async () => {
+  it('cada tanda terminada tiene los suyos, con su grupo y sus cilindros', async () => {
     const control = await getBatchResults('EXP-2026-02', 'G-01', 'A')
     expect(control.grupo.nombre).toBe('Control')
-    expect(control.especimenes.map((e) => e.especimen)).toEqual([1, 2, 3, 4])
+    expect(control.cilindros.map((e) => e.cilindro)).toEqual(['P1', 'P2', 'P3', 'P4'])
     const refB = await getBatchResults('EXP-2026-02', 'G-02', 'B')
     expect(refB.letra).toBe('B')
-    expect(refB.especimenes.map((e) => e.especimen)).toEqual([5, 6, 7, 8])
+    expect(refB.cilindros.map((e) => e.cilindro)).toEqual(['P1', 'P2', 'P3', 'P4'])
   })
 
   it('una tanda en cola o con error todavía no tiene resultados', async () => {

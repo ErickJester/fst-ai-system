@@ -25,7 +25,9 @@ const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
 const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
 const NIVEL = { PRECISO: 'preciso (3 conductas)', AGRUPADO: 'agrupado (2 conductas)' }
 
-const etiqueta = (e) => 'Espécimen ' + e.especimen + ' · Cilindro ' + e.cilindro
+// Dentro de una tanda cada cilindro basta para identificar al sujeto. Donde se junten
+// varias tandas, la etiqueta debe ser «Tanda A · Cilindro P1».
+const etiqueta = (e) => 'Cilindro ' + e.cilindro
 const nombreGrupo = (g) => (g.tipo === 'CONTROL' ? 'Grupo control' : 'Grupo ' + g.nombre[0].toLowerCase() + g.nombre.slice(1))
 const hora = (iso) => iso.slice(11, 16)
 
@@ -111,9 +113,9 @@ function Comparacion({ g }) {
 
 // ── exportación (segundos, no porcentaje) ──────────────────────────────────
 function tabla(r) {
-  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
-  const out = [['Espécimen', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']]
-  r.especimenes.forEach((e) => out.push([etiqueta(e), ...KEYS.map((k) => e[k + '_s'])]))
+  const col = (k) => r.cilindros.map((e) => e[k + '_s'])
+  const out = [['Cilindro', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']]
+  r.cilindros.forEach((e) => out.push([etiqueta(e), ...KEYS.map((k) => e[k + '_s'])]))
   estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...KEYS.map((k) => s.f(col(k)).replace(' s', ''))]))
   out.push([])
   out.push([etiqueta(r.linea_tiempo) + ' · minuto', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)'])
@@ -140,7 +142,7 @@ async function exportarXLSX(r) {
 }
 
 const TABS = [
-  { id: 'especimen', label: 'Por espécimen' },
+  { id: 'cilindro', label: 'Por cilindro' },
   { id: 'comparacion', label: 'Comparación entre grupos' },
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
 ]
@@ -184,8 +186,8 @@ function SinResultados({ clave }) {
 }
 
 function ResultadosTanda({ clave, gid, letra }) {
-  const [tab, setTab] = useState('especimen')
-  const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
+  const [tab, setTab] = useState('cilindro')
+  const refs = { cilindro: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
   const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
@@ -193,7 +195,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   if (error) return <SinResultados clave={clave} />
 
   const exp = r.experimento
-  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
+  const col = (k) => r.cilindros.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
 
   // Las pestañas llevan a su sección de la vista.
@@ -241,7 +243,7 @@ function ResultadosTanda({ clave, gid, letra }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 26 }}>
-            <div ref={refs.especimen} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
+            <div ref={refs.cilindro} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
               <div className="k">Tiempo por conducta · min:seg</div>
               <div style={{ flex: 1 }} />
               <span style={{ display: 'flex', gap: 18 }}>
@@ -254,16 +256,16 @@ function ResultadosTanda({ clave, gid, letra }) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '24%' }}>Espécimen</th><th style={{ textAlign: 'right' }}>Nado activo</th><th style={{ textAlign: 'right' }}>Inmovilidad</th>
+                  <th style={{ width: '24%' }}>Cilindro</th><th style={{ textAlign: 'right' }}>Nado activo</th><th style={{ textAlign: 'right' }}>Inmovilidad</th>
                   <th style={{ textAlign: 'right' }}>Escalamiento</th><th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
               <tbody>
-                {r.especimenes.map((e) => (
-                  <tr key={e.especimen}>
+                {r.cilindros.map((e) => (
+                  <tr key={e.cilindro}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.especimen}</span>
+                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.cilindro}</span>
                         <span style={{ fontSize: 13 }}>{etiqueta(e)}</span>
                       </div>
                     </td>

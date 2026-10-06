@@ -9,7 +9,7 @@ import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
-const posiciones = (t) => 'Especímenes ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
+const posiciones = (t) => 'Cilindros P1–P' + t.n_cilindros
 
 const LEGEND = [
   { label: 'En cola', style: { background: 'var(--color-accent-200)', border: '1px solid var(--color-divider)' } },
