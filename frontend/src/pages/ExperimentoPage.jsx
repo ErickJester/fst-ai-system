@@ -82,7 +82,9 @@ export default function ExperimentoPage() {
               <span>Inicio <strong style={{ color: 'var(--color-text)' }}>{fechaCorta(exp.fecha_inicio)}</strong></span>
               <span className="num">{groups.length} grupos · {esp} especímenes · {tandas.length} tandas</span>
               <span>Responsable <strong style={{ color: 'var(--color-text)' }}>{exp.responsable}</strong></span>
+              {exp.especie && <span>Especie <strong style={{ color: 'var(--color-text)' }}>{exp.especie}</strong></span>}
             </div>
+            {exp.notas && <p style={{ margin: '10px 0 0', maxWidth: 720, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-line', color: 'var(--muted-2)' }}>{exp.notas}</p>}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Link className="btn btn-secondary" to={`/experimentos/${exp.clave}/cargar`}>Cargar videos pendientes</Link>
