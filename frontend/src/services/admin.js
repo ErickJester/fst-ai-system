@@ -33,6 +33,36 @@ export async function createUser(data) {
   return (await api.post('/admin/users', data)).data
 }
 
+// PATCH /admin/users/:id → { nombre, apellidos, email, identificador, role } (9.6, editar cuenta).
+// 409 si el correo ya existe o si deja el sistema sin administradores activos.
+export async function updateUser(id, cambios) {
+  if (USE_MOCKS) {
+    const u = db.users.find((x) => x.id === id)
+    if (!u) return fail(404, 'No existe esa cuenta.')
+    const email = cambios.email.toLowerCase()
+    if (db.users.some((x) => x.email === email && x.id !== id)) return fail(409, 'Ya existe una cuenta con ese correo.')
+    const admins = db.users.filter((x) => x.role === 'ADMIN' && x.is_active)
+    if (u.role === 'ADMIN' && cambios.role !== 'ADMIN' && u.is_active && admins.length <= 1) return fail(409, 'Debe existir al menos un Administrador activo.')
+    Object.assign(u, cambios, { email })
+    return reply(sinPassword(u))
+  }
+  return (await api.patch(`/admin/users/${id}`, cambios)).data
+}
+
+// POST /admin/users/:id/reset-temporal → { password_temporal }. Propuesta: el documento no la
+// define todavía. Genera otra temporal (se muestra una sola vez), invalida la contraseña
+// anterior y la cuenta vuelve a pedir el cambio en su próximo acceso.
+export async function resetTemporal(id) {
+  if (USE_MOCKS) {
+    const u = db.users.find((x) => x.id === id)
+    if (!u) return fail(404, 'No existe esa cuenta.')
+    const password = temporal()
+    Object.assign(u, { password, must_change_password: true })
+    return reply({ password_temporal: password })
+  }
+  return (await api.post(`/admin/users/${id}/reset-temporal`)).data
+}
+
 // PATCH /admin/users/:id → { is_active }; el servidor impide dejar el sistema sin administradores
 export async function setUserActive(id, isActive) {
   if (USE_MOCKS) {
