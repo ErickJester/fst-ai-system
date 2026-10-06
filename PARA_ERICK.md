@@ -57,6 +57,7 @@ VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend r
 | Cualquier otro correo `@ipn.mx` | Investigador | entra como cuenta nueva con contraseña temporal (atajo de demo) |
 
 - **Recuperar contraseña**: como no hay correo, tras pedir el enlace aparece «Modo demo, sin correo: abrir el enlace que llegaría por correo». `/restablecer?token=vencido` muestra el caso de enlace vencido.
+- **La cola de análisis avanza sola** (`services/mocks/simulador.js`): 8 s por etapa, un trabajo a la vez; al terminar, la tanda queda Completada (o con Error, uno de cada tres) y llega la notificación. No usa temporizadores: avanza según el tiempo transcurrido en cada lectura.
 - **Los datos de ejemplo sobreviven a la recarga** (se guardan en `localStorage`, clave `fst.demo`). Para volver a los originales: **«Reiniciar datos»** en la franja de MODO DEMO (también cierra la sesión). La sesión dura hasta cerrar la pestaña.
 
 ---
@@ -119,6 +120,7 @@ frontend/src/
 - **Formularios**: `useErrorDeCampo(refs)` da `{ err, fail, clase, refs }` para marcar el campo con error y pasarle el foco; los errores del servidor se leen con `mensajeError(e, 'respaldo')`.
 - **Avisos tras redirigir** (sesión caducada, sin permiso): `useAviso('tipo')`.
 - **Enlaces a resultados**: `enlaceResultados(clave, gid, letra)` y `primeraTandaLista(exp)` (`lib/fst.js`); nunca un enlace fijo al experimento de ejemplo.
+- **Diálogos**: `useAtraparFoco(ref, activo)` mantiene el foco dentro y lo devuelve al cerrar.
 - **Errores al dibujar**: `components/ErrorBoundary.jsx` envuelve las rutas y muestra «Algo salió mal en esta pantalla» en lugar de dejarla en blanco.
 - Estilo: el de los mockups (estilos en línea + clases de `styles/fst.css`, `modernist.css`, `app.css`). Comentarios cortos en español explicando el porqué.
 
@@ -182,6 +184,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 12. **Calidad**: pruebas automáticas con Vitest (`npm test`, 24 pruebas) y revisión con ESLint (`npm run lint`).
 13. **Errores y rutas**: aviso «Algo salió mal» en lugar de pantalla en blanco; una ruta inexistente lleva a la pantalla de inicio de la cuenta, y con sesión abierta `/login` ya no muestra el formulario.
 14. **Detalles de uso**: sugerencias de grupo con el teclado (flechas, Enter, Escape) en Cargar video; especie y notas en el encabezado de Experimento; cada enlace a resultados lleva a su tanda, y sin resultados se ve «Todavía no hay resultados».
+15. **Seguridad**: axios 1.20.0 y react-router 6.30.6 (fallas de severidad alta en axios). Quedan avisos que exigen versiones mayores: react-router v7 (moderado, solo con enlaces armados con datos externos) y tinypool/esbuild/Vite, que afectan solo a las pruebas y al servidor de desarrollo.
+16. **Modo demo vivo y accesibilidad**: la cola avanza sola; eliminar experimento comprueba la contraseña de la cuenta; los diálogos atrapan el foco y lo devuelven al cerrar; la navegación de Resultados es un `<nav>` con `aria-current`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -224,6 +228,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 - **Quitar los códigos de trazabilidad** de la interfaz (RN-06, T-06, RF-08, RF-31): lo hace tu rama `feat/sin-codigos-cilindro` (ver sección 12).
 - **PDF de diagnóstico desde el servidor** con reintento «preparando…» (hoy se arma en el navegador).
 - **Revisión segundo a segundo** (§9.7): al final; necesita `GET .../review`, `GET .../video` con Range y `PUT .../segundos`. El borrador local debe guardarse por usuario y borrarse al cerrar sesión.
+- **Actualizaciones mayores pendientes**: react-router 7, Vitest 5 y Vite 8 (avisos de seguridad que no afectan a la app publicada; requieren revisar cambios incompatibles).
+- **Revisión automática en GitHub (CI)** y **pantallas angostas**: propuestas, pendientes de acordar.
 - **Conectar al backend**: cuando existan los endpoints, probar cada pantalla con `VITE_USE_MOCKS=false` y ajustar nombres de campos.
 
 ---
