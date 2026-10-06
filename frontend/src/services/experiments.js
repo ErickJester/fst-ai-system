@@ -2,10 +2,14 @@ import api from './api'
 import { USE_MOCKS, TOKEN_KEY } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
+import { simular } from './mocks/simulador'
 
 // GET /experiments → lista con estado agregado (pantalla 2a)
 export async function listExperiments() {
-  if (USE_MOCKS) return reply(db.experiments)
+  if (USE_MOCKS) {
+    simular()
+    return reply(db.experiments)
+  }
   return (await api.get('/experiments')).data
 }
 
@@ -42,6 +46,7 @@ function usuarioDeLaSesion() {
 // GET /experiments/:clave → datos generales + grupos → tandas (pantalla 2c)
 export async function getExperiment(clave) {
   if (USE_MOCKS) {
+    simular()
     const exp = db.experimentDetail[clave]
     return exp ? reply(exp) : fail(404, 'No existe ese experimento.')
   }

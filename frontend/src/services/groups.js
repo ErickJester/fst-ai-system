@@ -2,10 +2,13 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
+import { resumir } from './mocks/resumen'
+import { simular } from './mocks/simulador'
 
 // GET /experiments/:clave/groups/:gid → grupo con sus tandas y videos (pantalla 2d)
 export async function getGroup(clave, gid) {
   if (USE_MOCKS) {
+    simular()
     const exp = db.experimentDetail[clave]
     const grupo = exp?.grupos.find((g) => g.id === gid)
     if (!grupo) return fail(404, 'No existe ese grupo.')
@@ -49,7 +52,7 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
     if (dia === 'DAY1') t.dia1 = { estado: 'QUEUED' }
     else Object.assign(t, { estado: 'QUEUED', progreso: null, error: null, analisis_fecha: null })
     const job = {
-      job_id: Date.now(), posicion: db.queue.length + 1, experimento: db.experimentDetail[clave].titulo.split(' · ')[0],
+      job_id: Date.now(), posicion: db.queue.length + 1, clave, gid, creado_ms: Date.now(), experimento: db.experimentDetail[clave].titulo.split(' · ')[0],
       grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null,
     }
     db.queue.push(job)
@@ -66,24 +69,3 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
   return res.data
 }
 
-// Sin backend, la fila del experimento en la lista (2a) se recalcula a partir de sus
-// grupos y tandas, como lo haría el servidor.
-function resumir(clave) {
-  const exp = db.experimentDetail[clave]
-  const fila = db.experiments.find((e) => e.clave === clave)
-  if (!exp || !fila) return
-  const tandas = exp.grupos.flatMap((g) => g.tandas)
-  const total = tandas.length
-  const cargados = tandas.filter((t) => t.estado !== 'SIN_VIDEO').length
-  const listos = tandas.filter((t) => t.estado === 'DONE').length
-  Object.assign(fila, {
-    n_grupos: exp.grupos.length,
-    n_especimenes: exp.grupos.reduce((a, g) => a + g.n_especimenes, 0),
-    tratamientos: [...new Set(exp.grupos.map((g) => g.tratamiento))].join(' '),
-    videos_dia2_total: total,
-    videos_dia2_cargados: cargados,
-    videos_dia2_listos: listos,
-    estado: !total || cargados < total ? 'CARGA_INCOMPLETA' : listos === total ? 'CONCLUIDO' : 'EN_ANALISIS',
-    retencion_dias: fila.retencion_dias ?? (total ? 30 : null),
-  })
-}
