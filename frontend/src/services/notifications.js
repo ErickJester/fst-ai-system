@@ -2,10 +2,14 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
+import { simular } from './mocks/simulador'
 
 // GET /notifications → las de la cuenta, de la más nueva a la más vieja
 export async function listNotifications() {
-  if (USE_MOCKS) return reply(db.notifications, 60)
+  if (USE_MOCKS) {
+    simular()
+    return reply(db.notifications, 60)
+  }
   return (await api.get('/notifications')).data
 }
 
