@@ -2,11 +2,13 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
+import { simular } from './mocks/simulador'
 
 // GET /experiments/:clave/groups/:gid/batches/:letra/results?day= → por espécimen (s),
 // línea de tiempo, nivel y calidad del análisis (2f)
 export async function getBatchResults(clave, gid, letra, dia = 'DAY2') {
   if (USE_MOCKS) {
+    simular()
     const r = db.batchResults[[clave, gid, letra, dia].join('/')]
     if (r) return reply(r)
     // Sin backend solo hay resultados de una tanda. Las demás tandas terminadas muestran

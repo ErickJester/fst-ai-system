@@ -7,7 +7,9 @@ import { createExperiment, deleteExperiment, getExperiment, listExperiments } fr
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue } from './queue'
 import { getBatchResults } from './results'
-import { reiniciarDatos, resetTokens } from './mocks/data'
+import { reiniciarDatos, resetTokens, queue } from './mocks/data'
+import { avanzarSimulacion } from './mocks/simulador'
+import { listNotifications } from './notifications'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
 
@@ -154,5 +156,58 @@ describe('resultados por tanda', () => {
   it('una tanda en cola o con error todavía no tiene resultados', async () => {
     expect(await status(getBatchResults('EXP-2026-02', 'G-01', 'B'))).toBe(404)
     expect(await status(getBatchResults('EXP-2026-02', 'G-04', 'B'))).toBe(404)
+  })
+})
+
+describe('simulación de la cola (modo demo)', () => {
+  const T0 = Date.UTC(2026, 9, 5, 15, 0, 0)
+  const s = (n) => n * 1000
+
+  it('los trabajos avanzan por etapas, terminan, notifican y dejan correr al siguiente', async () => {
+    avanzarSimulacion(T0) // el trabajo inicial va en 75 %: le faltan 8 s
+    expect((await getQueue()).cola[0]).toMatchObject({ job_id: 501, status: 'RUNNING' })
+
+    avanzarSimulacion(T0 + s(9))
+    const cola = (await getQueue()).cola
+    expect(cola.map((j) => j.job_id)).toEqual([502, 503])
+    expect(cola[0]).toMatchObject({ posicion: 1, status: 'RUNNING' })
+    const tanda = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-03').tandas[1]
+    expect(tanda).toMatchObject({ letra: 'B', estado: 'DONE', progreso: null })
+    const [aviso] = await listNotifications()
+    expect(aviso).toMatchObject({ tipo: 'ANALYSIS_DONE', is_read: false, enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-03&tanda=B' })
+    expect((await listExperiments()).find((e) => e.clave === 'EXP-2026-02').videos_dia2_listos).toBe(5)
+    expect(await status(getBatchResults('EXP-2026-02', 'G-03', 'B'))).toBe('ok')
+
+    // 12 s después del inicio de Control · Tanda B: segunda etapa
+    avanzarSimulacion(T0 + s(8 + 12))
+    const enCurso = (await getQueue()).cola[0]
+    expect(enCurso).toMatchObject({ job_id: 502, stage: 'ROI_DETECTION', progress_pct: 37 })
+    const control = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-01').tandas[1]
+    expect(control).toMatchObject({ estado: 'RUNNING', progreso: { etapa: 'ROI_DETECTION', pct: 37 } })
+  })
+
+  it('uno de cada tres trabajos falla en la detección de cilindros', async () => {
+    avanzarSimulacion(T0)
+    avanzarSimulacion(T0 + s(8 + 32 + 16)) // 501 y 502 terminan; 503 falla a la mitad
+    const { cola, errores } = await getQueue()
+    expect(cola).toEqual([])
+    expect(errores[0]).toMatchObject({ job_id: 503, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50 })
+    expect(errores[0].error.codigo).toBe('E-DET-070')
+    const tanda = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-04').tandas[0]
+    expect(tanda.estado).toBe('FAILED')
+    expect((await listNotifications())[0]).toMatchObject({ tipo: 'ANALYSIS_FAILED', enlace: '/analisis' })
+  })
+
+  it('un video subido con la cola vacía empieza cuando se sube, no antes', async () => {
+    avanzarSimulacion(T0)
+    avanzarSimulacion(T0 + s(60)) // cola vacía
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-05', especie: '', notas: '' })
+    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'x' })
+    await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 })
+    queue[0].creado_ms = T0 + s(100) // fijamos el momento de la subida
+    avanzarSimulacion(T0 + s(90))
+    expect((await getQueue()).cola[0].status).toBe('QUEUED')
+    avanzarSimulacion(T0 + s(100 + 8))
+    expect((await getQueue()).cola[0]).toMatchObject({ status: 'RUNNING', stage: 'ROI_DETECTION', progress_pct: 25 })
   })
 })

@@ -52,9 +52,9 @@ export const experimentDetail = {
 // status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo);
 // confianza: de la detección de cilindros (mínimo 0.70).
 export const queue = [
-  { job_id: 501, posicion: 1, experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, confianza: 0.86, error: null },
-  { job_id: 502, posicion: 2, experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
-  { job_id: 503, posicion: 3, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
+  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, confianza: 0.86, error: null },
+  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
+  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
@@ -153,13 +153,16 @@ export const notifications = [
 // Un token que no está aquí, como «vencido», responde igual que un enlace vencido.
 export const resetTokens = {}
 
+// Simulación de la cola (mocks/simulador.js): hasta dónde se avanzó y cuántos trabajos terminaron.
+export const simulacion = { ultimo: null, terminados: 0 }
+
 // ── persistencia en el navegador ───────────────────────────────────────────
 // Los datos de ejemplo se guardan en localStorage para que sobrevivan a la recarga
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 1
-const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, groupComparison, users, system, notifications, resetTokens }
+const VERSION_DATOS = 2
+const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, groupComparison, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
 // Reemplaza el contenido de cada colección sin cambiar el objeto, porque los
