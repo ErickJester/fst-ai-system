@@ -11,7 +11,7 @@ Autora de la rama: Vanesa · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `P
 1. **No se toca `main`.** Nada de commits, merges, rebases ni push directo. Todo el trabajo va en ramas y entra por PR cuando el equipo lo decida.
 2. **Todo en español**: interfaz, comentarios, mensajes de commit y respuestas de Claude.
 3. **Terminología en la interfaz** (y en lo que se exporta, como el CSV):
-   - Se dice **«Espécimen» / «Especímenes»**. «Rata» en singular se permite solo como especie (p. ej. «Rata Wistar»); **nunca «ratas»**.
+   - A cada sujeto se le nombra **por su cilindro: «Cilindro P1»**. Donde se junten varias tandas (vista por grupo, CSV combinado), **«Tanda A · Cilindro P1»**, porque cada tanda tiene su propio P1. Para conteos se dice «especímenes» (p. ej. «32 especímenes»). «Rata» en singular se permite solo como especie («Rata Wistar»); **nunca «ratas»**.
    - Prohibido en la interfaz: «animal», «IA», «inteligencia artificial».
 4. **Los mockups v2 (`mockup/v2/`) mandan en lo visual.** Las pantallas deben verse como el mockup; si algo se aparta, se documenta por qué.
 5. Antes de hacer push o abrir un PR, avisar a la otra persona.
@@ -158,7 +158,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
 | `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }` |
 | `GET /queue` | — | `{ cola, errores }` |
-| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | tiempos por espécimen (s), línea de tiempo, nivel, confianza |
+| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `cilindros` con tiempos por conducta (s), línea de tiempo, nivel, confianza |
 | `GET /experiments/:clave/group-comparison` | — | inmovilidad media ± DE por grupo |
 | `GET /notifications` · `PATCH /notifications/:id` · `POST /notifications/read-all` | `{ is_read }` | — |
 
@@ -175,7 +175,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 3. **Limpieza**: componentes compartidos, `useErrorDeCampo`, `mensajeError`, `lib/estilos.js`; se eliminó `data/mock.js`. Verificado con la huella: el HTML no cambió.
 4. **Ajustes del documento de requisitos**: acepta .mp4 y .mov; rechaza videos verticales; barra de progreso al subir; texto exacto de recuperación; aviso de sesión caducada; cerrar sesión sin llamar al servidor; Progreso consulta cada 5 s con análisis activos y cada 30 s sin ninguno.
 5. **Corrección importante**: antes, cualquier 401 (incluida una contraseña incorrecta en el login) mandaba al login sin mostrar el error.
-6. **«Espécimen» en lugar de «Rata»** en Experimento, Grupo, Resultados y CSV. El campo de resultados pasó de `rata` a `especimen`.
+6. **Sin «Rata» en la interfaz**: primero se cambió a «Espécimen 1 · Cilindro P1» y después, por tu propuesta de `PARA_VANESA.md` §3, a **«Cilindro P1»** en Experimento, Grupo, Resultados y CSV. Los resultados de ejemplo traen `cilindros: [{ cilindro: 'P1', … }]`, sin número de espécimen.
 7. **El enlace de recuperación vale 60 minutos** (como `RESET_LINK_MINUTES`); el mockup decía 30.
 8. **Contraseñas y permisos**: modal en Admin que muestra la contraseña temporal una sola vez; pantalla `/restablecer` con caso de enlace vencido; los datos de ejemplo comprueban contraseñas de las cuentas creadas; 403 con aviso.
 9. **Versión 0.3.0**, como pediste en `PARA_VANESA.md`.
@@ -200,7 +200,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 
 | Tema | Decisión |
 |---|---|
-| Término para los sujetos | «Espécimen / Especímenes»; nunca «ratas». En tablas y CSV: **«Espécimen 1 · Cilindro P1»** (se queda así; ver sección 12). |
+| Término para los sujetos | **«Cilindro P1»** dentro de una tanda; **«Tanda A · Cilindro P1»** al juntar tandas; «especímenes» solo para conteos; nunca «ratas». Aceptada tu propuesta de `PARA_VANESA.md` §3. |
 | Contraseña temporal | Se muestra una sola vez al crear la cuenta. Sin caducidad por ahora. |
 | Dónde guardar el token | `sessionStorage` (falta decidir si la sesión debe sobrevivir al cerrar la pestaña). |
 | Revisión segundo a segundo | Va en este frontend, construida al final (§12 del documento). Mientras, se usa `tools/fst_labeler`. |
@@ -248,13 +248,13 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 Tu rama hace dos cosas; propongo tratarlas por separado:
 
 1. **Quitar los códigos de trazabilidad** (RN-06, T-06, RF-08, RF-31): de acuerdo, es tuyo y yo no los toco en esta rama para no chocar. Hoy siguen en Experimentos (aviso RN-06), Admin (T-06), Cargar video (RF-08) y Resultados (RF-31).
-2. **Nombre de los sujetos**: Vanesa decidió **mantener «Espécimen 1 · Cilindro P1»** (y «Especímenes 1–4» en los resúmenes). Al rehacer tu rama encima de esta, conserva ese texto y quita solo los códigos.
+2. **Nombre de los sujetos**: **de acuerdo con tu propuesta: «Cilindro P1»**. Ya está aplicado en esta rama con tus mismos textos («Cilindros P1–P4», «Cilindros de la tanda», «Cilindro P1», «Por cilindro», columna «Cilindro» en el CSV). Al rehacer tu rama solo te queda quitar los códigos.
 
 Orden sugerido:
 
 1. Esta rama entra a `main` por PR.
 2. Rehaces `feat/sin-codigos-cilindro` encima del `main` nuevo, solo con lo de los códigos, y le subes la versión a **0.3.1**.
-3. Si al rehacerla hay conflictos en Experimento, Grupo, Resultados o los datos de ejemplo, gana el texto «Espécimen N · Cilindro PN».
+3. Si al rehacerla hay conflictos en Experimento, Grupo, Resultados o los datos de ejemplo, gana lo de esta rama: ya tiene «Cilindro PN» y los datos con forma de API (`data/mock.js` ya no existe; los datos están en `services/mocks/data.js`).
 
 ---
 
