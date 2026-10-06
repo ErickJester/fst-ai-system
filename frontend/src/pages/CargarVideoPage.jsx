@@ -40,6 +40,7 @@ export default function CargarVideoPage() {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)
   const [sugOpen, setSugOpen] = useState(false)
+  const [activa, setActiva] = useState(-1) // sugerencia resaltada con el teclado
   const [tanda, setTanda] = useState('')
   const [cil, setCil] = useState('4')
   const [sesion, setSesion] = useState('2')
@@ -75,6 +76,7 @@ export default function CargarVideoPage() {
     setQ(v)
     setSel(null)
     setSugOpen(m.length > 0)
+    setActiva(-1)
     setTanda(t && m.length === 0 ? 'A' : '')
     setConfirmada(false)
   }
@@ -83,8 +85,27 @@ export default function CargarVideoPage() {
     setSel(g.id)
     setQ(g.nombre)
     setSugOpen(false)
+    setActiva(-1)
     setTanda(nextLetter(g.cargadas))
     setConfirmada(false)
+  }
+
+  // Flechas para recorrer las sugerencias, Enter para elegir, Escape para cerrar.
+  function onTeclaGrupo(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!matches.length) return
+      e.preventDefault()
+      setSugOpen(true)
+      const paso = e.key === 'ArrowDown' ? 1 : -1
+      // Sin resaltada, ↓ va a la primera y ↑ a la última; después da la vuelta.
+      setActiva((i) => (i < 0 ? (paso > 0 ? 0 : matches.length - 1) : (i + paso + matches.length) % matches.length))
+    } else if (e.key === 'Enter' && sugOpen && activa >= 0) {
+      e.preventDefault()
+      pick(matches[activa])
+    } else if (e.key === 'Escape' && sugOpen) {
+      setSugOpen(false)
+      setActiva(-1)
+    }
   }
 
   // ── 2 · tanda ─────────────────────────────────────────────────────────────
@@ -194,13 +215,18 @@ export default function CargarVideoPage() {
               <div>
                 <Campo id="grupo" label="Grupo o tratamiento">
                   <input className="input" id="grupo" autoComplete="off" placeholder="Escribe el grupo o el tratamiento"
+                    role="combobox" aria-autocomplete="list" aria-controls="sugGrupos" aria-expanded={sugOpen}
+                    aria-activedescendant={sugOpen && activa >= 0 ? 'sug-' + activa : undefined}
                     style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
-                    value={q} onChange={(e) => onGrupo(e.target.value)} />
+                    value={q} onChange={(e) => onGrupo(e.target.value)} onKeyDown={onTeclaGrupo} />
                 </Campo>
                 {sugOpen && (
                   <div style={{ border: '2px solid var(--color-text)', borderTop: 0, background: 'var(--color-bg)' }}>
-                    {matches.map((g) => (
-                      <div key={g.nombre} className="sug" onClick={() => pick(g)}>
+                    <div id="sugGrupos" role="listbox" aria-label="Grupos de este experimento">
+                    {matches.map((g, i) => (
+                      <div key={g.nombre} id={'sug-' + i} role="option" aria-selected={i === activa}
+                        className={'sug' + (i === activa ? ' active' : '')}
+                        onMouseEnter={() => setActiva(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(g)}>
                         <span className="nd" style={{ fontSize: 13 }}><Hi label={g.nombre} q={qt} /></span>
                         <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
                         <div style={{ flex: 1 }} />
@@ -209,6 +235,7 @@ export default function CargarVideoPage() {
                         </span>
                       </div>
                     ))}
+                    </div>
                     <div style={{ padding: '8px 12px', fontSize: 11.5, color: 'var(--muted)' }}>Solo se sugieren los {grupos.length} grupos de este experimento, nunca los de otros experimentos.</div>
                   </div>
                 )}
