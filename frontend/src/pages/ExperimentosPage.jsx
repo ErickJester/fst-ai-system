@@ -39,8 +39,10 @@ function retencion(e) {
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
 
-// Los reportes del mockup apuntan todos a los resultados del experimento de ejemplo.
-const RESULTADOS = '/experimentos/EXP-2026-02/resultados'
+// Los reportes llevan a los resultados del experimento; sin ningún Día 2 analizado no hay
+// nada que exportar. Sin backend, solo el experimento de ejemplo tiene detalle.
+const conReportes = (e) => e.con_detalle && e.videos_dia2_listos > 0
+const chipInactivo = { opacity: 0.4, cursor: 'default' }
 
 // 2a · Experimentos: lista a nivel experimento con estado agregado.
 export default function ExperimentosPage() {
@@ -127,7 +129,9 @@ export default function ExperimentosPage() {
                   <td className="num" style={{ fontSize: 12, color: ret.color }}>{ret.texto}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {['CSV', 'XLSX', 'PDF'].map((x) => <Link key={x} className="chip" to={RESULTADOS}>{x}</Link>)}
+                      {['CSV', 'XLSX', 'PDF'].map((x) => conReportes(e)
+                        ? <Link key={x} className="chip" to={`/experimentos/${e.clave}/resultados`}>{x}</Link>
+                        : <span key={x} className="chip" style={chipInactivo} aria-disabled="true" title="Todavía no hay resultados">{x}</span>)}
                     </div>
                   </td>
                 </tr>
