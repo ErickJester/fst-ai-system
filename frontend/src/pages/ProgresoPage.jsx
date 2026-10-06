@@ -36,7 +36,7 @@ function descargarDiagnostico(j, detalle) {
     '<body><h3>Reporte de diagnóstico</h3>' +
     '<p><strong>' + nombreTrabajo(j) + '</strong><br>' + detalle + '</p>' +
     '<p><strong>' + j.error.codigo + '</strong> · ' + j.error.mensaje + '</p>' +
-    '<script>onload=()=>print()<\/script></body></html>'
+    '<script>onload=()=>print()</script></body></html>'
   )
   w.document.close()
 }
