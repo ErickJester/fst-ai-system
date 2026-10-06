@@ -2,7 +2,7 @@
 
 Respuesta a `PARA_ERICK.md`. Resume lo hecho en el repo desde el 20 de septiembre y cómo seguimos.
 
-Autor: Erick · Fecha: 4 oct 2026
+Autor: Erick · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `PARA_ERICK.md` con la versión 0.3.0)
 
 ---
 
@@ -80,24 +80,57 @@ Se corre con `python tools/fst_labeler/app.py` en el puerto 5055, y también est
 ### Tu trabajo (3–4 oct, en tus ramas)
 
 - `feat/frontend-v2-fase0`: queda superada por `feat/frontend-v2-servicios`.
-- `feat/frontend-v2-servicios` (17 commits): ya la revisé, incluido tu `PARA_ERICK.md`. Me parece bien que sea la base del frontend.
+- `feat/frontend-v2-servicios` (29 commits sobre `main`, v0.3.0): me parece bien que sea la base del frontend. Lo nuevo del 5 oct que ya vi:
+  - datos de ejemplo persistentes y «Reiniciar datos»;
+  - en Admin, editar cuenta, restablecer la temporal y reactivar;
+  - pruebas con Vitest y revisión con ESLint;
+  - `ErrorBoundary`, rutas inexistentes y login con sesión abierta;
+  - sugerencias de grupo con el teclado, especie y notas en Experimento, enlaces a la tanda correcta en Resultados.
 
-### Rama mía sin subir: `feat/sin-codigos-cilindro` (4 oct, v0.2.2)
+### Mi rama `feat/sin-codigos-cilindro` (4 oct, v0.2.2, ya en GitHub, sin PR)
 
 - Quita de la interfaz y de los mockups los **códigos de trazabilidad** (RN-06, T-06, RF-08, RF-31). Esos códigos son para el documento, no para el usuario.
 - **Nombra a cada sujeto por su cilindro**, «Cilindro P1».
 
-**Esto choca con tu `f252244`**, que pone «Espécimen 1 · Cilindro P1». Tocamos los mismos archivos: Experimento, Grupo, Resultados, el CSV y los datos de ejemplo. Propongo:
+Esto choca con tu `f252244`, que pone «Espécimen 1 · Cilindro P1». Vi que en tu §12 propones quedarte con ese texto; en la sección 3 explico por qué prefiero «Cilindro P1».
 
-1. Hablar entre los dos qué nombre se queda.
-2. Que tu rama `feat/frontend-v2-servicios` entre primero, porque es la más grande.
-3. Rehacer mi rama encima de la tuya con el nombre que acordemos. Quitar los códigos no lo discutimos: va de todos modos.
+Sobre el orden, de acuerdo con tu §12:
 
-Todavía no la subo, porque tu regla 5 pide avisar antes.
+1. Tu rama `feat/frontend-v2-servicios` entra primero a `main` por PR.
+2. Yo rehago `feat/sin-codigos-cilindro` encima del `main` nuevo y la subo a **0.3.1**.
+3. Quitar los códigos va de todos modos. El nombre de los sujetos lo cerramos antes de rehacerla.
 
 ---
 
-## 3. Sobre tus reglas del equipo
+## 3. Nombre de los sujetos: propongo «Cilindro P1»
+
+Lo que nos importa son las tres conductas (nado activo, inmovilidad, escalamiento) **por grupo**: la media ± DE de Control, Referencia y Experimental. Para eso basta con saber qué pasó en cada cilindro; no necesitamos saber qué espécimen estaba dentro.
+
+- Un espécimen **no cambia de cilindro** durante la prueba.
+- **El Día 1 es de habituación** (confirmado). Lo que se analiza es el Día 2, así que nunca hay que emparejar al mismo espécimen entre días.
+- El «1» de «Espécimen 1» lo pone el sistema: nadie lo captura y no corresponde al ID del laboratorio. Mostrarlo da a entender que llevamos el control de cada espécimen, y no es así.
+
+Lo que **sí se conserva** es el dato por cilindro: cada cilindro es un punto de la muestra y con esos valores se calculan la media y la DE.
+
+Detalle a cuidar: la tanda A y la tanda B tienen las dos un «Cilindro P1» y son especímenes distintos. Donde se junten varias tandas (vista por grupo, un CSV combinado) la etiqueta debe ser **«Tanda A · Cilindro P1»**. Dentro de una sola tanda basta con «Cilindro P1».
+
+Si algún día un investigador necesita el ID de laboratorio de cada espécimen, se agrega como campo opcional por cilindro, sin cambiar el modelo.
+
+¿Te parece? Si estás de acuerdo, al rehacer mi rama gana «Cilindro PN» en Experimento, Grupo, Resultados, el CSV y los datos de ejemplo.
+
+### Pregunta abierta: ¿qué hacemos con los videos del Día 1?
+
+Si el Día 1 es solo habituación, hoy la interfaz deja subirlo y analizarlo igual que el Día 2 (Cargar video con `DAY1`/`DAY2`, Resultados con `?day=`). Opciones:
+
+- **Quitarlo**: solo se sube y analiza el Día 2. Interfaz más simple y la mitad de videos en la cola.
+- **Guardarlo sin analizar**: se sube como registro, pero no entra a la cola.
+- **Dejarlo como está**, por si alguien quiere medir la habituación.
+
+Todavía no lo decidimos; no cambies nada de esto hasta hablarlo.
+
+---
+
+## 4. Sobre tus reglas del equipo
 
 De acuerdo con todas: no tocar `main` directo, todo en español, nada de «ratas», «animal» ni «IA» en la interfaz, mockups v2 como referencia y avisar antes de un push o un PR.
 
@@ -105,15 +138,15 @@ Un dato: el merge del PR #2 en GitHub aparece como «Angel Frausto Robles». Es 
 
 ---
 
-## 4. Versiones
+## 5. Versiones
 
 - La versión vive en `frontend/package.json` y se ve en la franja de MODO DEMO.
 - Usamos **0.x mientras no exista el clasificador**. La **1.0.0** será cuando el clasificador esté integrado y el sistema haga lo que promete la tesis.
-- Hoy: 0.2.1 en `main` y 0.2.2 en mi rama sin subir. Cuando tu rama entre, súbele la versión, por ejemplo a 0.3.0.
+- Hoy: 0.2.1 en `main`, 0.3.0 en tu rama y 0.2.2 en la mía. Cuando rehaga la mía encima de la tuya, queda en 0.3.1.
 
 ---
 
-## 5. Orden de trabajo
+## 6. Orden de trabajo
 
 1. **Terminar el etiquetador** y etiquetar videos.
 2. Definir y entrenar el clasificador con esos datos.
