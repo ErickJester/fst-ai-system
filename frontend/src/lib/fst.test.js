@@ -44,9 +44,9 @@ describe('texto', () => {
 
 describe('CSV', () => {
   it('lleva BOM para Excel y escapa comas, comillas y saltos de línea', () => {
-    const csv = toCSV([['Espécimen', 'Nota'], ['Espécimen 1 · Cilindro P1', 'dijo "hola", y\nsiguió']])
+    const csv = toCSV([['Cilindro', 'Nota'], ['Cilindro P1', 'dijo "hola", y\nsiguió']])
     expect(csv.charCodeAt(0)).toBe(0xfeff)
-    expect(csv.slice(1)).toBe('Espécimen,Nota\nEspécimen 1 · Cilindro P1,"dijo ""hola"", y\nsiguió"')
+    expect(csv.slice(1)).toBe('Cilindro,Nota\nCilindro P1,"dijo ""hola"", y\nsiguió"')
   })
 })
 

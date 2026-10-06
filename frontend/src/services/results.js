@@ -4,7 +4,7 @@ import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { simular } from './mocks/simulador'
 
-// GET /experiments/:clave/groups/:gid/batches/:letra/results?day= → por espécimen (s),
+// GET /experiments/:clave/groups/:gid/batches/:letra/results?day= → por cilindro (s),
 // línea de tiempo, nivel y calidad del análisis (2f)
 export async function getBatchResults(clave, gid, letra, dia = 'DAY2') {
   if (USE_MOCKS) {
@@ -12,7 +12,7 @@ export async function getBatchResults(clave, gid, letra, dia = 'DAY2') {
     const r = db.batchResults[[clave, gid, letra, dia].join('/')]
     if (r) return reply(r)
     // Sin backend solo hay resultados de una tanda. Las demás tandas terminadas muestran
-    // esos mismos números con su grupo, letra y especímenes, para poder recorrerlas.
+    // esos mismos números con su grupo, letra y cilindros, para poder recorrerlas.
     const exp = db.experimentDetail[clave]
     const g = exp?.grupos.find((x) => x.id === gid)
     const t = g?.tandas.find((x) => x.letra === letra)
@@ -23,8 +23,7 @@ export async function getBatchResults(clave, gid, letra, dia = 'DAY2') {
       experimento: { clave: exp.clave, titulo: exp.titulo },
       grupo: { id: g.id, nombre: g.nombre, tipo: g.tipo, tratamiento: g.tratamiento },
       letra,
-      especimenes: base.especimenes.slice(0, t.n_cilindros).map((e, i) => ({ ...e, especimen: t.desde + i })),
-      linea_tiempo: { ...base.linea_tiempo, especimen: t.desde },
+      cilindros: base.cilindros.slice(0, t.n_cilindros),
     })
   }
   return (await api.get(`/experiments/${clave}/groups/${gid}/batches/${letra}/results`, { params: { day: dia } })).data
