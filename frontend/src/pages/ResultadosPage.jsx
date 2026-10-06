@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison } from '../services/results'
+import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, toCSV, loadScript, fechaCorta, norm } from '../lib/fst'
+import { mean, variance, fmt, r1, download, toCSV, loadScript, fechaCorta, norm, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -13,9 +14,6 @@ const N400 = 'var(--color-neutral-400)'
 const MUT = 'var(--muted)'
 const PEND = 'var(--color-accent-700)'
 const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
-
-// Sin ?grupo=&tanda= se abre la tanda de ejemplo de los mockups.
-const EJEMPLO = { grupo: 'G-02', tanda: 'A' }
 
 const CONDUCTAS = [
   { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
@@ -147,19 +145,52 @@ const TABS = [
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
 ]
 
-// 2f · Resultados: conductas y estadísticos de una tanda, Día 2.
+// 2f · Resultados de una tanda, Día 2: /experimentos/:clave/resultados?grupo=&tanda=.
+// Sin grupo y tanda abre la primera tanda del experimento con el Día 2 analizado.
 export default function ResultadosPage() {
   const { clave } = useParams()
   const [params] = useSearchParams()
-  const gid = params.get('grupo') || EJEMPLO.grupo
-  const letra = params.get('tanda') || EJEMPLO.tanda
+  const gid = params.get('grupo')
+  const letra = params.get('tanda')
+  if (gid && letra) return <ResultadosTanda key={gid + letra} clave={clave} gid={gid} letra={letra} />
+  return <PrimeraTanda clave={clave} />
+}
+
+function PrimeraTanda({ clave }) {
+  const { data: exp, error, loading } = useAsync(() => getExperiment(clave), [clave])
+  if (loading) return <Cargando />
+  if (error) return <NoEncontrado />
+  const t = primeraTandaLista(exp)
+  if (!t) return <SinResultados clave={clave} />
+  return <Navigate replace to={enlaceResultados(clave, t.gid, t.letra)} />
+}
+
+function SinResultados({ clave }) {
+  return (
+    <div className="app">
+      <Topbar><Brand /></Topbar>
+      <div className="page">
+        <h3 style={{ margin: '0 0 8px' }}>Todavía no hay resultados</h3>
+        <p className="lead" style={{ marginBottom: 16, maxWidth: 560 }}>
+          Los resultados de una tanda aparecen cuando termina el análisis de su video de Día 2.
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link className="btn btn-primary" to={`/experimentos/${clave}`}>Volver al experimento</Link>
+          <Link className="btn btn-secondary" to="/analisis">Ver progreso del análisis</Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ResultadosTanda({ clave, gid, letra }) {
   const [tab, setTab] = useState('especimen')
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
   const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
   if (loading) return <Cargando />
-  if (error) return <NoEncontrado />
+  if (error) return <SinResultados clave={clave} />
 
   const exp = r.experimento
   const col = (k) => r.especimenes.map((e) => e[k + '_s'])

@@ -5,7 +5,7 @@ import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, r
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { mensajeError } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
 const posiciones = (t) => 'Especímenes ' + t.desde + '–' + (t.desde + t.n_cilindros - 1) + ' · cilindros P1–P' + t.n_cilindros
@@ -50,6 +50,7 @@ export default function ExperimentoPage() {
   const groups = exp.grupos
   const tandas = groups.flatMap((g) => g.tandas)
   const completas = tandas.filter((t) => t.estado === 'DONE').length
+  const lista = primeraTandaLista(exp)
   const esp = groups.reduce((a, g) => a + g.n_especimenes, 0)
   const puedeBorrar = nombre === exp.titulo && pass.length > 0 && !borrando
 
@@ -88,7 +89,9 @@ export default function ExperimentoPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Link className="btn btn-secondary" to={`/experimentos/${exp.clave}/cargar`}>Cargar videos pendientes</Link>
-            <Link className="btn btn-primary" to={`/experimentos/${exp.clave}/resultados`}>Ver resultados</Link>
+            {lista
+              ? <Link className="btn btn-primary" to={enlaceResultados(exp.clave, lista.gid, lista.letra)}>Ver resultados</Link>
+              : <button type="button" className="btn btn-primary" disabled title="Todavía no hay tandas con el Día 2 analizado">Ver resultados</button>}
           </div>
         </div>
 
