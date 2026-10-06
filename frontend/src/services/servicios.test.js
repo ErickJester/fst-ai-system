@@ -6,6 +6,7 @@ import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue } from './queue'
+import { getBatchResults } from './results'
 import { reiniciarDatos, resetTokens } from './mocks/data'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
@@ -137,5 +138,21 @@ describe('experimentos', () => {
     expect(await status(deleteExperiment('EXP-2026-02', { titulo: 'otro nombre', password: 'x' }))).toBe(400)
     expect(await status(deleteExperiment('EXP-2026-02', { titulo: 'Compuesto CSR-14 · curva de dosis', password: 'x' }))).toBe('ok')
     expect(await status(getExperiment('EXP-2026-02'))).toBe(404)
+  })
+})
+
+describe('resultados por tanda', () => {
+  it('cada tanda terminada tiene los suyos, con su grupo y sus especímenes', async () => {
+    const control = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    expect(control.grupo.nombre).toBe('Control')
+    expect(control.especimenes.map((e) => e.especimen)).toEqual([1, 2, 3, 4])
+    const refB = await getBatchResults('EXP-2026-02', 'G-02', 'B')
+    expect(refB.letra).toBe('B')
+    expect(refB.especimenes.map((e) => e.especimen)).toEqual([5, 6, 7, 8])
+  })
+
+  it('una tanda en cola o con error todavía no tiene resultados', async () => {
+    expect(await status(getBatchResults('EXP-2026-02', 'G-01', 'B'))).toBe(404)
+    expect(await status(getBatchResults('EXP-2026-02', 'G-04', 'B'))).toBe(404)
   })
 })

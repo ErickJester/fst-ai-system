@@ -55,6 +55,18 @@ export const ETAPA = {
   CLASSIFICATION: 'Clasificación de conducta',
 }
 
+// Primera tanda con el Día 2 analizado de un experimento (detalle de la API), o null.
+export function primeraTandaLista(exp) {
+  for (const g of exp.grupos) {
+    const t = g.tandas.find((x) => x.estado === 'DONE')
+    if (t) return { gid: g.id, letra: t.letra }
+  }
+  return null
+}
+
+// Enlace a los resultados de una tanda.
+export const enlaceResultados = (clave, gid, letra) => `/experimentos/${clave}/resultados?grupo=${gid}&tanda=${letra}`
+
 // Búsqueda sin acentos ni mayúsculas.
 export const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 

@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsync } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -106,7 +106,7 @@ export default function GrupoPage() {
                       <span>{t.analisis_fecha ? 'Análisis vigente: ' + fechaCorta(t.analisis_fecha) : 'Sin análisis todavía'}</span>
                       <div style={{ flex: 1 }} />
                       {t.estado === 'DONE'
-                        ? <Link to={`/experimentos/${exp.clave}/resultados`}>Ver resultados</Link>
+                        ? <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados</Link>
                         : <Link to="/analisis">Ver progreso del análisis →</Link>}
                     </div>
                   </div>

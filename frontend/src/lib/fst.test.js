@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, isIpn, toCSV } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, isIpn, toCSV, primeraTandaLista, enlaceResultados } from './fst'
 
 describe('estadísticos y formato', () => {
   it('media y varianza muestral (n − 1), como en Resultados', () => {
@@ -45,7 +45,19 @@ describe('texto', () => {
 describe('CSV', () => {
   it('lleva BOM para Excel y escapa comas, comillas y saltos de línea', () => {
     const csv = toCSV([['Espécimen', 'Nota'], ['Espécimen 1 · Cilindro P1', 'dijo "hola", y\nsiguió']])
-    expect(csv.startsWith('﻿')).toBe(true)
+    expect(csv.charCodeAt(0)).toBe(0xfeff)
     expect(csv.slice(1)).toBe('Espécimen,Nota\nEspécimen 1 · Cilindro P1,"dijo ""hola"", y\nsiguió"')
+  })
+})
+
+describe('resultados', () => {
+  it('la primera tanda con el Día 2 analizado, o null si no hay', () => {
+    const exp = { grupos: [
+      { id: 'G-01', tandas: [{ letra: 'A', estado: 'QUEUED' }] },
+      { id: 'G-02', tandas: [{ letra: 'A', estado: 'FAILED' }, { letra: 'B', estado: 'DONE' }] },
+    ] }
+    expect(primeraTandaLista(exp)).toEqual({ gid: 'G-02', letra: 'B' })
+    expect(primeraTandaLista({ grupos: [] })).toBeNull()
+    expect(enlaceResultados('EXP-2026-02', 'G-02', 'B')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=B')
   })
 })
