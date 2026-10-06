@@ -152,3 +152,46 @@ export const notifications = [
 // Enlaces de recuperación pendientes (2h): token → { userId, vence (ms), usado }.
 // Un token que no está aquí, como «vencido», responde igual que un enlace vencido.
 export const resetTokens = {}
+
+// ── persistencia en el navegador ───────────────────────────────────────────
+// Los datos de ejemplo se guardan en localStorage para que sobrevivan a la recarga
+// (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
+// Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
+const CLAVE = 'fst.demo'
+const VERSION_DATOS = 1
+const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, groupComparison, users, system, notifications, resetTokens }
+const inicial = structuredClone(colecciones)
+
+// Reemplaza el contenido de cada colección sin cambiar el objeto, porque los
+// servicios importan estas mismas referencias.
+function restaurar(origen) {
+  for (const [k, destino] of Object.entries(colecciones)) {
+    const valor = structuredClone(origen[k])
+    if (Array.isArray(destino)) destino.splice(0, destino.length, ...valor)
+    else {
+      for (const key of Object.keys(destino)) delete destino[key]
+      Object.assign(destino, valor)
+    }
+  }
+}
+
+try {
+  const guardado = JSON.parse(localStorage.getItem(CLAVE))
+  if (guardado?.version === VERSION_DATOS) restaurar(guardado.datos)
+} catch {
+  /* sin almacenamiento o datos dañados: se usan los de ejemplo */
+}
+
+export function guardarDatos() {
+  try {
+    localStorage.setItem(CLAVE, JSON.stringify({ version: VERSION_DATOS, datos: colecciones }))
+  } catch {
+    /* sin almacenamiento: los cambios duran hasta recargar */
+  }
+}
+
+// Vuelve a los datos de ejemplo originales y olvida lo guardado.
+export function reiniciarDatos() {
+  restaurar(inicial)
+  try { localStorage.removeItem(CLAVE) } catch { /* sin almacenamiento */ }
+}
