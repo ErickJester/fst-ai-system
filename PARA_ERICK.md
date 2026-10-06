@@ -118,13 +118,17 @@ frontend/src/
 - **Componentes compartidos** (`components/ui.jsx`): `Campo`, `FieldError`, `Seg`, `EstadoTag`, `TipoTag`, `Migas`, `Pasos`, `Acceso`, `Cargando`, `NoEncontrado`, `rellenoTanda`. Úsalos antes de escribir markup nuevo.
 - **Formularios**: `useErrorDeCampo(refs)` da `{ err, fail, clase, refs }` para marcar el campo con error y pasarle el foco; los errores del servidor se leen con `mensajeError(e, 'respaldo')`.
 - **Avisos tras redirigir** (sesión caducada, sin permiso): `useAviso('tipo')`.
+- **Enlaces a resultados**: `enlaceResultados(clave, gid, letra)` y `primeraTandaLista(exp)` (`lib/fst.js`); nunca un enlace fijo al experimento de ejemplo.
+- **Errores al dibujar**: `components/ErrorBoundary.jsx` envuelve las rutas y muestra «Algo salió mal en esta pantalla» en lugar de dejarla en blanco.
 - Estilo: el de los mockups (estilos en línea + clases de `styles/fst.css`, `modernist.css`, `app.css`). Comentarios cortos en español explicando el porqué.
 
 ### Cómo verificar un cambio
 
-1. `npm --prefix frontend run build` debe compilar sin errores.
-2. Probarlo en el navegador con la app recién cargada y revisar que la consola no tenga errores.
-3. Para refactors que no deben cambiar nada visible, se usó una «huella»: guardar el `innerHTML` de cada pantalla antes y comparar después (24 estados, salieron idénticos). Si cambias markup compartido, conviene repetirlo.
+1. `npm --prefix frontend test` (Vitest): las pruebas de `lib/fst.test.js` y `services/servicios.test.js` deben pasar. Si cambias una regla de los servicios (contraseñas, administradores, experimentos), agrega o ajusta su prueba.
+2. `npm --prefix frontend run lint` (ESLint) sin errores: detecta variables sin definir, importaciones sin usar y hooks mal ordenados.
+3. `npm --prefix frontend run build` debe compilar sin errores.
+4. Probarlo en el navegador con la app recién cargada y revisar que la consola no tenga errores.
+5. Para refactors que no deben cambiar nada visible, se usó una «huella»: guardar el `innerHTML` de cada pantalla antes y comparar después (24 estados, salieron idénticos). Si cambias markup compartido, conviene repetirlo.
 
 ---
 
@@ -175,6 +179,9 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 9. **Versión 0.3.0**, como pediste en `PARA_VANESA.md`.
 10. **Datos de ejemplo persistentes** en `localStorage` y botón «Reiniciar datos» en la franja de MODO DEMO.
 11. **Admin**: editar cuenta (nombre, apellidos, correo, identificador, rol), restablecer la contraseña temporal (mismo modal, se muestra una vez) y reactivar cuentas inactivas. La cuenta propia se edita en Mi perfil y el rol del único Administrador activo no se puede cambiar.
+12. **Calidad**: pruebas automáticas con Vitest (`npm test`, 24 pruebas) y revisión con ESLint (`npm run lint`).
+13. **Errores y rutas**: aviso «Algo salió mal» en lugar de pantalla en blanco; una ruta inexistente lleva a la pantalla de inicio de la cuenta, y con sesión abierta `/login` ya no muestra el formulario.
+14. **Detalles de uso**: sugerencias de grupo con el teclado (flechas, Enter, Escape) en Cargar video; especie y notas en el encabezado de Experimento; cada enlace a resultados lleva a su tanda, y sin resultados se ve «Todavía no hay resultados».
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -252,5 +259,5 @@ Si eres Claude trabajando en este repo:
 - Responde y escribe en español. No modifiques `main` por ningún motivo; trabaja en la rama que te indiquen y no abras PR hacia `main` sin que lo pidan.
 - Antes de tocar una pantalla, lee su mockup en `mockup/v2/` y la página en `frontend/src/pages/`. Respeta las convenciones de la sección 5: datos solo desde `services/`, componentes de `components/ui.jsx`, textos con la terminología de la sección 1.
 - Si un dato o endpoint no existe en el backend, agrégalo primero a `services/mocks/data.js` con forma de API y documenta la ruta propuesta en el comentario de la función de servicio y en la tabla de la sección 6 de este archivo.
-- Verifica cada cambio: build sin errores, prueba en el navegador y consola limpia. Para refactors, compara el HTML antes y después.
+- Verifica cada cambio: `npm test`, `npm run lint` y build sin errores, prueba en el navegador y consola limpia. Para refactors, compara el HTML antes y después.
 - Si cambias algo de este traspaso (contrato, decisiones, pendientes), actualiza este archivo en el mismo commit.
