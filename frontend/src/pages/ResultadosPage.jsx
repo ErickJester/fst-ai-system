@@ -15,14 +15,23 @@ const MUT = 'var(--muted)'
 const PEND = 'var(--color-accent-700)'
 const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 
-const CONDUCTAS = [
-  { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
-  { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' },
-  { id: 'escalamiento', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
-]
-const KEYS = CONDUCTAS.map((c) => c.id)
-const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
-const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
+const INMOVILIDAD = { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' }
+// Nivel preciso: tres conductas. Nivel agrupado: nado activo y escalamiento juntos.
+const CONDUCTAS = {
+  PRECISO: [
+    { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
+    INMOVILIDAD,
+    { id: 'escalamiento', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
+  ],
+  AGRUPADO: [
+    { id: 'activa', label: 'Conducta activa', color: INK, nota: 'Nado activo y escalamiento juntos: este nivel no los distingue.' },
+    INMOVILIDAD,
+  ],
+}
+const conductasDe = (nivel) => CONDUCTAS[nivel] || CONDUCTAS.PRECISO
+const TODAS = [...CONDUCTAS.PRECISO, CONDUCTAS.AGRUPADO[0]]
+const CMAP = Object.fromEntries(TODAS.map((c) => [c.id, c.color]))
+const LBL = Object.fromEntries(TODAS.map((c) => [c.id, c.label]))
 const NIVEL = { PRECISO: 'preciso (3 conductas)', AGRUPADO: 'agrupado (2 conductas)' }
 
 // Dentro de una tanda cada cilindro basta para identificar al sujeto. Donde se junten
@@ -113,12 +122,14 @@ function Comparacion({ g }) {
 
 // ── exportación (segundos, no porcentaje) ──────────────────────────────────
 function tabla(r) {
+  const KEYS = conductasDe(r.nivel).map((c) => c.id)
+  const encabezados = KEYS.map((k) => LBL[k] + ' (s)')
   const col = (k) => r.cilindros.map((e) => e[k + '_s'])
-  const out = [['Cilindro', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)']]
+  const out = [['Cilindro', ...encabezados]]
   r.cilindros.forEach((e) => out.push([etiqueta(e), ...KEYS.map((k) => e[k + '_s'])]))
   estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...KEYS.map((k) => s.f(col(k)).replace(' s', ''))]))
   out.push([])
-  out.push([etiqueta(r.linea_tiempo) + ' · minuto', 'Nado activo (s)', 'Inmovilidad (s)', 'Escalamiento (s)'])
+  out.push([etiqueta(r.linea_tiempo) + ' · minuto', ...encabezados])
   r.linea_tiempo.minutos.forEach((segs, i) => {
     const sum = (k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
     out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), ...KEYS.map(sum)])
@@ -195,6 +206,8 @@ function ResultadosTanda({ clave, gid, letra }) {
   if (error) return <SinResultados clave={clave} />
 
   const exp = r.experimento
+  const conductas = conductasDe(r.nivel)
+  const KEYS = conductas.map((c) => c.id)
   const col = (k) => r.cilindros.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
 
@@ -223,7 +236,9 @@ function ResultadosTanda({ clave, gid, letra }) {
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(r.analizado_en.slice(0, 10))}, {hora(r.analizado_en)} · modelo {r.modelo}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
               <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {NIVEL[r.nivel]}</span>
-              {r.nivel === 'PRECISO' && <span className="hint">El otro nivel posible es <strong>agrupado</strong>: nado activo y escalamiento se juntan en «conducta activa».</span>}
+              {r.nivel === 'PRECISO'
+                ? <span className="hint">El otro nivel posible es <strong>agrupado</strong>: nado activo y escalamiento se juntan en «conducta activa».</span>
+                : <span className="hint">Este nivel junta nado activo y escalamiento en «conducta activa»; el otro posible es <strong>preciso</strong>, con las tres conductas.</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
@@ -247,7 +262,7 @@ function ResultadosTanda({ clave, gid, letra }) {
               <div className="k">Tiempo por conducta · min:seg</div>
               <div style={{ flex: 1 }} />
               <span style={{ display: 'flex', gap: 18 }}>
-                {CONDUCTAS.map((b) => (
+                {conductas.map((b) => (
                   <span key={b.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5 }}><span className="sw" style={{ background: b.color }} />{b.label}</span>
                 ))}
               </span>
@@ -256,8 +271,9 @@ function ResultadosTanda({ clave, gid, letra }) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '24%' }}>Cilindro</th><th style={{ textAlign: 'right' }}>Nado activo</th><th style={{ textAlign: 'right' }}>Inmovilidad</th>
-                  <th style={{ textAlign: 'right' }}>Escalamiento</th><th style={{ width: '30%' }}>Distribución</th>
+                  <th style={{ width: '24%' }}>Cilindro</th>
+                  {conductas.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
+                  <th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,7 +349,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             <div>
               <div className="k" style={{ marginBottom: 12 }}>Leyenda de conductas</div>
               <div style={{ borderTop: '1px solid var(--color-divider)' }}>
-                {CONDUCTAS.map((b) => (
+                {conductas.map((b) => (
                   <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--color-divider)' }}>
                     <span className="sw" style={{ marginTop: 4, background: b.color }} />
                     <div>
@@ -343,7 +359,7 @@ function ResultadosTanda({ clave, gid, letra }) {
                   </div>
                 ))}
               </div>
-              <p className="hint" style={{ margin: '11px 0 0' }}>El buceo cuenta como nado activo.</p>
+              <p className="hint" style={{ margin: '11px 0 0' }}>El buceo cuenta como {r.nivel === 'AGRUPADO' ? 'conducta activa' : 'nado activo'}.</p>
             </div>
           </div>
         </div>

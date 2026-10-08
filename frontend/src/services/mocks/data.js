@@ -62,13 +62,54 @@ export const failedJobs = [
   { job_id: 498, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50, confianza: 0.54, error: ERROR_DET },
 ]
 
-// Resultados de una tanda (2f). Solo la Tanda A del grupo Referencia, Día 2, tiene.
-// Tiempos en segundos. nivel: PRECISO (3 conductas) | AGRUPADO (nado activo y
-// escalamiento juntos como «conducta activa»).
+// Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
+// nivel: PRECISO (nado activo, inmovilidad, escalamiento) | AGRUPADO (nado activo y
+// escalamiento juntos como «conducta activa»: activa_s en lugar de nado_s y escalamiento_s).
+const EXPERIMENTO_EJEMPLO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' }
+
+// Línea de tiempo por minuto del primer cilindro: reparte sus segundos de cada conducta
+// en tramos alternados de hasta 12 s, minuto por minuto.
+function lineaTiempo(totales) {
+  const quedan = { ...totales }
+  const orden = Object.keys(quedan)
+  const minutos = []
+  let k = 0
+  for (let m = 0; m < 5; m++) {
+    const segs = []
+    let libre = 60
+    while (libre > 0 && orden.some((c) => quedan[c] > 0)) {
+      const c = orden[k++ % orden.length]
+      const s = Math.min(12, quedan[c], libre)
+      if (!s) continue
+      quedan[c] -= s
+      libre -= s
+      if (segs.length && segs[segs.length - 1][0] === c) segs[segs.length - 1][1] += s
+      else segs.push([c, s])
+    }
+    minutos.push(segs)
+  }
+  return minutos
+}
+
+function resultados(grupo, letra, nivel, filas, analizado_en) {
+  const cilindros = filas.map((f, i) => ({ cilindro: 'P' + (i + 1), ...f }))
+  const { cilindro, ...totales } = cilindros[0]
+  const minutos = lineaTiempo(Object.fromEntries(Object.entries(totales).map(([k, v]) => [k.replace('_s', ''), v])))
+  return {
+    experimento: EXPERIMENTO_EJEMPLO, grupo, letra, dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300,
+    analizado_en, modelo: 'clf-cascada v2.1', nivel, confianza: 0.83, cilindros, linea_tiempo: { cilindro, minutos },
+  }
+}
+
+const preciso = (nado, inmovilidad, escalamiento) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento })
+const agrupado = (activa, inmovilidad) => ({ activa_s: activa, inmovilidad_s: inmovilidad })
+const REFERENCIA = { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' }
+
 export const batchResults = {
+  'EXP-2026-02/G-01/A/DAY2': resultados({ id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)' }, 'A', 'PRECISO',
+    [preciso(127, 145, 28), preciso(113, 162, 25), preciso(99, 171, 30), preciso(82, 196, 22)], '2026-02-23T11:40:00'),
   'EXP-2026-02/G-02/A/DAY2': {
-    experimento: { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' },
-    grupo: { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' },
+    experimento: EXPERIMENTO_EJEMPLO, grupo: REFERENCIA,
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
     nivel: 'PRECISO', confianza: 0.83,
     cilindros: [
@@ -89,26 +130,14 @@ export const batchResults = {
       ],
     },
   },
+  'EXP-2026-02/G-02/B/DAY2': resultados(REFERENCIA, 'B', 'AGRUPADO',
+    [agrupado(217, 83), agrupado(201, 99), agrupado(197, 103), agrupado(180, 120)], '2026-02-24T16:10:00'),
+  'EXP-2026-02/G-03/A/DAY2': resultados({ id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg' }, 'A', 'PRECISO',
+    [preciso(164, 98, 38), preciso(151, 114, 35), preciso(139, 128, 33), preciso(125, 145, 30)], '2026-02-24T12:25:00'),
 }
 
-// Inmovilidad media ± DE por grupo, Día 2 (2f). Solo entran los especímenes con
-// Día 2 analizado; pendientes dice qué tandas faltan y por qué (JobStatus, o null si no se ha subido).
-// Si un grupo mezcla niveles de clasificación, viene por_nivel en vez de una sola media.
-export const groupComparison = {
-  'EXP-2026-02': [
-    { grupo: 'Control · placebo', tipo: 'CONTROL', media_s: 168.4, de_s: 21.3, n: 4, n_total: 8,
-      pendientes: [{ tanda: 'B', n: 4, estado: 'QUEUED' }] },
-    { grupo: 'Referencia · fluoxetina', tipo: 'REFERENCIA', n: 8, n_total: 8, pendientes: [],
-      por_nivel: [
-        { tanda: 'A', nivel: 'PRECISO', n: 4, media_s: 96.5, de_s: 18.4 },
-        { tanda: 'B', nivel: 'AGRUPADO', n: 4, media_s: 101.3, de_s: 15.2 },
-      ] },
-    { grupo: 'Experimental A · CSR-14, 5 mg/kg', tipo: 'EXPERIMENTAL', media_s: 121.2, de_s: 19.4, n: 4, n_total: 8,
-      pendientes: [{ tanda: 'B', n: 4, estado: 'RUNNING' }] },
-    { grupo: 'Experimental B · CSR-14, 15 mg/kg', tipo: 'EXPERIMENTAL', media_s: null, de_s: null, n: 0, n_total: 8,
-      pendientes: [{ tanda: 'A', n: 4, estado: 'QUEUED' }, { tanda: 'B', n: 4, estado: 'FAILED' }] },
-  ],
-}
+// La comparación entre grupos (inmovilidad media ± DE, 2f) ya no es fija: la calcula
+// services/results.js a partir de las tandas y sus resultados, como lo hará el servidor.
 
 // Cuentas (2g, 2h, 2i, 2j). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
 // must_change_password: la cuenta entró con contraseña temporal y debe cambiarla (2i).
@@ -161,8 +190,8 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 3
-const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, groupComparison, users, system, notifications, resetTokens, simulacion }
+const VERSION_DATOS = 4
+const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
 // Reemplaza el contenido de cada colección sin cambiar el objeto, porque los

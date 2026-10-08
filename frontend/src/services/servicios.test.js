@@ -6,7 +6,7 @@ import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue } from './queue'
-import { getBatchResults } from './results'
+import { getBatchResults, getGroupComparison } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
 import { listNotifications } from './notifications'
@@ -225,5 +225,42 @@ describe('eliminar experimento con la contraseña de la cuenta', () => {
     expect(await status(deleteExperiment('EXP-2026-02', { ...datos, password: 'otra' }))).toBe(400)
     expect(await status(deleteExperiment('EXP-2026-02', { ...datos, password: 'clave-de-ana-1' }))).toBe('ok')
     sesion.clear()
+  })
+})
+
+describe('comparación entre grupos calculada', () => {
+  const T0 = Date.UTC(2026, 9, 7, 15, 0, 0)
+
+  it('sale de las tandas: medias, pendientes y grupos que mezclan niveles', async () => {
+    const [control, referencia, expA, expB] = await getGroupComparison('EXP-2026-02')
+    expect(control).toMatchObject({ grupo: 'Control · Placebo (solución salina)', n: 4, n_total: 8, media_s: 168.5, de_s: 21.3,
+      pendientes: [{ tanda: 'B', n: 4, estado: 'QUEUED' }] })
+    expect(referencia.por_nivel).toEqual([
+      { tanda: 'A', nivel: 'PRECISO', n: 4, media_s: 96.5, de_s: 18.4 },
+      { tanda: 'B', nivel: 'AGRUPADO', n: 4, media_s: 101.3, de_s: 15.2 },
+    ])
+    expect(expA).toMatchObject({ n: 4, pendientes: [{ tanda: 'B', estado: 'RUNNING' }] })
+    expect(expB).toMatchObject({ n: 0, media_s: null, pendientes: [{ tanda: 'A', estado: 'QUEUED' }, { tanda: 'B', estado: 'FAILED' }] })
+  })
+
+  it('se actualiza cuando la simulación termina un trabajo', async () => {
+    avanzarSimulacion(T0)
+    avanzarSimulacion(T0 + 9000) // termina Experimental A · Tanda B
+    const expA = (await getGroupComparison('EXP-2026-02'))[2]
+    expect(expA).toMatchObject({ n: 8, pendientes: [] })
+  })
+
+  it('la tanda con nivel agrupado trae conducta activa e inmovilidad', async () => {
+    const r = await getBatchResults('EXP-2026-02', 'G-02', 'B')
+    expect(r.nivel).toBe('AGRUPADO')
+    expect(r.cilindros[0]).toEqual({ cilindro: 'P1', activa_s: 217, inmovilidad_s: 83 })
+  })
+
+  it('la línea de tiempo suma 60 s por minuto y coincide con los totales del cilindro', async () => {
+    const r = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    const { minutos } = r.linea_tiempo
+    expect(minutos.map((m) => m.reduce((a, [, s]) => a + s, 0))).toEqual([60, 60, 60, 60, 60])
+    const total = (c) => minutos.flat().filter(([k]) => k === c).reduce((a, [, s]) => a + s, 0)
+    expect([total('nado'), total('inmovilidad'), total('escalamiento')]).toEqual([127, 145, 28])
   })
 })
