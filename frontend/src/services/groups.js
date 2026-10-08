@@ -32,12 +32,17 @@ export async function createGroup(clave, data) {
 
 // POST /experiments/:clave/groups/:gid/batches/:letra/videos
 // (multipart: file, dia, n_cilindros) → { job_id, posicion_cola }
-export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindros }, onProgress) {
+// signal (AbortController) cancela la subida: no se registra nada y la promesa falla con
+// code 'ERR_CANCELED', igual que axios.
+export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindros, signal }, onProgress) {
   if (USE_MOCKS) {
     const g = db.experimentDetail[clave]?.grupos.find((x) => x.id === gid)
     if (!g) return fail(404, 'No existe ese grupo.')
+    const cancelada = () => Object.assign(new Error('Subida cancelada.'), { code: 'ERR_CANCELED' })
     for (let p = 25; p <= 100; p += 25) {
+      if (signal?.aborted) throw cancelada()
       await reply(null, 80)
+      if (signal?.aborted) throw cancelada()
       onProgress?.(p)
     }
     // La tanda queda registrada y su análisis entra al final de la cola.
@@ -64,6 +69,7 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
   fd.append('dia', dia)
   fd.append('n_cilindros', String(nCilindros))
   const res = await api.post(`/experiments/${clave}/groups/${gid}/batches/${letra}/videos`, fd, {
+    signal,
     onUploadProgress: (e) => e.total && onProgress?.(Math.round((e.loaded / e.total) * 100)),
   })
   return res.data
