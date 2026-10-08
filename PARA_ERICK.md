@@ -118,6 +118,7 @@ frontend/src/
 - **Los datos tienen forma de API, la apariencia vive en la página.** Los servicios devuelven valores como `QUEUED`, `DONE`, `CONTROL`, `fecha_inicio: '2026-02-18'`; las páginas los traducen a etiquetas y colores (`lib/fst.js`, `EstadoTag`, `TipoTag`, `fechaCorta`).
 - **Componentes compartidos** (`components/ui.jsx`): `Campo`, `FieldError`, `Seg`, `EstadoTag`, `TipoTag`, `Migas`, `Pasos`, `Acceso`, `Cargando`, `NoEncontrado`, `rellenoTanda`. Úsalos antes de escribir markup nuevo.
 - **Formularios**: `useErrorDeCampo(refs)` da `{ err, fail, clase, refs }` para marcar el campo con error y pasarle el foco; los errores del servidor se leen con `mensajeError(e, 'respaldo')`.
+- **Datos que cambian solos**: `useAsyncVivo(fn, deps, intervaloSegun)` en lugar de `useAsync` cuando la pantalla debe refrescarse; los intervalos son `CADA_ACTIVO_MS` y `CADA_INACTIVO_MS`.
 - **Avisos tras redirigir** (sesión caducada, sin permiso): `useAviso('tipo')`.
 - **Enlaces a resultados**: `enlaceResultados(clave, gid, letra)` y `primeraTandaLista(exp)` (`lib/fst.js`); nunca un enlace fijo al experimento de ejemplo.
 - **Diálogos**: `useAtraparFoco(ref, activo)` mantiene el foco dentro y lo devuelve al cerrar.
@@ -189,6 +190,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 17. **Comparación entre grupos calculada** a partir de las tandas y sus resultados (se actualiza con la simulación), y **nivel agrupado** en Resultados («Conducta activa» e «Inmovilidad», también en el CSV).
 18. **Pruebas de pantallas** con React Testing Library (`src/pantallas.test.jsx`): acceso, primer acceso, recuperar contraseña, crear cuenta, cargar video y resultados. Con las de servicios, 42 pruebas.
 19. **Cancelar la subida** de un video (`signal` de un `AbortController` en `uploadBatchVideo`) y limpieza de código sin uso (`hooks/useApi.js`, `store`).
+20. **Pantallas que se actualizan solas**: Experimento, Grupo y la cola de Admin, con `useAsyncVivo` (5 s con análisis activos, 30 s sin ellos, sin parpadeo de «Cargando…»).
 
 ### Diferencias visibles con tu v2 (a propósito)
 
