@@ -126,7 +126,7 @@ frontend/src/
 
 ### Cómo verificar un cambio
 
-1. `npm --prefix frontend test` (Vitest): las pruebas de `lib/fst.test.js` y `services/servicios.test.js` deben pasar. Si cambias una regla de los servicios (contraseñas, administradores, experimentos), agrega o ajusta su prueba.
+1. `npm --prefix frontend test` (Vitest): las pruebas de `lib/fst.test.js`, `services/servicios.test.js` y `pantallas.test.jsx` (pantallas en jsdom) deben pasar. Si cambias una regla de los servicios (contraseñas, administradores, experimentos), agrega o ajusta su prueba.
 2. `npm --prefix frontend run lint` (ESLint) sin errores: detecta variables sin definir, importaciones sin usar y hooks mal ordenados.
 3. `npm --prefix frontend run build` debe compilar sin errores.
 4. Probarlo en el navegador con la app recién cargada y revisar que la consola no tenga errores.
@@ -186,6 +186,9 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 14. **Detalles de uso**: sugerencias de grupo con el teclado (flechas, Enter, Escape) en Cargar video; especie y notas en el encabezado de Experimento; cada enlace a resultados lleva a su tanda, y sin resultados se ve «Todavía no hay resultados».
 15. **Seguridad**: axios 1.20.0 y react-router 6.30.6 (fallas de severidad alta en axios). Quedan avisos que exigen versiones mayores: react-router v7 (moderado, solo con enlaces armados con datos externos) y tinypool/esbuild/Vite, que afectan solo a las pruebas y al servidor de desarrollo.
 16. **Modo demo vivo y accesibilidad**: la cola avanza sola; eliminar experimento comprueba la contraseña de la cuenta; los diálogos atrapan el foco y lo devuelven al cerrar; la navegación de Resultados es un `<nav>` con `aria-current`.
+17. **Comparación entre grupos calculada** a partir de las tandas y sus resultados (se actualiza con la simulación), y **nivel agrupado** en Resultados («Conducta activa» e «Inmovilidad», también en el CSV).
+18. **Pruebas de pantallas** con React Testing Library (`src/pantallas.test.jsx`): acceso, primer acceso, recuperar contraseña, crear cuenta, cargar video y resultados. Con las de servicios, 42 pruebas.
+19. **Cancelar la subida** de un video (`signal` de un `AbortController` en `uploadBatchVideo`) y limpieza de código sin uso (`hooks/useApi.js`, `store`).
 
 ### Diferencias visibles con tu v2 (a propósito)
 
