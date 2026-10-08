@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
 import { getExperiment } from '../services/experiments'
 import { createGroup, uploadBatchVideo } from '../services/groups'
-import { mensajeError } from '../services/api'
+import { mensajeError, esCancelacion } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
 import { norm } from '../lib/fst'
 import { MUT60, btnLeft, mutedSub } from '../lib/estilos'
@@ -52,6 +52,8 @@ export default function CargarVideoPage() {
   const [ok, setOk] = useState('')
   const [subiendo, setSubiendo] = useState(null) // avance en % mientras se sube
   const [errGuardar, setErrGuardar] = useState('')
+  const [cancelada, setCancelada] = useState(false)
+  const subidaRef = useRef(null) // AbortController de la subida en curso
   const [over, setOver] = useState(false)
   const fileRef = useRef(null)
   const tandaRef = useRef(null)
@@ -172,7 +174,10 @@ export default function CargarVideoPage() {
   async function guardar() {
     setOk('')
     setErrGuardar('')
+    setCancelada(false)
     setSubiendo(0)
+    const control = new AbortController()
+    subidaRef.current = control
     try {
       let gid = grupo?.id
       if (!gid) {
@@ -182,15 +187,18 @@ export default function CargarVideoPage() {
         setQ(sugerencia(g).nombre)
       }
       const dia = sesion === '1' ? 'DAY1' : 'DAY2'
-      const r = await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil) }, setSubiendo)
+      const r = await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
       setOk(grupoNombre + ' · Tanda ' + tanda + ' · ' + (dia === 'DAY1' ? 'Día 1' : 'Día 2') + ' · posición ' + r.posicion_cola + ' en la cola.')
       setArchivo(null)
       if (fileRef.current) fileRef.current.value = ''
       reload()
     } catch (err) {
-      setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
+      // Cancelar no es un error: el archivo queda elegido para volver a intentarlo.
+      if (esCancelacion(err)) setCancelada(true)
+      else setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
     } finally {
       setSubiendo(null)
+      subidaRef.current = null
     }
   }
 
@@ -302,8 +310,10 @@ export default function CargarVideoPage() {
                     <div className="meter" role="progressbar" aria-label="Avance de la subida" aria-valuenow={subiendo} aria-valuemin={0} aria-valuemax={100}>
                       <div style={{ width: subiendo + '%' }} />
                     </div>
+                    <button type="button" className="btn btn-ghost" style={{ ...btnLeft, marginTop: 8 }} onClick={() => subidaRef.current?.abort()}>Cancelar subida</button>
                   </div>
                 )}
+                {cancelada && <div className="hint" style={{ marginTop: 10 }}>Subida cancelada: el video no se guardó. Puedes volver a intentarlo con el mismo archivo o elegir otro.</div>}
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
                   <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
                     {subiendo == null ? 'Guardar y encolar análisis' : 'Subiendo…'}

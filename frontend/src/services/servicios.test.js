@@ -264,3 +264,16 @@ describe('comparación entre grupos calculada', () => {
     expect([total('nado'), total('inmovilidad'), total('escalamiento')]).toEqual([127, 145, 28])
   })
 })
+
+describe('cancelar la subida de un video', () => {
+  it('no registra la tanda ni la encola, y falla como cancelación', async () => {
+    const control = new AbortController()
+    const subida = uploadBatchVideo('EXP-2026-02', 'G-02', 'C', { file: null, dia: 'DAY2', nCilindros: 4, signal: control.signal })
+    control.abort()
+    const error = await subida.catch((e) => e)
+    expect(error.code).toBe('ERR_CANCELED')
+    expect((await getQueue()).cola).toHaveLength(3)
+    const referencia = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-02')
+    expect(referencia.tandas.map((t) => t.letra)).toEqual(['A', 'B'])
+  })
+})

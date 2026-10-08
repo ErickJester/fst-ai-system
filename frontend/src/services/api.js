@@ -36,5 +36,8 @@ api.interceptors.response.use(
 
 export default api
 
+// Petición cancelada por quien la hizo (AbortController), como al cancelar una subida.
+export const esCancelacion = (e) => e?.code === 'ERR_CANCELED'
+
 // Mensaje de error que manda el servidor, o el de respaldo si no hay.
 export const mensajeError = (e, respaldo) => e.response?.data?.error || respaldo
