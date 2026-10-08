@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
 import { getQueue } from '../services/queue'
 import { usePolling } from '../hooks/usePolling'
+import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
 import { DIA, ETAPA } from '../lib/fst'
 import { Cargando } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
@@ -43,8 +44,6 @@ function descargarDiagnostico(j, detalle) {
 
 // La cola se consulta cada 5 s mientras haya análisis activos (en cola o procesando);
 // sin ninguno, cada 30 s, solo para ver si llega uno nuevo.
-const CADA_ACTIVO_MS = 5000
-const CADA_INACTIVO_MS = 30000
 
 // 2e · Progreso de análisis: cuatro etapas del pipeline, cola secuencial sin controles.
 export default function ProgresoPage() {
