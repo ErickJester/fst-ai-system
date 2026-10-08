@@ -1,25 +1,5 @@
 // FST · utilidades compartidas (equivalen a mockup/v2/assets/app.js).
 
-// ── almacenamiento local seguro (puede no estar disponible) ────────────────
-export const store = {
-  get(k, d) {
-    try {
-      const v = localStorage.getItem('fst.' + k)
-      return v == null ? d : JSON.parse(v)
-    } catch {
-      return d
-    }
-  },
-  set(k, v) {
-    try {
-      if (v == null) localStorage.removeItem('fst.' + k)
-      else localStorage.setItem('fst.' + k, JSON.stringify(v))
-    } catch {
-      /* sin almacenamiento */
-    }
-  },
-}
-
 // ── estadísticos y formato (idénticos al mockup) ───────────────────────────
 export const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length
 export const variance = (a) => {
