@@ -3,12 +3,14 @@ import { Link, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
-import { useAsync } from '../hooks/useAsync'
+import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
 import { fechaCorta, fechaRango, ETAPA, enlaceResultados } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
 const dur = { fontWeight: 400, fontFamily: 'var(--font-body)', color: 'var(--muted)' }
+
+const ACTIVOS = ['QUEUED', 'RUNNING']
 
 // Nota del video de Día 2 según el estado de su análisis.
 function notaDia2(t) {
@@ -25,7 +27,9 @@ function notaDia2(t) {
 // 2d · Detalle de grupo: tandas, cilindros y la asimetría Día 1 / Día 2.
 export default function GrupoPage() {
   const { clave, gid } = useParams()
-  const { data: g, error, loading } = useAsync(() => getGroup(clave, gid), [clave, gid])
+  // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
+  const { data: g, error, loading } = useAsyncVivo(() => getGroup(clave, gid), [clave, gid], (grupo) =>
+    grupo.tandas.some((t) => ACTIVOS.includes(t.estado) || ACTIVOS.includes(t.dia1?.estado)) ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
   const nombreGrupo = g && (g.tipo === 'CONTROL' ? 'Grupo control' : g.nombre)
 
   useEffect(() => {

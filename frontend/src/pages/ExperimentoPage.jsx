@@ -4,10 +4,14 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { mensajeError } from '../services/api'
-import { useAsync } from '../hooks/useAsync'
+import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
+
+// Hay análisis en curso o en cola en alguna tanda (Día 1 o Día 2).
+const ACTIVOS = ['QUEUED', 'RUNNING']
+const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.includes(t.estado) || ACTIVOS.includes(t.dia1?.estado)))
 
 const posiciones = (t) => 'Cilindros P1–P' + t.n_cilindros
 
@@ -29,7 +33,8 @@ export default function ExperimentoPage() {
   const [errBorrar, setErrBorrar] = useState('')
   const nombreRef = useRef(null)
   const dlgRef = useRef(null)
-  const { data: exp, error, loading } = useAsync(() => getExperiment(clave), [clave])
+  // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
+  const { data: exp, error, loading } = useAsyncVivo(() => getExperiment(clave), [clave], (e) => (conActivos(e) ? CADA_ACTIVO_MS : CADA_INACTIVO_MS))
 
   function cerrar() {
     setDlg(false)
