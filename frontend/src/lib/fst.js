@@ -70,18 +70,3 @@ export function toCSV(rows) {
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
   }).join(',')).join('\n')
 }
-
-// Carga un script externo una sola vez (el generador de XLSX).
-const scripts = {}
-export function loadScript(src) {
-  if (!scripts[src]) {
-    scripts[src] = new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = src
-      s.onload = resolve
-      s.onerror = () => { delete scripts[src]; reject(new Error('No se pudo cargar ' + src)) }
-      document.head.appendChild(s)
-    })
-  }
-  return scripts[src]
-}
