@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { EstadoTag, TipoTag, FieldError, Campo, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
+import { EstadoTag, TipoTag, FieldError, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
 import { getExperiment, deleteExperiment } from '../services/experiments'
 import { mensajeError } from '../services/api'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
@@ -27,28 +27,26 @@ export default function ExperimentoPage() {
   const { clave } = useParams()
   const navigate = useNavigate()
   const [dlg, setDlg] = useState(false)
-  const [nombre, setNombre] = useState('')
-  const [pass, setPass] = useState('')
   const [borrando, setBorrando] = useState(false)
   const [errBorrar, setErrBorrar] = useState('')
-  const nombreRef = useRef(null)
+  const cancelarRef = useRef(null)
   const dlgRef = useRef(null)
   // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
   const { data: exp, error, loading } = useAsyncVivo(() => getExperiment(clave), [clave], (e) => (conActivos(e) ? CADA_ACTIVO_MS : CADA_INACTIVO_MS))
 
   function cerrar() {
     setDlg(false)
-    setNombre('')
-    setPass('')
     setErrBorrar('')
   }
 
-  // Antes del efecto que enfoca el nombre, para recordar el botón que abrió el diálogo.
+  // Antes del efecto que enfoca «Cancelar», para recordar el botón que abrió el diálogo.
   useAtraparFoco(dlgRef, dlg)
 
+  // D-63: eliminar pide solo una confirmación (sin nombre ni contraseña). El foco empieza
+  // en «Cancelar», la opción segura, para que un Enter accidental no borre nada.
   useEffect(() => {
     if (!dlg) return
-    nombreRef.current?.focus()
+    cancelarRef.current?.focus()
     const onKey = (e) => { if (e.key === 'Escape') cerrar() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -62,15 +60,14 @@ export default function ExperimentoPage() {
   const completas = tandas.filter((t) => t.estado === 'DONE').length
   const lista = primeraTandaLista(exp)
   const esp = groups.reduce((a, g) => a + g.n_especimenes, 0)
-  const puedeBorrar = nombre === exp.titulo && pass.length > 0 && !borrando
 
   async function eliminar(e) {
     e.preventDefault()
-    if (!puedeBorrar) return
+    if (borrando) return
     setBorrando(true)
     setErrBorrar('')
     try {
-      await deleteExperiment(exp.clave, { titulo: nombre, password: pass })
+      await deleteExperiment(exp.clave)
       navigate('/experimentos?eliminado=' + encodeURIComponent(exp.clave))
     } catch (err) {
       setErrBorrar(mensajeError(err, 'No se pudo eliminar el experimento.'))
@@ -154,7 +151,7 @@ export default function ExperimentoPage() {
 
         <div style={{ marginTop: 26, border: '2px solid var(--color-accent)', display: 'flex', alignItems: 'center', gap: 20, padding: '16px 18px' }}>
           <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.6 }}>
-            <strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: pide escribir el nombre del experimento, «{exp.titulo}», y la contraseña de la cuenta.
+            <strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: se pide confirmación antes de borrar.
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setDlg(true)}>Eliminar experimento…</button>
         </div>
@@ -164,17 +161,13 @@ export default function ExperimentoPage() {
         <div className="dialog-backdrop" onClick={(e) => { if (e.target === e.currentTarget) cerrar() }}>
           <form ref={dlgRef} className="dialog dlg-del" noValidate role="dialog" aria-modal="true" aria-labelledby="dlgT" onSubmit={eliminar}>
             <div className="dialog-title" id="dlgT">Eliminar experimento</div>
-            <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
-            <Campo id="dNombre" label={<>Escribe el nombre del experimento, «{exp.titulo}»</>}>
-              <input ref={nombreRef} className="input" id="dNombre" autoComplete="off" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-            </Campo>
-            <Campo id="dPass" label="Contraseña de la cuenta">
-              <input className="input num" id="dPass" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
-            </Campo>
+            <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+              ¿Eliminar «{exp.titulo}»? Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.
+            </div>
             <FieldError msg={errBorrar} style={{ marginBottom: 12 }} />
             <div className="dialog-actions" style={btnLeft}>
-              <button type="submit" className="btn btn-primary" disabled={!puedeBorrar}>Eliminar experimento</button>
-              <button type="button" className="btn btn-secondary" onClick={cerrar}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" disabled={borrando}>Eliminar experimento</button>
+              <button ref={cancelarRef} type="button" className="btn btn-secondary" onClick={cerrar}>Cancelar</button>
             </div>
           </form>
         </div>

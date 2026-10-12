@@ -53,19 +53,15 @@ export async function getExperiment(clave) {
   return (await api.get(`/experiments/${clave}`)).data
 }
 
-// DELETE /experiments/:clave → exige el nombre exacto y la contraseña de la cuenta.
-// Con datos de ejemplo se comprueba igual que en el login: las cuentas con contraseña
-// deben escribir la suya; las de ejemplo, cualquiera no vacía.
-export async function deleteExperiment(clave, { titulo, password }) {
+// DELETE /experiments/:clave → borra el experimento con todo lo suyo. Según D-63 no pide
+// nombre ni contraseña: la pantalla solo muestra una confirmación.
+export async function deleteExperiment(clave) {
   if (USE_MOCKS) {
     const i = db.experiments.findIndex((e) => e.clave === clave)
     if (i < 0) return fail(404, 'No existe ese experimento.')
-    if (db.experiments[i].titulo !== titulo) return fail(400, 'El nombre no coincide.')
-    const u = usuarioDeLaSesion()
-    if (!password || (u?.password && password !== u.password)) return fail(400, 'La contraseña no es correcta.')
     db.experiments.splice(i, 1)
     delete db.experimentDetail[clave]
     return reply({ ok: true })
   }
-  return (await api.delete(`/experiments/${clave}`, { data: { titulo, password } })).data
+  return (await api.delete(`/experiments/${clave}`)).data
 }

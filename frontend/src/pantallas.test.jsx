@@ -168,3 +168,19 @@ describe('resultados', () => {
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
   })
 })
+
+describe('eliminar experimento (D-63)', () => {
+  it('pide solo confirmación, sin nombre ni contraseña, y el foco empieza en Cancelar', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02')
+    await user.click(await screen.findByRole('button', { name: 'Eliminar experimento…' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar experimento' })
+    expect(within(dialogo).getByText(/¿Eliminar «Compuesto CSR-14 · curva de dosis»\?/)).toBeTruthy()
+    expect(within(dialogo).queryByRole('textbox')).toBeNull()
+    expect(dialogo.querySelector('input[type=password]')).toBeNull()
+    expect(document.activeElement).toBe(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Eliminar experimento' }))
+    expect(await screen.findByRole('heading', { name: 'Experimentos' })).toBeTruthy()
+    expect(screen.queryByText('Compuesto CSR-14 · curva de dosis')).toBeNull()
+  })
+})
