@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison } from '../services/results'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, toCSV, loadScript, fechaCorta, norm, primeraTandaLista, enlaceResultados } from '../lib/fst'
+import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -13,7 +13,6 @@ const ACC = 'var(--color-accent)'
 const N400 = 'var(--color-neutral-400)'
 const MUT = 'var(--muted)'
 const PEND = 'var(--color-accent-700)'
-const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 
 const INMOVILIDAD = { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' }
 // Nivel preciso: tres conductas. Nivel agrupado: nado activo y escalamiento juntos.
@@ -139,14 +138,16 @@ function tabla(r) {
 
 const archivo = (r) => ['resultados', r.experimento.clave, norm(r.grupo.nombre).replace(/\s+/g, '-'), 'tanda' + r.letra, 'dia2'].join('_')
 
+// El generador de XLSX (SheetJS) viene con la app, pero se carga solo al exportar
+// para no agrandar la carga inicial. No depende de internet.
 async function exportarXLSX(r) {
+  let X
   try {
-    await loadScript(XLSX_SRC)
+    X = await import('xlsx')
   } catch {
-    alert('No se pudo cargar el generador de XLSX (requiere conexión).')
+    alert('No se pudo cargar el generador de XLSX. Recarga la página e inténtalo de nuevo.')
     return
   }
-  const X = window.XLSX
   const wb = X.utils.book_new()
   X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(tabla(r)), 'Resultados')
   X.writeFile(wb, archivo(r) + '.xlsx')

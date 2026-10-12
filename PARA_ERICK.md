@@ -62,6 +62,19 @@ VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend r
 
 ---
 
+### Contenedor de producción (propuesta)
+
+`frontend/Dockerfile` sigue siendo el de desarrollo (servidor de Vite, ~420 MB). Para producción hay uno aparte, que **no reemplaza** al tuyo:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+```
+
+- `frontend/Dockerfile.prod`: compila con Node y sirve `dist/` con nginx (imagen de ~75 MB).
+- `frontend/nginx.conf`: rutas de la app → `index.html` (recargar en `/experimentos/...` funciona), `/api/` se reenvía al contenedor `api` sin el prefijo (un solo origen, sin CORS), caché larga para `assets/`, `client_max_body_size 10g` para los videos, y `/salud` para el healthcheck.
+- `docker-compose.prod.yml`: cambia el frontend a esa imagen en el puerto **8080**. `VITE_USE_MOCKS` y `VITE_API_BASE` son argumentos de construcción (se graban al compilar); con el backend listo, `VITE_USE_MOCKS: "false"`.
+- La app ya no depende de internet al usarse: la fuente Archivo viene de `@fontsource/archivo` y el XLSX de SheetJS 0.20.3 (distribución oficial, sin las fallas de la 0.18.5 de npm), cargado solo al exportar. Construir la imagen sí necesita internet (npm).
+
 ## 4. Estructura del frontend
 
 ```
@@ -191,6 +204,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 18. **Pruebas de pantallas** con React Testing Library (`src/pantallas.test.jsx`): acceso, primer acceso, recuperar contraseña, crear cuenta, cargar video y resultados. Con las de servicios, 42 pruebas.
 19. **Cancelar la subida** de un video (`signal` de un `AbortController` en `uploadBatchVideo`) y limpieza de código sin uso (`hooks/useApi.js`, `store`).
 20. **Pantallas que se actualizan solas**: Experimento, Grupo y la cola de Admin, con `useAsyncVivo` (5 s con análisis activos, 30 s sin ellos, sin parpadeo de «Cargando…»).
+21. **Contenedor de producción** (propuesta, sección 3): `Dockerfile.prod` + nginx + `docker-compose.prod.yml`; fuente y XLSX incluidos en la app.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
