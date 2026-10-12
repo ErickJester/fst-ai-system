@@ -167,7 +167,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `GET /experiments` | — | lista con estado agregado |
 | `POST /experiments` | `{ titulo, fecha_inicio, especie, notas }` | `{ clave }` (el responsable sale de la sesión) |
 | `GET /experiments/:clave` | — | datos generales + grupos → tandas |
-| `DELETE /experiments/:clave` | `{ titulo, password }` | `{ ok }` |
+| `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }` |
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
 | `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }` |
@@ -205,6 +205,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 19. **Cancelar la subida** de un video (`signal` de un `AbortController` en `uploadBatchVideo`) y limpieza de código sin uso (`hooks/useApi.js`, `store`).
 20. **Pantallas que se actualizan solas**: Experimento, Grupo y la cola de Admin, con `useAsyncVivo` (5 s con análisis activos, 30 s sin ellos, sin parpadeo de «Cargando…»).
 21. **Contenedor de producción** (propuesta, sección 3): `Dockerfile.prod` + nginx + `docker-compose.prod.yml`; fuente y XLSX incluidos en la app.
+22. **D-63**: eliminar un experimento pide solo confirmación, sin nombre ni contraseña (app, servicio, pruebas y `mockup/v2/experimento.html`).
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -223,6 +224,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | Contraseña temporal | Se muestra una sola vez al crear la cuenta. Sin caducidad por ahora. |
 | Dónde guardar el token | `sessionStorage` (falta decidir si la sesión debe sobrevivir al cerrar la pestaña). |
 | Revisión segundo a segundo | Va en este frontend, construida al final (§12 del documento). Mientras, se usa `tools/fst_labeler`. |
+| Eliminar experimento (D-63) | Solo confirmación («¿Eliminar «…»?»), sin escribir el nombre ni la contraseña. El foco empieza en «Cancelar». Aplicado en la app y en `mockup/v2/experimento.html`. |
 | Respuesta 403 | Mensaje «No tienes permiso para esa sección» y regreso a Experimentos. |
 | Backend | Congelado hasta terminar el etiquetador (tu `PARA_VANESA.md` §1). El frontend sigue con datos de ejemplo. |
 | Versiones | 0.x hasta que exista el clasificador; 1.0.0 cuando esté integrado. Esta rama: 0.3.0. |

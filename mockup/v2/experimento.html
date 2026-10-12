@@ -56,7 +56,7 @@
     <div id="grupos" style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider);border:1px solid var(--color-divider)"></div>
 
     <div style="margin-top:26px;border:2px solid var(--color-accent);display:flex;align-items:center;gap:20px;padding:16px 18px">
-      <div style="flex:1;font-size:12.5px;line-height:1.6"><strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: pide escribir el nombre del experimento, «<span id="nombreDel"></span>», y la contraseña de la cuenta.</div>
+      <div style="flex:1;font-size:12.5px;line-height:1.6"><strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: se pide confirmación antes de borrar.</div>
       <button type="button" class="btn btn-primary" id="btnDel">Eliminar experimento…</button>
     </div>
   </div>
@@ -66,11 +66,9 @@
 <div class="dialog-backdrop hidden" id="dlg">
   <form class="dialog" id="fDel" novalidate role="dialog" aria-modal="true" aria-labelledby="dlgT">
     <div class="dialog-title" id="dlgT">Eliminar experimento</div>
-    <div class="dialog-body" style="font-size:12.5px;line-height:1.6">Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
-    <div class="field"><label for="dNombre">Escribe el nombre del experimento, «<span id="dlgNombre"></span>»</label><input class="input" id="dNombre" autocomplete="off"></div>
-    <div class="field"><label for="dPass">Contraseña de la cuenta</label><input class="input num" id="dPass" type="password" autocomplete="current-password"></div>
+    <div class="dialog-body" style="font-size:12.5px;line-height:1.6">¿Eliminar «<span id="dlgNombre"></span>»? Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
     <div class="dialog-actions" style="justify-content:flex-start">
-      <button type="submit" class="btn btn-primary" id="dOk" disabled>Eliminar experimento</button>
+      <button type="submit" class="btn btn-primary" id="dOk">Eliminar experimento</button>
       <button type="button" class="btn btn-secondary" id="dCancel">Cancelar</button>
     </div>
   </form>
@@ -114,20 +112,16 @@
       '<a class="btn btn-ghost" href="grupo.html?g=' + g.id + '" style="margin-top:12px">Abrir grupo →</a>' +
     '</div>').join('');
 
-  // ── eliminar ────────────────────────────────────────────────────────────
-  $('nombreDel').textContent = exp.titulo;
+  // ── eliminar (D-63: solo confirmación, sin nombre ni contraseña) ───────────
   $('dlgNombre').textContent = exp.titulo;
-  const check = () => { $('dOk').disabled = !($('dNombre').value === exp.titulo && $('dPass').value.length > 0); };
-  $('dNombre').addEventListener('input', check);
-  $('dPass').addEventListener('input', check);
-  const close = () => { $('dlg').classList.add('hidden'); $('fDel').reset(); check(); };
-  $('btnDel').onclick = () => { $('dlg').classList.remove('hidden'); $('dNombre').focus(); };
+  const close = () => { $('dlg').classList.add('hidden'); };
+  // El foco empieza en «Cancelar», la opción segura.
+  $('btnDel').onclick = () => { $('dlg').classList.remove('hidden'); $('dCancel').focus(); };
   $('dCancel').onclick = close;
   $('dlg').addEventListener('click', e => { if (e.target === $('dlg')) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   $('fDel').onsubmit = e => {
     e.preventDefault();
-    if ($('dOk').disabled) return;
     location.href = 'experimentos.html?eliminado=' + encodeURIComponent(exp.clave);
   };
 </script>
