@@ -52,7 +52,7 @@ const pct = (v) => (v / DIA2_S) * 100 + '%'
 const val = (m, de) => r1(m) + ' ± ' + r1(de) + ' s'
 const COLOR_TIPO = { CONTROL: INK, REFERENCIA: ACC, EXPERIMENTAL: N400 }
 const COLOR_AGRUPADO = 'var(--color-accent-300)'
-const PENDIENTE = { QUEUED: 'en cola', RUNNING: 'procesando', FAILED: 'con error' }
+const PENDIENTE = { QUEUED: 'en cola', RUNNING: 'procesando', PAUSED: 'en pausa', FAILED: 'con error', CANCELED: 'cancelada' }
 
 function Barra({ m, de, color, h }) {
   return (

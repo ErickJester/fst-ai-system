@@ -24,7 +24,7 @@ export const fechaRango = (desde, hasta) => {
 }
 
 // ── valores de la API → etiquetas de los mockups ───────────────────────────
-export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
+export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', QUEUED: 'En cola', RUNNING: 'Procesando', PAUSED: 'En pausa', DONE: 'Completado', FAILED: 'Error', CANCELED: 'Cancelado' }
 export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
 export const DIA = { DAY1: 'Día 1', DAY2: 'Día 2' }
 // En el orden en que las recorre el pipeline: tres etapas, un tercio del avance cada una.
@@ -47,6 +47,12 @@ export const ESTADO_EXPERIMENTO = {
   FAILED: 'Con error',
   CANCELED: 'Cancelado',
 }
+
+// Pantalla de pausa de un análisis (R-15): ahí se ajusta el recuadro o se cancela.
+export const enlacePausa = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/pausa`
+
+// «3:41» a partir de segundos.
+export const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0')
 
 // Un espécimen se distingue por su posición en el cuadro; como el número se repite en cada
 // tanda del grupo, donde se juntan tandas va con la tanda: «Tanda A · Espécimen 2» (D-55).
