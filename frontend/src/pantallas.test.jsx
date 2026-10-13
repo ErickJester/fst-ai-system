@@ -9,6 +9,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import { reiniciarDatos } from './services/mocks/data'
+import { createExperiment } from './services/experiments'
 import { avanzarSimulacion } from './services/mocks/simulador'
 
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
@@ -102,6 +103,21 @@ describe('acceso', () => {
 })
 
 describe('administración', () => {
+  it('filtra las cuentas por rol y estado, con cuántos experimentos creó cada una (§9.6)', async () => {
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    await screen.findByRole('columnheader', { name: 'Experimentos' })
+    expect(screen.getAllByRole('row')).toHaveLength(5) // encabezado + 4 cuentas
+    await user.selectOptions(screen.getByLabelText('Rol'), 'ADMIN')
+    const filas = screen.getAllByRole('row')
+    expect(filas).toHaveLength(2)
+    expect(within(filas[1]).getByText('creyesl@ipn.mx')).toBeTruthy()
+    expect(within(filas[1]).getByText('2')).toBeTruthy() // creó dos experimentos de ejemplo
+    await user.selectOptions(screen.getByLabelText('Rol'), '')
+    await user.selectOptions(screen.getByLabelText('Estado'), 'inactiva')
+    expect(screen.getByText('Ninguna cuenta coincide con los filtros.')).toBeTruthy()
+    expect(screen.getAllByText('sin duración mínima')).toHaveLength(4) // las cuatro conductas (RF-18)
+  })
+
   it('crear una cuenta muestra la contraseña temporal una sola vez', async () => {
     const user = abrir('/login')
     await entrar(user, 'creyesl@ipn.mx')
@@ -286,6 +302,16 @@ describe('revisión segundo a segundo (R-14)', () => {
 })
 
 describe('experimentos (dashboard)', () => {
+  it('pagina de 10 en 10', async () => {
+    for (let i = 0; i < 7; i++) await createExperiment({ titulo: 'Prueba ' + i, fecha_inicio: '2026-10-0' + (i + 1), especie: '', notas: '' })
+    const user = await conSesion('/experimentos')
+    await screen.findByText('Prueba 0')
+    expect(screen.getAllByRole('row')).toHaveLength(11) // encabezado + 10
+    await user.click(screen.getByRole('button', { name: '2' }))
+    expect(screen.getAllByRole('row')).toHaveLength(3) // los 2 que faltan de 12
+    expect(screen.getByRole('button', { name: 'Página siguiente' }).disabled).toBe(true)
+  })
+
   it('filtra por estado, fecha y tratamiento, y avisa de los videos por borrarse', async () => {
     const user = await conSesion('/experimentos')
     await screen.findByText('Compuesto CSR-14 · curva de dosis')

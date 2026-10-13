@@ -43,6 +43,7 @@ const opciones = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompa
 // nada que exportar. Sin backend, solo el experimento de ejemplo tiene detalle.
 const conReportes = (e) => e.con_detalle && e.videos_dia2_listos > 0
 const chipInactivo = { opacity: 0.4, cursor: 'default' }
+const POR_PAGINA = 10
 
 // 2a · Experimentos (dashboard): todos los del laboratorio, con estado calculado, filtros
 // por estado, año y tratamiento, aviso de videos por borrarse y eliminar (R-08, D-63).
@@ -52,6 +53,7 @@ export default function ExperimentosPage() {
   const sinPermiso = useAviso('sin-permiso')
   const [filtro, setFiltro] = useState({ estado: '', anio: '', tratamiento: '' })
   const [q, setQ] = useState('')
+  const [pagina, setPagina] = useState(1)
   const [borrar, setBorrar] = useState(null) // experimento del diálogo de eliminar
   const [eliminados, setEliminados] = useState([]) // títulos eliminados desde esta lista
   const { data, error, loading, reload } = useAsync(listExperiments)
@@ -70,7 +72,10 @@ export default function ExperimentosPage() {
     // Basta con que algún grupo tenga ese tratamiento.
     .filter((e) => !filtro.tratamiento || e.tratamientos.includes(filtro.tratamiento))
     .filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos.join(' ')).includes(nq))
-  const filtrar = (campo) => (ev) => setFiltro((f) => ({ ...f, [campo]: ev.target.value }))
+  const filtrar = (campo) => (ev) => { setFiltro((f) => ({ ...f, [campo]: ev.target.value })); setPagina(1) }
+  const paginas = Math.max(1, Math.ceil(list.length / POR_PAGINA))
+  const actual = Math.min(pagina, paginas)
+  const enPagina = list.slice((actual - 1) * POR_PAGINA, actual * POR_PAGINA)
 
   function alEliminar(exp) {
     setBorrar(null)
@@ -135,7 +140,7 @@ export default function ExperimentosPage() {
             </select>
           </div>
           <div style={{ flex: 1 }} />
-          <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => { setQ(e.target.value); setPagina(1) }} />
         </div>
 
         <table className="table">
@@ -146,7 +151,7 @@ export default function ExperimentosPage() {
             </tr>
           </thead>
           <tbody>
-            {list.map((e) => {
+            {enPagina.map((e) => {
               const videos = videosDia2(e)
               const ret = retencion(e)
               return (
@@ -182,6 +187,16 @@ export default function ExperimentosPage() {
             })}
           </tbody>
         </table>
+        {paginas > 1 && (
+          <nav aria-label="Páginas de experimentos" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 14 }}>
+            <button type="button" className="btn btn-ghost" disabled={actual === 1} aria-label="Página anterior" onClick={() => setPagina(actual - 1)}>‹</button>
+            {Array.from({ length: paginas }, (_, i) => i + 1).map((n) => (
+              <button key={n} type="button" className={'btn ' + (n === actual ? 'btn-primary' : 'btn-ghost')} aria-current={n === actual ? 'page' : undefined} onClick={() => setPagina(n)}>{n}</button>
+            ))}
+            <button type="button" className="btn btn-ghost" disabled={actual === paginas} aria-label="Página siguiente" onClick={() => setPagina(actual + 1)}>›</button>
+            <span className="hint" style={{ marginLeft: 8 }}>{list.length} experimentos</span>
+          </nav>
+        )}
         {loading && <p className="hint" style={{ margin: '14px 0 0' }}>Cargando experimentos…</p>}
         {error && <p className="hint" style={{ margin: '14px 0 0', color: 'var(--color-accent-700)' }}>No se pudo cargar la lista de experimentos.</p>}
         {data && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
