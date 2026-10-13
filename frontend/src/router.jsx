@@ -12,6 +12,7 @@ import NuevoExperimentoPage from './pages/NuevoExperimentoPage'
 import GrupoPage from './pages/GrupoPage'
 import CargarVideoPage from './pages/CargarVideoPage'
 import ProgresoPage from './pages/ProgresoPage'
+import PausaPage from './pages/PausaPage'
 import ResultadosPage from './pages/ResultadosPage'
 import AdminPage from './pages/AdminPage'
 
@@ -75,6 +76,7 @@ export default function AppRouter() {
         <Route path="/experimentos/:clave/cargar" element={p(<CargarVideoPage />)} />
         <Route path="/experimentos/:clave/resultados" element={p(<ResultadosPage />)} />
         <Route path="/analisis" element={p(<ProgresoPage />)} />
+        <Route path="/experimentos/:clave/analisis/:id/pausa" element={p(<PausaPage />)} />
         <Route path="/perfil" element={p(<PerfilPage />)} />
         <Route path="/admin" element={p(<AdminPage />, true)} />
 

@@ -8,8 +8,8 @@ import { getExperiment } from '../services/experiments'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
 import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 
-// Hay análisis en curso o en cola en alguna tanda (solo se analiza el Día 2).
-const ACTIVOS = ['QUEUED', 'RUNNING']
+// Hay análisis en cola, en curso o en pausa en alguna tanda (solo se analiza el Día 2).
+const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
 const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.includes(t.estado)))
 
 const posiciones = (t) => 'Especímenes 1–' + t.n_cilindros
@@ -17,6 +17,7 @@ const posiciones = (t) => 'Especímenes 1–' + t.n_cilindros
 const LEGEND = [
   { label: 'En cola', style: { background: 'var(--color-accent-200)', border: '1px solid var(--color-divider)' } },
   { label: 'Procesando', style: { background: 'var(--color-accent)' } },
+  { label: 'En pausa', style: { background: 'repeating-linear-gradient(90deg,var(--color-accent) 0 4px,var(--color-bg) 4px 7px)', border: '1px solid var(--color-accent)' } },
   { label: 'Completado', style: { background: 'var(--color-text)' } },
   { label: 'Error', style: { background: 'repeating-linear-gradient(135deg,var(--color-accent-800) 0 2px,var(--color-bg) 2px 4px)', border: '1px solid var(--color-accent-800)' } },
 ]
