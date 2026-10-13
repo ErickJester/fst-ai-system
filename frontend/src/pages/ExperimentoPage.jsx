@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, FieldError, Migas, Cargando, NoEncontrado, rellenoTanda } from '../components/ui'
 import { getExperiment, deleteExperiment } from '../services/experiments'
@@ -13,7 +13,7 @@ import { btnLeft } from '../lib/estilos'
 const ACTIVOS = ['QUEUED', 'RUNNING']
 const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.includes(t.estado)))
 
-const posiciones = (t) => 'Cilindros P1–P' + t.n_cilindros
+const posiciones = (t) => 'Especímenes 1–' + t.n_cilindros
 
 const LEGEND = [
   { label: 'En cola', style: { background: 'var(--color-accent-200)', border: '1px solid var(--color-divider)' } },
@@ -26,6 +26,7 @@ const LEGEND = [
 export default function ExperimentoPage() {
   const { clave } = useParams()
   const navigate = useNavigate()
+  const aviso = useLocation().state?.aviso // al volver después de subir un video de Día 1
   const [dlg, setDlg] = useState(false)
   const [borrando, setBorrando] = useState(false)
   const [errBorrar, setErrBorrar] = useState('')
@@ -83,6 +84,7 @@ export default function ExperimentoPage() {
       </Topbar>
 
       <div className="page">
+        {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 10px' }}>{exp.titulo}</h2>

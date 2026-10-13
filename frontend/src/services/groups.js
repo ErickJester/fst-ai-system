@@ -46,6 +46,11 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
       if (signal?.aborted) throw cancelada()
       onProgress?.(p)
     }
+    // El servidor valida el video al recibirlo (D-64). Sin backend, el nombre del archivo
+    // simula los rechazos, como hará worker_fake con «falla» y «pausa».
+    const nombre = file?.name || ''
+    if (/vertical/i.test(nombre)) return fail(422, 'El video es vertical: se necesita un video horizontal, con los cilindros de lado a lado.')
+    if (/da[ñn]ado/i.test(nombre)) return fail(422, 'El video no se puede reproducir: el archivo está dañado o incompleto.')
     // La tanda queda registrada; si es Día 2, su análisis entra al final de la cola.
     let t = g.tandas.find((x) => x.letra === letra)
     if (!t) {

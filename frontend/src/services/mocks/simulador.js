@@ -5,13 +5,13 @@
 // servicios calcula hasta dónde debió avanzar desde la vez anterior.
 import * as db from './data'
 import { resumir } from './resumen'
-import { DIA, enlaceResultados, mensajeErrorAnalisis } from '../../lib/fst'
+import { DIA, PCT_ETAPA, enlaceResultados, mensajeErrorAnalisis } from '../../lib/fst'
 
-const ETAPAS = ['PREPROCESSING', 'ROI_DETECTION', 'TRACKING', 'CLASSIFICATION']
+const ETAPAS = ['PREPROCESSING', 'ROI_DETECTION', 'CLASSIFICATION']
 export const POR_ETAPA_MS = 8000
 export const DURACION_MS = POR_ETAPA_MS * ETAPAS.length
-// Uno de cada tres trabajos falla en la detección de cilindros (no se hallan los tubos),
-// a la mitad del análisis. Solo hay trabajos de Día 2: el Día 1 no se analiza (D-54).
+// Uno de cada tres trabajos falla en la etapa de cilindros (no se hallan los tubos), al
+// terminar esa etapa. Solo hay trabajos de Día 2: el Día 1 no se analiza (D-54).
 const CADA_CUANTOS_FALLA = 3
 
 // Lo llaman los servicios al leer. En las pruebas automáticas no corre: ahí se prueba
@@ -32,11 +32,11 @@ export function avanzarSimulacion(ahora = Date.now()) {
       if (job.inicio_ms > ahora) break
       Object.assign(job, { status: 'RUNNING', stage: ETAPAS[0], progress_pct: 0 })
     }
-    // Un trabajo que ya venía procesando (datos iniciales) conserva su avance.
-    if (job.inicio_ms == null) job.inicio_ms = ahora - (job.progress_pct / 100) * DURACION_MS
+    // Un trabajo que ya venía procesando (datos iniciales) va a la mitad de su etapa.
+    if (job.inicio_ms == null) job.inicio_ms = ahora - (ETAPAS.indexOf(job.stage) + 0.5) * POR_ETAPA_MS
 
     const falla = sim.terminados % CADA_CUANTOS_FALLA === CADA_CUANTOS_FALLA - 1
-    const fin = job.inicio_ms + (falla ? DURACION_MS / 2 : DURACION_MS)
+    const fin = job.inicio_ms + (falla ? 2 * POR_ETAPA_MS : DURACION_MS)
     if (ahora < fin) {
       progreso(job, ahora, falla)
       break
@@ -53,9 +53,9 @@ function buscarTanda(job) {
 }
 
 function progreso(job, ahora, falla) {
-  const tope = falla ? 49 : 99
-  const pct = Math.min(tope, Math.floor(((ahora - job.inicio_ms) / DURACION_MS) * 100))
-  const etapa = ETAPAS[Math.min(ETAPAS.length - 1, Math.floor(pct / 25))]
+  const tope = falla ? 1 : ETAPAS.length - 1
+  const etapa = ETAPAS[Math.min(tope, Math.floor((ahora - job.inicio_ms) / POR_ETAPA_MS))]
+  const pct = PCT_ETAPA[etapa]
   Object.assign(job, { stage: etapa, progress_pct: pct })
 
   const t = buscarTanda(job)
@@ -74,7 +74,7 @@ function terminar(job, falla, fin) {
   if (falla) {
     const etapa = 'ROI_DETECTION'
     // fallo_ms: el PDF de diagnóstico tarda unos segundos en estar listo (services/queue.js).
-    db.failedJobs.unshift({ ...job, status: 'FAILED', stage: etapa, progress_pct: 50, fallo_ms: fin, posicion: undefined })
+    db.failedJobs.unshift({ ...job, status: 'FAILED', stage: etapa, progress_pct: PCT_ETAPA[etapa], fallo_ms: fin, posicion: undefined })
     if (t) Object.assign(t, { estado: 'FAILED', progreso: null, error: { etapa } })
     notificar('ANALYSIS_FAILED', 'Error en el análisis', nombre + '. ' + mensajeErrorAnalisis(etapa), '/analisis', fin)
   } else {

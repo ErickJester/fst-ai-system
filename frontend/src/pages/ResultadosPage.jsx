@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison } from '../services/results'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados } from '../lib/fst'
+import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados, especimen } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -33,9 +33,8 @@ const CMAP = Object.fromEntries(TODAS.map((c) => [c.id, c.color]))
 const LBL = Object.fromEntries(TODAS.map((c) => [c.id, c.label]))
 const NIVEL = { PRECISO: 'preciso (3 conductas)', AGRUPADO: 'agrupado (2 conductas)' }
 
-// Dentro de una tanda cada cilindro basta para identificar al sujeto. Donde se junten
-// varias tandas, la etiqueta debe ser «Tanda A · Cilindro P1».
-const etiqueta = (e) => 'Cilindro ' + e.cilindro
+// El espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
+const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
 const nombreGrupo = (g) => (g.tipo === 'CONTROL' ? 'Grupo control' : 'Grupo ' + g.nombre[0].toLowerCase() + g.nombre.slice(1))
 const hora = (iso) => iso.slice(11, 16)
 
@@ -123,12 +122,12 @@ function Comparacion({ g }) {
 function tabla(r) {
   const KEYS = conductasDe(r.nivel).map((c) => c.id)
   const encabezados = KEYS.map((k) => LBL[k] + ' (s)')
-  const col = (k) => r.cilindros.map((e) => e[k + '_s'])
-  const out = [['Cilindro', ...encabezados]]
-  r.cilindros.forEach((e) => out.push([etiqueta(e), ...KEYS.map((k) => e[k + '_s'])]))
+  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
+  const out = [['Espécimen', ...encabezados]]
+  r.especimenes.forEach((e) => out.push([etiqueta(e, r.letra), ...KEYS.map((k) => e[k + '_s'])]))
   estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...KEYS.map((k) => s.f(col(k)).replace(' s', ''))]))
   out.push([])
-  out.push([etiqueta(r.linea_tiempo) + ' · minuto', ...encabezados])
+  out.push([etiqueta(r.linea_tiempo, r.letra) + ' · minuto', ...encabezados])
   r.linea_tiempo.minutos.forEach((segs, i) => {
     const sum = (k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
     out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), ...KEYS.map(sum)])
@@ -154,7 +153,7 @@ async function exportarXLSX(r) {
 }
 
 const TABS = [
-  { id: 'cilindro', label: 'Por cilindro' },
+  { id: 'especimen', label: 'Por espécimen' },
   { id: 'comparacion', label: 'Comparación entre grupos' },
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
 ]
@@ -198,8 +197,8 @@ function SinResultados({ clave }) {
 }
 
 function ResultadosTanda({ clave, gid, letra }) {
-  const [tab, setTab] = useState('cilindro')
-  const refs = { cilindro: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
+  const [tab, setTab] = useState('especimen')
+  const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
   const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
@@ -209,7 +208,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   const exp = r.experimento
   const conductas = conductasDe(r.nivel)
   const KEYS = conductas.map((c) => c.id)
-  const col = (k) => r.cilindros.map((e) => e[k + '_s'])
+  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
 
   // Las pestañas llevan a su sección de la vista.
@@ -245,7 +244,7 @@ function ResultadosTanda({ clave, gid, letra }) {
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
             <button type="button" className="btn btn-secondary" onClick={() => download(archivo(r) + '.csv', toCSV(tabla(r)))}>CSV</button>
             <button type="button" className="btn btn-secondary" onClick={() => exportarXLSX(r)}>XLSX</button>
-            <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => window.print()}>PDF · resumen ejecutivo</button>
+            <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => window.print()}>PDF · reporte de resultados</button>
           </div>
         </div>
 
@@ -258,7 +257,7 @@ function ResultadosTanda({ clave, gid, letra }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 26 }}>
-            <div ref={refs.cilindro} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
+            <div ref={refs.especimen} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
               <div className="k">Tiempo por conducta · min:seg</div>
               <div style={{ flex: 1 }} />
               <span style={{ display: 'flex', gap: 18 }}>
@@ -271,18 +270,18 @@ function ResultadosTanda({ clave, gid, letra }) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '24%' }}>Cilindro</th>
+                  <th style={{ width: '24%' }}>Espécimen</th>
                   {conductas.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
                   <th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
               <tbody>
-                {r.cilindros.map((e) => (
-                  <tr key={e.cilindro}>
+                {r.especimenes.map((e) => (
+                  <tr key={e.numeroCilindro}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.cilindro}</span>
-                        <span style={{ fontSize: 13 }}>{etiqueta(e)}</span>
+                        <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.numeroCilindro}</span>
+                        <span style={{ fontSize: 13 }}>{etiqueta(e, r.letra)}</span>
                       </div>
                     </td>
                     {KEYS.map((k) => <td key={k} className="num" style={{ textAlign: 'right' }}>{fmt(e[k + '_s'])}</td>)}

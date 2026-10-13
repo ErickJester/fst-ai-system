@@ -10,19 +10,10 @@ import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import { reiniciarDatos } from './services/mocks/data'
 
-// Lo que jsdom no trae: desplazar la ventana, URLs de archivos y leer metadatos de video.
+// Lo que jsdom no trae: desplazar la ventana y URLs de archivos.
 window.scrollTo = vi.fn()
 URL.createObjectURL = vi.fn(() => 'blob:prueba')
 URL.revokeObjectURL = vi.fn()
-let videoAncho = 1280
-let videoAlto = 720
-Object.defineProperty(HTMLMediaElement.prototype, 'src', {
-  configurable: true,
-  set() { setTimeout(() => this.onloadedmetadata?.()) },
-})
-Object.defineProperty(HTMLMediaElement.prototype, 'duration', { configurable: true, get: () => 300 })
-Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => videoAncho })
-Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => videoAlto })
 
 function abrir(ruta = '/login') {
   const user = userEvent.setup()
@@ -55,8 +46,6 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   reiniciarDatos()
-  videoAncho = 1280
-  videoAlto = 720
 })
 afterEach(() => cleanup())
 
@@ -133,6 +122,15 @@ describe('administración', () => {
 })
 
 describe('cargar video', () => {
+  // Elige Referencia con el teclado, confirma la tanda C y adjunta el archivo.
+  async function prepararTandaC(user, nombre) {
+    await user.type(await screen.findByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], nombre, { type: 'video/mp4' }))
+    await screen.findByText(nombre)
+  }
+
   it('elegir el grupo con el teclado, confirmar la tanda y encolar el video', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/cargar')
     const grupo = await screen.findByRole('combobox')
@@ -146,39 +144,39 @@ describe('cargar video', () => {
     await user.upload(document.querySelector('input[type=file]'), archivo)
     await screen.findByText('tanda_C.mp4')
     await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
-    expect(await screen.findByText('Video almacenado · análisis en cola')).toBeTruthy()
-    expect(screen.getByText(/posición 4 en la cola/)).toBeTruthy()
+    // Con el Día 2, redirige a Progreso (§9.3).
+    expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
+    expect(screen.getByText(/El análisis está en cola: Referencia · Fluoxetina 10 mg\/kg · Tanda C · Día 2/)).toBeTruthy()
   })
 
-  it('el video de Día 1 se guarda sin encolar análisis (D-54)', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
-    await user.type(await screen.findByRole('combobox'), 'fluox')
-    await user.keyboard('{ArrowDown}{Enter}')
-    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
-    await user.click(screen.getByRole('button', { name: 'Día 1 (20 min)' }))
-    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'tanda_C_dia1.mp4', { type: 'video/mp4' }))
-    await screen.findByText('tanda_C_dia1.mp4')
-    await user.click(screen.getByRole('button', { name: 'Guardar video' }))
-    expect(await screen.findByText('Video de Día 1 almacenado')).toBeTruthy()
-    expect(screen.getByText(/No se analiza/)).toBeTruthy()
-    expect(screen.queryByText('Ver progreso del análisis →')).toBeNull()
-  })
-
-  it('rechaza un video vertical', async () => {
+  it('el video de Día 1 se guarda sin encolar análisis y vuelve al experimento (D-71)', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/cargar')
     await screen.findByRole('combobox')
-    videoAncho = 720
-    videoAlto = 1280
-    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'celular.mp4', { type: 'video/mp4' }))
-    expect(await screen.findByText('El video es vertical')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Día 1 (20 min)' }))
+    await prepararTandaC(user, 'tanda_C_dia1.mp4')
+    await user.click(screen.getByRole('button', { name: 'Guardar video' }))
+    expect(await screen.findByRole('heading', { name: 'Compuesto CSR-14 · curva de dosis' })).toBeTruthy()
+    expect(screen.getByText(/Video del Día 1 almacenado .*No se analiza\./)).toBeTruthy()
+  })
+
+  it('el navegador solo revisa la extensión; el servidor rechaza el video vertical (D-64)', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    await screen.findByRole('combobox')
+    await user.upload(document.querySelector('input[type=file]'), new File(['x'], 'notas.txt', { type: 'video/mp4' }), { applyAccept: false })
+    expect(await screen.findByText('El archivo no es .mp4 ni .mov')).toBeTruthy()
+
+    await prepararTandaC(user, 'celular_vertical.mp4')
+    await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
+    expect(await screen.findByText('El servidor rechazó el video')).toBeTruthy()
+    expect(screen.getByText(/El video es vertical/)).toBeTruthy()
   })
 })
 
 describe('resultados', () => {
-  it('muestra los cilindros de la tanda y la comparación entre grupos', async () => {
+  it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
     await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
-    expect(screen.getAllByText('Cilindro P1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
   })
 })

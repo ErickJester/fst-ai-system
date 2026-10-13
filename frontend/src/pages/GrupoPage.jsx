@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados, mensajeErrorAnalisis } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, mensajeErrorAnalisis, especimen } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -24,7 +24,7 @@ function notaDia2(t) {
   }
 }
 
-// 2d · Detalle de grupo: tandas, cilindros y la asimetría Día 1 / Día 2.
+// 2d · Detalle de grupo: tandas, especímenes y la asimetría Día 1 / Día 2.
 export default function GrupoPage() {
   const { clave, gid } = useParams()
   // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
@@ -57,7 +57,7 @@ export default function GrupoPage() {
           <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--muted-2)' }}>
             <span>{g.tratamiento}</span>
             <span className="num">{g.n_especimenes} especímenes</span>
-            <span className="num">{g.tandas.length} tandas · {g.tandas.map((t) => t.n_cilindros).join(' + ')} cilindros</span>
+            <span className="num">{g.tandas.length} tandas · {g.tandas.map((t) => t.n_cilindros).join(' + ')} especímenes</span>
           </div>
         </div>
 
@@ -76,12 +76,12 @@ export default function GrupoPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '410px 1fr' }}>
                   <div style={{ padding: '18px 20px', borderRight: '2px solid var(--color-divider)' }}>
-                    <div className="k" style={{ marginBottom: 13 }}>Cilindros de la tanda</div>
+                    <div className="k" style={{ marginBottom: 13 }}>Especímenes de la tanda</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
                       {Array.from({ length: t.n_cilindros }, (_, i) => (
                         <div key={i} style={{ background: 'var(--color-bg)', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px' }}>
-                          <span className="num nd" style={{ width: 28, height: 28, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>P{i + 1}</span>
-                          <div className="nd" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>Cilindro P{i + 1}</div>
+                          <span className="num nd" style={{ width: 28, height: 28, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{i + 1}</span>
+                          <div className="nd" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{especimen(i + 1)}</div>
                         </div>
                       ))}
                     </div>

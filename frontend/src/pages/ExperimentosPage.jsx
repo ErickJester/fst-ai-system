@@ -2,33 +2,29 @@ import React, { useState } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { Seg } from '../components/ui'
 import { listExperiments } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { useAviso } from '../hooks/useAviso'
-import { norm, fechaCorta } from '../lib/fst'
+import { norm, fechaCorta, ESTADO_EXPERIMENTO } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
-const ESTADO = {
-  EN_ANALISIS: { label: 'En análisis', tag: 'tag-accent' },
-  CARGA_INCOMPLETA: { label: 'Carga incompleta', tag: 'tag-outline' },
-  CONCLUIDO: { label: 'Concluido', tag: 'tag-neutral' },
+// Apariencia de cada estado calculado del experimento (ESTADO_EXPERIMENTO).
+const TAG = {
+  SIN_VIDEOS: { cls: 'tag-outline', style: { color: 'var(--muted)' } },
+  ESPERA_DIA2: { cls: 'tag-outline' },
+  QUEUED: { cls: 'tag-outline' },
+  RUNNING: { cls: 'tag-accent' },
+  PAUSED: { cls: 'tag-accent' },
+  DONE: { cls: 'tag-neutral' },
+  FAILED: { cls: 'tag-accent', style: { background: 'var(--color-accent-800)', color: 'var(--color-bg)' } },
+  CANCELED: { cls: 'tag-neutral', style: { color: 'var(--muted)' } },
 }
 
-const FILTROS = [
-  { v: 'todos', label: 'Todos', test: () => true },
-  { v: 'analisis', label: 'En análisis', test: (e) => e.estado === 'EN_ANALISIS' },
-  { v: 'incompleta', label: 'Carga incompleta', test: (e) => e.estado === 'CARGA_INCOMPLETA' },
-  { v: 'concluidos', label: 'Concluidos', test: (e) => e.estado === 'CONCLUIDO' },
-]
-
-// Con carga incompleta cuenta lo cargado; si no, lo ya analizado.
+// Tandas con el Día 2 ya analizado, de las que tiene el experimento.
 function videosDia2(e) {
-  const incompleta = e.estado === 'CARGA_INCOMPLETA'
-  const n = incompleta ? e.videos_dia2_cargados : e.videos_dia2_listos
   return {
-    texto: n + ' / ' + e.videos_dia2_total + (incompleta ? ' cargados' : ''),
-    pct: (e.videos_dia2_total ? Math.round((n / e.videos_dia2_total) * 100) : 0) + '%',
+    texto: e.videos_dia2_listos + ' / ' + e.videos_dia2_total,
+    pct: (e.videos_dia2_total ? Math.round((e.videos_dia2_listos / e.videos_dia2_total) * 100) : 0) + '%',
   }
 }
 
@@ -49,7 +45,7 @@ export default function ExperimentosPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
   const sinPermiso = useAviso('sin-permiso')
-  const [filtro, setFiltro] = useState('todos')
+  const [filtro, setFiltro] = useState('')
   const [q, setQ] = useState('')
   const { data, error, loading } = useAsync(listExperiments)
 
@@ -57,9 +53,8 @@ export default function ExperimentosPage() {
   const eliminado = params.get('eliminado')
   const experiments = (data || []).filter((e) => e.clave !== eliminado)
 
-  const f = FILTROS.find((x) => x.v === filtro)
   const nq = norm(q.trim())
-  const list = experiments.filter(f.test).filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos).includes(nq))
+  const list = experiments.filter((e) => !filtro || e.estado === filtro).filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos).includes(nq))
 
   return (
     <div className="app">
@@ -90,11 +85,13 @@ export default function ExperimentosPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <Seg
-            options={FILTROS.map((x) => ({ v: x.v, label: x.label + ' · ' + experiments.filter(x.test).length }))}
-            value={filtro}
-            onChange={setFiltro}
-          />
+          <label className="k" htmlFor="fEstado">Estado</label>
+          <select className="input" id="fEstado" style={{ width: 230 }} value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+            <option value="">Todos · {experiments.length}</option>
+            {Object.entries(ESTADO_EXPERIMENTO).map(([v, label]) => (
+              <option key={v} value={v}>{label} · {experiments.filter((e) => e.estado === v).length}</option>
+            ))}
+          </select>
           <div style={{ flex: 1 }} />
           <input className="input" type="search" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
@@ -102,7 +99,7 @@ export default function ExperimentosPage() {
         <table className="table">
           <thead>
             <tr>
-              <th style={{ width: '29%' }}>Experimento</th><th>Grupos</th><th>Especímenes</th><th style={{ width: '14%' }}>Videos Día 2</th>
+              <th style={{ width: '29%' }}>Experimento</th><th>Grupos</th><th>Especímenes</th><th style={{ width: '14%' }}>Día 2 analizados</th>
               <th>Estado</th><th>Responsable</th><th>Retención</th><th>Reporte</th>
             </tr>
           </thead>
@@ -124,7 +121,7 @@ export default function ExperimentosPage() {
                     <div className="num" style={{ fontSize: 12, marginBottom: 5 }}>{videos.texto}</div>
                     <div className="meter"><div style={{ width: videos.pct }} /></div>
                   </td>
-                  <td><span className={'tag ' + ESTADO[e.estado].tag}>{ESTADO[e.estado].label}</span></td>
+                  <td><span className={'tag ' + TAG[e.estado].cls} style={{ whiteSpace: 'nowrap', ...TAG[e.estado].style }}>{ESTADO_EXPERIMENTO[e.estado]}</span></td>
                   <td style={{ fontSize: 13 }}>{e.responsable}</td>
                   <td className="num" style={{ fontSize: 12, color: ret.color }}>{ret.texto}</td>
                   <td>

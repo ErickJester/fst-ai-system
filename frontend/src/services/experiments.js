@@ -24,7 +24,7 @@ export async function createExperiment(data) {
     const responsable = u ? u.nombre[0] + '. ' + u.apellidos.split(' ')[0] : ''
     db.experiments.unshift({
       clave, titulo: data.titulo, tratamientos: '', fecha_inicio: data.fecha_inicio, n_grupos: 0, n_especimenes: 0,
-      videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'CARGA_INCOMPLETA',
+      videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'SIN_VIDEOS',
       responsable, retencion_dias: null, videos_borrados: false, con_detalle: true,
     })
     db.experimentDetail[clave] = { clave, titulo: data.titulo, fecha_inicio: data.fecha_inicio, responsable, especie: data.especie, notas: data.notas, grupos: [] }
