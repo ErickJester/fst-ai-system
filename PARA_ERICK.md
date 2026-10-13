@@ -165,7 +165,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `POST /admin/users/:id/reset-temporal` | — | `{ password_temporal }` (una sola vez); la anterior deja de servir y vuelve `cambioRequerido` |
 | `GET /admin/system` | — | `{ disco, conductas, modelo }` |
 | `GET /experiments` | — | lista con estado calculado, `tratamientos` (lista), `creador_id` y `aviso_vencimiento` |
-| `POST /experiments` | `{ titulo, fecha_inicio, especie, notas }` | `{ clave }` (el responsable sale de la sesión) |
+| `POST /experiments` | `{ titulo, fecha_inicio, notas }` | `{ clave }` (el responsable sale de la sesión); 409 si el nombre ya existe |
 | `GET /experiments/:clave` | — | datos generales + grupos → tandas |
 | `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }`; 403 si no es quien lo creó ni Administrador; 409 con un análisis procesando o en pausa |
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
@@ -237,6 +237,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 28. **Revisión segundo a segundo** (R-14, §9.7) en `/experimentos/:clave/analisis/:id/revision` (`pages/RevisionPage.jsx`), con tema oscuro solo en esa pantalla (`.tema-oscuro` en `styles/app.css`). Un espécimen a la vez: video (o, sin backend, una escena simulada) con el tubo destacado por `cajas.json`, lupa de 40 s, línea de 300 s por espécimen, botones y teclas 1–4 y 0 (Dudosa), velocidades 0.5×–2×, Espacio, flechas, R, Tab, Ctrl+Z y Ctrl+S. Corriendo, la tecla cambia desde 0.4 s antes hasta el siguiente cambio de color; en pausa, solo ese segundo. «Visto» = lo que el cabezal dejó atrás a 2× o menos; solo eso se guarda (`confirmada`, `corregida` o `dudosa`, D-80); lo pintado sin verlo se descarta. Borrador en el navegador, Resumen, Guardar y «Reiniciar el análisis» (con confirmación). Solo de un análisis completado y para quien subió el video o un Administrador; se abre desde Resultados y Grupo. Resultados marca «Con revisión humana» y recalcula los totales con los segundos revisados.
 29. **Administración según §9.6:** filtros por rol y estado, columna Experimentos (`n_experimentos` en `GET /admin/users`), espacio libre, tiempo estimado de la cola (10 min por video) y acceso a todos los experimentos. Se corrigió el aviso de disco (al pasar del 90 % sí se borran los videos más antiguos) y el catálogo ya no muestra duraciones mínimas (RF-18): son las cuatro conductas.
 30. **Experimentos paginados** de 10 en 10, como el boceto del dashboard.
+31. **Nuevo experimento solo pide nombre, fecha y notas** (§7 y §9.3): se quitó el campo «especie», que además traía «Rata Wistar» (§9.8 prohíbe «rata»). El nombre es único en todo el sistema: 409 si se repite.
 
 ### Diferencias visibles con tu v2 (a propósito)
 

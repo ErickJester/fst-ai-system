@@ -127,15 +127,19 @@ describe('administradores', () => {
 
 describe('experimentos', () => {
   it('crear asigna la clave del año y empieza sin grupos', async () => {
-    const { clave } = await createExperiment({ titulo: 'Ketamina · dosis única', fecha_inicio: '2026-10-01', especie: 'Rata Wistar', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Ketamina · dosis única', fecha_inicio: '2026-10-01', notas: '' })
     expect(clave).toBe('EXP-2026-03')
     const exp = await getExperiment(clave)
     expect(exp.grupos).toEqual([])
     expect((await listExperiments())[0]).toMatchObject({ clave, estado: 'SIN_VIDEOS', n_grupos: 0 })
   })
 
+  it('el nombre es único en todo el sistema (EXPERIMENTO.nombre UNIQUE)', async () => {
+    expect(await status(createExperiment({ titulo: ' compuesto CSR-14 · CURVA de dosis ', fecha_inicio: '2026-10-01', notas: '' }))).toBe(409)
+  })
+
   it('subir el primer video crea la tanda, la encola y actualiza la lista', async () => {
-    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
     const avances = []
     const r = await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 }, (p) => avances.push(p))
@@ -150,7 +154,7 @@ describe('experimentos', () => {
   })
 
   it('el video de Día 1 se guarda pero no se analiza (D-54)', async () => {
-    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
     const r = await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY1', nCilindros: 3 })
 
@@ -163,7 +167,7 @@ describe('experimentos', () => {
   })
 
   it('el servidor rechaza un video vertical o que no se puede reproducir (D-64)', async () => {
-    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
     const subir = (name) => uploadBatchVideo(clave, g.id, 'A', { file: { name }, dia: 'DAY2', nCilindros: 2 })
     expect(await status(subir('celular_vertical.mp4'))).toBe(422)
@@ -192,7 +196,7 @@ describe('experimentos', () => {
     expect(await status(deleteExperiment('EXP-2026-02'))).toBe(409) // Experimental A · Tanda B se procesa
     expect(await status(getExperiment('EXP-2026-02'))).toBe('ok')
 
-    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
     await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 })
     expect((await getQueue()).cola.at(-1).clave).toBe(clave)
@@ -284,7 +288,7 @@ describe('simulación de la cola (modo demo)', () => {
   it('un video subido con la cola vacía empieza cuando se sube, no antes', async () => {
     avanzarSimulacion(T0)
     avanzarSimulacion(T0 + s(60)) // cola vacía
-    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-05', especie: '', notas: '' })
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-05', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'x' })
     await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 })
     queue[0].creado_ms = T0 + s(100) // fijamos el momento de la subida
