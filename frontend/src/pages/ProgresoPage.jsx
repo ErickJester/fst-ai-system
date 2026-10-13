@@ -138,7 +138,7 @@ function TrabajoActual({ j }) {
 
 function TrabajoFallido({ j }) {
   const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)'
-  // null | 'pidiendo' | 'preparando' (el PDF aún no existe: se reintenta solo) | 'error'
+  // null | 'pidiendo' | 'preparando' (el PDF aún no existe: se reintenta solo) | 'demo' (sin backend) | 'error'
   const [diag, setDiag] = useState(null)
   const [errDiag, setErrDiag] = useState('')
   const reintento = useRef(null)
@@ -150,6 +150,7 @@ function TrabajoFallido({ j }) {
     setErrDiag('')
     try {
       const pdf = await getDiagnostico(j)
+      if (!pdf) return setDiag('demo')
       download(['diagnostico', norm(j.experimento), norm(j.grupo), 'tanda' + j.tanda].join('_').replace(/\s+/g, '-') + '.pdf', pdf, 'application/pdf')
       setDiag(null)
     } catch (e) {
@@ -184,6 +185,11 @@ function TrabajoFallido({ j }) {
           </span>
         </div>
         <FieldError msg={errDiag} />
+        {diag === 'demo' && (
+          <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
+            <strong>Reporte de diagnóstico.</strong> Lo genera el worker cuando el análisis falla y el servidor lo entrega; aquí solo se descarga. Será un PDF con el video, la etapa en que se detuvo y la causa: {mensajeErrorAnalisis(j.stage).toLowerCase()} Disponible cuando el backend esté conectado.
+          </div>
+        )}
       </div>
     </div>
   )

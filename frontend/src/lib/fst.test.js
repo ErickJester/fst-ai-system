@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, toCSV, primeraTandaLista, enlaceResultados, bloqueDe } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, bloqueDe } from './fst'
 
 describe('bloques de 5 s (D-53)', () => {
   const N = 'nado', I = 'inmovilidad', E = 'escalamiento', A = 'activa'
@@ -59,14 +59,6 @@ describe('texto', () => {
     expect(esCorreo('alguien@gmail.com')).toBe(true)
     expect(esCorreo('sin arroba')).toBe(false)
     expect(esCorreo('sin@dominio')).toBe(false)
-  })
-})
-
-describe('CSV', () => {
-  it('lleva BOM para Excel y escapa comas, comillas y saltos de línea', () => {
-    const csv = toCSV([['Cilindro', 'Nota'], ['Cilindro P1', 'dijo "hola", y\nsiguió']])
-    expect(csv.charCodeAt(0)).toBe(0xfeff)
-    expect(csv.slice(1)).toBe('Cilindro,Nota\nCilindro P1,"dijo ""hola"", y\nsiguió"')
   })
 })
 

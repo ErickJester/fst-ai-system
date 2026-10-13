@@ -113,7 +113,7 @@ export const esCorreo = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
 // ── descargas ──────────────────────────────────────────────────────────────
 export function download(name, text, type) {
-  const blob = new Blob([text], { type: type || 'text/csv;charset=utf-8' })
+  const blob = new Blob([text], { type })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = name
@@ -123,9 +123,3 @@ export function download(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
 
-export function toCSV(rows) {
-  return '﻿' + rows.map((r) => r.map((v) => {
-    const s = String(v)
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
-  }).join(',')).join('\n')
-}

@@ -6,7 +6,7 @@ import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue, getDiagnostico, getPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
-import { getBatchResults, getGroupComparison, getBlocks } from './results'
+import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
 import { listNotifications } from './notifications'
@@ -279,8 +279,8 @@ describe('simulación de la cola (modo demo)', () => {
     // El PDF de diagnóstico tarda unos segundos: mientras tanto, 404 («preparando…»).
     expect(await status(getDiagnostico(errores[0]))).toBe(Date.now() - errores[0].fallo_ms < 6000 ? 404 : 'ok')
     expect(await status(getDiagnostico({ ...errores[0], fallo_ms: Date.now() }))).toBe(404)
-    const pdf = await getDiagnostico({ ...errores[0], fallo_ms: Date.now() - 60000 })
-    expect(pdf.type).toBe('application/pdf')
+    // Lo genera el worker: sin backend no hay archivo (null) y la pantalla explica qué hará.
+    expect(await getDiagnostico({ ...errores[0], fallo_ms: Date.now() - 60000 })).toBeNull()
     // Sin código de error: el mensaje se arma con la etapa en que se detuvo.
     expect((await listNotifications())[0].texto).toMatch(/No se encontraron los tubos en el video\.$/)
   })
@@ -355,6 +355,12 @@ describe('pausa del análisis (R-15, D-89)', () => {
     avanzarSimulacion(T0 + s(4 + 20) + 5 * 60 * 1000)
     expect((await getQueue()).cancelados[0]).toMatchObject({ job_id: 502, motivo: 'plazo' })
     expect((await listNotifications()).some((n) => n.tipo === 'ANALYSIS_CANCELED')).toBe(true)
+  })
+})
+
+describe('reportes (RF-22)', () => {
+  it('los genera el backend: sin él no hay archivo', async () => {
+    for (const f of ['csv', 'xlsx', 'pdf']) expect(await getReporte('EXP-2026-02', f)).toBeNull()
   })
 })
 

@@ -115,3 +115,13 @@ export async function getBlocks(clave, gid, letra) {
   }
   return (await api.get(`/experiments/${clave}/groups/${gid}/batches/${letra}/blocks`)).data
 }
+
+// ── Reportes (RF-22) ────────────────────────────────────────────────────────
+// GET /experiments/:clave/report/:formato (csv | xlsx | pdf) → el archivo, tal cual. Lo genera
+// el backend: si no existe lo crea, si es más viejo que el último análisis lo regenera y si
+// sigue vigente devuelve el guardado. El frontend solo lo descarga. Sin backend no hay
+// archivo: responde null y la pantalla explica qué hará el botón.
+export async function getReporte(clave, formato) {
+  if (USE_MOCKS) return reply(null)
+  return (await api.get(`/experiments/${clave}/report/${formato}`, { responseType: 'blob' })).data
+}
