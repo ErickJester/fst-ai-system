@@ -1,0 +1,7 @@
+target/
+db/
+.env
+.mvn/
+mvnw
+mvnw.cmd
+*.md

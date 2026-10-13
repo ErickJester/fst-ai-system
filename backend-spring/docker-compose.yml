@@ -1,0 +1,57 @@
+# Backend FST en Spring Boot con su propia base. Nombre de proyecto aparte (fst-spring) y puerto 5433 para
+# no chocar con el docker-compose.yml de la raíz (Flask y su base en el 5432).
+#
+#   cp .env.example .env
+#   docker compose --profile dev up --build      (con MailHog: correos en http://localhost:8025)
+#
+# El esquema (db/init) solo se aplica la primera vez, con el volumen pgdata vacío. Para volver a
+# aplicarlo: docker compose down -v, que BORRA todos los datos.
+name: fst-spring
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fst}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fst}
+      POSTGRES_DB: ${POSTGRES_DB:-fst}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - videos_reportes:/data/archivos
+    ports:
+      - "8080:8080"
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    profiles: ["dev"]
+    ports:
+      - "1025:1025"   # SMTP, para cuando el backend corre fuera de Docker
+      - "8025:8025"   # bandeja de correos de prueba
+
+volumes:
+  pgdata:
+  videos_reportes:   # videos y reportes; todavía no se usa (sin subida de video)
