@@ -15,12 +15,14 @@ import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 const VACIO = { nombre: '', apellidos: '', correo: '', id: '', rol: 'INVESTIGADOR' }
 const ROL = { INVESTIGADOR: 'Investigador', ADMIN: 'Administrador' }
 const AVISO_DISCO_PCT = 80
+const LIMPIEZA_DISCO_PCT = 90
+const MIN_POR_VIDEO = 10 // cada video de 5 min tarda unos 10 min en analizarse
 
 // «Mariana», «Rivera Alcántara» → «M. Rivera Alcántara».
 const nombreCorto = (u) => u.nombre.split(/\s+/).map((p) => p[0] + '.').join(' ') + ' ' + u.apellidos
 const gb = (v) => v + ' GB'
 
-// 2g · Administración: usuarios, cola y disco.
+// 2g · Administración (§9.6): cuentas con filtros, cola, disco y conductas.
 export default function AdminPage() {
   const { user } = useAuth()
   const { data: usuarios, error: errUsuarios, reload } = useAsync(listUsers)
@@ -34,6 +36,7 @@ export default function AdminPage() {
   const [aviso, setAviso] = useState(null) // 'creada' | 'editada' | 'temporal'
   const [temporal, setTemporal] = useState(null) // { nombre, email, password, nueva } para mostrarla una vez
   const [form, setForm] = useState(VACIO)
+  const [filtro, setFiltro] = useState({ rol: '', estado: '' })
   const crearRef = useRef(null)
   const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
 
@@ -48,6 +51,9 @@ export default function AdminPage() {
   if (!usuarios) return <Cargando />
 
   const adminsActivos = usuarios.filter((u) => u.role === 'ADMIN' && u.is_active).length
+  const visibles = usuarios
+    .filter((u) => !filtro.rol || u.role === filtro.rol)
+    .filter((u) => !filtro.estado || (filtro.estado === 'activa') === u.is_active)
   const ultimoAdmin = (u) => u.role === 'ADMIN' && u.is_active && adminsActivos <= 1
 
   async function cambiarActiva(u, activa) {
@@ -140,12 +146,23 @@ export default function AdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
           <div className="k">Cuentas · {usuarios.filter((u) => u.is_active).length} activas</div>
           <div style={{ flex: 1 }} />
+          <label className="k" htmlFor="fRol">Rol</label>
+          <select className="input" id="fRol" style={{ width: 150 }} value={filtro.rol} onChange={(e) => setFiltro({ ...filtro, rol: e.target.value })}>
+            <option value="">Todos</option>
+            {Object.entries(ROL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+          </select>
+          <label className="k" htmlFor="fEstadoCta">Estado</label>
+          <select className="input" id="fEstadoCta" style={{ width: 130 }} value={filtro.estado} onChange={(e) => setFiltro({ ...filtro, estado: e.target.value })}>
+            <option value="">Todas</option>
+            <option value="activa">Activas</option>
+            <option value="inactiva">Inactivas</option>
+          </select>
           <button ref={crearRef} type="button" className="btn btn-primary" style={btnLeft} onClick={() => abrir()}>Crear cuenta</button>
         </div>
         <table className="table">
-          <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Estado</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
+          <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Estado</th><th style={{ textAlign: 'right' }}>Experimentos</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
           <tbody>
-            {usuarios.map((u) => {
+            {visibles.map((u) => {
               const unico = ultimoAdmin(u)
               const yo = u.email === user.correo
               return (
@@ -154,6 +171,7 @@ export default function AdminPage() {
                   <td className="num" style={{ fontSize: 12.5, color: MUT70 }}>{u.email}</td>
                   <td style={{ fontSize: 12.5 }}>{ROL[u.role]}</td>
                   <td><span className="tag tag-neutral">{u.is_active ? 'Activa' : 'Inactiva'}{yo ? ' · tú' : ''}</span></td>
+                  <td className="num" style={{ textAlign: 'right' }}>{u.n_experimentos ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                       {/* La cuenta propia se edita en Mi perfil, para que la sesión no quede desactualizada. */}
@@ -171,6 +189,7 @@ export default function AdminPage() {
             })}
           </tbody>
         </table>
+        {visibles.length === 0 && <p className="hint" style={{ margin: '12px 0 0' }}>Ninguna cuenta coincide con los filtros.</p>}
         <FieldError msg={errAccion} style={{ marginTop: 10 }} />
 
         {crear && (
@@ -223,13 +242,21 @@ export default function AdminPage() {
             <div className="k" style={{ marginBottom: 12 }}>Cola de trabajos</div>
             {cola ? <ColaAdmin cola={cola.cola} /> : <p className="hint">Cargando…</p>}
             <p style={{ margin: '12px 0 0', fontSize: 11.5, lineHeight: 1.6, color: 'var(--muted-2)' }}>
-              <span className="trace">T-06</span> La cola se atiende en orden de llegada; nadie la reordena. Reanalizar reemplaza el resultado anterior.
+              <span className="trace">T-06</span> La cola se atiende en orden de llegada, un video a la vez; nadie la reordena. Reanalizar reemplaza el resultado anterior.
             </p>
           </div>
 
           <div style={{ background: 'var(--color-bg)', padding: '18px 20px' }}>
             <div className="k" style={{ marginBottom: 12 }}>Almacenamiento</div>
             {sistema ? <Disco d={sistema.disco} /> : <p className="hint">Cargando…</p>}
+          </div>
+
+          <div style={{ background: 'var(--color-bg)', padding: '18px 20px', gridColumn: '1 / -1', borderTop: '1px solid var(--color-divider)', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div className="k" style={{ marginBottom: 6 }}>Experimentos de todos los investigadores</div>
+              <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Como Administrador puedes eliminar cualquier experimento desde la lista o desde su detalle.</div>
+            </div>
+            <Link className="btn btn-secondary" to="/experimentos">Ver y gestionar experimentos</Link>
           </div>
 
           <div style={{ background: 'var(--color-bg)', padding: '18px 20px', gridColumn: '1 / -1', borderTop: '1px solid var(--color-divider)' }}>
@@ -263,6 +290,11 @@ function ColaAdmin({ cola }) {
         <span className="num nd" style={{ fontSize: 32, lineHeight: 1 }}>{proc}</span>
         <span style={{ fontSize: 12, color: 'var(--muted-2)' }}>procesando · {cola.length - proc} en cola</span>
       </div>
+      {cola.length > 0 && (
+        <div className="num" style={{ fontSize: 12, marginBottom: 12, color: 'var(--muted-2)' }}>
+          Tiempo estimado para vaciar la cola: unos {cola.length * MIN_POR_VIDEO} min ({MIN_POR_VIDEO} min por video)
+        </div>
+      )}
       <div style={{ borderTop: '1px solid var(--color-divider)' }}>
         {cola.map((j) => (
           <div key={j.job_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 12.5 }}>
@@ -284,6 +316,7 @@ function Disco({ d }) {
     { k: 'Videos crudos (se borran a los 30 días)', v: gb(d.videos_gb) },
     { k: 'Resultados y reportes (permanentes)', v: gb(d.resultados_gb) },
     { k: 'Se liberan en los próximos 7 días', v: gb(d.por_liberar_7d_gb) },
+    { k: 'Libre', v: gb(d.total_gb - d.usado_gb) },
   ]
   return (
     <>
@@ -294,7 +327,7 @@ function Disco({ d }) {
       <div style={{ height: 10, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)', marginBottom: 13 }}><div style={{ height: 10, background: aviso ? 'var(--color-accent)' : 'var(--color-text)', width: pct + '%' }} /></div>
       {aviso && (
         <div style={{ padding: '12px 13px', border: '1px solid var(--color-accent)', fontSize: 11.5, lineHeight: 1.6 }}>
-          <strong>Aviso activo.</strong> Al llegar al {AVISO_DISCO_PCT} % el sistema avisa al administrador. Nunca borra videos por su cuenta: la retención de 30 días es el único mecanismo automático, y avisa antes.
+          <strong>Por encima del {AVISO_DISCO_PCT} %.</strong> El sistema ya avisó a los Administradores. Si pasa del {LIMPIEZA_DISCO_PCT} %, borra primero los videos más antiguos y avisa a cada investigador afectado; resultados y reportes se conservan.
         </div>
       )}
       <div style={{ marginTop: 13, borderTop: '1px solid var(--color-divider)' }}>
@@ -308,9 +341,10 @@ function Disco({ d }) {
   )
 }
 
+// Solo de consulta: ningún requisito permite cambiar las conductas, el modelo ni el umbral.
 const catalogos = (s) => [
-  { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: c.nombre, m: '≥ ' + c.minimo_s + ' s' })) },
-  { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: ' + s.modelo, m: '' }] },
+  { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: c, m: 'sin duración mínima' })) },
+  { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: ' + s.modelo, m: 'no se cambia desde aquí' }] },
 ]
 
 // La contraseña temporal se muestra una sola vez: no se cierra con Escape ni al hacer clic

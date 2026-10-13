@@ -12,9 +12,9 @@ function temporal() {
   return [...crypto.getRandomValues(new Uint32Array(12))].map((n) => abc[n % abc.length]).join('')
 }
 
-// GET /admin/users
+// GET /admin/users → cuentas con n_experimentos (los que creó cada una)
 export async function listUsers() {
-  if (USE_MOCKS) return reply(db.users.map(sinPassword))
+  if (USE_MOCKS) return reply(db.users.map((u) => ({ ...sinPassword(u), n_experimentos: db.experiments.filter((e) => e.creador_id === u.id).length })))
   return (await api.get('/admin/users')).data
 }
 

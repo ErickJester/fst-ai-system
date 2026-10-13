@@ -173,15 +173,12 @@ export const users = [
 // Estado del sistema (2g): disco en GB, catálogo de conductas y modelo en uso.
 export const system = {
   disco: { usado_gb: 412, total_gb: 500, videos_gb: 381, resultados_gb: 2.4, por_liberar_7d_gb: 48 },
-  conductas: [
-    { nombre: 'Nado activo', minimo_s: 3 },
-    { nombre: 'Inmovilidad', minimo_s: 3 },
-    { nombre: 'Escalamiento', minimo_s: 3 },
-  ],
+  // Las cuatro conductas de la tabla CONDUCTA; ninguna tiene duración mínima (RF-18).
+  conductas: ['Nado activo', 'Inmovilidad', 'Escalamiento', 'Conducta activa'],
   modelo: 'clf-cascada v2.1',
 }
 
-// Notificaciones de la cuenta (2k). tipo: ANALYSIS_DONE | ANALYSIS_FAILED.
+// Notificaciones de la cuenta (2k). tipo: los seis de services/notifications.js.
 // creada es relativa a hoy para que la barra muestre «15:41» y «ayer» como el mockup.
 const hace = (dias, hora) => {
   const d = new Date()
@@ -211,7 +208,7 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 10
+const VERSION_DATOS = 11
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
