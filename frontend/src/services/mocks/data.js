@@ -7,13 +7,15 @@
 // retencion_dias: días que le quedan al video crudo (null si ya se borró).
 // con_detalle: solo el experimento de ejemplo tiene detalle en los mockups;
 //   con la API real todos lo tendrán.
+// tratamientos: los de sus grupos (para el filtro). creador_id: quien lo creó; solo esa
+//   cuenta o un Administrador puede eliminarlo.
 
 export const experiments = [
-  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: 'Compuesto CSR-14 Fluoxetina Placebo', fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
-  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: 'Salvia', fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
-  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: 'Valeriana officinalis', fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
-  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: '', fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
-  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: 'Fluoxetina', fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], creador_id: 1, fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
+  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], creador_id: 3, fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
+  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], creador_id: 1, fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
+  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], creador_id: 2, fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], creador_id: 2, fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
 ]
 
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
@@ -36,7 +38,7 @@ const tanda = (letra, estado, extra = {}) => ({
 
 export const experimentDetail = {
   'EXP-2026-02': {
-    clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera',
+    clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: 1,
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { dia1: { cargado: true } }), tanda('B', 'QUEUED')] },
@@ -177,6 +179,8 @@ const hace = (dias, hora) => {
 export const notifications = [
   { id: 1, tipo: 'ANALYSIS_FAILED', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', enlace: '/analisis', creada: hace(0, '15:41'), is_read: false },
   { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
+  { id: 4, tipo: 'DISK_ALERT', titulo: 'Alerta de disco', texto: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', enlace: '/admin', creada: hace(0, '09:12'), is_read: false, solo_admin: true },
+  { id: 5, tipo: 'VIDEO_DELETED', titulo: 'Videos borrados', texto: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', enlace: '/experimentos', creada: hace(1, '03:00'), is_read: true },
   { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
 ]
 
@@ -192,7 +196,7 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 6
+const VERSION_DATOS = 7
 const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 

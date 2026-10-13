@@ -13,7 +13,19 @@ import { listNotifications } from './notifications'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
 
-beforeEach(() => reiniciarDatos())
+// En Node no hay sessionStorage: uno en memoria para elegir la cuenta de la sesión.
+const almacen = new Map()
+globalThis.sessionStorage = {
+  getItem: (k) => almacen.get(k) ?? null,
+  setItem: (k, v) => almacen.set(k, String(v)),
+  removeItem: (k) => almacen.delete(k),
+}
+const sesion = (id) => sessionStorage.setItem('fst.token', 'mock-token-' + id) // 1 M. Rivera, 2 C. Reyes (Administrador)
+
+beforeEach(() => {
+  reiniciarDatos()
+  almacen.clear()
+})
 
 describe('inicio de sesión', () => {
   it('las cuentas de ejemplo entran con cualquier contraseña no vacía', async () => {
@@ -164,11 +176,46 @@ describe('experimentos', () => {
     expect((await listExperiments()).find((e) => e.clave === 'EXP-2026-02').estado).toBe('FAILED')
   })
 
-  it('eliminar quita el experimento de la lista y su detalle, sin pedir nombre ni contraseña (D-63)', async () => {
-    expect(await status(deleteExperiment('EXP-2026-02'))).toBe('ok')
-    expect(await status(getExperiment('EXP-2026-02'))).toBe(404)
-    expect((await listExperiments()).some((e) => e.clave === 'EXP-2026-02')).toBe(false)
-    expect(await status(deleteExperiment('EXP-2026-02'))).toBe(404)
+  it('eliminar: solo quien lo creó o un Administrador, sin pedir nombre ni contraseña (D-63, R-08)', async () => {
+    sesion(1) // M. Rivera
+    expect(await status(deleteExperiment('EXP-2026-01'))).toBe(403) // lo creó J. Domínguez
+    expect(await status(deleteExperiment('EXP-2025-11'))).toBe('ok')
+    expect((await listExperiments()).some((e) => e.clave === 'EXP-2025-11')).toBe(false)
+    expect(await status(deleteExperiment('EXP-2025-11'))).toBe(404)
+    sesion(2) // Administrador
+    expect(await status(deleteExperiment('EXP-2026-01'))).toBe('ok')
+  })
+
+  it('no se elimina con un análisis procesando; los que están en cola salen de la cola (D-87)', async () => {
+    sesion(1)
+    expect(await status(deleteExperiment('EXP-2026-02'))).toBe(409) // Experimental A · Tanda B se procesa
+    expect(await status(getExperiment('EXP-2026-02'))).toBe('ok')
+
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
+    await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 })
+    expect((await getQueue()).cola.at(-1).clave).toBe(clave)
+    expect(await status(deleteExperiment(clave))).toBe('ok')
+    const { cola } = await getQueue()
+    expect(cola.some((j) => j.clave === clave)).toBe(false)
+    expect(cola.map((j) => j.posicion)).toEqual([1, 2, 3])
+  })
+
+  it('avisa con la fecha exacta los videos que se borran en 7 días o menos (R-05)', async () => {
+    const lista = await listExperiments()
+    const valeriana = lista.find((e) => e.clave === 'EXP-2025-11') // le quedan 4 días
+    const d = new Date()
+    d.setDate(d.getDate() + 4)
+    expect(valeriana.aviso_vencimiento.fecha_borrado).toBe(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))
+    expect(lista.find((e) => e.clave === 'EXP-2026-01').aviso_vencimiento).toBeNull() // 12 días
+    expect(lista.find((e) => e.clave === 'EXP-2025-10').aviso_vencimiento).toBeNull() // ya se borraron
+  })
+
+  it('la alerta de disco solo llega a los Administradores', async () => {
+    sesion(1)
+    expect((await listNotifications()).some((n) => n.tipo === 'DISK_ALERT')).toBe(false)
+    sesion(2)
+    expect((await listNotifications()).some((n) => n.tipo === 'DISK_ALERT')).toBe(true)
   })
 })
 

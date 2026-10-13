@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
+import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperimento'
 import { listExperiments } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { useAviso } from '../hooks/useAviso'
@@ -35,26 +36,47 @@ function retencion(e) {
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
 
+// Valores distintos, ordenados, para las opciones de un filtro.
+const opciones = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'es'))
+
 // Los reportes llevan a los resultados del experimento; sin ningún Día 2 analizado no hay
 // nada que exportar. Sin backend, solo el experimento de ejemplo tiene detalle.
 const conReportes = (e) => e.con_detalle && e.videos_dia2_listos > 0
 const chipInactivo = { opacity: 0.4, cursor: 'default' }
 
-// 2a · Experimentos: lista a nivel experimento con estado agregado.
+// 2a · Experimentos (dashboard): todos los del laboratorio, con estado calculado, filtros
+// por estado, año y tratamiento, aviso de videos por borrarse y eliminar (R-08, D-63).
 export default function ExperimentosPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
   const sinPermiso = useAviso('sin-permiso')
-  const [filtro, setFiltro] = useState('')
+  const [filtro, setFiltro] = useState({ estado: '', anio: '', tratamiento: '' })
   const [q, setQ] = useState('')
-  const { data, error, loading } = useAsync(listExperiments)
+  const [borrar, setBorrar] = useState(null) // experimento del diálogo de eliminar
+  const [eliminados, setEliminados] = useState([]) // títulos eliminados desde esta lista
+  const { data, error, loading, reload } = useAsync(listExperiments)
 
   // Tras «Eliminar experimento…» en el detalle, el experimento ya no aparece.
   const eliminado = params.get('eliminado')
   const experiments = (data || []).filter((e) => e.clave !== eliminado)
+  const anios = opciones(experiments.map((e) => e.fecha_inicio.slice(0, 4))).reverse()
+  const tratamientos = opciones(experiments.flatMap((e) => e.tratamientos))
+  const avisos = experiments.filter((e) => e.aviso_vencimiento)
 
   const nq = norm(q.trim())
-  const list = experiments.filter((e) => !filtro || e.estado === filtro).filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos).includes(nq))
+  const list = experiments
+    .filter((e) => !filtro.estado || e.estado === filtro.estado)
+    .filter((e) => !filtro.anio || e.fecha_inicio.startsWith(filtro.anio))
+    // Basta con que algún grupo tenga ese tratamiento.
+    .filter((e) => !filtro.tratamiento || e.tratamientos.includes(filtro.tratamiento))
+    .filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos.join(' ')).includes(nq))
+  const filtrar = (campo) => (ev) => setFiltro((f) => ({ ...f, [campo]: ev.target.value }))
+
+  function alEliminar(exp) {
+    setBorrar(null)
+    setEliminados((l) => [...l, exp.titulo])
+    reload()
+  }
 
   return (
     <div className="app">
@@ -67,6 +89,7 @@ export default function ExperimentosPage() {
 
       <div className="page" style={{ paddingBottom: 34 }}>
         {sinPermiso && <div className="note-bar" style={{ marginBottom: 18 }}>No tienes permiso para esa sección.</div>}
+        {eliminados.map((t) => <div key={t} className="note-bar" role="status" style={{ marginBottom: 18 }}>Se eliminó «{t}».</div>)}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28, marginBottom: 22 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 8px' }}>Experimentos</h2>
@@ -77,30 +100,49 @@ export default function ExperimentosPage() {
           <Link className="btn btn-primary" to="/experimentos/nuevo" style={btnLeft}>Nuevo experimento</Link>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)' }}>
-          <span className="trace">RN-06</span>
-          <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.55 }}>
-            Los 10 videos crudos de <strong>Extracto de <em>Valeriana officinalis</em></strong> se eliminan en 4 días (retención de 30 días). Resultados y reportes se conservan indefinidamente; el video crudo no.
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <label className="k" htmlFor="fEstado">Estado</label>
-          <select className="input" id="fEstado" style={{ width: 230 }} value={filtro} onChange={(e) => setFiltro(e.target.value)}>
-            <option value="">Todos · {experiments.length}</option>
-            {Object.entries(ESTADO_EXPERIMENTO).map(([v, label]) => (
-              <option key={v} value={v}>{label} · {experiments.filter((e) => e.estado === v).length}</option>
+        {/* Aviso de vencimiento (R-05): videos que se borran en 7 días o menos, con la fecha exacta. */}
+        {avisos.length > 0 && (
+          <div style={{ padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)', fontSize: 12.5, lineHeight: 1.55 }}>
+            {avisos.map((e) => (
+              <div key={e.clave}>Los videos de <strong>{e.titulo}</strong> se borran el <strong className="num">{fechaCorta(e.aviso_vencimiento.fecha_borrado)}</strong>.</div>
             ))}
-          </select>
+            <div style={{ color: 'var(--muted-2)', marginTop: 4 }}>El borrado es irreversible. Resultados y reportes se conservan siempre.</div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="fEstado">Estado</label>
+            <select className="input" id="fEstado" style={{ width: 200 }} value={filtro.estado} onChange={filtrar('estado')}>
+              <option value="">Todos · {experiments.length}</option>
+              {Object.entries(ESTADO_EXPERIMENTO).map(([v, label]) => (
+                <option key={v} value={v}>{label} · {experiments.filter((e) => e.estado === v).length}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="fAnio">Fecha</label>
+            <select className="input" id="fAnio" style={{ width: 130 }} value={filtro.anio} onChange={filtrar('anio')}>
+              <option value="">Cualquiera</option>
+              {anios.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="fTrat">Tratamiento</label>
+            <select className="input" id="fTrat" style={{ width: 240 }} value={filtro.tratamiento} onChange={filtrar('tratamiento')}>
+              <option value="">Todos</option>
+              {tratamientos.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
           <div style={{ flex: 1 }} />
-          <input className="input" type="search" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
 
         <table className="table">
           <thead>
             <tr>
-              <th style={{ width: '29%' }}>Experimento</th><th>Grupos</th><th>Especímenes</th><th style={{ width: '14%' }}>Día 2 analizados</th>
-              <th>Estado</th><th>Responsable</th><th>Retención</th><th>Reporte</th>
+              <th style={{ width: '27%' }}>Experimento</th><th>Grupos</th><th>Especímenes</th><th style={{ width: '13%' }}>Día 2 analizados</th>
+              <th>Estado</th><th>Responsable</th><th>Retención</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -125,10 +167,14 @@ export default function ExperimentosPage() {
                   <td style={{ fontSize: 13 }}>{e.responsable}</td>
                   <td className="num" style={{ fontSize: 12, color: ret.color }}>{ret.texto}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       {['CSV', 'XLSX', 'PDF'].map((x) => conReportes(e)
                         ? <Link key={x} className="chip" to={`/experimentos/${e.clave}/resultados`}>{x}</Link>
                         : <span key={x} className="chip" style={chipInactivo} aria-disabled="true" title="Todavía no hay resultados">{x}</span>)}
+                      {puedeEliminar(user, e) && (
+                        <button type="button" className="linkbtn" style={{ fontSize: 12, marginLeft: 6, whiteSpace: 'nowrap' }}
+                          aria-label={'Eliminar ' + e.titulo} onClick={() => setBorrar(e)}>Eliminar…</button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -138,11 +184,13 @@ export default function ExperimentosPage() {
         </table>
         {loading && <p className="hint" style={{ margin: '14px 0 0' }}>Cargando experimentos…</p>}
         {error && <p className="hint" style={{ margin: '14px 0 0', color: 'var(--color-accent-700)' }}>No se pudo cargar la lista de experimentos.</p>}
-        {data && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con la búsqueda.</p>}
+        {data && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
         <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--muted)' }}>
-          Eliminar un experimento es permanente e irreversible: la acción vive dentro del detalle del experimento, nunca en esta lista.
+          Eliminar un experimento es permanente e irreversible. Solo puede hacerlo quien lo creó o un Administrador, y no mientras un análisis esté procesando o en pausa.
         </p>
       </div>
+
+      {borrar && <EliminarExperimento exp={borrar} onCerrar={() => setBorrar(null)} onEliminado={alEliminar} />}
     </div>
   )
 }
