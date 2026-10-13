@@ -5,7 +5,7 @@ import * as auth from './auth'
 import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
-import { getQueue, getDiagnostico } from './queue'
+import { getQueue, getDiagnostico, getPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
 import { getBatchResults, getGroupComparison } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
@@ -291,6 +291,65 @@ describe('simulación de la cola (modo demo)', () => {
     expect((await getQueue()).cola[0].status).toBe('QUEUED')
     avanzarSimulacion(T0 + s(100 + 8))
     expect((await getQueue()).cola[0]).toMatchObject({ status: 'RUNNING', stage: 'ROI_DETECTION', progress_pct: 67 })
+  })
+})
+
+describe('pausa del análisis (R-15, D-89)', () => {
+  // El trabajo 502 (Control · Tanda B) se pausa a la mitad de la clasificación: 4 s después de
+  // empezar la simulación termina el 501, y 20 s después de eso se pausa el 502.
+  const T0 = Date.now()
+  const s = (n) => n * 1000
+  const pausar = () => { avanzarSimulacion(T0); avanzarSimulacion(T0 + s(4 + 20)) }
+  const tandaB = async () => (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-01').tandas[1]
+
+  it('el análisis queda en pausa, sale de la cola y avisa', async () => {
+    pausar()
+    const { cola, pausas } = await getQueue()
+    expect(cola.map((j) => j.job_id)).toEqual([503]) // la cola sigue con el siguiente
+    expect(pausas[0]).toMatchObject({ job_id: 502, status: 'PAUSED', pausa: { cilindro: 2, desde_segundo: 142 } })
+    expect((await tandaB()).estado).toBe('PAUSED')
+    expect((await listNotifications())[0]).toMatchObject({ tipo: 'ANALYSIS_PAUSED', enlace: '/experimentos/EXP-2026-02/analisis/502/pausa' })
+  })
+
+  it('solo quien subió el video o un Administrador ve la pausa', async () => {
+    pausar()
+    sesion(3)
+    expect(await status(getPausa('EXP-2026-02', 502))).toBe(403)
+    sesion(1)
+    const p = await getPausa('EXP-2026-02', 502)
+    expect(p).toMatchObject({ cilindro: 2, desdeSegundo: 142, ancho: 1280, alto: 720 })
+    expect(p.recuadros).toHaveLength(4)
+    expect(p.segundosRestantes).toBeGreaterThan(290)
+    expect(p.segundosRestantes).toBeLessThanOrEqual(330)
+    sesion(2)
+    expect(await status(getPausa('EXP-2026-02', 502))).toBe('ok')
+  })
+
+  it('ajustar devuelve el análisis a la cola por delante de los nuevos y termina', async () => {
+    pausar()
+    sesion(1)
+    expect(await status(ajustarRecuadro('EXP-2026-02', 502, { cilindro: 2, x0: 370, y0: 130, x1: 590, y1: 640 }))).toBe('ok')
+    expect((await getQueue()).cola.map((j) => [j.job_id, j.posicion])).toEqual([[503, 1], [502, 2]])
+    expect((await tandaB()).estado).toBe('QUEUED')
+    expect(await status(ajustarRecuadro('EXP-2026-02', 502, { cilindro: 2, x0: 0, y0: 0, x1: 99, y1: 99 }))).toBe(409)
+    avanzarSimulacion(T0 + s(60)) // 503 falla en la etapa de cilindros; 502 sigue desde la pausa y termina
+    expect((await tandaB()).estado).toBe('DONE')
+  })
+
+  it('cancelar lo termina sin aviso; si pasan 5 minutos, se cancela solo y avisa', async () => {
+    pausar()
+    sesion(1)
+    expect(await status(cancelarAnalisis('EXP-2026-02', 502))).toBe('ok')
+    expect(await status(cancelarAnalisis('EXP-2026-02', 502))).toBe(409)
+    expect((await getQueue()).cancelados[0]).toMatchObject({ job_id: 502, motivo: 'usuario' })
+    expect((await tandaB()).estado).toBe('CANCELED')
+    expect((await listNotifications()).some((n) => n.tipo === 'ANALYSIS_CANCELED')).toBe(false)
+
+    reiniciarDatos()
+    pausar()
+    avanzarSimulacion(T0 + s(4 + 20) + 5 * 60 * 1000)
+    expect((await getQueue()).cancelados[0]).toMatchObject({ job_id: 502, motivo: 'plazo' })
+    expect((await listNotifications()).some((n) => n.tipo === 'ANALYSIS_CANCELED')).toBe(true)
   })
 })
 

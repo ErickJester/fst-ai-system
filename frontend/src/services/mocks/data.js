@@ -41,30 +41,38 @@ export const experimentDetail = {
     clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: 1,
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE', { dia1: { cargado: true } }), tanda('B', 'QUEUED')] },
+        tandas: [tanda('A', 'DONE', { dia1: { cargado: true } }), tanda('B', 'QUEUED', { id_analisis: 502 })] },
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE'), tanda('B', 'DONE')] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
+        tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
       { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'QUEUED'), tanda('B', 'FAILED', { error: { etapa: 'ROI_DETECTION' } })] },
+        tandas: [tanda('A', 'QUEUED', { id_analisis: 503 }), tanda('B', 'FAILED', { id_analisis: 498, error: { etapa: 'ROI_DETECTION' } })] },
     ],
   },
 }
 
 // Cola de análisis (2e). Un trabajo a la vez, en orden de llegada.
 // status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo).
-// Solo se analiza el Día 2 (D-54).
+// Solo se analiza el Día 2 (D-54). subido_por: cuenta que subió el video (puede ajustar o
+// cancelar su pausa, igual que un Administrador). simular_pausa: se pausa en la clasificación.
 export const queue = [
-  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
-  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
-  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
+  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, simular_pausa: true, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
 export const failedJobs = [
-  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
+  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
 ]
+
+// Análisis en pausa (R-15): salen de la cola mientras esperan el ajuste del recuadro. pausa:
+// { cilindro, desde_segundo, hora_ms, ancho, alto, recuadros, ajuste }, como pausa.json.
+export const pausedJobs = []
+
+// Análisis cancelados: por el usuario o porque pasaron 5 minutos sin respuesta (motivo).
+export const canceledJobs = []
 
 // Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
 // nivel: PRECISO (nado activo, inmovilidad, escalamiento) | AGRUPADO (nado activo y
@@ -196,8 +204,8 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 7
-const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, users, system, notifications, resetTokens, simulacion }
+const VERSION_DATOS = 8
+const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
 // Reemplaza el contenido de cada colección sin cambiar el objeto, porque los

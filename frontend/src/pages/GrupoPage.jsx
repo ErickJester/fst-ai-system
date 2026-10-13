@@ -4,13 +4,13 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados, mensajeErrorAnalisis, especimen } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, mensajeErrorAnalisis, especimen } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
 const dur = { fontWeight: 400, fontFamily: 'var(--font-body)', color: 'var(--muted)' }
 
-const ACTIVOS = ['QUEUED', 'RUNNING']
+const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
 
 // Nota del video de Día 2 según el estado de su análisis.
 function notaDia2(t) {
@@ -19,6 +19,8 @@ function notaDia2(t) {
     case 'QUEUED': return 'En espera de turno en la cola: un trabajo a la vez.'
     case 'RUNNING': return ETAPA[t.progreso.etapa] + ' · en curso · ' + t.progreso.pct + ' %'
     case 'FAILED': return mensajeErrorAnalisis(t.error.etapa)
+    case 'PAUSED': return 'En pausa: el sistema dejó de ver a un espécimen. Hay 5 minutos para ajustar el recuadro.'
+    case 'CANCELED': return 'Análisis cancelado.'
     case 'SIN_VIDEO': return 'Todavía no se sube el video de Día 2.'
     default: return ''
   }
@@ -111,7 +113,9 @@ export default function GrupoPage() {
                       <div style={{ flex: 1 }} />
                       {t.estado === 'DONE'
                         ? <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados</Link>
-                        : <Link to="/analisis">Ver progreso del análisis →</Link>}
+                        : t.estado === 'PAUSED'
+                          ? <Link to={enlacePausa(exp.clave, t.id_analisis)}>Ajustar o cancelar →</Link>
+                          : <Link to="/analisis">Ver progreso del análisis →</Link>}
                     </div>
                   </div>
                 </div>

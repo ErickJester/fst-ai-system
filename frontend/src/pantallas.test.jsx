@@ -9,6 +9,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import { reiniciarDatos } from './services/mocks/data'
+import { avanzarSimulacion } from './services/mocks/simulador'
 
 // Lo que jsdom no trae: desplazar la ventana y URLs de archivos.
 window.scrollTo = vi.fn()
@@ -206,6 +207,44 @@ describe('eliminar experimento (D-63)', () => {
     // Ya no está en la tabla (ni en el aviso de vencimiento).
     expect(screen.queryByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' })).toBeNull()
     expect(screen.queryByText(/Los videos de/)).toBeNull()
+  })
+})
+
+describe('pausa del análisis (R-15)', () => {
+  // El trabajo 502 (Control · Tanda B) se acaba de pausar: queda casi todo el plazo.
+  function pausarAhora() {
+    const ahora = Date.now()
+    avanzarSimulacion(ahora - 25000)
+    avanzarSimulacion(ahora)
+  }
+
+  it('muestra la imagen con el recuadro, el tiempo que queda y ajusta', async () => {
+    pausarAhora()
+    const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
+    expect(await screen.findByRole('heading', { name: 'No se ve al espécimen del cilindro 2 (segundo 142)' })).toBeTruthy()
+    expect(screen.getByRole('timer').textContent).toMatch(/Tiempo para responder: [45]:\d\d/)
+    const izquierda = screen.getByLabelText('Izquierda (px)')
+    await user.clear(izquierda)
+    await user.type(izquierda, '370')
+    expect(screen.getByLabelText(/Recuadro del cilindro 2: x 370–/)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Ajustar y continuar' }))
+    expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
+    expect(screen.getByText(/Recuadro del cilindro 2 ajustado\. El análisis volvió a la cola/)).toBeTruthy()
+  })
+
+  it('cancelar pide confirmación; después la pausa ya no está', async () => {
+    pausarAhora()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
+    await user.click(await screen.findByRole('button', { name: 'Cancelar análisis' }))
+    expect(window.confirm).toHaveBeenCalled()
+    expect(await screen.findByText(/Análisis cancelado: Compuesto CSR-14 · Control · Tanda B/)).toBeTruthy()
+    expect(screen.getByText(/Se canceló desde la pantalla de pausa/)).toBeTruthy()
+    window.confirm.mockRestore()
+
+    cleanup()
+    abrir('/experimentos/EXP-2026-02/analisis/502/pausa')
+    expect(await screen.findByRole('heading', { name: 'Este análisis ya no está en pausa' })).toBeTruthy()
   })
 })
 

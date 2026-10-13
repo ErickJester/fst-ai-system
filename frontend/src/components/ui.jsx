@@ -11,7 +11,9 @@ const ESTADO = {
   'Sin video': { cls: 'tag-outline', bg: 'transparent', fg: 'var(--muted)', fill: 'transparent' },
   'En cola': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'var(--color-accent-200)' },
   'Procesando': { cls: 'tag-accent', bg: 'var(--color-accent-100)', fg: 'var(--color-accent-700)', fill: 'var(--color-accent)' },
+  'En pausa': { cls: 'tag-accent', bg: 'var(--color-bg)', fg: 'var(--color-accent-700)', fill: 'repeating-linear-gradient(90deg, var(--color-accent) 0 4px, var(--color-bg) 4px 7px)' },
   'Completado': { cls: 'tag-neutral', bg: 'var(--color-neutral-200)', fg: INK, fill: INK },
+  'Cancelado': { cls: 'tag-outline', bg: 'transparent', fg: 'var(--muted)', fill: 'color-mix(in srgb, var(--color-text) 25%, transparent)' },
   'Error': { cls: 'tag-accent', bg: 'var(--color-accent-800)', fg: 'var(--color-bg)', fill: 'repeating-linear-gradient(135deg, var(--color-accent-800) 0 3px, var(--color-bg) 3px 6px)' },
 }
 
@@ -20,7 +22,8 @@ const TIPO_TAG = { control: 'tag-neutral', referencia: 'tag-outline', 'tratamien
 // Relleno de la barra de avance para un estado de tanda de la API (QUEUED, DONE…).
 export const rellenoTanda = (estado) => ESTADO[ESTADO_TANDA[estado]].fill
 
-// Etiqueta del estado de una tanda, a partir del valor de la API (QUEUED, RUNNING, DONE, FAILED, SIN_VIDEO).
+// Etiqueta del estado de una tanda, a partir del valor de la API (QUEUED, RUNNING, PAUSED, DONE,
+// FAILED, CANCELED, SIN_VIDEO).
 export function EstadoTag({ estado }) {
   const label = ESTADO_TANDA[estado]
   const e = ESTADO[label]

@@ -171,8 +171,12 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
 | `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }`; con `dia=DAY1` ambos en `null` (el Día 1 no se analiza, D-54); 422 si el video es vertical o no se puede reproducir (D-64) |
-| `GET /queue` | — | `{ cola, errores }`; cada error trae `stage` (etapa en que se detuvo), sin código ni mensaje |
+| `GET /queue` | — | `{ cola, pausas, errores, cancelados }` (cada pausa trae `pausa` y `segundos_restantes`); cada error trae `stage` (etapa en que se detuvo), sin código ni mensaje |
 | `GET /experiments/:clave/analyses/:id/diagnostic` | — | PDF de diagnóstico; 404 mientras el worker no lo escribe (la pantalla muestra «Preparando…» y reintenta cada 4 s) |
+| `GET /experiments/:clave/analyses/:id/pause` | — | `{ cilindro, desdeSegundo, segundosRestantes, ancho, alto, recuadros }` (§6.1); 409 si ya no está en pausa, 403 si no subió el video ni es Administrador |
+| `GET /experiments/:clave/analyses/:id/pause/image` | — | imagen fija (JPG) |
+| `POST /experiments/:clave/analyses/:id/pause/adjust` | `{ cilindro, x0, y0, x1, y1 }` en píxeles de la imagen | 200, o 409 si ya no está en pausa |
+| `POST /experiments/:clave/analyses/:id/cancel` | — | 200, o 409 si ya no está en pausa |
 | `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `especimenes` (`numeroCilindro` y tiempos por conducta en s), línea de tiempo, nivel |
 | `GET /experiments/:clave/group-comparison` | — | inmovilidad media ± DE por grupo |
 | `GET /notifications` · `PATCH /notifications/:id` · `POST /notifications/read-all` | `{ is_read }` | — |
@@ -222,6 +226,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **Experimentos:** filtros por estado, fecha (año) y tratamiento (basta con que un grupo lo tenga); aviso con la fecha exacta de los videos que se borran en 7 días o menos (`aviso_vencimiento: { fecha_borrado }`, R-05).
     - **Eliminar desde la lista y desde el detalle** (D-63), con el mismo diálogo (`components/EliminarExperimento.jsx`). Solo quien lo creó (`creador_id`) o un Administrador; el servicio responde 403 a los demás y 409 si algún análisis está procesando o en pausa; los que están en cola salen de la cola (R-08, D-87).
     - **Seis tipos de notificación:** `ANALYSIS_DONE`, `ANALYSIS_FAILED`, `ANALYSIS_PAUSED`, `ANALYSIS_CANCELED`, `DISK_ALERT` (solo Administradores) y `VIDEO_DELETED`.
+26. **Pantalla de pausa** (R-15, D-89) en `/experimentos/:clave/analisis/:id/pausa` (`pages/PausaPage.jsx`): imagen fija del instante, recuadro del cilindro que se arrastra y redimensiona (`components/RecuadroEditable.jsx`, también con flechas y con campos en píxeles de la imagen), cuenta regresiva de 5 minutos, «Ajustar y continuar» y «Cancelar análisis» (con confirmación). Solo quien subió el video (`subido_por`) o un Administrador. Progreso muestra los análisis en pausa y los cancelados; Grupo y Experimento conocen los estados `PAUSED` y `CANCELED`.
+    - **Modo demo:** el trabajo 502 (Control · Tanda B) se pausa unos 24 s después de abrir la app; un video con «pausa» en el nombre también se pausa. Sin respuesta en 5 minutos, se cancela y avisa.
 
 ### Diferencias visibles con tu v2 (a propósito)
 

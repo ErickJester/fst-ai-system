@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { getQueue, getDiagnostico } from '../services/queue'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, PCT_ETAPA, mensajeErrorAnalisis, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PCT_ETAPA, enlacePausa, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
 import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
 
@@ -36,13 +36,15 @@ export default function ProgresoPage() {
   const [activos, setActivos] = useState(true)
   const { data, error } = usePolling(getQueue, activos ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
   useEffect(() => {
-    if (data) setActivos(data.cola.length > 0)
+    if (data) setActivos(data.cola.length > 0 || data.pausas.length > 0)
   }, [data])
 
   if (!data && !error) return <Cargando />
 
   const cola = data?.cola || []
   const errores = data?.errores || []
+  const pausas = data?.pausas || []
+  const cancelados = data?.cancelados || []
   const actual = cola.find((j) => j.status === 'RUNNING')
   const proc = cola.filter((j) => j.status === 'RUNNING').length
 
@@ -54,13 +56,15 @@ export default function ProgresoPage() {
         {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <h3 style={{ margin: '0 0 8px' }}>Análisis en curso</h3>
         <p className="lead" style={{ margin: '0 0 22px', maxWidth: 600 }}>
-          El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: no hay iniciar, pausar, cancelar ni reiniciar desde aquí.
+          El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
         </p>
 
         {error && <p className="hint" style={{ margin: '0 0 18px', color: 'var(--color-accent-700)' }}>No se pudo consultar la cola. Se vuelve a intentar en unos segundos.</p>}
 
+        {pausas.map((j) => <TrabajoEnPausa key={j.job_id} j={j} />)}
         {actual && <TrabajoActual j={actual} />}
         {errores.map((j) => <TrabajoFallido key={j.job_id} j={j} />)}
+        {cancelados.map((j) => <TrabajoCancelado key={j.job_id} j={j} />)}
 
         <div className="k" style={{ margin: '26px 0 12px' }}>Cola · {proc} procesando, {cola.length - proc} en cola</div>
         <table className="table">
@@ -81,7 +85,7 @@ export default function ProgresoPage() {
         </table>
         {data && cola.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>No hay trabajos en la cola.</p>}
         <p className="hint" style={{ margin: '14px 0 0' }}>
-          Al terminar cada trabajo llega una notificación en el sistema con el enlace a resultados. Si un video falla, el trabajo se marca con la causa y la cola sigue con el siguiente.
+          Al terminar cada trabajo llega una notificación en el sistema con el enlace a resultados. Si un video falla o queda en pausa, la cola sigue con el siguiente.
         </p>
       </div>
     </div>
@@ -181,6 +185,51 @@ function TrabajoFallido({ j }) {
         </div>
         <FieldError msg={errDiag} />
       </div>
+    </div>
+  )
+}
+
+// Análisis en pausa: el sistema espera que se ajuste el recuadro del cilindro (R-15).
+function TrabajoEnPausa({ j }) {
+  // Cuenta regresiva local a partir de lo que dijo el servidor en la última consulta.
+  const [vence] = useState(() => Date.now() + j.segundos_restantes * 1000)
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const quedan = Math.max(0, Math.ceil((vence - ahora) / 1000))
+
+  return (
+    <div style={{ border: '2px solid var(--color-accent)', marginBottom: 18 }}>
+      <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div className="nd" style={{ fontSize: 15 }}>{nombreTrabajo(j)}</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>No se ve al espécimen del cilindro {j.pausa.cilindro} (segundo {j.pausa.desde_segundo}).</div>
+          <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--color-accent-700)' }}>
+            {quedan > 0 ? 'Tiempo para responder: ' + mmss(quedan) : 'Pasaron los 5 minutos: se cancela.'}
+          </div>
+        </div>
+        <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>En pausa</span>
+      </div>
+      <div style={{ padding: '0 20px 16px' }}>
+        <Link className="btn btn-primary" style={btnLeft} to={enlacePausa(j.clave, j.job_id)}>Ajustar o cancelar →</Link>
+      </div>
+    </div>
+  )
+}
+
+// Análisis cancelado: por quien lo atendía o porque nadie respondió a la pausa.
+function TrabajoCancelado({ j }) {
+  return (
+    <div style={{ border: '1px solid var(--color-divider)', marginTop: 18, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ flex: 1 }}>
+        <div className="nd" style={{ fontSize: 14 }}>{nombreTrabajo(j)}</div>
+        <div style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>
+          {j.motivo === 'plazo' ? 'Se canceló porque pasaron 5 minutos sin respuesta a la pausa.' : 'Se canceló desde la pantalla de pausa.'} Para analizarlo otra vez, sube el video de nuevo.
+        </div>
+      </div>
+      <span className="tag tag-outline" style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>Cancelado</span>
     </div>
   )
 }
