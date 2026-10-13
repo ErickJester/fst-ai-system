@@ -54,7 +54,7 @@ VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend r
 | `creyesl@ipn.mx` | Administrador | cualquiera no vacía |
 | `jdominguez@ipn.mx`, `lortega@ipn.mx` | Investigador | cualquiera no vacía |
 | Cuenta creada en Admin | Investigador | solo su contraseña temporal; luego la que ponga en el primer acceso |
-| Cualquier otro correo `@ipn.mx` | Investigador | entra como cuenta nueva con contraseña temporal (atajo de demo) |
+| Cualquier otro correo (de cualquier dominio, D-46) | Investigador | entra como cuenta nueva con contraseña temporal (atajo de demo) |
 
 - **Recuperar contraseña**: como no hay correo, tras pedir el enlace aparece «Modo demo, sin correo: abrir el enlace que llegaría por correo». `/restablecer?token=vencido` muestra el caso de enlace vencido.
 - **La cola de análisis avanza sola** (`services/mocks/simulador.js`): 8 s por etapa, un trabajo a la vez; al terminar, la tanda queda Completada (o con Error, uno de cada tres) y llega la notificación. No usa temporizadores: avanza según el tiempo transcurrido en cada lectura.
@@ -170,13 +170,14 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }` |
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
-| `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }` |
-| `GET /queue` | — | `{ cola, errores }` |
-| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `cilindros` con tiempos por conducta (s), línea de tiempo, nivel, confianza |
+| `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }`; con `dia=DAY1` ambos en `null` (el Día 1 no se analiza, D-54) |
+| `GET /queue` | — | `{ cola, errores }`; cada error trae `stage` (etapa en que se detuvo), sin código ni mensaje |
+| `GET /experiments/:clave/analyses/:id/diagnostic` | — | PDF de diagnóstico; 404 mientras el worker no lo escribe (la pantalla muestra «Preparando…» y reintenta cada 4 s) |
+| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `cilindros` con tiempos por conducta (s), línea de tiempo, nivel |
 | `GET /experiments/:clave/group-comparison` | — | inmovilidad media ± DE por grupo |
 | `GET /notifications` · `PATCH /notifications/:id` · `POST /notifications/read-all` | `{ is_read }` | — |
 
-**Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO`; etapa `PREPROCESSING | ROI_DETECTION | TRACKING | CLASSIFICATION`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
+**Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO` (con `FAILED`, `error: { etapa }`); `dia1: { cargado: true } | null`; etapa `PREPROCESSING | ROI_DETECTION | TRACKING | CLASSIFICATION`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
 
 **Sesión:** el token va en `sessionStorage` (`fst.token`) y se manda como `Authorization: Bearer`. Cerrar sesión es solo del frontend (borra el token). 401 con sesión → login con «Tu sesión caducó»; el 401 del propio login muestra «Correo o contraseña incorrectos» sin redirigir. 403 → Experimentos con «No tienes permiso para esa sección».
 
@@ -206,6 +207,11 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 20. **Pantallas que se actualizan solas**: Experimento, Grupo y la cola de Admin, con `useAsyncVivo` (5 s con análisis activos, 30 s sin ellos, sin parpadeo de «Cargando…»).
 21. **Contenedor de producción** (propuesta, sección 3): `Dockerfile.prod` + nginx + `docker-compose.prod.yml`; fuente y XLSX incluidos en la app.
 22. **D-63**: eliminar un experimento pide solo confirmación, sin nombre ni contraseña (app, servicio, pruebas y `mockup/v2/experimento.html`).
+23. **Ajustes de `INSTRUCCIONES-WEB.md`** (repo de LaTeX, rama `accesos-login`):
+    - **Error del análisis según la etapa** (§9.4): «No se pudo abrir el video» o «No se encontraron los tubos en el video», sin código (`E-DET-070`) ni confianza de detección, porque R-10 se eliminó. El PDF de diagnóstico lo pide al backend y, si aún no existe, muestra «Preparando…» y lo descarga solo cuando está listo.
+    - **El Día 1 no se analiza** (D-54): se guarda sin crear trabajo en la cola; Grupo lo muestra como «Cargado» y Cargar video dice «Guardar video».
+    - **Correo de cualquier dominio** (D-46) en el inicio de sesión, recuperar contraseña, Mi perfil y Admin; la etiqueta ahora dice «Correo electrónico».
+    - **Sin episodios de 3 s** en Resultados (RF-18: ninguna conducta se descarta por durar poco); se quitó la pestaña «Episodios».
 
 ### Diferencias visibles con tu v2 (a propósito)
 

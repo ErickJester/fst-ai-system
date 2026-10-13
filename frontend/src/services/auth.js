@@ -9,7 +9,7 @@ const publicUser = ({ id, nombre, apellidos, email, identificador, role, must_ch
 // RESET_LINK_MINUTES del documento: cuánto vale el enlace de recuperación.
 const MINUTOS_ENLACE = 60
 
-// Sin backend, un correo @ipn.mx desconocido entra como cuenta nueva con
+// Sin backend, un correo desconocido entra como cuenta nueva con
 // contraseña temporal, para poder recorrer el primer acceso (2i).
 function cuentaNueva(email) {
   const u = { id: Date.now(), nombre: email.split('@')[0], apellidos: '', email, identificador: '', role: 'INVESTIGADOR', is_active: true, must_change_password: true }

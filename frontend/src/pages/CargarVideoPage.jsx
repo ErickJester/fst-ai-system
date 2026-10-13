@@ -188,7 +188,9 @@ export default function CargarVideoPage() {
       }
       const dia = sesion === '1' ? 'DAY1' : 'DAY2'
       const r = await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
-      setOk(grupoNombre + ' · Tanda ' + tanda + ' · ' + (dia === 'DAY1' ? 'Día 1' : 'Día 2') + ' · posición ' + r.posicion_cola + ' en la cola.')
+      setOk(dia === 'DAY1'
+        ? { titulo: 'Video de Día 1 almacenado', texto: grupoNombre + ' · Tanda ' + tanda + ' · Día 1. No se analiza: solo confirma la sesión de habituación.' }
+        : { titulo: 'Video almacenado · análisis en cola', texto: grupoNombre + ' · Tanda ' + tanda + ' · Día 2 · posición ' + r.posicion_cola + ' en la cola.', cola: true })
       setArchivo(null)
       if (fileRef.current) fileRef.current.value = ''
       reload()
@@ -284,6 +286,7 @@ export default function CargarVideoPage() {
               <Campo label="Sesión">
                 <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
               </Campo>
+              <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
             </div>
 
             {/* 4 · archivo */}
@@ -316,7 +319,7 @@ export default function CargarVideoPage() {
                 {cancelada && <div className="hint" style={{ marginTop: 10 }}>Subida cancelada: el video no se guardó. Puedes volver a intentarlo con el mismo archivo o elegir otro.</div>}
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
                   <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
-                    {subiendo == null ? 'Guardar y encolar análisis' : 'Subiendo…'}
+                    {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
                   </button>
                   <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
                 </div>
@@ -362,9 +365,9 @@ export default function CargarVideoPage() {
           {ok && (
             <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)', borderLeft: '6px solid var(--color-text)' }}>
               <div style={{ padding: 14 }}>
-                <div className="nd" style={{ fontSize: 14 }}>Video almacenado · análisis en cola</div>
-                <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--muted-2)' }}>{ok}</div>
-                <Link to="/analisis" style={{ display: 'inline-block', marginTop: 10, fontSize: 12.5, whiteSpace: 'nowrap' }}>Ver progreso del análisis →</Link>
+                <div className="nd" style={{ fontSize: 14 }}>{ok.titulo}</div>
+                <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--muted-2)' }}>{ok.texto}</div>
+                {ok.cola && <Link to="/analisis" style={{ display: 'inline-block', marginTop: 10, fontSize: 12.5, whiteSpace: 'nowrap' }}>Ver progreso del análisis →</Link>}
               </div>
             </div>
           )}

@@ -9,9 +9,9 @@ import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
-// Hay análisis en curso o en cola en alguna tanda (Día 1 o Día 2).
+// Hay análisis en curso o en cola en alguna tanda (solo se analiza el Día 2).
 const ACTIVOS = ['QUEUED', 'RUNNING']
-const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.includes(t.estado) || ACTIVOS.includes(t.dia1?.estado)))
+const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.includes(t.estado)))
 
 const posiciones = (t) => 'Cilindros P1–P' + t.n_cilindros
 

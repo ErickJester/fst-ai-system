@@ -20,8 +20,10 @@ export const experiments = [
 // estado de tanda = estado del análisis de Día 2: QUEUED | RUNNING | DONE | FAILED,
 //   como JobStatus en backend/app/models.py, o SIN_VIDEO si aún no se sube el Día 2.
 // Cada tanda ocupa los cilindros P1…Pn; desde es la posición de su primer cilindro en el grupo.
-// dia1: el video de Día 1 es opcional (null si no se cargó).
-// progreso: etapa (PipelineStage) y avance mientras corre; error: si falló.
+// dia1: { cargado: true } si se subió el video de Día 1 (opcional; null si no). No se
+//   analiza: solo confirma que hubo sesión de habituación (D-54).
+// progreso: etapa (PipelineStage) y avance mientras corre; error: { etapa } en la que se
+//   detuvo, si falló (sin código: la pantalla arma el mensaje con la etapa).
 const tanda = (letra, estado, extra = {}) => ({
   letra, desde: (letra.charCodeAt(0) - 65) * 4 + 1, n_cilindros: 4,
   fecha_dia1: '2026-02-18', fecha_dia2: '2026-02-19',
@@ -30,36 +32,34 @@ const tanda = (letra, estado, extra = {}) => ({
   ...extra,
 })
 
-const ERROR_DET = { codigo: 'E-DET-070', mensaje: 'Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.' }
-
 export const experimentDetail = {
   'EXP-2026-02': {
     clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera',
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE', { dia1: { estado: 'DONE' } }), tanda('B', 'QUEUED')] },
+        tandas: [tanda('A', 'DONE', { dia1: { cargado: true } }), tanda('B', 'QUEUED')] },
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE'), tanda('B', 'DONE')] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { progreso: { etapa: 'TRACKING', pct: 75 } })] },
       { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'QUEUED'), tanda('B', 'FAILED', { error: ERROR_DET })] },
+        tandas: [tanda('A', 'QUEUED'), tanda('B', 'FAILED', { error: { etapa: 'ROI_DETECTION' } })] },
     ],
   },
 }
 
 // Cola de análisis (2e). Un trabajo a la vez, en orden de llegada.
-// status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo);
-// confianza: de la detección de cilindros (mínimo 0.70).
+// status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo).
+// Solo se analiza el Día 2 (D-54).
 export const queue = [
-  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, confianza: 0.86, error: null },
-  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
-  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null },
+  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, error: null },
+  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
 export const failedJobs = [
-  { job_id: 498, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50, confianza: 0.54, error: ERROR_DET },
+  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50 },
 ]
 
 // Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
@@ -97,7 +97,7 @@ function resultados(grupo, letra, nivel, filas, analizado_en) {
   const minutos = lineaTiempo(Object.fromEntries(Object.entries(totales).map(([k, v]) => [k.replace('_s', ''), v])))
   return {
     experimento: EXPERIMENTO_EJEMPLO, grupo, letra, dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300,
-    analizado_en, modelo: 'clf-cascada v2.1', nivel, confianza: 0.83, cilindros, linea_tiempo: { cilindro, minutos },
+    analizado_en, modelo: 'clf-cascada v2.1', nivel, cilindros, linea_tiempo: { cilindro, minutos },
   }
 }
 
@@ -111,7 +111,7 @@ export const batchResults = {
   'EXP-2026-02/G-02/A/DAY2': {
     experimento: EXPERIMENTO_EJEMPLO, grupo: REFERENCIA,
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
-    nivel: 'PRECISO', confianza: 0.83,
+    nivel: 'PRECISO',
     cilindros: [
       { cilindro: 'P1', nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
       { cilindro: 'P2', nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
@@ -173,7 +173,7 @@ const hace = (dias, hora) => {
 }
 
 export const notifications = [
-  { id: 1, tipo: 'ANALYSIS_FAILED', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. Confianza de detección 0.54, menor a 0.70.', enlace: '/analisis', creada: hace(0, '15:41'), is_read: false },
+  { id: 1, tipo: 'ANALYSIS_FAILED', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', enlace: '/analisis', creada: hace(0, '15:41'), is_read: false },
   { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
   { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
 ]
@@ -190,7 +190,7 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 4
+const VERSION_DATOS = 5
 const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 

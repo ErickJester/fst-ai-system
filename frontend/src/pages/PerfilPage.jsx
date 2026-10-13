@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { FieldError, Campo } from '../components/ui'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { mensajeError } from '../services/api'
-import { isIpn } from '../lib/fst'
+import { esCorreo } from '../lib/fst'
 import { MUT60 } from '../lib/estilos'
 
 const formStyle = { background: 'var(--color-bg)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }
@@ -33,7 +33,7 @@ export default function PerfilPage() {
     if (guardandoD) return
     if (!datos.nombre.trim()) return d.fail('nombre', 'Escribe el nombre.')
     if (!datos.apellidos.trim()) return d.fail('apellidos', 'Escribe los apellidos.')
-    if (!isIpn(datos.correo)) return d.fail('correo', 'El correo debe ser institucional (@ipn.mx).')
+    if (!esCorreo(datos.correo)) return d.fail('correo', 'Escribe un correo electrónico válido.')
     d.fail(null, '')
     setGuardandoD(true)
     try {
@@ -79,7 +79,7 @@ export default function PerfilPage() {
             <div className="k">Datos de la cuenta</div>
             <Campo id="pNombre" label="Nombre"><input ref={d.refs.nombre} className={d.clase('nombre')} id="pNombre" value={datos.nombre} onChange={setD('nombre')} /></Campo>
             <Campo id="pApe" label="Apellidos"><input ref={d.refs.apellidos} className={d.clase('apellidos')} id="pApe" value={datos.apellidos} onChange={setD('apellidos')} /></Campo>
-            <Campo id="pCorreo" label="Correo institucional"><input ref={d.refs.correo} className={d.clase('correo', 'input num')} id="pCorreo" type="email" value={datos.correo} onChange={setD('correo')} /></Campo>
+            <Campo id="pCorreo" label="Correo electrónico"><input ref={d.refs.correo} className={d.clase('correo', 'input num')} id="pCorreo" type="email" value={datos.correo} onChange={setD('correo')} /></Campo>
             <Campo id="pId" label="Identificador institucional · solo lectura">
               <input className="input num" id="pId" value={user.idInst} readOnly style={{ background: 'var(--color-surface)', color: MUT60 }} />
             </Campo>

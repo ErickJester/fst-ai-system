@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
-import { getQueue } from '../services/queue'
+import { getQueue, getDiagnostico } from '../services/queue'
+import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA } from '../lib/fst'
-import { Cargando } from '../components/ui'
+import { DIA, ETAPA, mensajeErrorAnalisis, download, norm } from '../lib/fst'
+import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
 
 const INK = 'var(--color-text)'
-const CONFIANZA_MIN = 0.7
 const ETAPAS = Object.keys(ETAPA)
 
 // Qué hace cada etapa, para un trabajo con n especímenes.
@@ -24,23 +24,11 @@ const pctEtapa = (i) => (i + 1) * 25 + ' %'
 
 const nombreTrabajo = (j) => j.experimento + ' · ' + j.grupo + ' · Tanda ' + j.tanda
 
-// Día 1 dura 20 min, pero de los dos días se analizan 5 min.
+// Solo se analiza el Día 2 (D-54): sus últimos 5 min.
 const duracion = (j) => DIA[j.dia] + ' · 5 min'
 
-// Reporte de diagnóstico: se imprime o guarda como PDF desde el navegador.
-function descargarDiagnostico(j, detalle) {
-  const w = window.open('', '_blank')
-  if (!w) return
-  w.document.write(
-    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte de diagnóstico · ' + j.error.codigo + '</title>' +
-    '<style>body{font-family:Archivo,system-ui,sans-serif;color:#231f20;padding:32px;line-height:1.55}h3{font-weight:800;font-size:25px;margin:0 0 12px}</style></head>' +
-    '<body><h3>Reporte de diagnóstico</h3>' +
-    '<p><strong>' + nombreTrabajo(j) + '</strong><br>' + detalle + '</p>' +
-    '<p><strong>' + j.error.codigo + '</strong> · ' + j.error.mensaje + '</p>' +
-    '<script>onload=()=>print()</script></body></html>'
-  )
-  w.document.close()
-}
+// Si el PDF de diagnóstico aún no existe, se vuelve a pedir tras esta espera.
+const REINTENTO_DIAGNOSTICO_MS = 4000
 
 // La cola se consulta cada 5 s mientras haya análisis activos (en cola o procesando);
 // sin ninguno, cada 30 s, solo para ver si llega uno nuevo.
@@ -141,22 +129,36 @@ function TrabajoActual({ j }) {
         )
       })}
 
-      {j.confianza != null && (
-        <div style={{ padding: '14px 20px', background: 'var(--color-surface)', fontSize: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span>Confianza de detección:</span>
-            <span className="num nd" style={{ fontSize: 15 }}>{j.confianza.toFixed(2)}</span>
-            <span className="num" style={{ color: MUT60 }}>(mínimo {CONFIANZA_MIN.toFixed(2)})</span>
-          </div>
-          <div className="hint" style={{ marginTop: 4 }}>Es la confianza de la detección de cilindros. Por debajo de {CONFIANZA_MIN.toFixed(2)}, el análisis se detiene completo.</div>
-        </div>
-      )}
     </div>
   )
 }
 
 function TrabajoFallido({ j }) {
   const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)'
+  // null | 'pidiendo' | 'preparando' (el PDF aún no existe: se reintenta solo) | 'error'
+  const [diag, setDiag] = useState(null)
+  const [errDiag, setErrDiag] = useState('')
+  const reintento = useRef(null)
+  useEffect(() => () => clearTimeout(reintento.current), [])
+
+  async function descargar() {
+    clearTimeout(reintento.current)
+    setDiag((d) => (d === 'preparando' ? d : 'pidiendo'))
+    setErrDiag('')
+    try {
+      const pdf = await getDiagnostico(j)
+      download(['diagnostico', norm(j.experimento), norm(j.grupo), 'tanda' + j.tanda].join('_').replace(/\s+/g, '-') + '.pdf', pdf, 'application/pdf')
+      setDiag(null)
+    } catch (e) {
+      if (e.response?.status === 404) {
+        setDiag('preparando')
+        reintento.current = setTimeout(descargar, REINTENTO_DIAGNOSTICO_MS)
+      } else {
+        setDiag('error')
+        setErrDiag(mensajeError(e, 'No se pudo descargar el reporte de diagnóstico. Inténtalo de nuevo.'))
+      }
+    }
+  }
 
   return (
     <div style={{ border: '2px solid var(--color-accent)', marginTop: 18 }}>
@@ -169,14 +171,16 @@ function TrabajoFallido({ j }) {
         <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{detalle}</div>
       </div>
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'baseline' }}>
-          <span className="num nd" style={{ fontSize: 13, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>{j.error.codigo}</span>
-          <span style={{ fontSize: 13, lineHeight: 1.55 }}>{j.error.mensaje}</span>
-        </div>
+        <div className="nd" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{mensajeErrorAnalisis(j.stage)}</div>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-          <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => descargarDiagnostico(j, detalle)}>Descargar reporte de diagnóstico (PDF)</button>
-          <span className="hint">El investigador no puede reiniciar el análisis.</span>
+          <button type="button" className="btn btn-primary" style={btnLeft} disabled={diag === 'pidiendo' || diag === 'preparando'} onClick={descargar}>
+            {diag === 'preparando' ? 'Preparando…' : 'Descargar reporte de diagnóstico (PDF)'}
+          </button>
+          <span className="hint" aria-live="polite">
+            {diag === 'preparando' ? 'El reporte todavía se está generando; se descarga solo en cuanto esté listo.' : 'El investigador no puede reiniciar el análisis.'}
+          </span>
         </div>
+        <FieldError msg={errDiag} />
       </div>
     </div>
   )

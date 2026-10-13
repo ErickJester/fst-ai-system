@@ -35,6 +35,14 @@ export const ETAPA = {
   CLASSIFICATION: 'Clasificación de conducta',
 }
 
+// Un análisis con error no trae código ni descripción: el mensaje se arma con la etapa en
+// que se detuvo. Hay dos errores definidos: el video no se pudo abrir o no se hallaron los tubos.
+const ERROR_POR_ETAPA = {
+  PREPROCESSING: 'No se pudo abrir el video.',
+  ROI_DETECTION: 'No se encontraron los tubos en el video.',
+}
+export const mensajeErrorAnalisis = (etapa) => ERROR_POR_ETAPA[etapa] || 'El análisis se detuvo en la etapa «' + (ETAPA[etapa] || etapa) + '».'
+
 // Primera tanda con el Día 2 analizado de un experimento (detalle de la API), o null.
 export function primeraTandaLista(exp) {
   for (const g of exp.grupos) {
@@ -50,7 +58,8 @@ export const enlaceResultados = (clave, gid, letra) => `/experimentos/${clave}/r
 // Búsqueda sin acentos ni mayúsculas.
 export const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-export const isIpn = (v) => /^[^\s@]+@ipn\.mx$/i.test(v.trim())
+// Correo de cualquier dominio (D-46): solo se revisa que tenga forma de correo.
+export const esCorreo = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
 // ── descargas ──────────────────────────────────────────────────────────────
 export function download(name, text, type) {

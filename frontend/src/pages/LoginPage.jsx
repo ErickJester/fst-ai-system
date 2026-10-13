@@ -6,7 +6,7 @@ import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { forgotPassword } from '../services/auth'
 import { mensajeError } from '../services/api'
 import { useAviso } from '../hooks/useAviso'
-import { isIpn } from '../lib/fst'
+import { esCorreo } from '../lib/fst'
 import { textoTarjeta } from '../lib/estilos'
 
 // 2h · Iniciar sesión y recuperar contraseña.
@@ -28,7 +28,7 @@ export default function LoginPage() {
   async function entrar(e) {
     e.preventDefault()
     if (enviando) return
-    if (!isIpn(email)) return entrada.fail('email', 'Usa tu correo institucional @ipn.mx.')
+    if (!esCorreo(email)) return entrada.fail('email', 'Escribe un correo electrónico válido.')
     if (!pass) return entrada.fail('pass', 'Escribe tu contraseña.')
     entrada.fail(null, '')
     setEnviando(true)
@@ -45,7 +45,7 @@ export default function LoginPage() {
   async function recuperar(e) {
     e.preventDefault()
     if (enviando) return
-    if (!isIpn(rEmail)) return recuperacion.fail('rEmail', 'Usa tu correo institucional @ipn.mx.')
+    if (!esCorreo(rEmail)) return recuperacion.fail('rEmail', 'Escribe un correo electrónico válido.')
     recuperacion.fail(null, '')
     setEnviando(true)
     try {
@@ -69,8 +69,8 @@ export default function LoginPage() {
             Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 60 minutos.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Campo id="rEmail" label="Correo institucional">
-              <input className={recuperacion.clase('rEmail', 'input num')} id="rEmail" type="email" placeholder="nombre@ipn.mx" autoFocus
+            <Campo id="rEmail" label="Correo electrónico">
+              <input className={recuperacion.clase('rEmail', 'input num')} id="rEmail" type="email" placeholder="nombre@ejemplo.com" autoFocus
                 value={rEmail} onChange={(e) => setREmail(e.target.value)} />
             </Campo>
             <FieldError msg={recuperacion.err.msg} />
@@ -101,8 +101,8 @@ export default function LoginPage() {
         {caducada && <div className="note-bar" style={{ marginBottom: 18 }}>Tu sesión caducó. Vuelve a iniciar sesión.</div>}
         <h3 style={{ margin: '0 0 22px' }}>Iniciar sesión</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Campo id="lEmail" label="Correo institucional">
-            <input className={entrada.clase('email', 'input num')} id="lEmail" type="email" placeholder="nombre@ipn.mx" autoComplete="username"
+          <Campo id="lEmail" label="Correo electrónico">
+            <input className={entrada.clase('email', 'input num')} id="lEmail" type="email" placeholder="nombre@ejemplo.com" autoComplete="username"
               value={email} onChange={(e) => setEmail(e.target.value)} />
           </Campo>
           <Campo id="lPass" label="Contraseña">
