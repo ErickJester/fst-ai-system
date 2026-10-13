@@ -2,10 +2,11 @@ import React, { useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { getBatchResults, getGroupComparison, getBlocks } from '../services/results'
+import { getBatchResults, getGroupComparison, getBlocks, getReporte } from '../services/results'
+import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -27,8 +28,6 @@ const CONDUCTAS = [
 const KEYS = CONDUCTAS.map((c) => c.id)
 const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
 const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
-// Orden y nombres de las columnas de los reportes CSV y XLSX (§7 del documento).
-const EXPORTA = [['nado', 'Nado'], ['escalamiento', 'Escalamiento'], ['inmovilidad', 'Inmovilidad'], ['activa', 'Conducta activa']]
 
 // El espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
 const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
@@ -118,40 +117,22 @@ function Comparacion({ g, c }) {
   )
 }
 
-// ── exportación (segundos, no porcentaje) ──────────────────────────────────
-function tabla(r) {
-  const claves = EXPORTA.map(([k]) => k)
-  const encabezados = EXPORTA.map(([, nombre]) => nombre)
-  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
-  const out = [['Espécimen', ...encabezados.map((n) => n + ' (s)')]]
-  r.especimenes.forEach((e) => out.push([etiqueta(e, r.letra), ...claves.map((k) => e[k + '_s'])]))
-  estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...claves.map((k) => s.f(col(k)).replace(' s', ''))]))
-  out.push([])
-  // Desglose por minuto: una fila por minuto, en segundos.
-  out.push([etiqueta(r.linea_tiempo, r.letra)])
-  out.push(['Tiempo (min:seg)', ...encabezados])
-  r.linea_tiempo.minutos.forEach((segs, i) => {
-    const sum = (k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
-    out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), ...claves.map(sum)])
-  })
-  return out
-}
-
-const archivo = (r) => ['resultados', r.experimento.clave, norm(r.grupo.nombre).replace(/\s+/g, '-'), 'tanda' + r.letra, 'dia2'].join('_')
-
-// El generador de XLSX (SheetJS) viene con la app, pero se carga solo al exportar
-// para no agrandar la carga inicial. No depende de internet.
-async function exportarXLSX(r) {
-  let X
-  try {
-    X = await import('xlsx')
-  } catch {
-    alert('No se pudo cargar el generador de XLSX. Recarga la página e inténtalo de nuevo.')
-    return
-  }
-  const wb = X.utils.book_new()
-  X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(tabla(r)), 'Resultados')
-  X.writeFile(wb, archivo(r) + '.xlsx')
+// ── reportes ────────────────────────────────────────────────────────────────
+// Los genera el equipo de backend (GET /experiments/:clave/report/:formato); aquí solo se
+// descargan. Mientras no haya backend, cada botón explica qué hará.
+const REPORTES = {
+  csv: {
+    boton: 'CSV', tipo: 'text/csv',
+    hara: 'una fila por espécimen con los segundos de Nado, Escalamiento, Inmovilidad y Conducta activa; el desglose por minuto (columna «Tiempo (min:seg)»); y la media, la desviación estándar y la varianza de cada conducta por grupo.',
+  },
+  xlsx: {
+    boton: 'XLSX', tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    hara: 'el mismo contenido que el CSV, en un libro de Excel.',
+  },
+  pdf: {
+    boton: 'PDF · reporte de resultados', tipo: 'application/pdf',
+    hara: 'el reporte de resultados que se entrega al terminar, con los fragmentos «no se ve» marcados. Es distinto del reporte de diagnóstico.',
+  },
 }
 
 const TABS = [
@@ -204,6 +185,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   const [tab, setTab] = useState('especimen')
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
+  const [reporte, setReporte] = useState(null) // { formato, error } del último botón de reporte
   const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
@@ -214,6 +196,19 @@ function ResultadosTanda({ clave, gid, letra }) {
   const conductas = CONDUCTAS
   const col = (k) => r.especimenes.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
+
+  // Pide el reporte del experimento al backend y lo descarga; sin backend, explica qué hará.
+  async function pedirReporte(formato) {
+    setReporte({ formato, pidiendo: true })
+    try {
+      const archivo = await getReporte(exp.clave, formato)
+      if (!archivo) return setReporte({ formato })
+      download('reporte_' + exp.clave + '.' + formato, archivo, REPORTES[formato].tipo)
+      setReporte(null)
+    } catch (e) {
+      setReporte({ formato, error: mensajeError(e, 'No se pudo descargar el reporte. Inténtalo de nuevo.') })
+    }
+  }
 
   // Las pestañas llevan a su sección de la vista.
   function irA(id) {
@@ -251,11 +246,25 @@ function ResultadosTanda({ clave, gid, letra }) {
             {r.id_analisis && (user.admin || r.subido_por === user.id) && (
               <Link className="btn btn-secondary" to={enlaceRevision(clave, r.id_analisis)}>Revisar segundo a segundo</Link>
             )}
-            <button type="button" className="btn btn-secondary" onClick={() => download(archivo(r) + '.csv', toCSV(tabla(r)))}>CSV</button>
-            <button type="button" className="btn btn-secondary" onClick={() => exportarXLSX(r)}>XLSX</button>
-            <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => window.print()}>PDF · reporte de resultados</button>
+            {Object.entries(REPORTES).map(([formato, x]) => (
+              <button key={formato} type="button" className={'btn ' + (formato === 'pdf' ? 'btn-primary' : 'btn-secondary')} style={btnLeft}
+                disabled={reporte?.pidiendo} onClick={() => pedirReporte(formato)}>{x.boton}</button>
+            ))}
           </div>
         </div>
+
+        {reporte && !reporte.pidiendo && (
+          <div className="note-bar" role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginTop: 16 }}>
+            <span style={{ flex: 1, lineHeight: 1.55 }}>
+              {reporte.error || (
+                <>
+                  <strong>Reporte {REPORTES[reporte.formato].boton.split(' ·')[0]} del experimento.</strong> Lo genera el servidor y aquí se descarga. Tendrá {REPORTES[reporte.formato].hara} Disponible cuando el backend esté conectado.
+                </>
+              )}
+            </span>
+            <button type="button" className="linkbtn" style={{ fontSize: 12 }} onClick={() => setReporte(null)}>Entendido</button>
+          </div>
+        )}
 
         {/* Saltos a secciones de esta misma vista (no cambian el contenido): navegación, no pestañas. */}
         <nav aria-label="Secciones de los resultados" className="no-print" style={{ display: 'flex', borderBottom: '2px solid var(--color-divider)', margin: '22px 0 24px' }}>

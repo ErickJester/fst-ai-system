@@ -200,6 +200,17 @@ describe('resultados', () => {
     expect(screen.getByRole('columnheader', { name: 'Conducta activa' })).toBeTruthy()
   })
 
+  it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    await user.click(await screen.findByRole('button', { name: 'CSV' }))
+    expect((await screen.findByText(/Reporte CSV del experimento/)).parentElement.textContent).toMatch(/Lo genera el servidor .*Tiempo \(min:seg\)/)
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'PDF · reporte de resultados' }))
+    expect(screen.getByText(/Reporte PDF del experimento/)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(screen.queryByText(/Reporte PDF del experimento/)).toBeNull()
+  })
+
   it('los bloques de 5 s se abren para ver sus cinco segundos', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
     const fila = await screen.findByRole('group', { name: 'Bloques de Tanda A · Espécimen 1' })

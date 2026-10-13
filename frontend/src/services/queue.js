@@ -3,10 +3,8 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { simular, ajustarPausa, cancelarPausa, PLAZO_PAUSA_MS } from './mocks/simulador'
-import { pdfDeTexto } from './mocks/pdf'
 import { imagenDePausa } from './mocks/imagenPausa'
 import { usuarioDeLaSesion } from './mocks/sesion'
-import { DIA, ETAPA, mensajeErrorAnalisis } from '../lib/fst'
 
 // Sin backend, el PDF de diagnóstico tarda esto en estar listo después del error.
 const PDF_TARDA_MS = 6000
@@ -22,16 +20,13 @@ export async function getQueue() {
 }
 
 // GET /experiments/:clave/analyses/:id/diagnostic → PDF de diagnóstico de un análisis con
-// error. Lo escribe el worker al fallar; mientras no existe, el backend responde 404.
+// error. Lo genera el worker al fallar; mientras no existe, el backend responde 404. El
+// frontend solo lo descarga. Sin backend se simula la espera (404) y después responde null:
+// no hay archivo, y la pantalla explica qué hará el botón.
 export async function getDiagnostico(job) {
   if (USE_MOCKS) {
     if (job.fallo_ms && Date.now() - job.fallo_ms < PDF_TARDA_MS) return fail(404, 'El reporte de diagnóstico todavía no está listo.')
-    return reply(pdfDeTexto([
-      'Reporte de diagnóstico',
-      job.experimento + ' · ' + job.grupo + ' · Tanda ' + job.tanda + ' · ' + DIA[job.dia],
-      'Detenido en: ' + ETAPA[job.stage] + ' (' + job.progress_pct + ' %)',
-      mensajeErrorAnalisis(job.stage),
-    ]))
+    return reply(null)
   }
   return (await api.get(`/experiments/${job.clave}/analyses/${job.job_id}/diagnostic`, { responseType: 'blob' })).data
 }
