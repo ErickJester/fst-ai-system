@@ -31,7 +31,7 @@ export const experiments = [
 const tanda = (letra, estado, extra = {}) => ({
   letra, desde: (letra.charCodeAt(0) - 65) * 4 + 1, n_cilindros: 4,
   fecha_dia1: '2026-02-18', fecha_dia2: '2026-02-19',
-  estado, dia1: null, progreso: null, error: null,
+  estado, dia1: null, progreso: null, error: null, id_analisis: null, subido_por: 1,
   analisis_fecha: estado === 'DONE' ? '2026-02-24' : null,
   ...extra,
 })
@@ -41,11 +41,11 @@ export const experimentDetail = {
     clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: 1,
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE', { dia1: { cargado: true } }), tanda('B', 'QUEUED', { id_analisis: 502 })] },
+        tandas: [tanda('A', 'DONE', { id_analisis: 401, dia1: { cargado: true } }), tanda('B', 'QUEUED', { id_analisis: 502 })] },
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE'), tanda('B', 'DONE')] },
+        tandas: [tanda('A', 'DONE', { id_analisis: 402 }), tanda('B', 'DONE', { id_analisis: 403 })] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
+        tandas: [tanda('A', 'DONE', { id_analisis: 404 }), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
       { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'QUEUED', { id_analisis: 503 }), tanda('B', 'FAILED', { id_analisis: 498, error: { etapa: 'ROI_DETECTION' } })] },
     ],
@@ -73,6 +73,11 @@ export const pausedJobs = []
 
 // Análisis cancelados: por el usuario o porque pasaron 5 minutos sin respuesta (motivo).
 export const canceledJobs = []
+
+// Correcciones guardadas en la revisión segundo a segundo (la tabla SEGUNDO revisada), por
+// id de análisis y número de cilindro: 300 pares [conducta, origen]. origen: maquina |
+// confirmada | corregida | dudosa (D-80).
+export const revisiones = {}
 
 // Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
 // Cada espécimen trae los segundos de las cuatro conductas (R-12): nado_s, inmovilidad_s,
@@ -206,8 +211,8 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 9
-const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, batchResults, users, system, notifications, resetTokens, simulacion }
+const VERSION_DATOS = 10
+const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
 // Reemplaza el contenido de cada colección sin cambiar el objeto, porque los
