@@ -27,10 +27,14 @@ export async function listExperiments() {
   return (await api.get('/experiments')).data
 }
 
-// POST /experiments → paso 1, «Datos generales»: { titulo, fecha_inicio, especie, notas }.
-// El servidor asigna la clave y pone como responsable a la cuenta de la sesión.
+// POST /experiments → paso 1, «Datos generales»: { titulo, fecha_inicio, notas } (nombre único,
+// fecha y notas opcionales, §7). El servidor asigna la clave y pone como responsable a la
+// cuenta de la sesión. 409 si ya existe un experimento con ese nombre.
 export async function createExperiment(data) {
   if (USE_MOCKS) {
+    if (db.experiments.some((e) => e.titulo.trim().toLowerCase() === data.titulo.trim().toLowerCase())) {
+      return fail(409, 'Ya existe un experimento con ese nombre.')
+    }
     const anio = data.fecha_inicio.slice(0, 4)
     const n = db.experiments.filter((e) => e.clave.startsWith('EXP-' + anio)).length + 1
     const clave = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
@@ -42,7 +46,7 @@ export async function createExperiment(data) {
       videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'SIN_VIDEOS',
       responsable, creador_id, retencion_dias: null, videos_borrados: false, con_detalle: true,
     })
-    db.experimentDetail[clave] = { clave, titulo: data.titulo, fecha_inicio: data.fecha_inicio, responsable, creador_id, especie: data.especie, notas: data.notas, grupos: [] }
+    db.experimentDetail[clave] = { clave, titulo: data.titulo, fecha_inicio: data.fecha_inicio, responsable, creador_id, notas: data.notas, grupos: [] }
     return reply({ clave })
   }
   return (await api.post('/experiments', data)).data

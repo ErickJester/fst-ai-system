@@ -303,7 +303,7 @@ describe('revisión segundo a segundo (R-14)', () => {
 
 describe('experimentos (dashboard)', () => {
   it('pagina de 10 en 10', async () => {
-    for (let i = 0; i < 7; i++) await createExperiment({ titulo: 'Prueba ' + i, fecha_inicio: '2026-10-0' + (i + 1), especie: '', notas: '' })
+    for (let i = 0; i < 7; i++) await createExperiment({ titulo: 'Prueba ' + i, fecha_inicio: '2026-10-0' + (i + 1), notas: '' })
     const user = await conSesion('/experimentos')
     await screen.findByText('Prueba 0')
     expect(screen.getAllByRole('row')).toHaveLength(11) // encabezado + 10

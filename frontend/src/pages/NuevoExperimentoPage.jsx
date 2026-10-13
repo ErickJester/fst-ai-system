@@ -20,7 +20,7 @@ const hoy = () => {
 export default function NuevoExperimentoPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ titulo: '', fecha_inicio: hoy(), especie: 'Rata Wistar', notas: '' })
+  const [form, setForm] = useState({ titulo: '', fecha_inicio: hoy(), notas: '' })
   const [guardando, setGuardando] = useState(false)
   const { err, fail, clase: cls, refs } = useErrorDeCampo({ titulo: useRef(), fecha_inicio: useRef() })
 
@@ -36,10 +36,11 @@ export default function NuevoExperimentoPage() {
     fail(null, '')
     setGuardando(true)
     try {
-      const { clave } = await createExperiment({ titulo, fecha_inicio: form.fecha_inicio, especie: form.especie.trim(), notas: form.notas.trim() })
+      const { clave } = await createExperiment({ titulo, fecha_inicio: form.fecha_inicio, notas: form.notas.trim() })
       navigate(`/experimentos/${clave}/cargar`)
     } catch (e) {
-      fail(null, mensajeError(e, 'No se pudo crear el experimento. Inténtalo de nuevo.'))
+      // 409: ya existe un experimento con ese nombre (el nombre es único en todo el sistema).
+      fail(e.response?.status === 409 ? 'titulo' : null, mensajeError(e, 'No se pudo crear el experimento. Inténtalo de nuevo.'))
       setGuardando(false)
     }
   }
@@ -64,20 +65,15 @@ export default function NuevoExperimentoPage() {
               <Campo id="nTitulo" label="Nombre del experimento">
                 <input ref={refs.titulo} className={cls('titulo')} id="nTitulo" autoComplete="off" autoFocus maxLength={MAX_NOMBRE}
                   placeholder="Compuesto CSR-14 · curva de dosis" value={form.titulo} onChange={set('titulo')} />
-                <div style={{ marginTop: 6, ...mutedSub }}>Así aparece en la lista de experimentos y en los reportes.</div>
+                <div style={{ marginTop: 6, ...mutedSub }}>Único en todo el sistema. Así aparece en la lista de experimentos y en los reportes.</div>
               </Campo>
             </div>
 
             <div className="step">
               <span className="step-n num">2</span>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <Campo id="nFecha" label="Fecha de inicio" style={{ width: 200 }}>
-                  <input ref={refs.fecha_inicio} className={cls('fecha_inicio') + ' num'} id="nFecha" type="date" value={form.fecha_inicio} onChange={set('fecha_inicio')} />
-                </Campo>
-                <Campo id="nEspecie" label="Especie o cepa" style={{ flex: 1, minWidth: 200 }}>
-                  <input className="input" id="nEspecie" value={form.especie} onChange={set('especie')} />
-                </Campo>
-              </div>
+              <Campo id="nFecha" label="Fecha de inicio" style={{ width: 200 }}>
+                <input ref={refs.fecha_inicio} className={cls('fecha_inicio') + ' num'} id="nFecha" type="date" value={form.fecha_inicio} onChange={set('fecha_inicio')} />
+              </Campo>
             </div>
 
             <div className="step" style={{ borderBottom: 0, paddingBottom: 0 }}>
@@ -100,7 +96,7 @@ export default function NuevoExperimentoPage() {
           <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)' }}>
             <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Qué sigue</div>
             <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, lineHeight: 1.6 }}>
-              <div>En el paso 2 cargas un video por tanda: indicas el grupo (o creas uno nuevo con su tipo y tratamiento), confirmas la tanda y sueltas el archivo .mp4.</div>
+              <div>En el paso 2 cargas un video por tanda: indicas el grupo (o creas uno nuevo con su tipo y tratamiento), confirmas la tanda y sueltas el archivo .mp4 o .mov.</div>
               <div style={{ color: 'var(--muted-2)' }}>El experimento aparece en la lista como <strong>Sin videos</strong>; con solo videos de Día 1, como <strong>En espera del Día 2</strong>.</div>
             </div>
           </div>
