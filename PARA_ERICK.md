@@ -180,6 +180,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `especimenes` (`numeroCilindro` y tiempos por conducta en s), línea de tiempo, nivel |
 | `GET /experiments/:clave/group-comparison` | — | por grupo, `por_conducta` (media ± DE de cada conducta) o `por_nivel` si mezcla niveles |
 | `GET /experiments/:clave/groups/:gid/batches/:letra/blocks` | — | `especimenes: [{ numeroCilindro, bloques: [{ inicio, conducta, matiz, segundos }] }]` (D-53) |
+| `GET /experiments/:clave/report/:formato` | `csv`, `xlsx` o `pdf` | el archivo tal cual (lo genera el backend; se regenera si hay un análisis más nuevo) |
 | `GET /experiments/:clave/analyses/:id/review` | — | `{ puedeCorregir, videoUrl, duracion, ancho, alto, especimenes: [{ numeroCilindro, recuadro, segundos: [{ segundo, conducta, origen }] }] }` (§6.1; conductas con su nombre de la base); 403 sin permiso, 409 si no está completado |
 | `PUT /experiments/:clave/analyses/:id/segundos` | `{ especimenes: [{ numeroCilindro, segundos: [{ segundo, conducta, origen }] }] }` solo lo que cambió | totales recalculados |
 | `POST /experiments/:clave/analyses/:id/restart` | — | 202; borra el resultado al empezar y deja el análisis en cola |
@@ -213,7 +214,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 18. **Pruebas de pantallas** con React Testing Library (`src/pantallas.test.jsx`): acceso, primer acceso, recuperar contraseña, crear cuenta, cargar video y resultados. Con las de servicios, 42 pruebas.
 19. **Cancelar la subida** de un video (`signal` de un `AbortController` en `uploadBatchVideo`) y limpieza de código sin uso (`hooks/useApi.js`, `store`).
 20. **Pantallas que se actualizan solas**: Experimento, Grupo y la cola de Admin, con `useAsyncVivo` (5 s con análisis activos, 30 s sin ellos, sin parpadeo de «Cargando…»).
-21. **Contenedor de producción** (propuesta, sección 3): `Dockerfile.prod` + nginx + `docker-compose.prod.yml`; fuente y XLSX incluidos en la app.
+21. **Contenedor de producción** (propuesta, sección 3): `Dockerfile.prod` + nginx + `docker-compose.prod.yml`; fuente incluida en la app.
 22. **D-63**: eliminar un experimento pide solo confirmación, sin nombre ni contraseña (app, servicio, pruebas y `mockup/v2/experimento.html`).
 23. **Ajustes de `INSTRUCCIONES-WEB.md`** (repo de LaTeX, rama `accesos-login`):
     - **Error del análisis según la etapa** (§9.4): «No se pudo abrir el video» o «No se encontraron los tubos en el video», sin código (`E-DET-070`) ni confianza de detección, porque R-10 se eliminó. El PDF de diagnóstico lo pide al backend y, si aún no existe, muestra «Preparando…» y lo descarga solo cuando está listo.
@@ -238,6 +239,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 29. **Administración según §9.6:** filtros por rol y estado, columna Experimentos (`n_experimentos` en `GET /admin/users`), espacio libre, tiempo estimado de la cola (10 min por video) y acceso a todos los experimentos. Se corrigió el aviso de disco (al pasar del 90 % sí se borran los videos más antiguos) y el catálogo ya no muestra duraciones mínimas (RF-18): son las cuatro conductas.
 30. **Experimentos paginados** de 10 en 10, como el boceto del dashboard.
 31. **Nuevo experimento solo pide nombre, fecha y notas** (§7 y §9.3): se quitó el campo «especie», que además traía «Rata Wistar» (§9.8 prohíbe «rata»). El nombre es único en todo el sistema: 409 si se repite.
+32. **Los archivos los genera el backend, no el frontend.** Los botones CSV, XLSX y «PDF · reporte de resultados» piden `GET /experiments/:clave/report/:formato` y descargan lo que devuelve el servidor; el PDF de diagnóstico, `GET .../analyses/:id/diagnostic`. Sin backend, cada botón muestra un mensaje con lo que hará. Se quitaron del frontend el armado del CSV, SheetJS (`xlsx`), la impresión del PDF y el PDF de diagnóstico de ejemplo. **Le toca al backend:** generar los tres reportes (columnas `Nado`, `Escalamiento`, `Inmovilidad`, `Conducta activa`; desglose por minuto con `Tiempo (min:seg)`; media, DE y varianza por grupo; el PDF marca los fragmentos «no se ve») y regenerarlos si hay un análisis más nuevo.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
