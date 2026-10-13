@@ -37,7 +37,7 @@ function abrir(ruta = '/login') {
 }
 
 async function entrar(user, correo, password = 'x') {
-  await user.type(screen.getByLabelText('Correo institucional'), correo)
+  await user.type(screen.getByLabelText('Correo electrónico'), correo)
   await user.type(screen.getByLabelText('Contraseña'), password)
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
 }
@@ -68,11 +68,11 @@ describe('acceso', () => {
     expect(screen.getByText('Compuesto CSR-14 · curva de dosis')).toBeTruthy()
   })
 
-  it('marca el correo que no es @ipn.mx', async () => {
+  it('marca el correo que no tiene forma de correo', async () => {
     const user = abrir('/login')
-    await entrar(user, 'alguien@gmail.com')
-    expect(await screen.findByText('Usa tu correo institucional @ipn.mx.')).toBeTruthy()
-    expect(screen.getByLabelText('Correo institucional').className).toContain('error')
+    await entrar(user, 'alguien@gmail')
+    expect(await screen.findByText('Escribe un correo electrónico válido.')).toBeTruthy()
+    expect(screen.getByLabelText('Correo electrónico').className).toContain('error')
   })
 
   it('sin sesión, cualquier ruta lleva al login', async () => {
@@ -94,7 +94,7 @@ describe('acceso', () => {
   it('recuperar la contraseña con el enlace y entrar con la nueva', async () => {
     const user = abrir('/login')
     await user.click(screen.getByText('Olvidé mi contraseña'))
-    await user.type(screen.getByLabelText('Correo institucional'), 'mrivera@ipn.mx')
+    await user.type(screen.getByLabelText('Correo electrónico'), 'mrivera@ipn.mx')
     await user.click(screen.getByRole('button', { name: 'Enviar enlace' }))
     expect(await screen.findByText('Si el correo está registrado, recibirás un enlace.')).toBeTruthy()
 
@@ -118,7 +118,7 @@ describe('administración', () => {
     await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }))
     await user.type(screen.getByLabelText('Nombre'), 'Andrea')
     await user.type(screen.getByLabelText('Apellidos'), 'Barrera Solís')
-    await user.type(screen.getByLabelText('Correo institucional (@ipn.mx)'), 'abarrera@ipn.mx')
+    await user.type(screen.getByLabelText('Correo electrónico'), 'abarrera@ipn.mx')
     await user.type(screen.getByLabelText(/Identificador institucional/), '2021630154')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -148,6 +148,20 @@ describe('cargar video', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
     expect(await screen.findByText('Video almacenado · análisis en cola')).toBeTruthy()
     expect(screen.getByText(/posición 4 en la cola/)).toBeTruthy()
+  })
+
+  it('el video de Día 1 se guarda sin encolar análisis (D-54)', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    await user.type(await screen.findByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+    await user.click(screen.getByRole('button', { name: 'Día 1 (20 min)' }))
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'tanda_C_dia1.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_C_dia1.mp4')
+    await user.click(screen.getByRole('button', { name: 'Guardar video' }))
+    expect(await screen.findByText('Video de Día 1 almacenado')).toBeTruthy()
+    expect(screen.getByText(/No se analiza/)).toBeTruthy()
+    expect(screen.queryByText('Ver progreso del análisis →')).toBeNull()
   })
 
   it('rechaza un video vertical', async () => {

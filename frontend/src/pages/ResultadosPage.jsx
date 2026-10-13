@@ -254,7 +254,6 @@ function ResultadosTanda({ clave, gid, letra }) {
           {TABS.map((t) => (
             <button key={t.id} type="button" className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'true' : undefined} onClick={() => irA(t.id)}>{t.label}</button>
           ))}
-          <button type="button" className="tab" disabled title="Disponible cuando exista el clasificador">Episodios</button>
         </nav>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 2, background: 'var(--color-divider)' }}>
@@ -305,7 +304,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             </table>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
-              Un episodio requiere 3 segundos consecutivos de la misma conducta; el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+              Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
             <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo)}</div>
@@ -325,11 +324,8 @@ function ResultadosTanda({ clave, gid, letra }) {
 
           <div style={{ background: 'var(--color-bg)', paddingLeft: 26, display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div>
-              <div className="k" style={{ marginBottom: 12 }}>Calidad del análisis</div>
-              <div className="num nd" style={{ fontSize: 20, lineHeight: 1.2, marginBottom: 9 }}>Confianza de detección: {r.confianza.toFixed(2)}</div>
-              <div style={{ height: 8, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)', marginBottom: 9 }}><div style={{ height: 8, background: INK, width: r.confianza * 100 + '%' }} /></div>
-              <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: MUT70 }}>Es la confianza de la detección de cilindros, por arriba del mínimo de 0.70.</p>
-              <div style={{ marginTop: 13, borderTop: '1px solid var(--color-divider)' }}>
+              <div className="k" style={{ marginBottom: 12 }}>Análisis</div>
+              <div style={{ borderTop: '1px solid var(--color-divider)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 11.5 }}>
                   <span style={{ color: MUT70 }}>Duración analizada</span>
                   <span className="num">{fmt(r.duracion_analizada_s)} / {fmt(r.duracion_s)}</span>

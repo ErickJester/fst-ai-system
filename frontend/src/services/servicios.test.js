@@ -5,7 +5,7 @@ import * as auth from './auth'
 import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
-import { getQueue } from './queue'
+import { getQueue, getDiagnostico } from './queue'
 import { getBatchResults, getGroupComparison } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
@@ -136,6 +136,17 @@ describe('experimentos', () => {
     expect(fila).toMatchObject({ n_grupos: 1, n_especimenes: 4, videos_dia2_total: 1, videos_dia2_cargados: 1, estado: 'EN_ANALISIS' })
   })
 
+  it('el video de Día 1 se guarda pero no se analiza (D-54)', async () => {
+    const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', especie: '', notas: '' })
+    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
+    const r = await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY1', nCilindros: 3 })
+
+    expect(r).toEqual({ job_id: null, posicion_cola: null })
+    expect((await getQueue()).cola.some((j) => j.clave === clave)).toBe(false)
+    const tanda = (await getExperiment(clave)).grupos[0].tandas[0]
+    expect(tanda).toMatchObject({ letra: 'A', n_cilindros: 3, estado: 'SIN_VIDEO', dia1: { cargado: true } })
+  })
+
   it('eliminar quita el experimento de la lista y su detalle, sin pedir nombre ni contraseña (D-63)', async () => {
     expect(await status(deleteExperiment('EXP-2026-02'))).toBe('ok')
     expect(await status(getExperiment('EXP-2026-02'))).toBe(404)
@@ -193,10 +204,16 @@ describe('simulación de la cola (modo demo)', () => {
     const { cola, errores } = await getQueue()
     expect(cola).toEqual([])
     expect(errores[0]).toMatchObject({ job_id: 503, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50 })
-    expect(errores[0].error.codigo).toBe('E-DET-070')
     const tanda = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-04').tandas[0]
     expect(tanda.estado).toBe('FAILED')
     expect((await listNotifications())[0]).toMatchObject({ tipo: 'ANALYSIS_FAILED', enlace: '/analisis' })
+    // El PDF de diagnóstico tarda unos segundos: mientras tanto, 404 («preparando…»).
+    expect(await status(getDiagnostico(errores[0]))).toBe(Date.now() - errores[0].fallo_ms < 6000 ? 404 : 'ok')
+    expect(await status(getDiagnostico({ ...errores[0], fallo_ms: Date.now() }))).toBe(404)
+    const pdf = await getDiagnostico({ ...errores[0], fallo_ms: Date.now() - 60000 })
+    expect(pdf.type).toBe('application/pdf')
+    // Sin código de error: el mensaje se arma con la etapa en que se detuvo.
+    expect((await listNotifications())[0].texto).toMatch(/No se encontraron los tubos en el video\.$/)
   })
 
   it('un video subido con la cola vacía empieza cuando se sube, no antes', async () => {

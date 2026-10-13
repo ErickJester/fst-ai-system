@@ -9,7 +9,7 @@ import { useAsync, useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hoo
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { mensajeError } from '../services/api'
-import { isIpn, DIA } from '../lib/fst'
+import { esCorreo, DIA } from '../lib/fst'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
 const VACIO = { nombre: '', apellidos: '', correo: '', id: '', rol: 'INVESTIGADOR' }
@@ -99,7 +99,7 @@ export default function AdminPage() {
     const v = Object.fromEntries(Object.entries(form).map(([k, x]) => [k, x.trim()]))
     if (!v.nombre) return fail('nombre', 'Escribe el nombre.')
     if (!v.apellidos) return fail('apellidos', 'Escribe los apellidos.')
-    if (!isIpn(v.correo)) return fail('correo', 'El correo debe ser institucional (@ipn.mx).')
+    if (!esCorreo(v.correo)) return fail('correo', 'Escribe un correo electrónico válido.')
     if (!/^\d+$/.test(v.id)) return fail('id', 'El identificador institucional es numérico (boleta o número de empleado).')
     fail(null, '')
     setGuardando(true)
@@ -181,7 +181,7 @@ export default function AdminPage() {
             <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Campo id="cNombre" label="Nombre"><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></Campo>
               <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
-              <Campo id="cCorreo" label="Correo institucional (@ipn.mx)"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
+              <Campo id="cCorreo" label="Correo electrónico"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
               <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></Campo>
               {editando
                 ? (

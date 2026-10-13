@@ -31,7 +31,8 @@ export async function createGroup(clave, data) {
 }
 
 // POST /experiments/:clave/groups/:gid/batches/:letra/videos
-// (multipart: file, dia, n_cilindros) → { job_id, posicion_cola }
+// (multipart: file, dia, n_cilindros) → { job_id, posicion_cola }. El Día 1 solo se guarda
+// (D-54): no crea análisis y responde job_id y posicion_cola en null.
 // signal (AbortController) cancela la subida: no se registra nada y la promesa falla con
 // code 'ERR_CANCELED', igual que axios.
 export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindros, signal }, onProgress) {
@@ -45,7 +46,7 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
       if (signal?.aborted) throw cancelada()
       onProgress?.(p)
     }
-    // La tanda queda registrada y su análisis entra al final de la cola.
+    // La tanda queda registrada; si es Día 2, su análisis entra al final de la cola.
     let t = g.tandas.find((x) => x.letra === letra)
     if (!t) {
       const desde = g.tandas.reduce((a, x) => a + x.n_cilindros, 0) + 1
@@ -54,11 +55,15 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
       g.tandas.push(t)
       g.n_especimenes += nCilindros
     }
-    if (dia === 'DAY1') t.dia1 = { estado: 'QUEUED' }
-    else Object.assign(t, { estado: 'QUEUED', progreso: null, error: null, analisis_fecha: null })
+    if (dia === 'DAY1') {
+      t.dia1 = { cargado: true }
+      resumir(clave)
+      return reply({ job_id: null, posicion_cola: null })
+    }
+    Object.assign(t, { estado: 'QUEUED', progreso: null, error: null, analisis_fecha: null })
     const job = {
       job_id: Date.now(), posicion: db.queue.length + 1, clave, gid, creado_ms: Date.now(), experimento: db.experimentDetail[clave].titulo.split(' · ')[0],
-      grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, status: 'QUEUED', stage: null, progress_pct: 0, confianza: null, error: null,
+      grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, status: 'QUEUED', stage: null, progress_pct: 0,
     }
     db.queue.push(job)
     resumir(clave)
