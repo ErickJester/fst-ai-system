@@ -14,9 +14,11 @@ Solo lo que se ha visto en clase: CRUD, PDF y correo.
 | 4. Experimentos | Solo el CRUD (`GET`, `POST`, `PUT`, `DELETE /experiments`). Sin grupos, tandas ni carga de video |
 | 8. Reportes | Solo el PDF de resultados (`GET /experiments/{id}/report/pdf`), con iText y en memoria |
 | 9. Correo | `EmailService` por SMTP. Al crear un experimento se manda un correo **de demostración** al creador |
+| 10. `worker_fake` | En `../worker_fake` (Python), servicio `worker` de este compose. Ver su README |
 
 Falta todo lo demás: inicio de sesión (JWT, bcrypt), administración de cuentas, carga de video, progreso,
-resultados, revisión, CSV y XLSX, notificaciones y el worker.
+resultados, revisión, CSV y XLSX y la lectura de notificaciones. Mientras no exista la carga de video,
+`worker_fake/simular_carga.py` encola videos de prueba.
 
 Diferencias con la práctica:
 - PostgreSQL en lugar de MySQL.
