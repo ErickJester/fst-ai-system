@@ -45,6 +45,27 @@ services:
     ports:
       - "8080:8080"
 
+  # Simulador del worker (../worker_fake, en Python). Cumple el contrato de la sección 4 de la guía con
+  # datos inventados; el worker real (pipeline) lo reemplazará con la misma base y el mismo volumen.
+  worker:
+    build: ../worker_fake
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      ARCHIVOS_DIR: /data/archivos
+      MODELOS_DIR: /data/modelos
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - videos_reportes:/data/archivos
+      - modelos:/data/modelos:ro
+
   mailhog:
     image: mailhog/mailhog:v1.0.1
     profiles: ["dev"]
@@ -54,4 +75,5 @@ services:
 
 volumes:
   pgdata:
-  videos_reportes:   # videos y reportes; todavía no se usa (sin subida de video)
+  videos_reportes:   # videos, copias para revisión, pausas y diagnósticos; compartido backend y worker
+  modelos:           # modelos entrenados, solo lectura para el worker (el worker_fake no los usa)
