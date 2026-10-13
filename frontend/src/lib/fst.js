@@ -48,26 +48,6 @@ export const ESTADO_EXPERIMENTO = {
   CANCELED: 'Cancelado',
 }
 
-// ── Bloques de 5 s (D-53, RN-15) ─────────────────────────────────────────
-// Conducta de un bloque a partir de sus cinco segundos ('nado', 'inmovilidad',
-// 'escalamiento', 'activa' o null si no se ve). No usa la red: es mayoría sobre los cinco.
-// - Gana la conducta con más segundos (2 de nado y 1 de escalamiento: nado).
-// - Empate entre conductas activas (2 de nado y 2 de escalamiento): conducta activa.
-// - Empate de inmovilidad con una activa (2 y 2): decide el quinto; si es escalamiento o no
-//   se ve, conducta activa. Cualquier otro empate con inmovilidad también queda activa.
-// - Los cinco sin ver: conducta activa con matiz (el modelo no pudo ver bien esa parte).
-// matiz también marca un bloque que se decidió con algún segundo sin ver.
-export function bloqueDe(segundos) {
-  const cuenta = {}
-  for (const c of segundos) if (c) cuenta[c] = (cuenta[c] || 0) + 1
-  const sinVer = segundos.filter((c) => !c).length
-  const tope = Math.max(0, ...Object.values(cuenta))
-  if (!tope) return { conducta: 'activa', matiz: true }
-  const ganan = Object.keys(cuenta).filter((c) => cuenta[c] === tope)
-  if (ganan.length === 1) return { conducta: ganan[0], matiz: false }
-  return { conducta: 'activa', matiz: sinVer > 0 }
-}
-
 // Nombres de las conductas en la base (CONDUCTA.nombre) ↔ claves del frontend.
 export const CONDUCTA_BD = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
 export const DE_BD = Object.fromEntries(Object.entries(CONDUCTA_BD).map(([k, v]) => [v, k]))

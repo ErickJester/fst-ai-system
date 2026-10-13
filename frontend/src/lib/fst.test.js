@@ -1,24 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, bloqueDe } from './fst'
-
-describe('bloques de 5 s (D-53)', () => {
-  const N = 'nado', I = 'inmovilidad', E = 'escalamiento', A = 'activa'
-  it('gana la conducta con más segundos', () => {
-    expect(bloqueDe([N, N, N, I, I])).toEqual({ conducta: N, matiz: false })
-    expect(bloqueDe([N, N, E, null, null])).toEqual({ conducta: N, matiz: false }) // 2 y 1: nado
-  })
-  it('empate de nado activo y escalamiento: conducta activa', () => {
-    expect(bloqueDe([N, N, E, E, I])).toEqual({ conducta: A, matiz: false })
-  })
-  it('2 de inmovilidad y 2 de nado: decide el quinto', () => {
-    expect(bloqueDe([I, I, N, N, E])).toEqual({ conducta: A, matiz: false })
-    expect(bloqueDe([I, I, N, N, null])).toEqual({ conducta: A, matiz: true })
-    expect(bloqueDe([I, I, N, N, I])).toEqual({ conducta: I, matiz: false })
-  })
-  it('los cinco sin ver: conducta activa con matiz', () => {
-    expect(bloqueDe([null, null, null, null, null])).toEqual({ conducta: A, matiz: true })
-  })
-})
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados } from './fst'
 
 describe('estadísticos y formato', () => {
   it('media y varianza muestral (n − 1), como en Resultados', () => {

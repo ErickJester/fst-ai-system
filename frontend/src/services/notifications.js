@@ -2,7 +2,6 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { simular } from './mocks/simulador'
 import { usuarioDeLaSesion } from './mocks/sesion'
 
 // Tipos (los seis del documento): ANALYSIS_DONE, ANALYSIS_FAILED, ANALYSIS_PAUSED,
@@ -13,7 +12,6 @@ const mias = () => db.notifications.filter((n) => !n.solo_admin || usuarioDeLaSe
 // GET /notifications → las de la cuenta, de la más nueva a la más vieja
 export async function listNotifications() {
   if (USE_MOCKS) {
-    simular()
     return reply(mias(), 60)
   }
   return (await api.get('/notifications')).data

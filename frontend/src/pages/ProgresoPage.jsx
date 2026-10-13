@@ -56,7 +56,7 @@ export default function ProgresoPage() {
         {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <h3 style={{ margin: '0 0 8px' }}>Análisis en curso</h3>
         <p className="lead" style={{ margin: '0 0 22px', maxWidth: 600 }}>
-          El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
+          El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez y el <em>worker</em> informa su avance; esta pantalla se actualiza sola. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
         </p>
 
         {error && <p className="hint" style={{ margin: '0 0 18px', color: 'var(--color-accent-700)' }}>No se pudo consultar la cola. Se vuelve a intentar en unos segundos.</p>}

@@ -10,7 +10,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import { reiniciarDatos } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
-import { avanzarSimulacion } from './services/mocks/simulador'
 
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
 window.scrollTo = vi.fn()
@@ -211,12 +210,9 @@ describe('resultados', () => {
     expect(screen.queryByText(/Reporte PDF del experimento/)).toBeNull()
   })
 
-  it('los bloques de 5 s se abren para ver sus cinco segundos', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
-    const fila = await screen.findByRole('group', { name: 'Bloques de Tanda A · Espécimen 1' })
-    await user.click(within(fila).getByRole('button', { name: '2:00–2:05 · Conducta activa (no se vio bien)' }))
-    expect(screen.getAllByText('No se ve')).toHaveLength(5)
-    expect(screen.getByText(/El modelo no pudo ver bien al espécimen/)).toBeTruthy()
+  it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
+    await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
+    expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el servidor/)
   })
 })
 
@@ -249,15 +245,8 @@ describe('eliminar experimento (D-63)', () => {
 })
 
 describe('pausa del análisis (R-15)', () => {
-  // El trabajo 502 (Control · Tanda B) se acaba de pausar: queda casi todo el plazo.
-  function pausarAhora() {
-    const ahora = Date.now()
-    avanzarSimulacion(ahora - 25000)
-    avanzarSimulacion(ahora)
-  }
-
+  // El trabajo 502 (Control · Tanda B) está en pausa en los datos de ejemplo.
   it('muestra la imagen con el recuadro, el tiempo que queda y ajusta', async () => {
-    pausarAhora()
     const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
     expect(await screen.findByRole('heading', { name: 'No se ve al espécimen del cilindro 2 (segundo 142)' })).toBeTruthy()
     expect(screen.getByRole('timer').textContent).toMatch(/Tiempo para responder: [45]:\d\d/)
@@ -271,7 +260,6 @@ describe('pausa del análisis (R-15)', () => {
   })
 
   it('cancelar pide confirmación; después la pausa ya no está', async () => {
-    pausarAhora()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
     await user.click(await screen.findByRole('button', { name: 'Cancelar análisis' }))
