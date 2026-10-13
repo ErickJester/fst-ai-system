@@ -182,7 +182,7 @@ describe('resultados', () => {
 })
 
 describe('eliminar experimento (D-63)', () => {
-  it('pide solo confirmación, sin nombre ni contraseña, y el foco empieza en Cancelar', async () => {
+  it('desde el detalle pide solo confirmación; con un análisis procesando, no se puede (D-87)', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02')
     await user.click(await screen.findByRole('button', { name: 'Eliminar experimento…' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Eliminar experimento' })
@@ -192,7 +192,36 @@ describe('eliminar experimento (D-63)', () => {
     expect(document.activeElement).toBe(within(dialogo).getByRole('button', { name: 'Cancelar' }))
 
     await user.click(within(dialogo).getByRole('button', { name: 'Eliminar experimento' }))
-    expect(await screen.findByRole('heading', { name: 'Experimentos' })).toBeTruthy()
+    expect(await within(dialogo).findByText(/No se puede eliminar mientras un análisis está procesando o en pausa/)).toBeTruthy()
+  })
+
+  it('desde la lista, solo en los experimentos propios (o como Administrador)', async () => {
+    const user = await conSesion('/experimentos')
+    await screen.findByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' })
+    expect(screen.queryByRole('button', { name: 'Eliminar Extracto de Salvia · dosis única' })).toBeNull() // lo creó J. Domínguez
+    await user.click(screen.getByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar experimento' })
+    await user.click(within(dialogo).getByRole('button', { name: 'Eliminar experimento' }))
+    expect(await screen.findByText('Se eliminó «Extracto de Valeriana officinalis».')).toBeTruthy()
+    // Ya no está en la tabla (ni en el aviso de vencimiento).
+    expect(screen.queryByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' })).toBeNull()
+    expect(screen.queryByText(/Los videos de/)).toBeNull()
+  })
+})
+
+describe('experimentos (dashboard)', () => {
+  it('filtra por estado, fecha y tratamiento, y avisa de los videos por borrarse', async () => {
+    const user = await conSesion('/experimentos')
+    await screen.findByText('Compuesto CSR-14 · curva de dosis')
+    expect(screen.getByText(/Los videos de/).textContent).toMatch(/Extracto de Valeriana officinalis se borran el/)
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'FAILED')
+    expect(screen.getAllByRole('row')).toHaveLength(2) // encabezado + el de ejemplo
+    await user.selectOptions(screen.getByLabelText('Estado'), '')
+    await user.selectOptions(screen.getByLabelText('Fecha'), '2025')
     expect(screen.queryByText('Compuesto CSR-14 · curva de dosis')).toBeNull()
+    await user.selectOptions(screen.getByLabelText('Tratamiento'), 'Fluoxetina 20 mg/kg')
+    expect(screen.getAllByRole('row')).toHaveLength(2)
+    expect(screen.getByText('Fluoxetina · calibración del clasificador')).toBeTruthy()
   })
 })

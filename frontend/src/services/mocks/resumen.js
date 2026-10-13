@@ -23,7 +23,7 @@ export function resumir(clave) {
   Object.assign(fila, {
     n_grupos: exp.grupos.length,
     n_especimenes: exp.grupos.reduce((a, g) => a + g.n_especimenes, 0),
-    tratamientos: [...new Set(exp.grupos.map((g) => g.tratamiento))].join(' '),
+    tratamientos: [...new Set(exp.grupos.map((g) => g.tratamiento))],
     videos_dia2_total: total,
     videos_dia2_cargados: cargados,
     videos_dia2_listos: listos,

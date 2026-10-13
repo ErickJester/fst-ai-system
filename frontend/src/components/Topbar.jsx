@@ -10,7 +10,15 @@ import { MUT60, MUT70 } from '../lib/estilos'
 // Las notificaciones se vuelven a consultar cada 30 s.
 const CADA_MS = 30000
 
-const ENLACE = { ANALYSIS_DONE: 'Ver resultados', ANALYSIS_FAILED: 'Ver detalle del error' }
+// Texto del enlace de cada tipo de notificación (los seis del documento).
+const ENLACE = {
+  ANALYSIS_DONE: 'Ver resultados',
+  ANALYSIS_FAILED: 'Ver detalle del error',
+  ANALYSIS_PAUSED: 'Ajustar o cancelar el análisis',
+  ANALYSIS_CANCELED: 'Ver el análisis',
+  DISK_ALERT: 'Ver el estado del sistema',
+  VIDEO_DELETED: 'Ver los experimentos',
+}
 
 // Hoy → «15:41»; ayer → «ayer»; antes → «18 feb 2026».
 function cuando(iso) {
