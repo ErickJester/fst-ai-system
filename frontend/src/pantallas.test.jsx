@@ -11,10 +11,11 @@ import App from './App'
 import { reiniciarDatos } from './services/mocks/data'
 import { avanzarSimulacion } from './services/mocks/simulador'
 
-// Lo que jsdom no trae: desplazar la ventana y URLs de archivos.
+// Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
 window.scrollTo = vi.fn()
 URL.createObjectURL = vi.fn(() => 'blob:prueba')
 URL.revokeObjectURL = vi.fn()
+HTMLCanvasElement.prototype.getContext = () => null // las líneas de tiempo de la revisión no se dibujan
 
 function abrir(ruta = '/login') {
   const user = userEvent.setup()
@@ -255,6 +256,32 @@ describe('pausa del análisis (R-15)', () => {
     cleanup()
     abrir('/experimentos/EXP-2026-02/analisis/502/pausa')
     expect(await screen.findByRole('heading', { name: 'Este análisis ya no está en pausa' })).toBeTruthy()
+  })
+})
+
+describe('revisión segundo a segundo (R-14)', () => {
+  it('en pausa, una tecla cambia solo ese segundo; guardar deja la revisión', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/analisis/402/revision')
+    expect(await screen.findByRole('heading', { name: 'Revisión segundo a segundo · Referencia, Tanda A' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Espécimen 1/ }).getAttribute('aria-selected')).toBe('true')
+    await user.keyboard('3')
+    expect(screen.getByText(/Borrador sin guardar/).parentElement.textContent).toMatch(/1 segundo corregido en 1 espécimen/)
+    expect(screen.getAllByText('Escalamiento').length).toBeGreaterThan(1)
+    await user.click(screen.getByRole('button', { name: 'Guardar correcciones' }))
+    expect(await screen.findByText(/Correcciones guardadas/)).toBeTruthy()
+  })
+
+  it('reiniciar pide confirmación y lleva a Análisis en curso', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = await conSesion('/experimentos/EXP-2026-02/analisis/402/revision')
+    await user.click(await screen.findByRole('button', { name: 'Reiniciar el análisis…' }))
+    expect(await screen.findByText(/Análisis reiniciado: Referencia · Tanda A volvió a la cola/)).toBeTruthy()
+    window.confirm.mockRestore()
+  })
+
+  it('sin permiso, lo explica', async () => {
+    await conSesion('/experimentos/EXP-2026-02/analisis/402/revision', 'jdominguez@ipn.mx')
+    expect(await screen.findByRole('heading', { name: 'No puedes revisar este análisis' })).toBeTruthy()
   })
 })
 

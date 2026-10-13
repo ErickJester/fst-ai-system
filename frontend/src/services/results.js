@@ -3,6 +3,7 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { simular } from './mocks/simulador'
+import { segundosDe, totalesDe, minutosDe, CONDUCTAS } from './mocks/segundos'
 import { mean, variance, bloqueDe } from '../lib/fst'
 
 // GET /experiments/:clave/groups/:gid/batches/:letra/results?day= → por espécimen (s),
@@ -25,20 +26,31 @@ function resultadosDeEjemplo(clave, gid, letra, dia) {
   const t = g?.tandas.find((x) => x.letra === letra)
   if (!t || t.estado !== 'DONE' || dia !== 'DAY2') return null
   const propios = db.batchResults[[clave, gid, letra, dia].join('/')]
-  if (propios) return propios
   const base = db.batchResults['EXP-2026-02/G-02/A/DAY2']
-  return {
+  const r = propios || {
     ...base,
     experimento: { clave: exp.clave, titulo: exp.titulo },
     grupo: { id: g.id, nombre: g.nombre, tipo: g.tipo, tratamiento: g.tratamiento },
     letra,
     especimenes: base.especimenes.slice(0, t.n_cilindros),
   }
+  // id_analisis y subido_por: para la revisión segundo a segundo (solo quien subió el video o
+  // un Administrador). Con correcciones guardadas, los totales salen de los segundos
+  // revisados (R-14) y revisado lo indica.
+  const conAnalisis = { ...r, id_analisis: t.id_analisis, subido_por: t.subido_por, revisado: false }
+  const revision = db.revisiones[t.id_analisis]
+  if (!revision) return conAnalisis
+  const especimenes = r.especimenes.map((e) => ({ numeroCilindro: e.numeroCilindro, ...totalesDe(segundosDe(t.id_analisis, e)) }))
+  const primero = segundosDe(t.id_analisis, r.especimenes[0])
+  return {
+    ...conAnalisis, especimenes, revisado: true,
+    nivel: especimenes.some((e) => e.activa_s > 0) ? 'AGRUPADO' : 'PRECISO',
+    linea_tiempo: { numeroCilindro: r.especimenes[0].numeroCilindro, minutos: minutosDe(primero) },
+  }
 }
 
 const media = (a) => Math.round(mean(a) * 10) / 10
 const de = (a) => (a.length > 1 ? Math.round(Math.sqrt(variance(a)) * 10) / 10 : 0)
-const CONDUCTAS = ['nado', 'inmovilidad', 'escalamiento', 'activa']
 
 // Media ± DE de cada conducta entre los especímenes dados (promedio, no suma: el tamaño del
 // grupo no distorsiona).
@@ -81,31 +93,6 @@ export async function getGroupComparison(clave) {
 }
 
 // ── Bloques de 5 s (D-53) ───────────────────────────────────────────────────
-// Sin backend, la conducta de cada segundo se arma con los totales del espécimen, en tramos
-// alternados como la línea de tiempo. Para mostrar el matiz, el espécimen 1 tiene unos
-// segundos «no se ve» (null): datos ilustrativos, no salen de un video.
-function segundosDeEjemplo(e) {
-  const quedan = Object.fromEntries(CONDUCTAS.map((c) => [c, e[c + '_s']]))
-  const largo = [9, 4, 7, 3, 11, 5, 2, 8, 6, 3]
-  const seq = []
-  let k = 0
-  while (seq.length < 300 && CONDUCTAS.some((c) => quedan[c] > 0)) {
-    const c = CONDUCTAS[(k + e.numeroCilindro) % 4]
-    const n = Math.min(largo[k % largo.length], quedan[c], 300 - seq.length)
-    k++
-    if (!n) continue
-    quedan[c] -= n
-    for (let i = 0; i < n; i++) seq.push(c)
-  }
-  while (seq.length < 300) seq.push(null)
-  if (e.numeroCilindro === 1) {
-    for (let i = 120; i < 125; i++) seq[i] = null // un bloque entero sin ver
-    seq[42] = null
-    seq[43] = null
-  }
-  return seq
-}
-
 // GET /experiments/:clave/groups/:gid/batches/:letra/blocks → por espécimen, sus 60 bloques:
 // { inicio (segundo, desde 1), conducta, matiz, segundos: [cinco conductas o null] }.
 // Se calculan al pedirlos; no se guardan.
@@ -116,7 +103,7 @@ export async function getBlocks(clave, gid, letra) {
     if (!r) return fail(404, 'Esta tanda todavía no tiene resultados.')
     return reply({
       especimenes: r.especimenes.map((e) => {
-        const seq = segundosDeEjemplo(e)
+        const seq = segundosDe(r.id_analisis, e).map((x) => x.conducta)
         const bloques = []
         for (let i = 0; i < 300; i += 5) {
           const segundos = seq.slice(i, i + 5)

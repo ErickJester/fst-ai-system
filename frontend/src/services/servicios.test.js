@@ -10,6 +10,7 @@ import { getBatchResults, getGroupComparison, getBlocks } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
 import { listNotifications } from './notifications'
+import { getRevision, guardarSegundos, reiniciarAnalisis } from './revision'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
 
@@ -350,6 +351,48 @@ describe('pausa del análisis (R-15, D-89)', () => {
     avanzarSimulacion(T0 + s(4 + 20) + 5 * 60 * 1000)
     expect((await getQueue()).cancelados[0]).toMatchObject({ job_id: 502, motivo: 'plazo' })
     expect((await listNotifications()).some((n) => n.tipo === 'ANALYSIS_CANCELED')).toBe(true)
+  })
+})
+
+describe('revisión segundo a segundo (R-14)', () => {
+  it('solo de un análisis completado y para quien subió el video o un Administrador', async () => {
+    sesion(3)
+    expect(await status(getRevision('EXP-2026-02', 402))).toBe(403)
+    sesion(1)
+    expect(await status(getRevision('EXP-2026-02', 503))).toBe(409) // en cola
+    const r = await getRevision('EXP-2026-02', 402)
+    expect(r).toMatchObject({ puedeCorregir: true, tanda: 'A', duracion: 300 })
+    expect(r.especimenes).toHaveLength(4)
+    expect(r.especimenes[0].segundos).toHaveLength(300)
+    expect(r.especimenes[0].segundos[0]).toMatchObject({ segundo: 1, origen: 'maquina' })
+    expect(r.especimenes[0].segundos[0].conducta).toMatch(/^(nado activo|inmovilidad|escalamiento|conducta activa)$/)
+    sesion(2)
+    expect(await status(getRevision('EXP-2026-02', 402))).toBe('ok')
+  })
+
+  it('guardar cambia los segundos, recalcula los totales y marca la revisión', async () => {
+    sesion(1)
+    const antes = (await getBatchResults('EXP-2026-02', 'G-02', 'A')).especimenes[0]
+    const primero = (await getRevision('EXP-2026-02', 402)).especimenes[0].segundos[0]
+    expect(primero.conducta).not.toBe('escalamiento')
+    await guardarSegundos('EXP-2026-02', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }, { segundo: 2, conducta: null, origen: 'dudosa' }] }])
+    const r = await getRevision('EXP-2026-02', 402)
+    expect(r.especimenes[0].segundos.slice(0, 2)).toEqual([
+      { segundo: 1, conducta: 'escalamiento', origen: 'corregida' },
+      { segundo: 2, conducta: null, origen: 'dudosa' },
+    ])
+    const despues = await getBatchResults('EXP-2026-02', 'G-02', 'A')
+    expect(despues.revisado).toBe(true)
+    expect(despues.especimenes[0].escalamiento_s).toBeGreaterThan(antes.escalamiento_s - 1)
+  })
+
+  it('reiniciar borra la revisión y vuelve a encolar el análisis (D-60, D-68)', async () => {
+    sesion(1)
+    await guardarSegundos('EXP-2026-02', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }] }])
+    expect(await status(reiniciarAnalisis('EXP-2026-02', 402))).toBe('ok')
+    expect((await getQueue()).cola.at(-1)).toMatchObject({ job_id: 402, grupo: 'Referencia', tanda: 'A', status: 'QUEUED' })
+    expect(await status(getBatchResults('EXP-2026-02', 'G-02', 'A'))).toBe(404)
+    expect(await status(getRevision('EXP-2026-02', 402))).toBe(409)
   })
 })
 

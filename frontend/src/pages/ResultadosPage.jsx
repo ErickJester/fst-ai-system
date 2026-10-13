@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison, getBlocks } from '../services/results'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados, especimen } from '../lib/fst'
+import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -199,6 +200,7 @@ function SinResultados({ clave }) {
 }
 
 function ResultadosTanda({ clave, gid, letra }) {
+  const { user } = useAuth()
   const [tab, setTab] = useState('especimen')
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
@@ -238,12 +240,17 @@ function ResultadosTanda({ clave, gid, letra }) {
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(r.analizado_en.slice(0, 10))}, {hora(r.analizado_en)} · modelo {r.modelo}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
               <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {r.nivel === 'AGRUPADO' ? 'agrupado' : 'preciso'}</span>
+              {r.revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
               {r.nivel === 'AGRUPADO'
                 ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
                 : <span className="hint">Ningún segundo quedó como conducta activa: cada uno se clasificó como nado activo, inmovilidad o escalamiento.</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
+            {/* Corregir los segundos: solo quien subió el video o un Administrador (D-57). */}
+            {r.id_analisis && (user.admin || r.subido_por === user.id) && (
+              <Link className="btn btn-secondary" to={enlaceRevision(clave, r.id_analisis)}>Revisar segundo a segundo</Link>
+            )}
             <button type="button" className="btn btn-secondary" onClick={() => download(archivo(r) + '.csv', toCSV(tabla(r)))}>CSV</button>
             <button type="button" className="btn btn-secondary" onClick={() => exportarXLSX(r)}>XLSX</button>
             <button type="button" className="btn btn-primary" style={btnLeft} onClick={() => window.print()}>PDF · reporte de resultados</button>
