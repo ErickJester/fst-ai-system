@@ -57,7 +57,7 @@ VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend r
 | Cualquier otro correo (de cualquier dominio, D-46) | Investigador | entra como cuenta nueva con contraseña temporal (atajo de demo) |
 
 - **Recuperar contraseña**: como no hay correo, tras pedir el enlace aparece «Modo demo, sin correo: abrir el enlace que llegaría por correo». `/restablecer?token=vencido` muestra el caso de enlace vencido.
-- **La cola de análisis avanza sola** (`services/mocks/simulador.js`): 8 s por etapa, un trabajo a la vez; al terminar, la tanda queda Completada (o con Error, uno de cada tres) y llega la notificación. No usa temporizadores: avanza según el tiempo transcurrido en cada lectura.
+- **La cola de análisis no avanza sola:** la avanza el worker (equipo de backend). Sin backend queda fija; la pausa de ejemplo (502) empieza su plazo de 5 minutos la primera vez que se abre.
 - **Los datos de ejemplo sobreviven a la recarga** (se guardan en `localStorage`, clave `fst.demo`). Para volver a los originales: **«Reiniciar datos»** en la franja de MODO DEMO (también cierra la sesión). La sesión dura hasta cerrar la pestaña.
 
 ---
@@ -240,6 +240,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 30. **Experimentos paginados** de 10 en 10, como el boceto del dashboard.
 31. **Nuevo experimento solo pide nombre, fecha y notas** (§7 y §9.3): se quitó el campo «especie», que además traía «Rata Wistar» (§9.8 prohíbe «rata»). El nombre es único en todo el sistema: 409 si se repite.
 32. **Los archivos los genera el backend, no el frontend.** Los botones CSV, XLSX y «PDF · reporte de resultados» piden `GET /experiments/:clave/report/:formato` y descargan lo que devuelve el servidor; el PDF de diagnóstico, `GET .../analyses/:id/diagnostic`. Sin backend, cada botón muestra un mensaje con lo que hará. Se quitaron del frontend el armado del CSV, SheetJS (`xlsx`), la impresión del PDF y el PDF de diagnóstico de ejemplo. **Le toca al backend:** generar los tres reportes (columnas `Nado`, `Escalamiento`, `Inmovilidad`, `Conducta activa`; desglose por minuto con `Tiempo (min:seg)`; media, DE y varianza por grupo; el PDF marca los fragmentos «no se ve») y regenerarlos si hay un análisis más nuevo.
+33. **Tampoco simula el trabajo del worker ni calcula lo del backend.** Se quitaron `mocks/simulador.js` (la cola que avanzaba sola, los errores, la pausa y la cancelación por plazo) y `mocks/imagenPausa.js`. Sin backend, los datos de ejemplo quedan fijos: 501 procesando, 503 en cola, 502 en pausa y 498 con error. Ajustar o cancelar la pausa sí responde como lo haría el servidor. Donde falta algo que produce el backend, la pantalla lo explica: imagen fija de la pausa (`pausa.jpg`), video de la revisión (`web.mp4`), PDF de diagnóstico y bloques de 5 s.
+    - **Le toca al backend:** que el worker avance la cola y escriba estados, etapas, errores y pausas (y cancele las pausas a los 5 minutos); guardar y entregar `pausa.jpg`, `web.mp4` y `diagnostico.pdf`; y calcular los bloques de 5 s con esta regla (D-53): gana la conducta con más de los cinco segundos; si empatan nado activo y escalamiento, conducta activa; si empata inmovilidad con una activa, conducta activa; los cinco sin ver, conducta activa con matiz (`matiz: true` también si se decidió con algún segundo sin ver).
 
 ### Diferencias visibles con tu v2 (a propósito)
 

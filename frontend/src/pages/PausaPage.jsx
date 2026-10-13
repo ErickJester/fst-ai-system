@@ -32,7 +32,7 @@ export default function PausaPage() {
   useEffect(() => {
     let url = null
     let vivo = true
-    getImagenPausa(clave, id).then((b) => { if (vivo) setImg((url = URL.createObjectURL(b))) }).catch(() => {})
+    getImagenPausa(clave, id).then((b) => { if (vivo && b) setImg((url = URL.createObjectURL(b))) }).catch(() => {})
     return () => { vivo = false; if (url) URL.revokeObjectURL(url) }
   }, [clave, id])
 
@@ -54,7 +54,7 @@ export default function PausaPage() {
 
   const job = cola?.pausas.find((j) => j.job_id === Number(id))
   const titulo = job ? job.experimento + ' · ' + job.grupo + ' · Tanda ' + job.tanda + ' · ' + DIA[job.dia] : 'Análisis en pausa'
-  const quedan = Math.max(0, Math.ceil((vence - ahora) / 1000))
+  const quedan = Math.min(p.segundosRestantes, Math.max(0, Math.ceil((vence - ahora) / 1000)))
   const vencido = quedan === 0
 
   async function ajustar() {
@@ -107,7 +107,8 @@ export default function PausaPage() {
         </div>
 
         <RecuadroEditable src={img} ancho={p.ancho} alto={p.alto} recuadro={recuadro} onChange={setRecuadro}
-          otros={p.recuadros.filter((x) => x.cilindro !== p.cilindro)} etiqueta={'Recuadro del cilindro ' + p.cilindro} />
+          otros={p.recuadros.filter((x) => x.cilindro !== p.cilindro)} etiqueta={'Recuadro del cilindro ' + p.cilindro}
+          sinImagen={img ? null : 'Aquí va la imagen fija del instante de la pausa (pausa.jpg): la guarda el pipeline y la entrega el servidor. Disponible cuando el backend esté conectado. Los recuadros sí vienen en los datos de la pausa y se pueden ajustar.'} />
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
           {CAMPOS.map(([k, label]) => (

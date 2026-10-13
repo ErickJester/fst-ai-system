@@ -2,50 +2,51 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { simular, ajustarPausa, cancelarPausa, PLAZO_PAUSA_MS } from './mocks/simulador'
-import { imagenDePausa } from './mocks/imagenPausa'
+import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion } from './mocks/sesion'
 
-// Sin backend, el PDF de diagnóstico tarda esto en estar listo después del error.
-const PDF_TARDA_MS = 6000
+// La cola, las pausas y los errores los produce el worker (equipo de backend). Sin backend,
+// los datos de ejemplo quedan fijos: aquí solo se responde lo que el servidor respondería.
 
 // GET /queue → cola global en orden de llegada, análisis en pausa, con error y cancelados
 // recientes (pantalla 2e)
 export async function getQueue() {
-  if (USE_MOCKS) {
-    simular()
-    return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs })
-  }
+  if (USE_MOCKS) return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs })
   return (await api.get('/queue')).data
 }
 
 // GET /experiments/:clave/analyses/:id/diagnostic → PDF de diagnóstico de un análisis con
-// error. Lo genera el worker al fallar; mientras no existe, el backend responde 404. El
-// frontend solo lo descarga. Sin backend se simula la espera (404) y después responde null:
-// no hay archivo, y la pantalla explica qué hará el botón.
+// error. Lo genera el worker al fallar; mientras no existe, el backend responde 404 (la
+// pantalla muestra «Preparando…» y reintenta). El frontend solo lo descarga. Sin backend no
+// hay archivo: responde null y la pantalla explica qué hará el botón.
 export async function getDiagnostico(job) {
-  if (USE_MOCKS) {
-    if (job.fallo_ms && Date.now() - job.fallo_ms < PDF_TARDA_MS) return fail(404, 'El reporte de diagnóstico todavía no está listo.')
-    return reply(null)
-  }
+  if (USE_MOCKS) return reply(null)
   return (await api.get(`/experiments/${job.clave}/analyses/${job.job_id}/diagnostic`, { responseType: 'blob' })).data
 }
 
 // ── Pausa (R-15, D-89) ──────────────────────────────────────────────────────
-// Segundos que quedan para responder (hora de la pausa + 5 minutos).
-const restante = (job, ahora = Date.now()) => Math.max(0, Math.ceil((job.pausa.hora_ms + PLAZO_PAUSA_MS - ahora) / 1000))
+// Plazo para responder (PAUSE_TIMEOUT_MINUTES). Al vencer, el worker cancela el análisis.
+const PLAZO_PAUSA_MS = 5 * 60 * 1000
+
+// Segundos que quedan para responder (hora de la pausa + 5 minutos). Sin backend, la pausa
+// de ejemplo empieza la primera vez que se consulta, para poder ver el plazo corriendo.
+function restante(job, ahora = Date.now()) {
+  if (job.pausa.hora_ms == null) job.pausa.hora_ms = ahora
+  return Math.max(0, Math.ceil((job.pausa.hora_ms + PLAZO_PAUSA_MS - ahora) / 1000))
+}
 const conRestante = (job) => ({ ...job, segundos_restantes: restante(job) })
+
+const buscarTanda = (job) => db.experimentDetail[job.clave]?.grupos.find((g) => g.id === job.gid)?.tandas.find((t) => t.letra === job.tanda)
 
 // Análisis en pausa con permiso para atenderlo: quien subió el video o un Administrador.
 function pausaPropia(clave, id) {
-  simular()
-  const job = db.pausedJobs.find((j) => j.job_id === Number(id) && j.clave === clave)
-  if (!job) return { error: fail(409, 'El análisis ya no está en pausa.') }
+  const i = db.pausedJobs.findIndex((j) => j.job_id === Number(id) && j.clave === clave)
+  if (i < 0) return { error: fail(409, 'El análisis ya no está en pausa.') }
   const u = usuarioDeLaSesion()
-  if (!u || (u.role !== 'ADMIN' && job.subido_por !== u.id)) {
+  if (!u || (u.role !== 'ADMIN' && db.pausedJobs[i].subido_por !== u.id)) {
     return { error: fail(403, 'Solo quien subió el video o un Administrador puede atender esta pausa.') }
   }
-  return { job }
+  return { job: db.pausedJobs[i], i }
 }
 
 // GET /experiments/:clave/analyses/:id/pause → { cilindro, desdeSegundo, segundosRestantes,
@@ -61,22 +62,32 @@ export async function getPausa(clave, id) {
 }
 
 // GET /experiments/:clave/analyses/:id/pause/image → imagen fija del instante de la pausa
+// (pausa.jpg, la guarda el pipeline). Sin backend no hay imagen: responde null.
 export async function getImagenPausa(clave, id) {
   if (USE_MOCKS) {
-    const { job, error } = pausaPropia(clave, id)
-    if (error) return error
-    return reply(imagenDePausa(job.pausa, job.n_especimenes))
+    const { error } = pausaPropia(clave, id)
+    return error || reply(null)
   }
   return (await api.get(`/experiments/${clave}/analyses/${id}/pause/image`, { responseType: 'blob' })).data
 }
 
 // POST /experiments/:clave/analyses/:id/pause/adjust { cilindro, x0, y0, x1, y1 } → el
-// análisis vuelve a la cola y sigue desde el segundo de la pausa; 409 si ya no está en pausa.
+// backend guarda el recuadro y el análisis vuelve a la cola, por delante de los que llegaron
+// después; el worker lo retoma desde el segundo de la pausa. 409 si ya no está en pausa.
 export async function ajustarRecuadro(clave, id, recuadro) {
   if (USE_MOCKS) {
-    const { job, error } = pausaPropia(clave, id)
+    const { job, i, error } = pausaPropia(clave, id)
     if (error) return error
-    ajustarPausa(job.job_id, recuadro)
+    db.pausedJobs.splice(i, 1)
+    job.pausa.ajuste = { ...recuadro, hora: new Date().toISOString() }
+    Object.assign(job, { status: 'QUEUED', stage: null, progress_pct: 0 })
+    let k = db.queue.findIndex((j) => j.status === 'QUEUED' && j.job_id > job.job_id)
+    if (k < 0) k = db.queue.length
+    db.queue.splice(k, 0, job)
+    db.queue.forEach((j, n) => { j.posicion = n + 1 })
+    const t = buscarTanda(job)
+    if (t) Object.assign(t, { estado: 'QUEUED', progreso: null })
+    resumir(clave)
     return reply({ ok: true })
   }
   return (await api.post(`/experiments/${clave}/analyses/${id}/pause/adjust`, recuadro)).data
@@ -86,9 +97,13 @@ export async function ajustarRecuadro(clave, id, recuadro) {
 // está en pausa (por ejemplo, porque pasaron los 5 minutos).
 export async function cancelarAnalisis(clave, id) {
   if (USE_MOCKS) {
-    const { job, error } = pausaPropia(clave, id)
+    const { job, i, error } = pausaPropia(clave, id)
     if (error) return error
-    cancelarPausa(job.job_id, 'usuario')
+    db.pausedJobs.splice(i, 1)
+    db.canceledJobs.unshift({ ...job, status: 'CANCELED', motivo: 'usuario' })
+    const t = buscarTanda(job)
+    if (t) Object.assign(t, { estado: 'CANCELED', progreso: null })
+    resumir(clave)
     return reply({ ok: true })
   }
   return (await api.post(`/experiments/${clave}/analyses/${id}/cancel`)).data

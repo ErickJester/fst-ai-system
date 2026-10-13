@@ -2,7 +2,6 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { simular } from './mocks/simulador'
 import { usuarioDeLaSesion } from './mocks/sesion'
 
 // Fecha local de dentro de n días, como 'AAAA-MM-DD'.
@@ -21,7 +20,6 @@ const conAviso = (e) => ({
 // GET /experiments → lista con estado agregado y aviso de vencimiento (pantalla 2a)
 export async function listExperiments() {
   if (USE_MOCKS) {
-    simular()
     return reply(db.experiments.map(conAviso))
   }
   return (await api.get('/experiments')).data
@@ -55,7 +53,6 @@ export async function createExperiment(data) {
 // GET /experiments/:clave → datos generales + grupos → tandas (pantalla 2c)
 export async function getExperiment(clave) {
   if (USE_MOCKS) {
-    simular()
     const exp = db.experimentDetail[clave]
     return exp ? reply(exp) : fail(404, 'No existe ese experimento.')
   }
@@ -68,7 +65,6 @@ export async function getExperiment(clave) {
 // pausa, y los que están en cola salen de la cola (R-08, D-87).
 export async function deleteExperiment(clave) {
   if (USE_MOCKS) {
-    simular()
     const i = db.experiments.findIndex((e) => e.clave === clave)
     if (i < 0) return fail(404, 'No existe ese experimento.')
     const u = usuarioDeLaSesion()
