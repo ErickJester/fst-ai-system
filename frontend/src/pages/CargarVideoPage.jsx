@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
 import { getExperiment } from '../services/experiments'
@@ -36,7 +36,8 @@ function Hi({ label, q }) {
 // y validación del archivo.
 export default function CargarVideoPage() {
   const { clave } = useParams()
-  const { data: exp, error, reload } = useAsync(() => getExperiment(clave), [clave])
+  const navigate = useNavigate()
+  const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)
   const [sugOpen, setSugOpen] = useState(false)
@@ -49,7 +50,6 @@ export default function CargarVideoPage() {
   const [confirmada, setConfirmada] = useState(false)
   const [archivo, setArchivo] = useState(null)
   const [rechazo, setRechazo] = useState(null)
-  const [ok, setOk] = useState('')
   const [subiendo, setSubiendo] = useState(null) // avance en % mientras se sube
   const [errGuardar, setErrGuardar] = useState('')
   const [cancelada, setCancelada] = useState(false)
@@ -132,34 +132,14 @@ export default function CargarVideoPage() {
   function reject(titulo, detalle) {
     setArchivo(null)
     setRechazo({ titulo, detalle })
-    setOk('')
   }
 
-  // Se aceptan .mp4 y .mov, y se rechazan los videos verticales leyendo los metadatos
-  // (el servidor repite ambas comprobaciones). Algunos .mov usan códecs que el
-  // navegador no lee: esos pasan y la orientación la comprueba el servidor.
+  // En el navegador solo se revisa la extensión (.mp4 o .mov). La orientación y que el
+  // video se pueda reproducir las valida el servidor al recibirlo (D-64).
   function takeFile(f) {
     setRechazo(null)
-    const ext = (f.name.match(/\.(mp4|mov)$/i) || [])[1]?.toLowerCase()
-    if (!ext) return reject('El archivo no es .mp4 ni .mov', f.name + ' · solo se aceptan archivos .mp4 o .mov (RF-08).')
-    const v = document.createElement('video')
-    const url = URL.createObjectURL(f)
-    const dañado = () => reject('El video no se puede reproducir', f.name + ' · el archivo está dañado o incompleto.')
-    v.preload = 'metadata'
-    v.onloadedmetadata = () => {
-      URL.revokeObjectURL(url)
-      if (!isFinite(v.duration) || v.duration <= 0) return dañado()
-      if (v.videoHeight > v.videoWidth) {
-        return reject('El video es vertical', f.name + ' · ' + v.videoWidth + ' × ' + v.videoHeight + ' px · se necesita un video horizontal, con los cilindros de lado a lado.')
-      }
-      setArchivo(f)
-    }
-    v.onerror = () => {
-      URL.revokeObjectURL(url)
-      if (ext === 'mov') setArchivo(f)
-      else dañado()
-    }
-    v.src = url
+    if (!/\.(mp4|mov)$/i.test(f.name)) return reject('El archivo no es .mp4 ni .mov', f.name + ' · solo se aceptan archivos .mp4 o .mov.')
+    setArchivo(f)
   }
 
   function onDrop(e) {
@@ -172,7 +152,6 @@ export default function CargarVideoPage() {
   // ── guardar ───────────────────────────────────────────────────────────────
   // Un grupo nuevo se crea antes de subir su primera tanda.
   async function guardar() {
-    setOk('')
     setErrGuardar('')
     setCancelada(false)
     setSubiendo(0)
@@ -187,18 +166,17 @@ export default function CargarVideoPage() {
         setQ(sugerencia(g).nombre)
       }
       const dia = sesion === '1' ? 'DAY1' : 'DAY2'
-      const r = await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
-      setOk(dia === 'DAY1'
-        ? { titulo: 'Video de Día 1 almacenado', texto: grupoNombre + ' · Tanda ' + tanda + ' · Día 1. No se analiza: solo confirma la sesión de habituación.' }
-        : { titulo: 'Video almacenado · análisis en cola', texto: grupoNombre + ' · Tanda ' + tanda + ' · Día 2 · posición ' + r.posicion_cola + ' en la cola.', cola: true })
-      setArchivo(null)
-      if (fileRef.current) fileRef.current.value = ''
-      reload()
+      await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
+      // Día 2: a Progreso. Día 1: se guarda sin analizar y se vuelve al experimento (§9.3).
+      const donde = grupoNombre + ' · Tanda ' + tanda
+      if (dia === 'DAY2') navigate('/analisis', { state: { aviso: 'Video almacenado. El análisis está en cola: ' + donde + ' · Día 2.' } })
+      else navigate(`/experimentos/${clave}`, { state: { aviso: 'Video del Día 1 almacenado (' + donde + '). No se analiza.' } })
     } catch (err) {
       // Cancelar no es un error: el archivo queda elegido para volver a intentarlo.
       if (esCancelacion(err)) setCancelada(true)
+      // 422: el servidor rechazó el video (vertical o que no se puede reproducir).
+      else if (err.response?.status === 422) reject('El servidor rechazó el video', archivo.name + ' · ' + mensajeError(err, 'El video no se puede procesar.'))
       else setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
-    } finally {
       setSubiendo(null)
       subidaRef.current = null
     }
@@ -262,8 +240,8 @@ export default function CargarVideoPage() {
                       style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 16, textTransform: 'uppercase' }}
                       value={tanda} onChange={(e) => onTanda(e.target.value)} />
                   </Campo>
-                  <Campo label="Cilindros en el cuadro">
-                    <Seg options={[{ v: '3', label: '3' }, { v: '4', label: '4' }]} value={cil} onChange={setCil} />
+                  <Campo label="Especímenes en esta tanda">
+                    <Seg options={[{ v: '2', label: '2' }, { v: '3', label: '3' }, { v: '4', label: '4' }]} value={cil} onChange={setCil} />
                   </Campo>
                   <p style={{ margin: '0 0 10px', ...mutedSub }}>Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
                 </div>
@@ -301,7 +279,7 @@ export default function CargarVideoPage() {
                   onDrop={onDrop}>
                   <div style={{ flex: 1 }}>
                     <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4 o .mov'}</div>
-                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión. Se valida el formato, que el video se pueda reproducir y que sea horizontal.</div>
+                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión. Aquí se revisa el formato; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
                   </div>
                   <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
                   <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden"
@@ -362,15 +340,6 @@ export default function CargarVideoPage() {
             </div>
           )}
 
-          {ok && (
-            <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)', borderLeft: '6px solid var(--color-text)' }}>
-              <div style={{ padding: 14 }}>
-                <div className="nd" style={{ fontSize: 14 }}>{ok.titulo}</div>
-                <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--muted-2)' }}>{ok.texto}</div>
-                {ok.cola && <Link to="/analisis" style={{ display: 'inline-block', marginTop: 10, fontSize: 12.5, whiteSpace: 'nowrap' }}>Ver progreso del análisis →</Link>}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -170,14 +170,14 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }` |
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
-| `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }`; con `dia=DAY1` ambos en `null` (el Día 1 no se analiza, D-54) |
+| `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }`; con `dia=DAY1` ambos en `null` (el Día 1 no se analiza, D-54); 422 si el video es vertical o no se puede reproducir (D-64) |
 | `GET /queue` | — | `{ cola, errores }`; cada error trae `stage` (etapa en que se detuvo), sin código ni mensaje |
 | `GET /experiments/:clave/analyses/:id/diagnostic` | — | PDF de diagnóstico; 404 mientras el worker no lo escribe (la pantalla muestra «Preparando…» y reintenta cada 4 s) |
-| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `cilindros` con tiempos por conducta (s), línea de tiempo, nivel |
+| `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `especimenes` (`numeroCilindro` y tiempos por conducta en s), línea de tiempo, nivel |
 | `GET /experiments/:clave/group-comparison` | — | inmovilidad media ± DE por grupo |
 | `GET /notifications` · `PATCH /notifications/:id` · `POST /notifications/read-all` | `{ is_read }` | — |
 
-**Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO` (con `FAILED`, `error: { etapa }`); `dia1: { cargado: true } | null`; etapa `PREPROCESSING | ROI_DETECTION | TRACKING | CLASSIFICATION`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
+**Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO` (con `FAILED`, `error: { etapa }`); `dia1: { cargado: true } | null`; etapa `PREPROCESSING | ROI_DETECTION | CLASSIFICATION` (33, 67 y 100 %); estado de experimento `SIN_VIDEOS | ESPERA_DIA2 | QUEUED | RUNNING | PAUSED | DONE | FAILED | CANCELED`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
 
 **Sesión:** el token va en `sessionStorage` (`fst.token`) y se manda como `Authorization: Bearer`. Cerrar sesión es solo del frontend (borra el token). 401 con sesión → login con «Tu sesión caducó»; el 401 del propio login muestra «Correo o contraseña incorrectos» sin redirigir. 403 → Experimentos con «No tienes permiso para esa sección».
 
@@ -212,6 +212,12 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **El Día 1 no se analiza** (D-54): se guarda sin crear trabajo en la cola; Grupo lo muestra como «Cargado» y Cargar video dice «Guardar video».
     - **Correo de cualquier dominio** (D-46) en el inicio de sesión, recuperar contraseña, Mi perfil y Admin; la etiqueta ahora dice «Correo electrónico».
     - **Sin episodios de 3 s** en Resultados (RF-18: ninguna conducta se descarta por durar poco); se quitó la pestaña «Episodios».
+24. **Primer bloque de `INSTRUCCIONES-WEB.md` del `main` del repo de LaTeX** (es ley, 12-oct):
+    - **Orientación y reproducibilidad las valida el servidor** (D-64): el navegador solo revisa la extensión; el rechazo del servidor (422) se muestra en «El servidor rechazó el video». Con datos de ejemplo, un archivo con «vertical» o «dañado» en el nombre simula el rechazo.
+    - **Tres etapas** (preprocesamiento, cilindros, clasificación) a 33, 67 y 100 %.
+    - **Ocho estados del experimento**, calculados con la precedencia del documento: Sin videos, En espera del Día 2 (D-83), En cola, Procesando, En pausa, Completado, Con error y Cancelado. En la lista, filtro por estado.
+    - **Al subir:** Día 2 → Progreso con el aviso «El análisis está en cola»; Día 1 → el experimento con «No se analiza». Tandas de **2 a 4 especímenes**.
+    - **«Espécimen» en vez de «Cilindro P1»** (D-55): «Tanda A · Espécimen 1» en Resultados y CSV, «Espécimen 1» dentro de la tanda en Grupo. Los resultados traen `especimenes: [{ numeroCilindro: 1, … }]`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -226,7 +232,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 
 | Tema | Decisión |
 |---|---|
-| Término para los sujetos | **«Cilindro P1»** dentro de una tanda; **«Tanda A · Cilindro P1»** al juntar tandas; «especímenes» solo para conteos; nunca «ratas». Aceptada tu propuesta de `PARA_VANESA.md` §3. |
+| Término para los sujetos | **«Espécimen 1»** dentro de una tanda; **«Tanda A · Espécimen 1»** al juntar tandas (D-55 de `INSTRUCCIONES-WEB.md`, que reemplaza a «Cilindro P1»); nunca «ratas». |
 | Contraseña temporal | Se muestra una sola vez al crear la cuenta. Sin caducidad por ahora. |
 | Dónde guardar el token | `sessionStorage` (falta decidir si la sesión debe sobrevivir al cerrar la pestaña). |
 | Revisión segundo a segundo | Va en este frontend, construida al final (§12 del documento). Mientras, se usa `tools/fst_labeler`. |

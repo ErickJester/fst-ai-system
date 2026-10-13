@@ -27,13 +27,30 @@ export const fechaRango = (desde, hasta) => {
 export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', QUEUED: 'En cola', RUNNING: 'Procesando', DONE: 'Completado', FAILED: 'Error' }
 export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
 export const DIA = { DAY1: 'Día 1', DAY2: 'Día 2' }
-// En el orden en que las recorre el pipeline.
+// En el orden en que las recorre el pipeline: tres etapas, un tercio del avance cada una.
 export const ETAPA = {
   PREPROCESSING: 'Preprocesamiento',
-  ROI_DETECTION: 'Detección de cilindros',
-  TRACKING: 'Seguimiento de especímenes',
-  CLASSIFICATION: 'Clasificación de conducta',
+  ROI_DETECTION: 'Cilindros',
+  CLASSIFICATION: 'Clasificación',
 }
+// Porcentaje que informa el backend en cada etapa (33, 67 y 100; 0 en cola).
+export const PCT_ETAPA = { PREPROCESSING: 33, ROI_DETECTION: 67, CLASSIFICATION: 100 }
+
+// Estado de un experimento: no se guarda, se calcula con sus tandas (§4.8 del documento).
+export const ESTADO_EXPERIMENTO = {
+  SIN_VIDEOS: 'Sin videos',
+  ESPERA_DIA2: 'En espera del Día 2',
+  QUEUED: 'En cola',
+  RUNNING: 'Procesando',
+  PAUSED: 'En pausa',
+  DONE: 'Completado',
+  FAILED: 'Con error',
+  CANCELED: 'Cancelado',
+}
+
+// Un espécimen se distingue por su posición en el cuadro; como el número se repite en cada
+// tanda del grupo, donde se juntan tandas va con la tanda: «Tanda A · Espécimen 2» (D-55).
+export const especimen = (n, letra) => (letra ? 'Tanda ' + letra + ' · ' : '') + 'Espécimen ' + n
 
 // Un análisis con error no trae código ni descripción: el mensaje se arma con la etapa en
 // que se detuvo. Hay dos errores definidos: el video no se pudo abrir o no se hallaron los tubos.

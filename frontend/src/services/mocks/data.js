@@ -2,24 +2,26 @@
 // Las pantallas no los importan: los piden a la capa de servicios (../*.js),
 // que los entrega mientras VITE_USE_MOCKS no sea 'false'.
 //
-// estado: EN_ANALISIS | CARGA_INCOMPLETA | CONCLUIDO
+// estado: se calcula con las tandas (ESTADO_EXPERIMENTO en lib/fst.js): SIN_VIDEOS |
+//   ESPERA_DIA2 | QUEUED | RUNNING | PAUSED | DONE | FAILED | CANCELED
 // retencion_dias: días que le quedan al video crudo (null si ya se borró).
 // con_detalle: solo el experimento de ejemplo tiene detalle en los mockups;
 //   con la API real todos lo tendrán.
 
 export const experiments = [
-  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: 'Compuesto CSR-14 Fluoxetina Placebo', fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'EN_ANALISIS', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
-  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: 'Salvia', fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'CONCLUIDO', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
-  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: 'Valeriana officinalis', fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'CONCLUIDO', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
-  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: '', fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'CARGA_INCOMPLETA', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
-  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: 'Fluoxetina', fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'CONCLUIDO', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: 'Compuesto CSR-14 Fluoxetina Placebo', fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
+  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: 'Salvia', fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
+  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: 'Valeriana officinalis', fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
+  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: '', fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: 'Fluoxetina', fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
 ]
 
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
 // tipo: CONTROL | REFERENCIA | EXPERIMENTAL
 // estado de tanda = estado del análisis de Día 2: QUEUED | RUNNING | DONE | FAILED,
 //   como JobStatus en backend/app/models.py, o SIN_VIDEO si aún no se sube el Día 2.
-// Cada tanda ocupa los cilindros P1…Pn; desde es la posición de su primer cilindro en el grupo.
+// Cada tanda tiene los especímenes 1…n (su posición en el cuadro); desde es la posición de su
+// primer espécimen contando todas las tandas del grupo.
 // dia1: { cargado: true } si se subió el video de Día 1 (opcional; null si no). No se
 //   analiza: solo confirma que hubo sesión de habituación (D-54).
 // progreso: etapa (PipelineStage) y avance mientras corre; error: { etapa } en la que se
@@ -41,7 +43,7 @@ export const experimentDetail = {
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE'), tanda('B', 'DONE')] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { progreso: { etapa: 'TRACKING', pct: 75 } })] },
+        tandas: [tanda('A', 'DONE'), tanda('B', 'RUNNING', { progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
       { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'QUEUED'), tanda('B', 'FAILED', { error: { etapa: 'ROI_DETECTION' } })] },
     ],
@@ -52,14 +54,14 @@ export const experimentDetail = {
 // status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo).
 // Solo se analiza el Día 2 (D-54).
 export const queue = [
-  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'TRACKING', progress_pct: 75, error: null },
+  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
   { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
   { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
 export const failedJobs = [
-  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 50 },
+  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
 ]
 
 // Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
@@ -67,7 +69,7 @@ export const failedJobs = [
 // escalamiento juntos como «conducta activa»: activa_s en lugar de nado_s y escalamiento_s).
 const EXPERIMENTO_EJEMPLO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' }
 
-// Línea de tiempo por minuto del primer cilindro: reparte sus segundos de cada conducta
+// Línea de tiempo por minuto del primer espécimen: reparte sus segundos de cada conducta
 // en tramos alternados de hasta 12 s, minuto por minuto.
 function lineaTiempo(totales) {
   const quedan = { ...totales }
@@ -92,12 +94,12 @@ function lineaTiempo(totales) {
 }
 
 function resultados(grupo, letra, nivel, filas, analizado_en) {
-  const cilindros = filas.map((f, i) => ({ cilindro: 'P' + (i + 1), ...f }))
-  const { cilindro, ...totales } = cilindros[0]
+  const especimenes = filas.map((f, i) => ({ numeroCilindro: i + 1, ...f }))
+  const { numeroCilindro, ...totales } = especimenes[0]
   const minutos = lineaTiempo(Object.fromEntries(Object.entries(totales).map(([k, v]) => [k.replace('_s', ''), v])))
   return {
     experimento: EXPERIMENTO_EJEMPLO, grupo, letra, dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300,
-    analizado_en, modelo: 'clf-cascada v2.1', nivel, cilindros, linea_tiempo: { cilindro, minutos },
+    analizado_en, modelo: 'clf-cascada v2.1', nivel, especimenes, linea_tiempo: { numeroCilindro, minutos },
   }
 }
 
@@ -112,15 +114,15 @@ export const batchResults = {
     experimento: EXPERIMENTO_EJEMPLO, grupo: REFERENCIA,
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
     nivel: 'PRECISO',
-    cilindros: [
-      { cilindro: 'P1', nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
-      { cilindro: 'P2', nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
-      { cilindro: 'P3', nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
-      { cilindro: 'P4', nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
+    especimenes: [
+      { numeroCilindro: 1, nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
+      { numeroCilindro: 2, nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
+      { numeroCilindro: 3, nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
+      { numeroCilindro: 4, nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
     ],
-    // Desglose por minuto de un cilindro: segmentos [conducta, segundos].
+    // Desglose por minuto de un espécimen: segmentos [conducta, segundos].
     linea_tiempo: {
-      cilindro: 'P1',
+      numeroCilindro: 1,
       minutos: [
         [['nado', 38], ['escalamiento', 8], ['nado', 10], ['inmovilidad', 4]],
         [['nado', 30], ['inmovilidad', 12], ['escalamiento', 6], ['nado', 8], ['inmovilidad', 4]],
@@ -190,7 +192,7 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 5
+const VERSION_DATOS = 6
 const colecciones = { experiments, experimentDetail, queue, failedJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 
