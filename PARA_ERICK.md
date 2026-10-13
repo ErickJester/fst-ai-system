@@ -164,10 +164,10 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `PATCH /admin/users/:id` | `{ is_active }` o `{ nombre, apellidos, email, identificador, role }` | cuenta · 409 si el correo existe o si deja el sistema sin administradores |
 | `POST /admin/users/:id/reset-temporal` | — | `{ password_temporal }` (una sola vez); la anterior deja de servir y vuelve `cambioRequerido` |
 | `GET /admin/system` | — | `{ disco, conductas, modelo }` |
-| `GET /experiments` | — | lista con estado agregado |
+| `GET /experiments` | — | lista con estado calculado, `tratamientos` (lista), `creador_id` y `aviso_vencimiento` |
 | `POST /experiments` | `{ titulo, fecha_inicio, especie, notas }` | `{ clave }` (el responsable sale de la sesión) |
 | `GET /experiments/:clave` | — | datos generales + grupos → tandas |
-| `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }` |
+| `DELETE /experiments/:clave` | — (D-63: sin nombre ni contraseña) | `{ ok }`; 403 si no es quien lo creó ni Administrador; 409 con un análisis procesando o en pausa |
 | `GET /experiments/:clave/groups/:gid` | — | grupo con tandas, Día 1/Día 2, progreso y error |
 | `POST /experiments/:clave/groups` | `{ nombre, tipo, tratamiento }` | grupo |
 | `POST /experiments/:clave/groups/:gid/batches/:letra/videos` | multipart `file`, `dia`, `n_cilindros` | `{ job_id, posicion_cola }`; con `dia=DAY1` ambos en `null` (el Día 1 no se analiza, D-54); 422 si el video es vertical o no se puede reproducir (D-64) |
@@ -218,6 +218,10 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **Ocho estados del experimento**, calculados con la precedencia del documento: Sin videos, En espera del Día 2 (D-83), En cola, Procesando, En pausa, Completado, Con error y Cancelado. En la lista, filtro por estado.
     - **Al subir:** Día 2 → Progreso con el aviso «El análisis está en cola»; Día 1 → el experimento con «No se analiza». Tandas de **2 a 4 especímenes**.
     - **«Espécimen» en vez de «Cilindro P1»** (D-55): «Tanda A · Espécimen 1» en Resultados y CSV, «Espécimen 1» dentro de la tanda en Grupo. Los resultados traen `especimenes: [{ numeroCilindro: 1, … }]`.
+25. **Segundo bloque de `INSTRUCCIONES-WEB.md`:**
+    - **Experimentos:** filtros por estado, fecha (año) y tratamiento (basta con que un grupo lo tenga); aviso con la fecha exacta de los videos que se borran en 7 días o menos (`aviso_vencimiento: { fecha_borrado }`, R-05).
+    - **Eliminar desde la lista y desde el detalle** (D-63), con el mismo diálogo (`components/EliminarExperimento.jsx`). Solo quien lo creó (`creador_id`) o un Administrador; el servicio responde 403 a los demás y 409 si algún análisis está procesando o en pausa; los que están en cola salen de la cola (R-08, D-87).
+    - **Seis tipos de notificación:** `ANALYSIS_DONE`, `ANALYSIS_FAILED`, `ANALYSIS_PAUSED`, `ANALYSIS_CANCELED`, `DISK_ALERT` (solo Administradores) y `VIDEO_DELETED`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 

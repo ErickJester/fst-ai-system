@@ -3,12 +3,18 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { simular } from './mocks/simulador'
+import { usuarioDeLaSesion } from './mocks/sesion'
+
+// Tipos (los seis del documento): ANALYSIS_DONE, ANALYSIS_FAILED, ANALYSIS_PAUSED,
+// ANALYSIS_CANCELED, DISK_ALERT (solo Administradores) y VIDEO_DELETED.
+// Sin backend, las que van solo a Administradores llevan solo_admin.
+const mias = () => db.notifications.filter((n) => !n.solo_admin || usuarioDeLaSesion()?.role === 'ADMIN')
 
 // GET /notifications → las de la cuenta, de la más nueva a la más vieja
 export async function listNotifications() {
   if (USE_MOCKS) {
     simular()
-    return reply(db.notifications, 60)
+    return reply(mias(), 60)
   }
   return (await api.get('/notifications')).data
 }
@@ -27,7 +33,7 @@ export async function setRead(id, isRead) {
 // POST /notifications/read-all
 export async function markAllRead() {
   if (USE_MOCKS) {
-    db.notifications.forEach((n) => { n.is_read = true })
+    mias().forEach((n) => { n.is_read = true })
     return reply({ ok: true }, 0)
   }
   return (await api.post('/notifications/read-all')).data
