@@ -75,8 +75,10 @@ export const pausedJobs = []
 export const canceledJobs = []
 
 // Resultados de una tanda (2f), por «clave/gid/letra/día». Tiempos en segundos.
-// nivel: PRECISO (nado activo, inmovilidad, escalamiento) | AGRUPADO (nado activo y
-// escalamiento juntos como «conducta activa»: activa_s en lugar de nado_s y escalamiento_s).
+// Cada espécimen trae los segundos de las cuatro conductas (R-12): nado_s, inmovilidad_s,
+// escalamiento_s y activa_s (conducta activa: no inmóvil, sin decidir entre nado y
+// escalamiento). Un mismo análisis puede mezclar las cuatro.
+// nivel (nivelClasif): AGRUPADO si algún segundo quedó como conducta activa; si no, PRECISO.
 const EXPERIMENTO_EJEMPLO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' }
 
 // Línea de tiempo por minuto del primer espécimen: reparte sus segundos de cada conducta
@@ -113,8 +115,8 @@ function resultados(grupo, letra, nivel, filas, analizado_en) {
   }
 }
 
-const preciso = (nado, inmovilidad, escalamiento) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento })
-const agrupado = (activa, inmovilidad) => ({ activa_s: activa, inmovilidad_s: inmovilidad })
+const preciso = (nado, inmovilidad, escalamiento) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento, activa_s: 0 })
+const mixto = (nado, inmovilidad, escalamiento, activa) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento, activa_s: activa })
 const REFERENCIA = { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' }
 
 export const batchResults = {
@@ -125,10 +127,10 @@ export const batchResults = {
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
     nivel: 'PRECISO',
     especimenes: [
-      { numeroCilindro: 1, nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41 },
-      { numeroCilindro: 2, nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38 },
-      { numeroCilindro: 3, nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42 },
-      { numeroCilindro: 4, nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33 },
+      { numeroCilindro: 1, nado_s: 171, inmovilidad_s: 88, escalamiento_s: 41, activa_s: 0 },
+      { numeroCilindro: 2, nado_s: 158, inmovilidad_s: 104, escalamiento_s: 38, activa_s: 0 },
+      { numeroCilindro: 3, nado_s: 182, inmovilidad_s: 76, escalamiento_s: 42, activa_s: 0 },
+      { numeroCilindro: 4, nado_s: 149, inmovilidad_s: 118, escalamiento_s: 33, activa_s: 0 },
     ],
     // Desglose por minuto de un espécimen: segmentos [conducta, segundos].
     linea_tiempo: {
@@ -143,12 +145,12 @@ export const batchResults = {
     },
   },
   'EXP-2026-02/G-02/B/DAY2': resultados(REFERENCIA, 'B', 'AGRUPADO',
-    [agrupado(217, 83), agrupado(201, 99), agrupado(197, 103), agrupado(180, 120)], '2026-02-24T16:10:00'),
+    [mixto(40, 83, 12, 165), mixto(38, 99, 9, 154), mixto(35, 103, 11, 151), mixto(30, 120, 8, 142)], '2026-02-24T16:10:00'),
   'EXP-2026-02/G-03/A/DAY2': resultados({ id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg' }, 'A', 'PRECISO',
     [preciso(164, 98, 38), preciso(151, 114, 35), preciso(139, 128, 33), preciso(125, 145, 30)], '2026-02-24T12:25:00'),
 }
 
-// La comparación entre grupos (inmovilidad media ± DE, 2f) ya no es fija: la calcula
+// La comparación entre grupos (media ± DE de cada conducta, 2f) ya no es fija: la calcula
 // services/results.js a partir de las tandas y sus resultados, como lo hará el servidor.
 
 // Cuentas (2g, 2h, 2i, 2j). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
@@ -204,7 +206,7 @@ export const simulacion = { ultimo: null, terminados: 0 }
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 8
+const VERSION_DATOS = 9
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, batchResults, users, system, notifications, resetTokens, simulacion }
 const inicial = structuredClone(colecciones)
 

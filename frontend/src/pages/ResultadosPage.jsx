@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
-import { getBatchResults, getGroupComparison } from '../services/results'
+import { getBatchResults, getGroupComparison, getBlocks } from '../services/results'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { mean, variance, fmt, r1, download, toCSV, fechaCorta, norm, primeraTandaLista, enlaceResultados, especimen } from '../lib/fst'
@@ -14,24 +14,20 @@ const N400 = 'var(--color-neutral-400)'
 const MUT = 'var(--muted)'
 const PEND = 'var(--color-accent-700)'
 
-const INMOVILIDAD = { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' }
-// Nivel preciso: tres conductas. Nivel agrupado: nado activo y escalamiento juntos.
-const CONDUCTAS = {
-  PRECISO: [
-    { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
-    INMOVILIDAD,
-    { id: 'escalamiento', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
-  ],
-  AGRUPADO: [
-    { id: 'activa', label: 'Conducta activa', color: INK, nota: 'Nado activo y escalamiento juntos: este nivel no los distingue.' },
-    INMOVILIDAD,
-  ],
-}
-const conductasDe = (nivel) => CONDUCTAS[nivel] || CONDUCTAS.PRECISO
-const TODAS = [...CONDUCTAS.PRECISO, CONDUCTAS.AGRUPADO[0]]
-const CMAP = Object.fromEntries(TODAS.map((c) => [c.id, c.color]))
-const LBL = Object.fromEntries(TODAS.map((c) => [c.id, c.label]))
-const NIVEL = { PRECISO: 'preciso (3 conductas)', AGRUPADO: 'agrupado (2 conductas)' }
+const ACTIVA = 'var(--color-accent-300)'
+// Las cuatro conductas (R-12). En cada segundo el espécimen está en exactamente una; un mismo
+// análisis puede mezclar las cuatro.
+const CONDUCTAS = [
+  { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
+  { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' },
+  { id: 'escalamiento', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
+  { id: 'activa', label: 'Conducta activa', color: ACTIVA, nota: 'El espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.' },
+]
+const KEYS = CONDUCTAS.map((c) => c.id)
+const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
+const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
+// Orden y nombres de las columnas de los reportes CSV y XLSX (§7 del documento).
+const EXPORTA = [['nado', 'Nado'], ['escalamiento', 'Escalamiento'], ['inmovilidad', 'Inmovilidad'], ['activa', 'Conducta activa']]
 
 // El espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
 const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
@@ -52,6 +48,8 @@ const pct = (v) => (v / DIA2_S) * 100 + '%'
 const val = (m, de) => r1(m) + ' ± ' + r1(de) + ' s'
 const COLOR_TIPO = { CONTROL: INK, REFERENCIA: ACC, EXPERIMENTAL: N400 }
 const COLOR_AGRUPADO = 'var(--color-accent-300)'
+// Bloque que se decidió sin ver bien al espécimen (matiz de D-53).
+const MATIZ = 'repeating-linear-gradient(135deg, var(--color-accent-300) 0 3px, var(--color-bg) 3px 6px)'
 const PENDIENTE = { QUEUED: 'en cola', RUNNING: 'procesando', PAUSED: 'en pausa', FAILED: 'con error', CANCELED: 'cancelada' }
 
 function Barra({ m, de, color, h }) {
@@ -74,7 +72,7 @@ function notaComparacion(g) {
   return g.n === 0 ? texto : n + ' · ' + texto
 }
 
-function Comparacion({ g }) {
+function Comparacion({ g, c }) {
   const notaFg = g.pendientes.length ? PEND : MUT
   let valor, valorFg, body
   if (g.por_nivel) {
@@ -88,22 +86,23 @@ function Comparacion({ g }) {
             <div key={u.tanda}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
                 <span style={{ fontSize: 11.5, color: MUT70 }}>{u.nivel.toLowerCase()} · Tanda {u.tanda} · n = {u.n}</span>
-                <span className="num nd" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{val(u.media_s, u.de_s)}</span>
+                <span className="num nd" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{val(u.por_conducta[c].media_s, u.por_conducta[c].de_s)}</span>
               </div>
-              <Barra m={u.media_s} de={u.de_s} color={u.nivel === 'AGRUPADO' ? COLOR_AGRUPADO : COLOR_TIPO[g.tipo]} h={8} />
+              <Barra m={u.por_conducta[c].media_s} de={u.por_conducta[c].de_s} color={u.nivel === 'AGRUPADO' ? COLOR_AGRUPADO : COLOR_TIPO[g.tipo]} h={8} />
             </div>
           ))}
         </div>
       </>
     )
-  } else if (g.media_s == null) {
+  } else if (g.por_conducta[c].media_s == null) {
     valor = 'sin datos'
     valorFg = PEND
     body = <div style={{ height: 10, background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 18%,transparent) 0 3px,transparent 3px 6px)', border: '1px solid var(--color-divider)' }} />
   } else {
-    valor = val(g.media_s, g.de_s)
+    const { media_s, de_s } = g.por_conducta[c]
+    valor = val(media_s, de_s)
     valorFg = INK
-    body = <Barra m={g.media_s} de={g.de_s} color={COLOR_TIPO[g.tipo]} h={10} />
+    body = <Barra m={media_s} de={de_s} color={COLOR_TIPO[g.tipo]} h={10} />
   }
 
   return (
@@ -120,17 +119,19 @@ function Comparacion({ g }) {
 
 // ── exportación (segundos, no porcentaje) ──────────────────────────────────
 function tabla(r) {
-  const KEYS = conductasDe(r.nivel).map((c) => c.id)
-  const encabezados = KEYS.map((k) => LBL[k] + ' (s)')
+  const claves = EXPORTA.map(([k]) => k)
+  const encabezados = EXPORTA.map(([, nombre]) => nombre)
   const col = (k) => r.especimenes.map((e) => e[k + '_s'])
-  const out = [['Espécimen', ...encabezados]]
-  r.especimenes.forEach((e) => out.push([etiqueta(e, r.letra), ...KEYS.map((k) => e[k + '_s'])]))
-  estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...KEYS.map((k) => s.f(col(k)).replace(' s', ''))]))
+  const out = [['Espécimen', ...encabezados.map((n) => n + ' (s)')]]
+  r.especimenes.forEach((e) => out.push([etiqueta(e, r.letra), ...claves.map((k) => e[k + '_s'])]))
+  estadisticos(r.duracion_s).forEach((s) => out.push([s.nombre, ...claves.map((k) => s.f(col(k)).replace(' s', ''))]))
   out.push([])
-  out.push([etiqueta(r.linea_tiempo, r.letra) + ' · minuto', ...encabezados])
+  // Desglose por minuto: una fila por minuto, en segundos.
+  out.push([etiqueta(r.linea_tiempo, r.letra)])
+  out.push(['Tiempo (min:seg)', ...encabezados])
   r.linea_tiempo.minutos.forEach((segs, i) => {
     const sum = (k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
-    out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), ...KEYS.map(sum)])
+    out.push([fmt(i * 60) + '–' + fmt(i * 60 + 60), ...claves.map(sum)])
   })
   return out
 }
@@ -156,6 +157,7 @@ const TABS = [
   { id: 'especimen', label: 'Por espécimen' },
   { id: 'comparacion', label: 'Comparación entre grupos' },
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
+  { id: 'bloques', label: 'Bloques de 5 s' },
 ]
 
 // 2f · Resultados de una tanda, Día 2: /experimentos/:clave/resultados?grupo=&tanda=.
@@ -198,7 +200,8 @@ function SinResultados({ clave }) {
 
 function ResultadosTanda({ clave, gid, letra }) {
   const [tab, setTab] = useState('especimen')
-  const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null) }
+  const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
+  const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
   const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
@@ -206,8 +209,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   if (error) return <SinResultados clave={clave} />
 
   const exp = r.experimento
-  const conductas = conductasDe(r.nivel)
-  const KEYS = conductas.map((c) => c.id)
+  const conductas = CONDUCTAS
   const col = (k) => r.especimenes.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
 
@@ -235,10 +237,10 @@ function ResultadosTanda({ clave, gid, letra }) {
             <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, Tanda {r.letra}</h2>
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(r.analizado_en.slice(0, 10))}, {hora(r.analizado_en)} · modelo {r.modelo}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {NIVEL[r.nivel]}</span>
-              {r.nivel === 'PRECISO'
-                ? <span className="hint">El otro nivel posible es <strong>agrupado</strong>: nado activo y escalamiento se juntan en «conducta activa».</span>
-                : <span className="hint">Este nivel junta nado activo y escalamiento en «conducta activa»; el otro posible es <strong>preciso</strong>, con las tres conductas.</span>}
+              <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {r.nivel === 'AGRUPADO' ? 'agrupado' : 'preciso'}</span>
+              {r.nivel === 'AGRUPADO'
+                ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
+                : <span className="hint">Ningún segundo quedó como conducta activa: cada uno se clasificó como nado activo, inmovilidad o escalamiento.</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
@@ -306,7 +308,7 @@ function ResultadosTanda({ clave, gid, letra }) {
               Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
-            <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo)}</div>
+            <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo, r.letra)}</div>
             <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {r.linea_tiempo.minutos.map((segs, i) => (
@@ -319,6 +321,9 @@ function ResultadosTanda({ clave, gid, letra }) {
                 ))}
               </div>
             </div>
+
+            <div ref={refs.bloques} className="k" style={{ margin: '26px 0 12px' }}>Bloques de 5 s</div>
+            <Bloques clave={clave} gid={gid} letra={letra} />
           </div>
 
           <div style={{ background: 'var(--color-bg)', paddingLeft: 26, display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -333,9 +338,14 @@ function ResultadosTanda({ clave, gid, letra }) {
             </div>
 
             <div ref={refs.comparacion}>
-              <div className="k" style={{ marginBottom: 12 }}>Inmovilidad por grupo · Día 2 (5 min)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <label className="k" htmlFor="cConducta" style={{ flex: 1 }}>Comparación entre grupos · Día 2</label>
+                <select className="input" id="cConducta" style={{ width: 150, padding: '4px 6px', fontSize: 12 }} value={conducta} onChange={(e) => setConducta(e.target.value)}>
+                  {CONDUCTAS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+                </select>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                {comparacion ? comparacion.map((g) => <Comparacion key={g.grupo} g={g} />) : <p className="hint">Cargando…</p>}
+                {comparacion ? comparacion.map((g) => <Comparacion key={g.grupo} g={g} c={conducta} />) : <p className="hint">Cargando…</p>}
               </div>
               <p className="hint" style={{ margin: '12px 0 0' }}>
                 Promedio por espécimen de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los especímenes sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio.
@@ -355,11 +365,67 @@ function ResultadosTanda({ clave, gid, letra }) {
                   </div>
                 ))}
               </div>
-              <p className="hint" style={{ margin: '11px 0 0' }}>El buceo cuenta como {r.nivel === 'AGRUPADO' ? 'conducta activa' : 'nado activo'}.</p>
+              <p className="hint" style={{ margin: '11px 0 0' }}>El buceo cuenta como nado activo.</p>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Bloques de 5 s (D-53): cada bloque muestra la conducta con más segundos; al abrirlo, sus
+// cinco segundos, para notar las conductas breves. Se calculan al pedirlos.
+function Bloques({ clave, gid, letra }) {
+  const { data, error } = useAsync(() => getBlocks(clave, gid, letra), [clave, gid, letra])
+  const [abierto, setAbierto] = useState(null) // { numeroCilindro, i }
+
+  if (error) return <p className="hint">No se pudieron calcular los bloques.</p>
+  if (!data) return <p className="hint">Cargando…</p>
+
+  const sel = abierto && data.especimenes.find((e) => e.numeroCilindro === abierto.numeroCilindro)?.bloques[abierto.i]
+  const desc = (b) => fmt(b.inicio - 1) + '–' + fmt(b.inicio + 4) + ' · ' + LBL[b.conducta] + (b.matiz ? ' (no se vio bien)' : '')
+
+  return (
+    <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.especimenes.map((e) => (
+          <div key={e.numeroCilindro} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 132, fontSize: 11.5, color: MUT60 }}>{especimen(e.numeroCilindro, letra)}</span>
+            <div role="group" aria-label={'Bloques de ' + especimen(e.numeroCilindro, letra)} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(60, 1fr)', height: 18, border: '1px solid var(--color-divider)' }}>
+              {e.bloques.map((b, i) => {
+                const on = abierto?.numeroCilindro === e.numeroCilindro && abierto.i === i
+                return (
+                  <button key={i} type="button" title={desc(b)} aria-label={desc(b)} aria-pressed={on}
+                    onClick={() => setAbierto(on ? null : { numeroCilindro: e.numeroCilindro, i })}
+                    style={{ padding: 0, border: 0, minWidth: 0, cursor: 'pointer', background: b.matiz ? MATIZ : CMAP[b.conducta], outline: on ? '2px solid var(--color-text)' : 'none', outlineOffset: -1 }} />
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {sel ? (
+        <div role="status" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-divider)' }}>
+          <div className="nd" style={{ fontSize: 13 }}>{especimen(abierto.numeroCilindro, letra)} · {desc(sel)}</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {sel.segundos.map((c, k) => (
+              <div key={k} style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--color-divider)', fontSize: 11.5 }}>
+                <div className="num" style={{ color: MUT60 }}>{fmt(sel.inicio - 1 + k)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span className="sw" style={{ background: c ? CMAP[c] : 'transparent', border: c ? 0 : '1px dashed var(--muted)' }} />
+                  {c ? LBL[c] : 'No se ve'}
+                </div>
+              </div>
+            ))}
+          </div>
+          {sel.matiz && <p className="hint" style={{ margin: '8px 0 0' }}>El modelo no pudo ver bien al espécimen en esta parte del video; el bloque se muestra como conducta activa con este matiz.</p>}
+        </div>
+      ) : (
+        <p className="hint" style={{ margin: '12px 0 0' }}>
+          Cada celda es un bloque de 5 s con la conducta que ocupa más de sus segundos; si nado activo y escalamiento empatan, el bloque es conducta activa. Las celdas rayadas no se vieron bien. Haz clic en una para ver sus cinco segundos.
+        </p>
+      )}
     </div>
   )
 }

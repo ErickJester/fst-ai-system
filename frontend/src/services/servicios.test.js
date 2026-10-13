@@ -6,7 +6,7 @@ import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue, getDiagnostico, getPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
-import { getBatchResults, getGroupComparison } from './results'
+import { getBatchResults, getGroupComparison, getBlocks } from './results'
 import { reiniciarDatos, resetTokens, queue } from './mocks/data'
 import { avanzarSimulacion } from './mocks/simulador'
 import { listNotifications } from './notifications'
@@ -358,14 +358,19 @@ describe('comparación entre grupos calculada', () => {
 
   it('sale de las tandas: medias, pendientes y grupos que mezclan niveles', async () => {
     const [control, referencia, expA, expB] = await getGroupComparison('EXP-2026-02')
-    expect(control).toMatchObject({ grupo: 'Control · Placebo (solución salina)', n: 4, n_total: 8, media_s: 168.5, de_s: 21.3,
+    expect(control).toMatchObject({ grupo: 'Control · Placebo (solución salina)', n: 4, n_total: 8,
       pendientes: [{ tanda: 'B', n: 4, estado: 'QUEUED' }] })
-    expect(referencia.por_nivel).toEqual([
-      { tanda: 'A', nivel: 'PRECISO', n: 4, media_s: 96.5, de_s: 18.4 },
-      { tanda: 'B', nivel: 'AGRUPADO', n: 4, media_s: 101.3, de_s: 15.2 },
+    // Promedio por espécimen de cada conducta (no suma).
+    expect(control.por_conducta).toEqual({
+      nado: { media_s: 105.3, de_s: 19.3 }, inmovilidad: { media_s: 168.5, de_s: 21.3 },
+      escalamiento: { media_s: 26.3, de_s: 3.5 }, activa: { media_s: 0, de_s: 0 },
+    })
+    expect(referencia.por_nivel.map((u) => [u.tanda, u.nivel, u.n, u.por_conducta.inmovilidad])).toEqual([
+      ['A', 'PRECISO', 4, { media_s: 96.5, de_s: 18.4 }],
+      ['B', 'AGRUPADO', 4, { media_s: 101.3, de_s: 15.2 }],
     ])
     expect(expA).toMatchObject({ n: 4, pendientes: [{ tanda: 'B', estado: 'RUNNING' }] })
-    expect(expB).toMatchObject({ n: 0, media_s: null, pendientes: [{ tanda: 'A', estado: 'QUEUED' }, { tanda: 'B', estado: 'FAILED' }] })
+    expect(expB).toMatchObject({ n: 0, por_conducta: { inmovilidad: { media_s: null } }, pendientes: [{ tanda: 'A', estado: 'QUEUED' }, { tanda: 'B', estado: 'FAILED' }] })
   })
 
   it('se actualiza cuando la simulación termina un trabajo', async () => {
@@ -375,10 +380,25 @@ describe('comparación entre grupos calculada', () => {
     expect(expA).toMatchObject({ n: 8, pendientes: [] })
   })
 
-  it('la tanda con nivel agrupado trae conducta activa e inmovilidad', async () => {
+  it('cada espécimen trae las cuatro conductas; con conducta activa el nivel es agrupado (R-12)', async () => {
     const r = await getBatchResults('EXP-2026-02', 'G-02', 'B')
     expect(r.nivel).toBe('AGRUPADO')
-    expect(r.especimenes[0]).toEqual({ numeroCilindro: 1, activa_s: 217, inmovilidad_s: 83 })
+    expect(r.especimenes[0]).toEqual({ numeroCilindro: 1, nado_s: 40, inmovilidad_s: 83, escalamiento_s: 12, activa_s: 165 })
+    const preciso = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    expect(preciso.nivel).toBe('PRECISO')
+    expect(preciso.especimenes.every((e) => e.activa_s === 0)).toBe(true)
+  })
+
+  it('bloques de 5 s: 60 por espécimen, con su conducta mayoritaria y sus cinco segundos (D-53)', async () => {
+    const { especimenes } = await getBlocks('EXP-2026-02', 'G-01', 'A')
+    expect(especimenes).toHaveLength(4)
+    const [uno] = especimenes
+    expect(uno.bloques).toHaveLength(60)
+    expect(uno.bloques[0]).toMatchObject({ inicio: 1 })
+    expect(uno.bloques[0].segundos).toHaveLength(5)
+    // El espécimen 1 de ejemplo tiene un bloque entero sin ver: conducta activa con matiz.
+    expect(uno.bloques[24]).toEqual({ inicio: 121, segundos: [null, null, null, null, null], conducta: 'activa', matiz: true })
+    expect(await status(getBlocks('EXP-2026-02', 'G-01', 'B'))).toBe(404)
   })
 
   it('la línea de tiempo suma 60 s por minuto y coincide con los totales del espécimen', async () => {

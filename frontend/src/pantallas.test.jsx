@@ -179,6 +179,16 @@ describe('resultados', () => {
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
+    // Cuatro columnas de conducta, también la conducta activa (R-12).
+    expect(screen.getByRole('columnheader', { name: 'Conducta activa' })).toBeTruthy()
+  })
+
+  it('los bloques de 5 s se abren para ver sus cinco segundos', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
+    const fila = await screen.findByRole('group', { name: 'Bloques de Tanda A · Espécimen 1' })
+    await user.click(within(fila).getByRole('button', { name: '2:00–2:05 · Conducta activa (no se vio bien)' }))
+    expect(screen.getAllByText('No se ve')).toHaveLength(5)
+    expect(screen.getByText(/El modelo no pudo ver bien al espécimen/)).toBeTruthy()
   })
 })
 

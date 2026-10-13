@@ -178,7 +178,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `POST /experiments/:clave/analyses/:id/pause/adjust` | `{ cilindro, x0, y0, x1, y1 }` en píxeles de la imagen | 200, o 409 si ya no está en pausa |
 | `POST /experiments/:clave/analyses/:id/cancel` | — | 200, o 409 si ya no está en pausa |
 | `GET /experiments/:clave/groups/:gid/batches/:letra/results?day=` | — | `especimenes` (`numeroCilindro` y tiempos por conducta en s), línea de tiempo, nivel |
-| `GET /experiments/:clave/group-comparison` | — | inmovilidad media ± DE por grupo |
+| `GET /experiments/:clave/group-comparison` | — | por grupo, `por_conducta` (media ± DE de cada conducta) o `por_nivel` si mezcla niveles |
+| `GET /experiments/:clave/groups/:gid/batches/:letra/blocks` | — | `especimenes: [{ numeroCilindro, bloques: [{ inicio, conducta, matiz, segundos }] }]` (D-53) |
 | `GET /notifications` · `PATCH /notifications/:id` · `POST /notifications/read-all` | `{ is_read }` | — |
 
 **Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO` (con `FAILED`, `error: { etapa }`); `dia1: { cargado: true } | null`; etapa `PREPROCESSING | ROI_DETECTION | CLASSIFICATION` (33, 67 y 100 %); estado de experimento `SIN_VIDEOS | ESPERA_DIA2 | QUEUED | RUNNING | PAUSED | DONE | FAILED | CANCELED`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
@@ -228,6 +229,8 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **Seis tipos de notificación:** `ANALYSIS_DONE`, `ANALYSIS_FAILED`, `ANALYSIS_PAUSED`, `ANALYSIS_CANCELED`, `DISK_ALERT` (solo Administradores) y `VIDEO_DELETED`.
 26. **Pantalla de pausa** (R-15, D-89) en `/experimentos/:clave/analisis/:id/pausa` (`pages/PausaPage.jsx`): imagen fija del instante, recuadro del cilindro que se arrastra y redimensiona (`components/RecuadroEditable.jsx`, también con flechas y con campos en píxeles de la imagen), cuenta regresiva de 5 minutos, «Ajustar y continuar» y «Cancelar análisis» (con confirmación). Solo quien subió el video (`subido_por`) o un Administrador. Progreso muestra los análisis en pausa y los cancelados; Grupo y Experimento conocen los estados `PAUSED` y `CANCELED`.
     - **Modo demo:** el trabajo 502 (Control · Tanda B) se pausa unos 24 s después de abrir la app; un video con «pausa» en el nombre también se pausa. Sin respuesta en 5 minutos, se cancela y avisa.
+27. **Resultados con las cuatro conductas** (R-12): cada espécimen trae `nado_s`, `inmovilidad_s`, `escalamiento_s` y `activa_s`; «Conducta activa» es siempre la cuarta columna. `nivel` (nivelClasif) es AGRUPADO si algún segundo quedó como conducta activa. Comparación entre grupos por conducta (`por_conducta`, con selector). CSV y XLSX con las columnas del documento (`Nado`, `Escalamiento`, `Inmovilidad`, `Conducta activa`) y el desglose por minuto con `Tiempo (min:seg)`.
+    - **Pestaña «Bloques de 5 s»** (D-53): 60 bloques por espécimen con la conducta mayoritaria; al abrir uno se ven sus cinco segundos; los que no se vieron bien van rayados. La regla está en `bloqueDe()` de `lib/fst.js`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
