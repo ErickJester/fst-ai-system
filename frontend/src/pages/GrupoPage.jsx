@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, mensajeErrorAnalisis, especimen } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, enlaceRevision, mensajeErrorAnalisis, especimen } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -112,7 +112,12 @@ export default function GrupoPage() {
                       <span>{t.analisis_fecha ? 'Análisis vigente: ' + fechaCorta(t.analisis_fecha) : 'Sin análisis todavía'}</span>
                       <div style={{ flex: 1 }} />
                       {t.estado === 'DONE'
-                        ? <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados</Link>
+                        ? (
+                          <span style={{ display: 'flex', gap: 14 }}>
+                            {t.id_analisis && <Link to={enlaceRevision(exp.clave, t.id_analisis)}>Revisar segundo a segundo</Link>}
+                            <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados</Link>
+                          </span>
+                        )
                         : t.estado === 'PAUSED'
                           ? <Link to={enlacePausa(exp.clave, t.id_analisis)}>Ajustar o cancelar →</Link>
                           : <Link to="/analisis">Ver progreso del análisis →</Link>}

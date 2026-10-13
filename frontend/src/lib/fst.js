@@ -68,6 +68,13 @@ export function bloqueDe(segundos) {
   return { conducta: 'activa', matiz: sinVer > 0 }
 }
 
+// Nombres de las conductas en la base (CONDUCTA.nombre) ↔ claves del frontend.
+export const CONDUCTA_BD = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
+export const DE_BD = Object.fromEntries(Object.entries(CONDUCTA_BD).map(([k, v]) => [v, k]))
+
+// Revisión segundo a segundo de un análisis completado (R-14).
+export const enlaceRevision = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/revision`
+
 // Pantalla de pausa de un análisis (R-15): ahí se ajusta el recuadro o se cancela.
 export const enlacePausa = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/pausa`
 
