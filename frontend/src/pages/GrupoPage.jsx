@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, mensajeErrorAnalisis } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -18,7 +18,7 @@ function notaDia2(t) {
     case 'DONE': return 'Video principal del sistema. Analizado completo.'
     case 'QUEUED': return 'En espera de turno en la cola: un trabajo a la vez.'
     case 'RUNNING': return ETAPA[t.progreso.etapa] + ' · en curso · ' + t.progreso.pct + ' %'
-    case 'FAILED': return t.error.codigo + ' · ' + t.error.mensaje
+    case 'FAILED': return mensajeErrorAnalisis(t.error.etapa)
     case 'SIN_VIDEO': return 'Todavía no se sube el video de Día 2.'
     default: return ''
   }
@@ -29,7 +29,7 @@ export default function GrupoPage() {
   const { clave, gid } = useParams()
   // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
   const { data: g, error, loading } = useAsyncVivo(() => getGroup(clave, gid), [clave, gid], (grupo) =>
-    grupo.tandas.some((t) => ACTIVOS.includes(t.estado) || ACTIVOS.includes(t.dia1?.estado)) ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
+    grupo.tandas.some((t) => ACTIVOS.includes(t.estado)) ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
   const nombreGrupo = g && (g.tipo === 'CONTROL' ? 'Grupo control' : g.nombre)
 
   useEffect(() => {
@@ -93,9 +93,9 @@ export default function GrupoPage() {
                         <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 16%,transparent) 0 5px,transparent 5px 10px)', color: MUT60 }}>cuadro<br />día 1</div>
                         <div style={{ flex: 1 }}>
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 1 · sesión de estrés <span style={dur}>20 min</span></div>
-                          <div style={sub}>{d1 ? 'Se analizan sus primeros 5 minutos.' : 'Sin video de Día 1 (opcional)'}</div>
+                          <div style={sub}>{d1 ? 'Video cargado. No se analiza: confirma la sesión de habituación.' : 'Sin video de Día 1 (opcional)'}</div>
                         </div>
-                        {d1 && <EstadoTag estado={t.dia1.estado} />}
+                        {d1 && <span className="tag tag-neutral" style={{ whiteSpace: 'nowrap' }}>Cargado</span>}
                       </div>
                       <div style={{ background: 'var(--color-accent-100)', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 15px', borderLeft: '4px solid var(--color-accent)' }}>
                         <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-accent) 34%,transparent) 0 5px,transparent 5px 10px)', color: 'var(--color-accent-800)' }}>cuadro<br />día 2</div>

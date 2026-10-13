@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, isIpn, toCSV, primeraTandaLista, enlaceResultados } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, toCSV, primeraTandaLista, enlaceResultados } from './fst'
 
 describe('estadísticos y formato', () => {
   it('media y varianza muestral (n − 1), como en Resultados', () => {
@@ -34,11 +34,12 @@ describe('texto', () => {
     expect(norm('Valeriána')).toBe(norm('valeriana'))
   })
 
-  it('solo correos @ipn.mx', () => {
-    expect(isIpn('mrivera@ipn.mx')).toBe(true)
-    expect(isIpn('  MRivera@IPN.MX ')).toBe(true)
-    expect(isIpn('alguien@gmail.com')).toBe(false)
-    expect(isIpn('sin arroba')).toBe(false)
+  it('correos de cualquier dominio (D-46)', () => {
+    expect(esCorreo('mrivera@ipn.mx')).toBe(true)
+    expect(esCorreo('  MRivera@IPN.MX ')).toBe(true)
+    expect(esCorreo('alguien@gmail.com')).toBe(true)
+    expect(esCorreo('sin arroba')).toBe(false)
+    expect(esCorreo('sin@dominio')).toBe(false)
   })
 })
 
