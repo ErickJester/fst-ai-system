@@ -101,7 +101,7 @@ export default function NuevoExperimentoPage() {
             <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Qué sigue</div>
             <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5, lineHeight: 1.6 }}>
               <div>En el paso 2 cargas un video por tanda: indicas el grupo (o creas uno nuevo con su tipo y tratamiento), confirmas la tanda y sueltas el archivo .mp4.</div>
-              <div style={{ color: 'var(--muted-2)' }}>El experimento aparece en la lista como <strong>Carga incompleta</strong> hasta que tenga videos de Día 2.</div>
+              <div style={{ color: 'var(--muted-2)' }}>El experimento aparece en la lista como <strong>Sin videos</strong>; con solo videos de Día 1, como <strong>En espera del Día 2</strong>.</div>
             </div>
           </div>
         </div>

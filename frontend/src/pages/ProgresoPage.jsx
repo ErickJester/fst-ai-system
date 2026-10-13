@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
+import { useLocation } from 'react-router-dom'
 import { getQueue, getDiagnostico } from '../services/queue'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, mensajeErrorAnalisis, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PCT_ETAPA, mensajeErrorAnalisis, download, norm } from '../lib/fst'
 import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
 
@@ -13,14 +14,10 @@ const ETAPAS = Object.keys(ETAPA)
 
 // Qué hace cada etapa, para un trabajo con n especímenes.
 const DETALLE = {
-  PREPROCESSING: () => 'CLAHE (realce local de contraste)',
-  ROI_DETECTION: (n) => n + ' cilindros detectados',
-  TRACKING: (n) => 'tracking (seguimiento) de ' + n + ' especímenes',
-  CLASSIFICATION: () => 'nado activo, inmovilidad, escalamiento',
+  PREPROCESSING: () => 'preparación del video',
+  ROI_DETECTION: (n) => 'localización de los ' + n + ' cilindros',
+  CLASSIFICATION: () => 'nado activo, inmovilidad, escalamiento y conducta activa',
 }
-
-// Cada etapa cierra un cuarto del análisis.
-const pctEtapa = (i) => (i + 1) * 25 + ' %'
 
 const nombreTrabajo = (j) => j.experimento + ' · ' + j.grupo + ' · Tanda ' + j.tanda
 
@@ -33,8 +30,9 @@ const REINTENTO_DIAGNOSTICO_MS = 4000
 // La cola se consulta cada 5 s mientras haya análisis activos (en cola o procesando);
 // sin ninguno, cada 30 s, solo para ver si llega uno nuevo.
 
-// 2e · Progreso de análisis: cuatro etapas del pipeline, cola secuencial sin controles.
+// 2e · Progreso de análisis: tres etapas del pipeline, cola secuencial sin controles.
 export default function ProgresoPage() {
+  const aviso = useLocation().state?.aviso // al llegar después de subir un video de Día 2
   const [activos, setActivos] = useState(true)
   const { data, error } = usePolling(getQueue, activos ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
   useEffect(() => {
@@ -53,6 +51,7 @@ export default function ProgresoPage() {
       <Topbar><Brand sub="Análisis en curso" /></Topbar>
 
       <div className="page" style={{ paddingBottom: 34 }}>
+        {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <h3 style={{ margin: '0 0 8px' }}>Análisis en curso</h3>
         <p className="lead" style={{ margin: '0 0 22px', maxWidth: 600 }}>
           El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: no hay iniciar, pausar, cancelar ni reiniciar desde aquí.
@@ -102,7 +101,7 @@ function TrabajoActual({ j }) {
         </div>
         <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{duracion(j)} · {j.n_especimenes} especímenes</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 2 }}>
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(' + ETAPAS.length + ',1fr)', gap: 2 }}>
             {ETAPAS.map((s, i) => (
               <div key={s} style={{ height: 10, background: i < iActual ? 'var(--color-text)' : i === iActual ? 'var(--color-accent)' : 'color-mix(in srgb,var(--color-text) 12%,transparent)' }} />
             ))}
@@ -124,7 +123,7 @@ function TrabajoActual({ j }) {
             </div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, whiteSpace: 'nowrap', color }}>{hecha ? 'hecha' : enCurso ? 'en curso' : 'pendiente'}</span>
-            <span className="num nd" style={{ width: 56, textAlign: 'right', fontSize: 13, color }}>{pctEtapa(i)}</span>
+            <span className="num nd" style={{ width: 56, textAlign: 'right', fontSize: 13, color }}>{PCT_ETAPA[s]} %</span>
           </div>
         )
       })}

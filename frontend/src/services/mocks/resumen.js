@@ -1,5 +1,15 @@
 import * as db from './data'
 
+// Precedencia del documento (§4.8): error > cancelado > en pausa > procesando > en cola > completado.
+const PRECEDENCIA = ['FAILED', 'CANCELED', 'PAUSED', 'RUNNING', 'QUEUED', 'DONE']
+
+// Sin ningún Día 2 subido: «sin videos», o «en espera del Día 2» si ya hay algún Día 1 (D-83).
+function estadoExperimento(tandas) {
+  const conDia2 = tandas.filter((t) => t.estado !== 'SIN_VIDEO')
+  if (!conDia2.length) return tandas.some((t) => t.dia1) ? 'ESPERA_DIA2' : 'SIN_VIDEOS'
+  return PRECEDENCIA.find((e) => conDia2.some((t) => t.estado === e))
+}
+
 // Sin backend, la fila del experimento en la lista (2a) se recalcula a partir de sus
 // grupos y tandas, como lo haría el servidor.
 export function resumir(clave) {
@@ -17,7 +27,7 @@ export function resumir(clave) {
     videos_dia2_total: total,
     videos_dia2_cargados: cargados,
     videos_dia2_listos: listos,
-    estado: !total || cargados < total ? 'CARGA_INCOMPLETA' : listos === total ? 'CONCLUIDO' : 'EN_ANALISIS',
+    estado: estadoExperimento(tandas),
     retencion_dias: fila.retencion_dias ?? (total ? 30 : null),
   })
 }
