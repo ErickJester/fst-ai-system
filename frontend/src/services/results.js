@@ -2,15 +2,13 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { simular } from './mocks/simulador'
 import { segundosDe, totalesDe, minutosDe, CONDUCTAS } from './mocks/segundos'
-import { mean, variance, bloqueDe } from '../lib/fst'
+import { mean, variance } from '../lib/fst'
 
 // GET /experiments/:clave/groups/:gid/batches/:letra/results?day= → por espécimen (s),
 // línea de tiempo, nivel y calidad del análisis (2f)
 export async function getBatchResults(clave, gid, letra, dia = 'DAY2') {
   if (USE_MOCKS) {
-    simular()
     const r = resultadosDeEjemplo(clave, gid, letra, dia)
     return r ? reply(r) : fail(404, 'Esta tanda todavía no tiene resultados.')
   }
@@ -86,7 +84,6 @@ function compararGrupos(clave) {
 // GET /experiments/:clave/group-comparison → por grupo, media ± DE de cada conducta, Día 2
 export async function getGroupComparison(clave) {
   if (USE_MOCKS) {
-    simular()
     return reply(compararGrupos(clave))
   }
   return (await api.get(`/experiments/${clave}/group-comparison`)).data
@@ -94,25 +91,11 @@ export async function getGroupComparison(clave) {
 
 // ── Bloques de 5 s (D-53) ───────────────────────────────────────────────────
 // GET /experiments/:clave/groups/:gid/batches/:letra/blocks → por espécimen, sus 60 bloques:
-// { inicio (segundo, desde 1), conducta, matiz, segundos: [cinco conductas o null] }.
-// Se calculan al pedirlos; no se guardan.
+// { inicio (segundo, desde 1), conducta, matiz, segundos: [cinco conductas o null] }. Los
+// calcula el backend al pedirlos, por mayoría sobre la conducta de cada segundo (regla en
+// PARA_ERICK.md). Sin backend no hay bloques: responde null y la pantalla explica.
 export async function getBlocks(clave, gid, letra) {
-  if (USE_MOCKS) {
-    simular()
-    const r = resultadosDeEjemplo(clave, gid, letra, 'DAY2')
-    if (!r) return fail(404, 'Esta tanda todavía no tiene resultados.')
-    return reply({
-      especimenes: r.especimenes.map((e) => {
-        const seq = segundosDe(r.id_analisis, e).map((x) => x.conducta)
-        const bloques = []
-        for (let i = 0; i < 300; i += 5) {
-          const segundos = seq.slice(i, i + 5)
-          bloques.push({ inicio: i + 1, segundos, ...bloqueDe(segundos) })
-        }
-        return { numeroCilindro: e.numeroCilindro, bloques }
-      }),
-    })
-  }
+  if (USE_MOCKS) return reply(null)
   return (await api.get(`/experiments/${clave}/groups/${gid}/batches/${letra}/blocks`)).data
 }
 

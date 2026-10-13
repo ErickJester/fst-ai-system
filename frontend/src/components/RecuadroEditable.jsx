@@ -9,7 +9,8 @@ const limitar = (v, a, b) => Math.min(b, Math.max(a, v))
 // Se arrastra desde el centro y se redimensiona desde las esquinas; con el foco en el
 // recuadro, las flechas lo mueven (Mayús: 20 px) y Alt + flechas cambian su tamaño.
 // Los demás cilindros se ven punteados, solo como referencia.
-export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [], onChange, etiqueta }) {
+// Sin imagen (src null) se ve el aviso sinImagen sobre un fondo oscuro del mismo tamaño.
+export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [], onChange, etiqueta, sinImagen }) {
   const svgRef = useRef(null)
   const arrastre = useRef(null) // { modo: 'mover' | [kx, ky], desde: {x, y}, inicial }
 
@@ -77,7 +78,13 @@ export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [
   const lado = Math.max(14, Math.round(ancho / 60)) // tamaño de las esquinas
   return (
     <div style={{ position: 'relative', lineHeight: 0, background: '#111', userSelect: 'none' }}>
-      {src ? <img src={src} alt="Imagen fija del instante de la pausa" style={{ width: '100%', display: 'block' }} /> : <div style={{ aspectRatio: ancho + ' / ' + alto }} />}
+      {src
+        ? <img src={src} alt="Imagen fija del instante de la pausa" style={{ width: '100%', display: 'block' }} />
+        : (
+          <div style={{ aspectRatio: ancho + ' / ' + alto, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+            {sinImagen && <p style={{ margin: '18px 24px 0', maxWidth: 560, lineHeight: 1.5, fontSize: 12.5, color: '#d6d7d9', textAlign: 'center' }}>{sinImagen}</p>}
+          </div>
+        )}
       <svg ref={svgRef} viewBox={`0 0 ${ancho} ${alto}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
         onPointerMove={seguir} onPointerUp={soltar} onPointerCancel={soltar}>
         {/* Oscurece todo menos el recuadro que se ajusta. */}

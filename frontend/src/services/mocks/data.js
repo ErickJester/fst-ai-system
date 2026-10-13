@@ -41,7 +41,7 @@ export const experimentDetail = {
     clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: 1,
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE', { id_analisis: 401, dia1: { cargado: true } }), tanda('B', 'QUEUED', { id_analisis: 502 })] },
+        tandas: [tanda('A', 'DONE', { id_analisis: 401, dia1: { cargado: true } }), tanda('B', 'PAUSED', { id_analisis: 502 })] },
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 402 }), tanda('B', 'DONE', { id_analisis: 403 })] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
@@ -52,14 +52,14 @@ export const experimentDetail = {
   },
 }
 
-// Cola de análisis (2e). Un trabajo a la vez, en orden de llegada.
+// Cola de análisis (2e). Un trabajo a la vez, en orden de llegada. La avanza el worker
+// (equipo de backend): sin backend queda fija, como en un momento dado.
 // status: JobStatus; stage: PipelineStage en la que va (o en la que se detuvo).
 // Solo se analiza el Día 2 (D-54). subido_por: cuenta que subió el video (puede ajustar o
-// cancelar su pausa, igual que un Administrador). simular_pausa: se pausa en la clasificación.
+// cancelar su pausa, igual que un Administrador).
 export const queue = [
   { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
-  { job_id: 502, posicion: 2, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, simular_pausa: true, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
-  { job_id: 503, posicion: 3, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 503, posicion: 2, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
@@ -69,7 +69,15 @@ export const failedJobs = [
 
 // Análisis en pausa (R-15): salen de la cola mientras esperan el ajuste del recuadro. pausa:
 // { cilindro, desde_segundo, hora_ms, ancho, alto, recuadros, ajuste }, como pausa.json.
-export const pausedJobs = []
+// La pausa la decide el worker; el de ejemplo ya está en pausa. hora_ms null: sin backend,
+// la pausa empieza la primera vez que se consulta (services/queue.js), para ver el plazo.
+export const pausedJobs = [
+  { job_id: 502, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
+    pausa: { cilindro: 2, desde_segundo: 142, hora_ms: null, ancho: 1280, alto: 720, ajuste: null,
+      // El recuadro del cilindro 2 quedó corrido: por eso el pipeline dejó de ver a su espécimen.
+      recuadros: [{ cilindro: 1, x0: 50, y0: 130, x1: 270, y1: 640 }, { cilindro: 2, x0: 450, y0: 200, x1: 670, y1: 710 },
+        { cilindro: 3, x0: 690, y0: 130, x1: 910, y1: 640 }, { cilindro: 4, x0: 1010, y0: 130, x1: 1230, y1: 640 }] } },
+]
 
 // Análisis cancelados: por el usuario o porque pasaron 5 minutos sin respuesta (motivo).
 export const canceledJobs = []
@@ -193,6 +201,7 @@ export const notifications = [
   { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
   { id: 4, tipo: 'DISK_ALERT', titulo: 'Alerta de disco', texto: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', enlace: '/admin', creada: hace(0, '09:12'), is_read: false, solo_admin: true },
   { id: 5, tipo: 'VIDEO_DELETED', titulo: 'Videos borrados', texto: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', enlace: '/experimentos', creada: hace(1, '03:00'), is_read: true },
+  { id: 6, tipo: 'ANALYSIS_PAUSED', titulo: 'Análisis en pausa', texto: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', enlace: '/experimentos/EXP-2026-02/analisis/502/pausa', creada: hace(0, '15:50'), is_read: false },
   { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
 ]
 
@@ -200,16 +209,13 @@ export const notifications = [
 // Un token que no está aquí, como «vencido», responde igual que un enlace vencido.
 export const resetTokens = {}
 
-// Simulación de la cola (mocks/simulador.js): hasta dónde se avanzó y cuántos trabajos terminaron.
-export const simulacion = { ultimo: null, terminados: 0 }
-
 // ── persistencia en el navegador ───────────────────────────────────────────
 // Los datos de ejemplo se guardan en localStorage para que sobrevivan a la recarga
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 11
-const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens, simulacion }
+const VERSION_DATOS = 12
+const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 
 // Reemplaza el contenido de cada colección sin cambiar el objeto, porque los

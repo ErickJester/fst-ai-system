@@ -3,13 +3,11 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
-import { simular } from './mocks/simulador'
 import { usuarioDeLaSesion } from './mocks/sesion'
 
 // GET /experiments/:clave/groups/:gid → grupo con sus tandas y videos (pantalla 2d)
 export async function getGroup(clave, gid) {
   if (USE_MOCKS) {
-    simular()
     const exp = db.experimentDetail[clave]
     const grupo = exp?.grupos.find((g) => g.id === gid)
     if (!grupo) return fail(404, 'No existe ese grupo.')
@@ -71,8 +69,7 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
     const job = {
       job_id, posicion: db.queue.length + 1, clave, gid, creado_ms: Date.now(), experimento: db.experimentDetail[clave].titulo.split(' · ')[0],
       grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, subido_por: usuarioDeLaSesion()?.id ?? null,
-      // Como en worker_fake: un video con «pausa» en el nombre se pausa en la clasificación.
-      simular_pausa: /pausa/i.test(file?.name || ''), status: 'QUEUED', stage: null, progress_pct: 0,
+      status: 'QUEUED', stage: null, progress_pct: 0,
     }
     db.queue.push(job)
     resumir(clave)

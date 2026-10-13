@@ -2,7 +2,6 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { simular } from './mocks/simulador'
 import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion } from './mocks/sesion'
 import { segundosDe, totalesDe, cajasDe } from './mocks/segundos'
@@ -23,7 +22,6 @@ function buscar(clave, id) {
 
 // Solo un análisis completado, y solo quien subió el video o un Administrador (D-57).
 function revisable(clave, id) {
-  simular()
   const r = buscar(clave, id)
   if (!r) return { error: fail(404, 'No existe ese análisis.') }
   const u = usuarioDeLaSesion()

@@ -407,7 +407,11 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
             <div className="rev-stage">
               {datos.videoUrl
                 ? <video ref={videoRef} src={datos.videoUrl} preload="auto" muted playsInline aria-label={'Video de la tanda ' + datos.tanda} />
-                : <Escena especimenes={datos.especimenes} L={L.current} s={s} t={t} ancho={datos.ancho} alto={datos.alto} />}
+                : (
+                  <p style={{ position: 'absolute', left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '0 20px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)' }}>
+                    Aquí va el video de la tanda (la copia H.264 de los últimos 300 s): la genera el worker al terminar el análisis y la entrega el servidor. Disponible cuando el backend esté conectado. Sin video, el cabezal avanza igual y se puede revisar con las teclas.
+                  </p>
+                )}
               {/* Oscurece todo menos el tubo del espécimen que se revisa (cajas.json). */}
               {[[0, 0, 100, r.y0 / datos.alto * 100], [0, r.y1 / datos.alto * 100, 100, 100 - r.y1 / datos.alto * 100],
                 [0, r.y0 / datos.alto * 100, r.x0 / datos.ancho * 100, (r.y1 - r.y0) / datos.alto * 100],
@@ -505,27 +509,6 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
       </div>
 
       {resumen && <Resumen especimenes={ESP} L={L.current} N={N} tanda={datos.tanda} onCerrar={() => setResumen(false)} />}
-    </div>
-  )
-}
-
-// Escena sin video (datos de ejemplo): los tubos de cajas.json y cada espécimen moviéndose
-// según su conducta en ese segundo.
-function Escena({ especimenes, L, s, t, ancho, alto }) {
-  return (
-    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,#2c2e30 0%,#1f2123 60%,#171819 100%)' }}>
-      {especimenes.map(({ numeroCilindro: e, recuadro: r }) => {
-        const c = L[e].p[s]
-        const f = t * (c === 'nado' ? 2.2 : c === 'escalamiento' ? 3 : 0.4)
-        const x = 35 + Math.sin(f + e) * (c === 'nado' ? 22 : 4)
-        const y = c === 'escalamiento' ? 14 + Math.sin(f * 2) * 3 : 25 + Math.cos(f + e) * 2
-        return (
-          <div key={e} className="rev-tubo" style={{ left: (r.x0 + 20) / ancho * 100 + '%', top: (r.y0 + 10) / alto * 100 + '%', width: (r.x1 - r.x0 - 40) / ancho * 100 + '%', height: (r.y1 - r.y0 - 20) / alto * 100 + '%' }}>
-            <i />
-            <b style={{ left: x + '%', top: y + '%', opacity: c ? 1 : 0.15 }} />
-          </div>
-        )
-      })}
     </div>
   )
 }

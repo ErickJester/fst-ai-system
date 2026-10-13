@@ -393,11 +393,19 @@ function ResultadosTanda({ clave, gid, letra }) {
 // Bloques de 5 s (D-53): cada bloque muestra la conducta con más segundos; al abrirlo, sus
 // cinco segundos, para notar las conductas breves. Se calculan al pedirlos.
 function Bloques({ clave, gid, letra }) {
-  const { data, error } = useAsync(() => getBlocks(clave, gid, letra), [clave, gid, letra])
+  const { data, error, loading } = useAsync(() => getBlocks(clave, gid, letra), [clave, gid, letra])
   const [abierto, setAbierto] = useState(null) // { numeroCilindro, i }
 
-  if (error) return <p className="hint">No se pudieron calcular los bloques.</p>
-  if (!data) return <p className="hint">Cargando…</p>
+  if (error) return <p className="hint">No se pudieron cargar los bloques.</p>
+  if (loading) return <p className="hint">Cargando…</p>
+  // Los calcula el backend; sin él no hay bloques y se explica qué mostrará esta sección.
+  if (!data) {
+    return (
+      <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
+        <strong>Bloques de 5 s.</strong> Los calcula el servidor con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Disponible cuando el backend esté conectado.
+      </div>
+    )
+  }
 
   const sel = abierto && data.especimenes.find((e) => e.numeroCilindro === abierto.numeroCilindro)?.bloques[abierto.i]
   const desc = (b) => fmt(b.inicio - 1) + '–' + fmt(b.inicio + 4) + ' · ' + LBL[b.conducta] + (b.matiz ? ' (no se vio bien)' : '')
