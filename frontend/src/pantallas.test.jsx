@@ -202,12 +202,36 @@ describe('resultados', () => {
   it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
     await user.click(await screen.findByRole('button', { name: 'CSV' }))
-    expect((await screen.findByText(/Reporte CSV del experimento/)).parentElement.textContent).toMatch(/Lo genera el servidor .*Tiempo \(min:seg\)/)
+    expect((await screen.findByText(/Reporte CSV de la Tanda A./)).parentElement.textContent).toMatch(/Lo genera el servidor .*Tiempo \(min:seg\)/)
     expect(URL.createObjectURL).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'PDF · reporte de resultados' }))
     expect(screen.getByText(/Reporte PDF del experimento/)).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Entendido' }))
     expect(screen.queryByText(/Reporte PDF del experimento/)).toBeNull()
+  })
+
+  it('ver el grupo completo: todas sus tandas completadas, con los estadísticos recalculados (D-93)', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Espécimen \d/.test(f.textContent))
+    expect(await filas()).toHaveLength(4)
+    const media = () => screen.getByRole('row', { name: /^Media/ }).textContent
+    const mediaTanda = media()
+    await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 especímenes' }))
+    expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, grupo completo' })).toBeTruthy()
+    expect(await filas()).toHaveLength(8)
+    expect(screen.getByText('Tanda B · Espécimen 4')).toBeTruthy()
+    expect(media()).not.toBe(mediaTanda)
+    expect(screen.getByText('8 de 8')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull() // la revisión es por tanda
+    await user.click(screen.getByRole('button', { name: 'CSV' }))
+    expect(screen.getByText(/Reporte CSV del grupo completo\./)).toBeTruthy()
+  })
+
+  it('en el grupo completo, las tandas sin análisis completado se señalan como faltantes', async () => {
+    await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01')
+    expect(await screen.findByRole('heading', { name: 'Resultados · Grupo control, grupo completo' })).toBeTruthy()
+    expect(screen.getByText(/Faltan Tanda B \(en pausa\)/)).toBeTruthy()
+    expect(screen.getByText('4 de 8')).toBeTruthy()
   })
 
   it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
@@ -241,6 +265,16 @@ describe('eliminar experimento (D-63)', () => {
     // Ya no está en la tabla (ni en el aviso de vencimiento).
     expect(screen.queryByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' })).toBeNull()
     expect(screen.queryByText(/Los videos de/)).toBeNull()
+  })
+})
+
+describe('grupo', () => {
+  it('lleva a los resultados del grupo completo o de cada tanda', async () => {
+    await conSesion('/experimentos/EXP-2026-02/grupos/G-01')
+    expect((await screen.findByRole('link', { name: 'Ver resultados del grupo completo' })).getAttribute('href')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-01')
+    expect(screen.getByText('Reúne las tandas con análisis completado: 1 de 2')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Ver resultados de esta tanda' }).getAttribute('href')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
+    expect(screen.getByText('Guardado')).toBeTruthy() // el Día 1 se guarda y no se analiza
   })
 })
 

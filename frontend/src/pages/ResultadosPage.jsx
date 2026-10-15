@@ -142,14 +142,14 @@ const TABS = [
   { id: 'bloques', label: 'Bloques de 5 s' },
 ]
 
-// 2f · Resultados de una tanda, Día 2: /experimentos/:clave/resultados?grupo=&tanda=.
-// Sin grupo y tanda abre la primera tanda del experimento con el Día 2 analizado.
+// 2f · Resultados, Día 2 (RF-19, D-93): de una tanda (?grupo=&tanda=) o del grupo completo
+// (?grupo= sin tanda). Sin grupo abre la primera tanda del experimento con el Día 2 analizado.
 export default function ResultadosPage() {
   const { clave } = useParams()
   const [params] = useSearchParams()
   const gid = params.get('grupo')
   const letra = params.get('tanda')
-  if (gid && letra) return <ResultadosTanda key={gid + letra} clave={clave} gid={gid} letra={letra} />
+  if (gid) return <ResultadosTanda key={gid + (letra || '*')} clave={clave} gid={gid} letra={letra} />
   return <PrimeraTanda clave={clave} />
 }
 
@@ -186,24 +186,50 @@ function ResultadosTanda({ clave, gid, letra }) {
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
   const [reporte, setReporte] = useState(null) // { formato, error } del último botón de reporte
-  const { data: r, error, loading } = useAsync(() => getBatchResults(clave, gid, letra), [clave, gid, letra])
+  // Una tanda (letra) o el grupo completo (letra null). El grupo completo reúne solo las tandas
+  // con análisis completado; las demás se señalan como faltantes (RN-12).
+  const { data, error, loading } = useAsync(async () => {
+    const e = await getExperiment(clave)
+    const g = e.grupos.find((x) => x.id === gid)
+    if (!g) throw new Error('No existe ese grupo.')
+    const listas = g.tandas.filter((t) => t.estado === 'DONE' && (!letra || t.letra === letra))
+    if (!listas.length) throw new Error('Todavía no hay resultados.')
+    return { g, rs: await Promise.all(listas.map((t) => getBatchResults(clave, gid, t.letra))) }
+  }, [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
   if (loading) return <Cargando />
   if (error) return <SinResultados clave={clave} />
 
+  const { g, rs } = data
+  const r = rs[0]
   const exp = r.experimento
+  const grupoCompleto = !letra
   const conductas = CONDUCTAS
-  const col = (k) => r.especimenes.map((e) => e[k + '_s'])
+  // Los especímenes que se ven, cada uno con su tanda; los estadísticos (RF-31) se calculan
+  // sobre ellos: los de la tanda o los del grupo completo.
+  const especimenes = rs.flatMap((x) => x.especimenes.map((e) => ({ ...e, letra: x.letra })))
+  const col = (k) => especimenes.map((e) => e[k + '_s'])
   const stats = estadisticos(r.duracion_s)
+  const completadas = g.tandas.filter((t) => t.estado === 'DONE')
+  const faltan = g.tandas.filter((t) => t.estado !== 'DONE')
+  const nCompletos = completadas.reduce((a, t) => a + t.n_cilindros, 0)
+  const agrupado = rs.some((x) => x.nivel === 'AGRUPADO')
+  const revisado = rs.some((x) => x.revisado)
+  const analizado = rs.map((x) => x.analizado_en).sort().at(-1)
+  const vistaTexto = grupoCompleto ? 'del grupo completo' : 'de la Tanda ' + r.letra
+  const enlaceGrupo = `/experimentos/${clave}/resultados?grupo=${gid}`
 
-  // Pide el reporte del experimento al backend y lo descarga; sin backend, explica qué hará.
+  // Pide el reporte al backend y lo descarga; sin backend, explica qué hará. CSV y XLSX son de
+  // lo que se ve (el grupo completo o la tanda); el PDF, del experimento (D-93).
   async function pedirReporte(formato) {
     setReporte({ formato, pidiendo: true })
+    const alcance = formato === 'pdf' ? null : grupoCompleto ? { grupo: gid } : { grupo: gid, tanda: r.letra }
     try {
-      const archivo = await getReporte(exp.clave, formato)
+      const archivo = await getReporte(exp.clave, formato, alcance)
       if (!archivo) return setReporte({ formato })
-      download('reporte_' + exp.clave + '.' + formato, archivo, REPORTES[formato].tipo)
+      const nombre = ['reporte', exp.clave, alcance ? (grupoCompleto ? 'grupo-' + gid : 'tanda' + r.letra) : null].filter(Boolean).join('_')
+      download(nombre + '.' + formato, archivo, REPORTES[formato].tipo)
       setReporte(null)
     } catch (e) {
       setReporte({ formato, error: mensajeError(e, 'No se pudo descargar el reporte. Inténtalo de nuevo.') })
@@ -224,26 +250,44 @@ function ResultadosTanda({ clave, gid, letra }) {
           { to: '/experimentos', label: 'Experimentos' },
           { to: `/experimentos/${exp.clave}`, label: exp.titulo },
           { to: `/experimentos/${exp.clave}/grupos/${r.grupo.id}`, label: r.grupo.nombre },
-          { label: `Tanda ${r.letra} · Día 2` },
+          { label: grupoCompleto ? 'Grupo completo · Día 2' : `Tanda ${r.letra} · Día 2` },
         ]} />
       </Topbar>
 
       <div className="page">
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
           <div style={{ flex: 1 }}>
-            <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, Tanda {r.letra}</h2>
-            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(r.analizado_en.slice(0, 10))}, {hora(r.analizado_en)} · modelo {r.modelo}</div>
+            <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}, {hora(analizado)}</div>
+            {/* Ver una tanda o el grupo completo (RF-19, D-93). */}
+            <nav aria-label="Ver" className="no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              <span className="k" style={{ marginRight: 4 }}>Ver</span>
+              {completadas.map((t) => {
+                const on = !grupoCompleto && t.letra === r.letra
+                return (
+                  <Link key={t.letra} to={enlaceResultados(clave, gid, t.letra)} className={'tab' + (on ? ' on' : '')} aria-current={on ? 'page' : undefined}
+                    style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (on ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
+                    Tanda {t.letra} · {t.n_cilindros} especímenes
+                  </Link>
+                )
+              })}
+              <Link to={enlaceGrupo} className={'tab' + (grupoCompleto ? ' on' : '')} aria-current={grupoCompleto ? 'page' : undefined}
+                style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (grupoCompleto ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
+                Grupo completo · {nCompletos} especímenes
+              </Link>
+              <span className="hint" style={{ maxWidth: 360 }}>El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.</span>
+            </nav>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {r.nivel === 'AGRUPADO' ? 'agrupado' : 'preciso'}</span>
-              {r.revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
-              {r.nivel === 'AGRUPADO'
+              <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {agrupado ? 'agrupado' : 'preciso'}</span>
+              {revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
+              {agrupado
                 ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
                 : <span className="hint">Ningún segundo quedó como conducta activa: cada uno se clasificó como nado activo, inmovilidad o escalamiento.</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
             {/* Corregir los segundos: solo quien subió el video o un Administrador (D-57). */}
-            {r.id_analisis && (user.admin || r.subido_por === user.id) && (
+            {!grupoCompleto && r.id_analisis && (user.admin || r.subido_por === user.id) && (
               <Link className="btn btn-secondary" to={enlaceRevision(clave, r.id_analisis)}>Revisar segundo a segundo</Link>
             )}
             {Object.entries(REPORTES).map(([formato, x]) => (
@@ -258,7 +302,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             <span style={{ flex: 1, lineHeight: 1.55 }}>
               {reporte.error || (
                 <>
-                  <strong>Reporte {REPORTES[reporte.formato].boton.split(' ·')[0]} del experimento.</strong> Lo genera el servidor y aquí se descarga. Tendrá {REPORTES[reporte.formato].hara} Disponible cuando el backend esté conectado.
+                  <strong>Reporte {REPORTES[reporte.formato].boton.split(' ·')[0]} {reporte.formato === 'pdf' ? 'del experimento' : vistaTexto}.</strong> Lo genera el servidor y aquí se descarga. Tendrá {REPORTES[reporte.formato].hara} Disponible cuando el backend esté conectado.
                 </>
               )}
             </span>
@@ -288,18 +332,18 @@ function ResultadosTanda({ clave, gid, letra }) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '24%' }}>Espécimen</th>
+                  <th style={{ width: '27%' }}>Espécimen</th>
                   {conductas.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
                   <th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
               <tbody>
-                {r.especimenes.map((e) => (
-                  <tr key={e.numeroCilindro}>
+                {especimenes.map((e) => (
+                  <tr key={e.letra + e.numeroCilindro}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span className="num nd" style={{ width: 24, height: 24, flex: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{e.numeroCilindro}</span>
-                        <span style={{ fontSize: 13 }}>{etiqueta(e, r.letra)}</span>
+                        <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{etiqueta(e, e.letra)}</span>
                       </div>
                     </td>
                     {KEYS.map((k) => <td key={k} className="num" style={{ textAlign: 'right' }}>{fmt(e[k + '_s'])}</td>)}
@@ -321,7 +365,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             </table>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
-              Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de grupo de RF-31. El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+              Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de RF-31 de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
             <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo, r.letra)}</div>
@@ -339,7 +383,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             </div>
 
             <div ref={refs.bloques} className="k" style={{ margin: '26px 0 12px' }}>Bloques de 5 s</div>
-            <Bloques clave={clave} gid={gid} letra={letra} />
+            <Bloques clave={clave} gid={gid} letras={rs.map((x) => x.letra)} />
           </div>
 
           <div style={{ background: 'var(--color-bg)', paddingLeft: 26, display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -349,6 +393,10 @@ function ResultadosTanda({ clave, gid, letra }) {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 11.5 }}>
                   <span style={{ color: MUT70 }}>Duración analizada</span>
                   <span className="num">{fmt(r.duracion_analizada_s)} / {fmt(r.duracion_s)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 11.5 }}>
+                  <span style={{ color: MUT70 }}>Especímenes analizados</span>
+                  <span className="num">{especimenes.length} de {grupoCompleto ? g.n_especimenes : especimenes.length}</span>
                 </div>
               </div>
             </div>
@@ -392,9 +440,14 @@ function ResultadosTanda({ clave, gid, letra }) {
 
 // Bloques de 5 s (D-53): cada bloque muestra la conducta con más segundos; al abrirlo, sus
 // cinco segundos, para notar las conductas breves. Se calculan al pedirlos.
-function Bloques({ clave, gid, letra }) {
-  const { data, error, loading } = useAsync(() => getBlocks(clave, gid, letra), [clave, gid, letra])
-  const [abierto, setAbierto] = useState(null) // { numeroCilindro, i }
+function Bloques({ clave, gid, letras }) {
+  // Los de cada tanda que se ve; en el grupo completo, una fila por espécimen de cada tanda.
+  const { data, error, loading } = useAsync(async () => {
+    const todos = await Promise.all(letras.map((l) => getBlocks(clave, gid, l)))
+    if (todos.every((x) => !x)) return null
+    return { especimenes: todos.flatMap((x, i) => (x ? x.especimenes.map((e) => ({ ...e, letra: letras[i] })) : [])) }
+  }, [clave, gid, letras.join()])
+  const [abierto, setAbierto] = useState(null) // { letra, numeroCilindro, i }
 
   if (error) return <p className="hint">No se pudieron cargar los bloques.</p>
   if (loading) return <p className="hint">Cargando…</p>
@@ -407,21 +460,21 @@ function Bloques({ clave, gid, letra }) {
     )
   }
 
-  const sel = abierto && data.especimenes.find((e) => e.numeroCilindro === abierto.numeroCilindro)?.bloques[abierto.i]
+  const sel = abierto && data.especimenes.find((e) => e.letra === abierto.letra && e.numeroCilindro === abierto.numeroCilindro)?.bloques[abierto.i]
   const desc = (b) => fmt(b.inicio - 1) + '–' + fmt(b.inicio + 4) + ' · ' + LBL[b.conducta] + (b.matiz ? ' (no se vio bien)' : '')
 
   return (
     <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {data.especimenes.map((e) => (
-          <div key={e.numeroCilindro} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 132, fontSize: 11.5, color: MUT60 }}>{especimen(e.numeroCilindro, letra)}</span>
-            <div role="group" aria-label={'Bloques de ' + especimen(e.numeroCilindro, letra)} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(60, 1fr)', height: 18, border: '1px solid var(--color-divider)' }}>
+          <div key={e.letra + e.numeroCilindro} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 132, fontSize: 11.5, color: MUT60 }}>{especimen(e.numeroCilindro, e.letra)}</span>
+            <div role="group" aria-label={'Bloques de ' + especimen(e.numeroCilindro, e.letra)} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(60, 1fr)', height: 18, border: '1px solid var(--color-divider)' }}>
               {e.bloques.map((b, i) => {
-                const on = abierto?.numeroCilindro === e.numeroCilindro && abierto.i === i
+                const on = abierto?.letra === e.letra && abierto.numeroCilindro === e.numeroCilindro && abierto.i === i
                 return (
                   <button key={i} type="button" title={desc(b)} aria-label={desc(b)} aria-pressed={on}
-                    onClick={() => setAbierto(on ? null : { numeroCilindro: e.numeroCilindro, i })}
+                    onClick={() => setAbierto(on ? null : { letra: e.letra, numeroCilindro: e.numeroCilindro, i })}
                     style={{ padding: 0, border: 0, minWidth: 0, cursor: 'pointer', background: b.matiz ? MATIZ : CMAP[b.conducta], outline: on ? '2px solid var(--color-text)' : 'none', outlineOffset: -1 }} />
                 )
               })}
@@ -431,7 +484,7 @@ function Bloques({ clave, gid, letra }) {
       </div>
       {sel ? (
         <div role="status" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-divider)' }}>
-          <div className="nd" style={{ fontSize: 13 }}>{especimen(abierto.numeroCilindro, letra)} · {desc(sel)}</div>
+          <div className="nd" style={{ fontSize: 13 }}>{especimen(abierto.numeroCilindro, abierto.letra)} · {desc(sel)}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             {sel.segundos.map((c, k) => (
               <div key={k} style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--color-divider)', fontSize: 11.5 }}>
