@@ -20,7 +20,7 @@ Por eso la palabra que dispara cada caso se busca en el nombre del **experimento
 
 | Palabra | Resultado |
 |---|---|
-| (ninguna) | `completado`: observaciones, 300 segundos, intervalos, `presenta`, `web.mp4`, `cajas.json` y aviso |
+| (ninguna) | `completado`: observaciones, 300 segundos por espécimen, `web.mp4`, `cajas.json` y aviso |
 | `falla` | `error` en la etapa de cilindros, con `diagnostico.pdf` y aviso |
 | `pausa` | `en pausa` en la clasificación, con `pausa.jpg` y `pausa.json`; el worker sigue con la cola |
 

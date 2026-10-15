@@ -16,7 +16,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-// Tabla observacion: un espécimen en un video del Día 2. De ella cuelgan sus 5 intervalos y sus segundos.
+// Tabla observacion: un espécimen en un video del Día 2. De ella cuelgan sus segundos (hasta 300).
 @Data
 @NoArgsConstructor
 @Entity

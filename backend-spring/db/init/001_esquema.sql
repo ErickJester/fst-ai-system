@@ -31,6 +31,9 @@ CREATE DOMAIN nivel_clasif_analisis AS varchar(8)
 CREATE DOMAIN origen_segundo AS varchar(16)
   CHECK (VALUE IN ('maquina', 'confirmada', 'corregida', 'dudosa'));
 
+CREATE DOMAIN tipo_conducta AS varchar(16)
+  CHECK (VALUE IN ('nado activo', 'inmovilidad', 'escalamiento', 'conducta activa'));
+
 -- ------------------------------------------------------------
 --  Usuarios
 -- ------------------------------------------------------------
@@ -132,35 +135,14 @@ CREATE TABLE observacion (
   CONSTRAINT uq_observacion UNIQUE (idespecimen, idvideo)
 );
 
-CREATE TABLE intervalo (
-  idintervalo    integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  idobservacion  integer  NOT NULL
-    REFERENCES observacion (idobservacion) ON UPDATE NO ACTION ON DELETE NO ACTION,
-  minuto         smallint NOT NULL CHECK (minuto BETWEEN 1 AND 5),
-  CONSTRAINT uq_intervalo UNIQUE (idobservacion, minuto)
-);
-
-CREATE TABLE conducta (
-  nombre varchar(30) PRIMARY KEY
-);
-
-CREATE TABLE presenta (
-  idintervalo  integer     NOT NULL
-    REFERENCES intervalo (idintervalo) ON UPDATE NO ACTION ON DELETE NO ACTION,
-  conducta     varchar(30) NOT NULL
-    REFERENCES conducta (nombre) ON UPDATE NO ACTION ON DELETE NO ACTION,
-  segundos     numeric(6,2) NOT NULL CHECK (segundos >= 0 AND segundos <= 60),
-  PRIMARY KEY (idintervalo, conducta)
-);
-
 -- Una fila por espécimen y por segundo. Es lo que se revisa y corrige en la pantalla
--- de revisión; PRESENTA es su resumen por minuto y se recalcula al guardar.
+-- de revisión; los totales por minuto no se guardan: se calculan desde esta tabla (D-52).
+-- La conducta es el dominio cerrado tipo_conducta (D-102), no una tabla.
 CREATE TABLE segundo (
   idobservacion  integer        NOT NULL
     REFERENCES observacion (idobservacion) ON UPDATE NO ACTION ON DELETE NO ACTION,
   segundo        smallint       NOT NULL CHECK (segundo BETWEEN 1 AND 300),
-  conducta       varchar(30)                              -- nula = no decidio o "no se ve"
-    REFERENCES conducta (nombre) ON UPDATE NO ACTION ON DELETE NO ACTION,
+  conducta       tipo_conducta,                           -- nula = no decidio o "no se ve"
   origen         origen_segundo NOT NULL DEFAULT 'maquina',
   PRIMARY KEY (idobservacion, segundo)
 );
@@ -198,17 +180,12 @@ CREATE TABLE notificacion (
 CREATE INDEX ix_experimento_usuario   ON experimento (idinstitucional);
 CREATE INDEX ix_analisis_estado       ON analisis (estado);       -- el worker hace polling por aqui
 CREATE INDEX ix_observacion_video     ON observacion (idvideo);
-CREATE INDEX ix_presenta_conducta     ON presenta (conducta);
 CREATE INDEX ix_notificacion_usuario  ON notificacion (idinstitucional, leido);
 CREATE INDEX ix_notificacion_experim  ON notificacion (idexperimento);
-CREATE INDEX ix_segundo_conducta      ON segundo (conducta);
 
 -- ------------------------------------------------------------
 --  Datos semilla
 -- ------------------------------------------------------------
-INSERT INTO conducta (nombre) VALUES
-  ('nado activo'), ('inmovilidad'), ('escalamiento'), ('conducta activa');
-
 -- El administrador inicial NO se inserta aqui: no hay contrasena que poner en un SQL.
 -- Lo creara el backend con los valores ADMIN_* del .env (seccion 11, punto 7) cuando haya
 -- autenticacion. Mientras tanto, 002_dev_usuario.sql crea un usuario solo para desarrollo.
