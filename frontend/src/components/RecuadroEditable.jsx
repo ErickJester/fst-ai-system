@@ -96,7 +96,7 @@ export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [
           </g>
         ))}
         <rect x={r.x0} y={r.y0} width={r.x1 - r.x0} height={r.y1 - r.y0} fill="rgba(158,27,80,.12)" stroke="#e8336f" strokeWidth={ancho / 250}
-          style={{ cursor: 'move', outline: 'none' }} tabIndex={0} aria-label={`${etiqueta}: x ${r.x0}–${r.x1}, y ${r.y0}–${r.y1}`} onPointerDown={empezar('mover')} onKeyDown={onKey} />
+          style={{ cursor: 'move', outline: 'none' }} tabIndex={0} role="group" aria-roledescription="recuadro ajustable" aria-label={`${etiqueta}: x ${r.x0}–${r.x1}, y ${r.y0}–${r.y1}`} onPointerDown={empezar('mover')} onKeyDown={onKey} />
         <text x={r.x0 + 8} y={r.y0 + ancho / 45} fill="#fff" fontSize={ancho / 50} fontFamily="monospace" fontWeight="700" pointerEvents="none">{r.cilindro}</text>
         {ESQUINAS.map(([kx, ky]) => (
           <rect key={kx + ky} x={r[kx] - lado / 2} y={r[ky] - lado / 2} width={lado} height={lado} fill="#fff" stroke="#e8336f" strokeWidth={ancho / 500}

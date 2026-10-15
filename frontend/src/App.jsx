@@ -9,9 +9,12 @@ export default function App() {
   return (
     <>
       <DemoBanner />
-      <ErrorBoundary key={pathname}>
-        <AppRouter />
-      </ErrorBoundary>
+      {/* Región principal: los lectores de pantalla saltan directo al contenido. */}
+      <main>
+        <ErrorBoundary key={pathname}>
+          <AppRouter />
+        </ErrorBoundary>
+      </main>
     </>
   )
 }
