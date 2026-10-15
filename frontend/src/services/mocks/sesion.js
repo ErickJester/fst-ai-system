@@ -5,7 +5,7 @@ import * as db from './data'
 // como el servidor la sacaría del JWT. Sin sesión (o sin almacenamiento), null.
 export function usuarioDeLaSesion() {
   try {
-    const id = Number((sessionStorage.getItem(TOKEN_KEY) || '').replace('mock-token-', ''))
+    const id = Number((localStorage.getItem(TOKEN_KEY) || '').replace('mock-token-', ''))
     return db.users.find((u) => u.id === id) || null
   } catch {
     return null

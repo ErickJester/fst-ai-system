@@ -3,8 +3,9 @@ import * as auth from '../services/auth'
 import { TOKEN_KEY } from '../services/config'
 
 // Sesión de la cuenta. Las cuentas y contraseñas las resuelve services/auth.js
-// (datos de ejemplo mientras no haya backend). La sesión vive en sessionStorage:
-// al cerrar el navegador se vuelve a pedir login.
+// (datos de ejemplo mientras no haya backend). La sesión vive en localStorage: sobrevive a
+// cerrar la pestaña, como pide el documento (token de larga duración, JWT_EXPIRES_HOURS = 168,
+// §11.1). «Cerrar sesión» la borra; si el token vence, el servidor responde 401.
 const AuthContext = createContext(null)
 
 const KEY = 'fst.user'
@@ -12,8 +13,9 @@ const KEY = 'fst.user'
 const session = {
   get() {
     try {
-      localStorage.removeItem(KEY) // sesión que guardaba la versión anterior
-      const v = sessionStorage.getItem(KEY)
+      sessionStorage.removeItem(KEY) // sesión que guardaba la versión anterior
+      sessionStorage.removeItem(TOKEN_KEY)
+      const v = localStorage.getItem(KEY)
       const u = v ? JSON.parse(v) : null
       return u?.id ? u : null // las sesiones sin id son de la versión sin servicios
     } catch {
@@ -22,10 +24,10 @@ const session = {
   },
   set(u, token) {
     try {
-      if (u) sessionStorage.setItem(KEY, JSON.stringify(u))
-      else sessionStorage.removeItem(KEY)
-      if (token) sessionStorage.setItem(TOKEN_KEY, token)
-      if (!u) sessionStorage.removeItem(TOKEN_KEY)
+      if (u) localStorage.setItem(KEY, JSON.stringify(u))
+      else localStorage.removeItem(KEY)
+      if (token) localStorage.setItem(TOKEN_KEY, token)
+      if (!u) localStorage.removeItem(TOKEN_KEY)
     } catch {
       /* sin almacenamiento */
     }

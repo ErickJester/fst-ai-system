@@ -2,6 +2,7 @@
 // que el backend también tendrá que cumplir: contraseñas, administradores y experimentos.
 import { describe, it, expect, beforeEach } from 'vitest'
 import * as auth from './auth'
+import { mensajeError } from './api'
 import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
@@ -13,14 +14,14 @@ import { getRevision, guardarSegundos, reiniciarAnalisis } from './revision'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
 
-// En Node no hay sessionStorage: uno en memoria para elegir la cuenta de la sesión.
+// En Node no hay localStorage: uno en memoria para elegir la cuenta de la sesión.
 const almacen = new Map()
-globalThis.sessionStorage = {
+globalThis.localStorage = {
   getItem: (k) => almacen.get(k) ?? null,
   setItem: (k, v) => almacen.set(k, String(v)),
   removeItem: (k) => almacen.delete(k),
 }
-const sesion = (id) => sessionStorage.setItem('fst.token', 'mock-token-' + id) // 1 M. Rivera, 2 C. Reyes (Administrador)
+const sesion = (id) => localStorage.setItem('fst.token', 'mock-token-' + id) // 1 M. Rivera, 2 C. Reyes (Administrador)
 
 beforeEach(() => {
   reiniciarDatos()
@@ -165,6 +166,12 @@ describe('experimentos', () => {
     expect((await listExperiments()).find((e) => e.clave === clave).estado).toBe('ESPERA_DIA2')
   })
 
+  it('una tanda lleva un solo video por sesión: el segundo de ese día responde 409', async () => {
+    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-02', 'A', { file: null, dia: 'DAY2', nCilindros: 4 }))).toBe(409)
+    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-01', 'A', { file: null, dia: 'DAY1', nCilindros: 4 }))).toBe(409) // ya tiene su Día 1
+    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-02', 'A', { file: null, dia: 'DAY1', nCilindros: 4 }))).toBe('ok') // su Día 1 faltaba
+  })
+
   it('el servidor rechaza un video vertical o que no se puede reproducir (D-64)', async () => {
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
@@ -245,6 +252,14 @@ describe('cola de análisis (la avanza el worker)', () => {
     expect(cola.map((j) => [j.job_id, j.status, j.posicion])).toEqual([[501, 'RUNNING', 1], [503, 'QUEUED', 2]])
     expect(pausas.map((j) => j.job_id)).toEqual([502])
     expect(errores[0]).toMatchObject({ job_id: 498, status: 'FAILED', stage: 'ROI_DETECTION' })
+  })
+
+  it('trae los análisis completados recientemente, del más nuevo al más viejo', async () => {
+    const { terminados } = await getQueue()
+    expect(terminados.map((j) => j.job_id).sort()).toEqual([401, 402, 403, 404])
+    expect(terminados.length).toBeGreaterThan(0)
+    expect(terminados[0]).toMatchObject({ clave: 'EXP-2026-02', dia: 'DAY2' })
+    expect(terminados.every((j, i) => i === 0 || (terminados[i - 1].analisis_fecha || '') >= (j.analisis_fecha || ''))).toBe(true)
   })
 
   it('el PDF de diagnóstico lo genera el worker: sin backend no hay archivo', async () => {
@@ -393,5 +408,16 @@ describe('cancelar la subida de un video', () => {
     expect((await getQueue()).cola).toHaveLength(2)
     const referencia = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-02')
     expect(referencia.tandas.map((t) => t.letra)).toEqual(['A', 'B'])
+  })
+})
+
+describe('mensajes de error del servidor', () => {
+  const con = (data) => ({ response: { status: 409, data } })
+  it('lee «mensaje» (backend de Spring), luego «errores» y luego «error» (§6)', () => {
+    expect(mensajeError(con({ mensaje: 'Ya existe un experimento con ese nombre', error: 'duplicate key value…' }), 'x')).toBe('Ya existe un experimento con ese nombre')
+    expect(mensajeError(con({ errores: ["El campo 'nombre' no debe estar vacío"] }), 'x')).toBe("El campo 'nombre' no debe estar vacío")
+    expect(mensajeError(con({ error: 'No existe ese grupo.' }), 'x')).toBe('No existe ese grupo.')
+    expect(mensajeError(con(new Blob(['x'])), 'respaldo')).toBe('respaldo')
+    expect(mensajeError(new Error('sin respuesta'), 'respaldo')).toBe('respaldo')
   })
 })

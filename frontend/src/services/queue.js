@@ -8,10 +8,25 @@ import { usuarioDeLaSesion } from './mocks/sesion'
 // La cola, las pausas y los errores los produce el worker (equipo de backend). Sin backend,
 // los datos de ejemplo quedan fijos: aquí solo se responde lo que el servidor respondería.
 
-// GET /queue → cola global en orden de llegada, análisis en pausa, con error y cancelados
-// recientes (pantalla 2e)
+// Análisis completados, del más reciente al más viejo (sin backend, los de las tandas de ejemplo).
+const TERMINADOS = 5
+function terminados() {
+  const out = []
+  for (const exp of Object.values(db.experimentDetail)) {
+    for (const g of exp.grupos) {
+      for (const t of g.tandas) {
+        if (t.estado !== 'DONE' || !t.id_analisis) continue
+        out.push({ job_id: t.id_analisis, clave: exp.clave, gid: g.id, experimento: exp.titulo.split(' · ')[0], grupo: g.nombre, tanda: t.letra, dia: 'DAY2', subido_por: t.subido_por, analisis_fecha: t.analisis_fecha })
+      }
+    }
+  }
+  return out.sort((a, b) => (b.analisis_fecha || '').localeCompare(a.analisis_fecha || '')).slice(0, TERMINADOS)
+}
+
+// GET /queue → cola global en orden de llegada, análisis en pausa, con error, cancelados y
+// terminados recientes (pantalla 2e)
 export async function getQueue() {
-  if (USE_MOCKS) return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs })
+  if (USE_MOCKS) return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs, terminados: terminados() })
   return (await api.get('/queue')).data
 }
 

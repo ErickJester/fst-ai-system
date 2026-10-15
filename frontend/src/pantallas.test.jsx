@@ -35,7 +35,7 @@ async function entrar(user, correo, password = 'x') {
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
 }
 
-// Inicia sesión y abre directamente otra ruta (la sesión queda en sessionStorage).
+// Inicia sesión y abre directamente otra ruta (la sesión queda en localStorage).
 async function conSesion(ruta, correo = 'mrivera@ipn.mx') {
   const user = abrir('/login')
   await entrar(user, correo)
@@ -176,6 +176,30 @@ describe('cargar video', () => {
     expect(screen.getByText(/Video del Día 1 almacenado .*No se analiza\./)).toBeTruthy()
   })
 
+  it('avisa si la tanda ya tiene el video de esa sesión y no deja guardar', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    await user.type(await screen.findByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    const campoTanda = screen.getByLabelText('Tanda')
+    await user.clear(campoTanda)
+    await user.type(campoTanda, 'A')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la A' }))
+    expect(screen.getByText(/La Tanda A de Referencia · Fluoxetina 10 mg\/kg ya tiene su video de Día 2/)).toBeTruthy()
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'repetido.mp4', { type: 'video/mp4' }))
+    expect(screen.getByRole('button', { name: 'Guardar y encolar análisis' }).disabled).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Día 1 (20 min)' }))
+    expect(screen.queryByText(/ya tiene su video de/)).toBeNull()
+  })
+
+  it('rechaza antes de subir un archivo más grande que el límite', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    await screen.findByRole('combobox')
+    const grande = new File(['video'], 'enorme.mp4', { type: 'video/mp4' })
+    Object.defineProperty(grande, 'size', { value: 3 * 1024 * 1024 * 1024 })
+    await user.upload(document.querySelector('input[type=file]'), grande)
+    expect(await screen.findByText('El archivo pasa del límite de 2048 MB')).toBeTruthy()
+  })
+
   it('el navegador solo revisa la extensión; el servidor rechaza el video vertical (D-64)', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/cargar')
     await screen.findByRole('combobox')
@@ -265,6 +289,29 @@ describe('eliminar experimento (D-63)', () => {
     // Ya no está en la tabla (ni en el aviso de vencimiento).
     expect(screen.queryByRole('button', { name: 'Eliminar Extracto de Valeriana officinalis' })).toBeNull()
     expect(screen.queryByText(/Los videos de/)).toBeNull()
+  })
+})
+
+describe('sesión', () => {
+  it('se guarda en localStorage, que sobrevive a cerrar la pestaña (token de larga duración)', async () => {
+    await conSesion('/experimentos')
+    expect(localStorage.getItem('fst.token')).toMatch(/^mock-token-/)
+    expect(sessionStorage.getItem('fst.token')).toBeNull()
+  })
+})
+
+describe('progreso', () => {
+  it('los análisis completados habilitan «Ver resultados» y «Revisar segundo a segundo» (§9.4)', async () => {
+    await conSesion('/analisis')
+    expect(await screen.findByText('Completados recientemente')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: 'Ver resultados' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Revisar segundo a segundo' }).length).toBeGreaterThan(0)
+  })
+
+  it('quien no subió los videos no ve «Revisar segundo a segundo»', async () => {
+    await conSesion('/analisis', 'jdominguez@ipn.mx')
+    expect(await screen.findByText('Completados recientemente')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull()
   })
 })
 
