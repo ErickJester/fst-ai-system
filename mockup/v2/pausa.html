@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Análisis en pausa</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+<style>
+  .frame{position:relative;height:360px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 10%,transparent) 0 6px,transparent 6px 12px);border:2px solid var(--color-text);overflow:hidden;user-select:none}
+  .cil{position:absolute;top:30px;bottom:30px;width:120px;border:2px solid color-mix(in srgb,var(--color-text) 45%,transparent);background:color-mix(in srgb,var(--color-bg) 70%,transparent)}
+  .cil span{position:absolute;top:6px;left:8px;font-size:11px}
+  .agua{position:absolute;left:0;right:0;top:78px;border-top:2px dashed color-mix(in srgb,var(--color-text) 35%,transparent)}
+  .caja{position:absolute;border:3px solid var(--color-accent);background:color-mix(in srgb,var(--color-accent) 12%,transparent);cursor:move}
+  .caja i{position:absolute;right:-6px;bottom:-6px;width:11px;height:11px;background:var(--color-accent);cursor:nwse-resize}
+  .tiempo{font-size:30px}
+</style>
+</head>
+<body>
+<div class="app narrow">
+  <!-- 2f · Pantalla de pausa (RN-17, D-59, D-89) -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand"><a href="experimentos.html" style="font-size:inherit">FST</a><span class="nav-sub">Análisis en curso</span></span>
+    <span class="crumbs"><a href="progreso.html">Progreso</a> / <span class="here">Análisis en pausa</span></span>
+  </nav>
+
+  <div class="page" style="padding-bottom:34px">
+    <div id="vistaPausa">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <h3 style="margin:0">Análisis en pausa</h3>
+        <span class="tag tag-accent" style="white-space:nowrap">En pausa</span>
+      </div>
+      <p class="lead" style="margin:0 0 18px;max-width:640px">Compuesto CSR-14 · Experimental B · Tanda A · Día 2. El sistema no vio al espécimen del <strong>cilindro 2 (P2)</strong> durante tres segundos seguidos, en el <strong>segundo 142</strong> del video.</p>
+
+      <div style="display:flex;align-items:center;gap:22px;border:2px solid var(--color-accent);padding:14px 18px;margin-bottom:18px">
+        <div>
+          <div class="k">Tiempo que queda para responder</div>
+          <div class="num nd tiempo" id="reloj">3:41</div>
+        </div>
+        <div class="hint" style="flex:1">Si pasan 5 minutos sin respuesta, el sistema cancela el análisis. Mientras tanto, la cola atiende el siguiente video.</div>
+      </div>
+
+      <div class="k" style="margin-bottom:8px">Imagen fija del instante · arrastra el recuadro hasta donde está el espécimen</div>
+      <div class="frame" id="frame">
+        <div class="agua"></div>
+        <div class="cil" style="left:70px"><span class="num nd">P1</span></div>
+        <div class="cil" style="left:250px"><span class="num nd">P2</span></div>
+        <div class="cil" style="left:430px"><span class="num nd">P3</span></div>
+        <div class="cil" style="left:610px"><span class="num nd">P4</span></div>
+        <div class="caja" id="caja" style="left:262px;top:210px;width:96px;height:100px"><i id="asa"></i></div>
+      </div>
+      <p class="hint" style="margin:8px 0 18px">El recuadro se arrastra y se redimensiona sobre la imagen. «Ajustar y continuar» reemplaza el recuadro de ese cilindro, vuelve a revisar esos 3 segundos y sigue desde ahí; los segundos anteriores se quedan medidos con el recuadro original.</p>
+
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+        <button type="button" class="btn btn-primary" id="btnAjustar">Ajustar y continuar</button>
+        <button type="button" class="btn btn-secondary" id="btnCancelar">Cancelar análisis</button>
+        <span class="hint">Solo quien subió el video o un administrador puede ajustar o cancelar.</span>
+      </div>
+    </div>
+
+    <div id="vistaCancelado" class="hidden">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <h3 style="margin:0">Análisis cancelado</h3>
+        <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-800);color:var(--color-bg)">Cancelado</span>
+      </div>
+      <p class="lead" style="margin:0 0 18px;max-width:640px">Compuesto CSR-14 · Experimental B · Tanda A · Día 2.</p>
+      <div style="border:2px solid var(--color-accent);padding:16px 20px;font-size:13px;line-height:1.6">
+        El análisis ya se canceló: pasaron los 5 minutos sin respuesta y el sistema lo cerró. No se guardó ningún resultado de esta tanda.
+      </div>
+      <div style="margin-top:16px"><a class="btn btn-secondary" href="progreso.html">Volver al progreso</a></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  // Cuenta regresiva de los 5 minutos (en el mockup arranca en 3:41).
+  let s = 221;
+  const pinta = () => { $('reloj').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  pinta();
+  const t = setInterval(() => { if (s > 0) { s--; pinta(); } else { clearInterval(t); cancelar(); } }, 1000);
+
+  function cancelar() {
+    clearInterval(t);
+    $('vistaPausa').classList.add('hidden');
+    $('vistaCancelado').classList.remove('hidden');
+  }
+  $('btnCancelar').onclick = cancelar;
+  $('btnAjustar').onclick = () => { location.href = 'progreso.html'; };
+  if (new URLSearchParams(location.search).get('estado') === 'cancelado') cancelar();
+
+  // Arrastrar y redimensionar el recuadro.
+  const caja = $('caja'), frame = $('frame');
+  let modo = null, ox = 0, oy = 0, b = null;
+  const inicia = (m) => e => { modo = m; ox = e.clientX; oy = e.clientY; b = { l: caja.offsetLeft, t: caja.offsetTop, w: caja.offsetWidth, h: caja.offsetHeight }; e.preventDefault(); e.stopPropagation(); };
+  caja.addEventListener('mousedown', inicia('mover'));
+  $('asa').addEventListener('mousedown', inicia('medir'));
+  document.addEventListener('mousemove', e => {
+    if (!modo) return;
+    const dx = e.clientX - ox, dy = e.clientY - oy;
+    if (modo === 'mover') {
+      caja.style.left = Math.max(0, Math.min(frame.clientWidth - b.w, b.l + dx)) + 'px';
+      caja.style.top = Math.max(0, Math.min(frame.clientHeight - b.h, b.t + dy)) + 'px';
+    } else {
+      caja.style.width = Math.max(30, b.w + dx) + 'px';
+      caja.style.height = Math.max(30, b.h + dy) + 'px';
+    }
+  });
+  document.addEventListener('mouseup', () => { modo = null; });
+</script>
+</body>
+</html>

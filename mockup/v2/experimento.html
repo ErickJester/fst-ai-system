@@ -46,6 +46,7 @@
         <div style="display:flex;gap:2px" id="avance"></div>
       </div>
       <div style="display:flex;gap:18px;font-size:11.5px;color:var(--muted-2)">
+        <span class="legend"><i style="background:repeating-linear-gradient(90deg,var(--color-accent-200) 0 3px,var(--color-bg) 3px 6px);border:1px solid var(--color-divider)"></i>En espera del Día 2</span>
         <span class="legend"><i style="background:var(--color-accent-200);border:1px solid var(--color-divider)"></i>En cola</span>
         <span class="legend"><i style="background:var(--color-accent)"></i>Procesando</span>
         <span class="legend"><i style="background:var(--color-text)"></i>Completado</span>
@@ -56,7 +57,7 @@
     <div id="grupos" style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider);border:1px solid var(--color-divider)"></div>
 
     <div style="margin-top:26px;border:2px solid var(--color-accent);display:flex;align-items:center;gap:20px;padding:16px 18px">
-      <div style="flex:1;font-size:12.5px;line-height:1.6"><strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: se pide confirmación antes de borrar.</div>
+      <div style="flex:1;font-size:12.5px;line-height:1.6"><strong>Eliminar este experimento</strong> borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible: solo pide confirmar con un aviso de «¿está seguro?».</div>
       <button type="button" class="btn btn-primary" id="btnDel">Eliminar experimento…</button>
     </div>
   </div>
@@ -66,7 +67,7 @@
 <div class="dialog-backdrop hidden" id="dlg">
   <form class="dialog" id="fDel" novalidate role="dialog" aria-modal="true" aria-labelledby="dlgT">
     <div class="dialog-title" id="dlgT">Eliminar experimento</div>
-    <div class="dialog-body" style="font-size:12.5px;line-height:1.6">¿Eliminar «<span id="dlgNombre"></span>»? Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
+    <div class="dialog-body" style="font-size:12.5px;line-height:1.6">¿Está seguro de eliminar «<span id="dlgNombre"></span>»? Borra grupos, tandas, videos, análisis y reportes. Es permanente e irreversible.</div>
     <div class="dialog-actions" style="justify-content:flex-start">
       <button type="submit" class="btn btn-primary" id="dOk">Eliminar experimento</button>
       <button type="button" class="btn btn-secondary" id="dCancel">Cancelar</button>
@@ -112,11 +113,17 @@
       '<a class="btn btn-ghost" href="grupo.html?g=' + g.id + '" style="margin-top:12px">Abrir grupo →</a>' +
     '</div>').join('');
 
-  // ── eliminar (D-63: solo confirmación, sin nombre ni contraseña) ───────────
+  // ── eliminar ────────────────────────────────────────────────────────────
+  // D-43: solo quien creó el experimento o un administrador puede eliminarlo.
+  const sesion = FST.USERS[document.querySelector('.nav[data-user]').dataset.user] || FST.USERS.MR;
+  const puedeEliminar = sesion.admin || exp.responsable === sesion.nombre.split(' ')[0][0] + '. ' + sesion.nombre.split(' ')[1];
+  if (!puedeEliminar) {
+    $('btnDel').disabled = true;
+    $('btnDel').insertAdjacentHTML('afterend', '<span style="font-size:11.5px">Solo quien creó el experimento o un administrador puede eliminarlo.</span>');
+  }
   $('dlgNombre').textContent = exp.titulo;
   const close = () => { $('dlg').classList.add('hidden'); };
-  // El foco empieza en «Cancelar», la opción segura.
-  $('btnDel').onclick = () => { $('dlg').classList.remove('hidden'); $('dCancel').focus(); };
+  $('btnDel').onclick = () => { $('dlg').classList.remove('hidden'); $('dOk').focus(); };
   $('dCancel').onclick = close;
   $('dlg').addEventListener('click', e => { if (e.target === $('dlg')) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
