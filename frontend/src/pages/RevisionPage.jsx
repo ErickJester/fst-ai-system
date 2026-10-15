@@ -408,7 +408,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
               {datos.videoUrl
                 ? <video ref={videoRef} src={datos.videoUrl} preload="auto" muted playsInline aria-label={'Video de la tanda ' + datos.tanda} />
                 : (
-                  <p style={{ position: 'absolute', left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '0 20px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)' }}>
+                  <p style={{ position: 'absolute', zIndex: 2, left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '10px 16px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)', background: 'var(--color-bg)', border: '1px solid var(--color-divider)' }}>
                     Aquí va el video de la tanda (la copia H.264 de los últimos 300 s): la genera el worker al terminar el análisis y la entrega el servidor. Disponible cuando el backend esté conectado. Sin video, el cabezal avanza igual y se puede revisar con las teclas.
                   </p>
                 )}
