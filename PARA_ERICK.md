@@ -275,6 +275,10 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - Sin jerga técnica en pantalla («pipeline», «worker», «backend»): ahora dice «el sistema» y «modo demo».
     - Cargar video: «+ Agregar otra tanda» y «Terminar» (§9.3).
     - Con el video borrado, «Revisar segundo a segundo» queda en gris con «Video no disponible» (Resultados y Grupo). Los resultados de la tanda traen `video_disponible`.
+40. **Propuesta para el documento (falta tu visto bueno): sin video no se corrige.** Revisar es comparar lo que asignó el sistema con lo que se ve en el video; sin video, corregir sería adivinar y el resultado quedaría marcado «Con revisión humana» sin serlo. Los resultados y reportes se conservan igual (R-05).
+    - Frontend (ya hecho): con `videoDisponible: false` la revisión es de solo lectura (sin «Guardar correcciones» ni «Reiniciar el análisis…») y explica por qué.
+    - Backend (propuesto): `PUT /experiments/:clave/analyses/:id/segundos` y `POST …/restart` responden **409** si el video del análisis ya se borró (`VIDEO.archivo` nulo). Reiniciar también lo necesita: vuelve a correr el análisis sobre el video. Así lo hace ya el modo demo.
+    - Si te parece, conviene anotarlo como decisión nueva en §6 de `preguntas-doctor.md`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 

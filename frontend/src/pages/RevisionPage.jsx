@@ -53,7 +53,9 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   // El borrador es de cada cuenta; «Cerrar sesión» borra los de todas (AuthContext).
   const BORRADOR = 'fst.revision.' + user.id + '.' + clave + '.' + id
   // Sin permiso para corregir, la revisión es de solo lectura (la respuesta lo dice).
-  const soloLectura = datos.puedeCorregir === false
+  // Sin video (ya se borró, R-05) no se corrige ni se reinicia: no hay contra qué comparar.
+  const sinVideo = datos.videoDisponible === false
+  const soloLectura = datos.puedeCorregir === false || sinVideo
 
   // Por espécimen: p (conducta que hay en el servidor), o (su origen), c (la de ahora) y v
   // (segundos vistos). Viven en una referencia; version vuelve a pintar.
@@ -398,7 +400,9 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
                 </div>
               )
               : soloLectura
-                ? <div className="note-bar">Solo lectura: quien subió el video o un Administrador puede corregir estos segundos.</div>
+                ? <div className="note-bar">{sinVideo
+                  ? 'Solo lectura: el video ya se borró, así que estos segundos ya no se corrigen ni se reinicia el análisis. Los resultados y reportes se conservan.'
+                  : 'Solo lectura: quien subió el video o un Administrador puede corregir estos segundos.'}</div>
                 : <div className="hint">Cada segundo ya trae la conducta que puso el sistema. Si lo que ves no coincide con «Ahora», pulsa la conducta correcta. Solo se guarda lo que ya viste.</div>)}
         </div>
 
@@ -418,7 +422,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
                 : (
                   <p style={{ position: 'absolute', zIndex: 2, left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '10px 16px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)', background: 'var(--color-bg)', border: '1px solid var(--color-divider)' }}>
                     {datos.videoDisponible === false
-                      ? 'El video ya se borró (30 días después del análisis o por falta de espacio). Las conductas de cada segundo se conservan: el cabezal avanza igual y se puede revisar con las teclas.'
+                      ? 'El video ya se borró (30 días después del análisis o por falta de espacio). Las conductas de cada segundo se conservan y se pueden consultar, pero ya no corregir.'
                       : 'Aquí aparecerá el video de la tanda (sus últimos 5 minutos). Todavía no está disponible en el modo demo. El cabezal avanza igual y se puede revisar con las teclas.'}
                   </p>
                 )}
