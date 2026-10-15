@@ -6,8 +6,8 @@ import com.ipn.mx.fst.repository.ExperimentoRepository;
 import com.ipn.mx.fst.repository.FilaResultado;
 import com.ipn.mx.fst.repository.GrupoRepository;
 import com.ipn.mx.fst.repository.NotificacionRepository;
-import com.ipn.mx.fst.repository.PresentaRepository;
 import com.ipn.mx.fst.repository.ReporteRepository;
+import com.ipn.mx.fst.repository.SegundoRepository;
 import com.ipn.mx.fst.repository.UsuarioRepository;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
@@ -63,7 +63,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private NotificacionRepository notificacionRepository;
 
 	@Autowired
-	private PresentaRepository presentaRepository;
+	private SegundoRepository segundoRepository;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -123,7 +123,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	public ByteArrayInputStream generarReporte(Integer idExperimento) {
 		Experimento experimento = experimentoRepository.findById(idExperimento).orElseThrow();
 		Usuario creador = experimento.getUsuario();
-		List<FilaResultado> filas = presentaRepository.buscarResultados(idExperimento);
+		List<FilaResultado> filas = segundoRepository.buscarResultados(idExperimento);
 
 		Document documento = new Document(PageSize.LETTER);
 		ByteArrayOutputStream salida = new ByteArrayOutputStream();

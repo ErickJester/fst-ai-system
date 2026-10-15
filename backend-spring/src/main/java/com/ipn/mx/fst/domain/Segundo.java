@@ -36,13 +36,10 @@ public class Segundo implements Serializable {
 	@JoinColumn(name = "idobservacion")
 	private Observacion observacion;
 
-	// Nula si el worker no decidió el segundo, si no se ve al espécimen o si el usuario lo marcó dudoso.
-	@JsonIgnore
-	@ToString.Exclude
-	@EqualsAndHashCode.Exclude
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "conducta")
-	private Conducta conducta;
+	// Dominio tipo_conducta: 'nado activo', 'inmovilidad', 'escalamiento' o 'conducta activa' (D-102, no es
+	// tabla). Nula si el worker no decidió el segundo, si no se ve al espécimen o si el usuario lo marcó dudoso.
+	@Column(name = "conducta", columnDefinition = "tipo_conducta")
+	private String conducta;
 
 	// Dominio origen_segundo: 'maquina', 'confirmada', 'corregida' o 'dudosa'.
 	@Column(name = "origen", columnDefinition = "origen_segundo", nullable = false)

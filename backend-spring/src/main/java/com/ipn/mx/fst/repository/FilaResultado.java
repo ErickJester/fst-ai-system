@@ -2,7 +2,7 @@ package com.ipn.mx.fst.repository;
 
 import java.math.BigDecimal;
 
-// Una fila de la consulta de resultados de PresentaRepository: los segundos de una conducta, en un minuto,
+// Una fila de la consulta de resultados de SegundoRepository: los segundos de una conducta, en un minuto,
 // de un espécimen. Spring llena cada método con la columna del mismo nombre (el alias "AS" del SQL).
 public interface FilaResultado {
 

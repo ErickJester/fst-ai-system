@@ -10,7 +10,7 @@ Solo lo que se ha visto en clase: CRUD, PDF y correo.
 | Sección de la guía | Estado |
 |---|---|
 | 0. Base y Docker | Compose con `db`, `backend` y `mailhog` (perfil `dev`), `.env.example` y `/health` |
-| 1. Base de datos | El SQL del Anexo B en `db/init/001_esquema.sql` y las 15 entidades JPA. Hibernate no crea las tablas: `ddl-auto=validate` comprueba que coinciden al arrancar |
+| 1. Base de datos | El SQL del Anexo B en `db/init/001_esquema.sql` y las 12 entidades JPA (`intervalo`, `presenta` y `conducta` ya no existen: los totales por minuto se calculan desde `segundo` y la conducta es el dominio `tipo_conducta`). Hibernate no crea las tablas: `ddl-auto=validate` comprueba que coinciden al arrancar |
 | 4. Experimentos | Solo el CRUD (`GET`, `POST`, `PUT`, `DELETE /experiments`). Sin grupos, tandas ni carga de video |
 | 8. Reportes | Solo el PDF de resultados (`GET /experiments/{id}/report/pdf`), con iText y en memoria |
 | 9. Correo | `EmailService` por SMTP. Al crear un experimento se manda un correo **de demostración** al creador |

@@ -1,0 +1,35 @@
+package com.ipn.mx.fst.repository;
+
+import com.ipn.mx.fst.domain.Segundo;
+import com.ipn.mx.fst.domain.SegundoId;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface SegundoRepository extends JpaRepository<Segundo, SegundoId> {
+
+	// Resultados de un experimento para el reporte. Los totales por minuto no se guardan (D-52): se cuentan
+	// aquí desde SEGUNDO. El minuto sale del número de segundo (1-60 es el minuto 1, 61-120 el 2, ...), y los
+	// segundos sin conducta (nula: no se ve o no se decidió) no se cuentan, por eso un minuto puede sumar menos
+	// de 60. nativeQuery = true: es SQL de PostgreSQL tal cual, no JPQL. Ordenado como se imprime en el PDF.
+	@Query(value = """
+			SELECT g.etiqueta                      AS grupo,
+			       t.ordinal                       AS ordinal,
+			       e.numerocilindro                AS cilindro,
+			       ((s.segundo - 1) / 60) + 1      AS minuto,
+			       s.conducta                      AS conducta,
+			       CAST(COUNT(*) AS numeric)       AS segundos
+			FROM segundo s
+			JOIN observacion o ON o.idobservacion = s.idobservacion
+			JOIN especimen   e ON e.idespecimen   = o.idespecimen
+			JOIN tanda       t ON t.idtanda       = e.idtanda
+			JOIN grupo       g ON g.idgrupo       = t.idgrupo
+			WHERE g.idexperimento = :idExperimento
+			  AND s.conducta IS NOT NULL
+			GROUP BY g.etiqueta, t.ordinal, e.numerocilindro, ((s.segundo - 1) / 60) + 1, s.conducta
+			ORDER BY g.etiqueta, t.ordinal, e.numerocilindro, minuto
+			""", nativeQuery = true)
+	List<FilaResultado> buscarResultados(@Param("idExperimento") Integer idExperimento);
+
+}

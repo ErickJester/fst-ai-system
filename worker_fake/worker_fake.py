@@ -27,7 +27,6 @@ from comun import (
     enviar_correos, log, notificar, relativa,
 )
 
-CONDUCTAS = ["nado activo", "inmovilidad", "escalamiento", "conducta activa"]
 ANCHO, ALTO = 1280, 720
 FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
@@ -305,8 +304,7 @@ def inventar_segundos(rng, n):
 
 def completar(conn, d, especimenes):
     """Sección 4.4: por espécimen, una OBSERVACION, hasta 300 SEGUNDO (los últimos 300 s, ya
-    renumerados de 1 a 300), sus INTERVALO por minuto y 4 PRESENTA por intervalo (incluso con 0).
-    Los archivos se escriben antes y la base se actualiza en una sola transacción."""
+    renumerados de 1 a 300). Los totales por minuto no se guardan (D-52). Los archivos se escriben antes y la base se actualiza en una sola transacción."""
     id_analisis = d["idanalisis"]
     carpeta = carpeta_analisis(id_analisis)
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -329,24 +327,12 @@ def completar(conn, d, especimenes):
 
             conductas = inventar_segundos(random.Random(id_analisis * 10 + cilindro), n)
             hay_conducta_activa |= "conducta activa" in conductas
+            # Los totales por minuto no se guardan: el backend los calcula desde SEGUNDO (D-52).
             execute_values(
                 cur,
                 "INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES %s",
                 [(id_observacion, s, c, "maquina") for s, c in enumerate(conductas, start=1)],
             )
-
-            for minuto in range(1, (n + 59) // 60 + 1):
-                tramo = conductas[(minuto - 1) * 60: minuto * 60]
-                cur.execute(
-                    "INSERT INTO intervalo (idobservacion, minuto) VALUES (%s, %s) RETURNING idintervalo",
-                    (id_observacion, minuto),
-                )
-                id_intervalo = cur.fetchone()[0]
-                execute_values(
-                    cur,
-                    "INSERT INTO presenta (idintervalo, conducta, segundos) VALUES %s",
-                    [(id_intervalo, c, tramo.count(c)) for c in CONDUCTAS],
-                )
 
         nivel = "agrupado" if hay_conducta_activa else "preciso"
         cur.execute(
