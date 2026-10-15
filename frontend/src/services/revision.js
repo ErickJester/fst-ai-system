@@ -32,6 +32,13 @@ function revisable(clave, id) {
   return r
 }
 
+// Corregir o reiniciar necesita el video: si ya se borró responde 409 (propuesta para el backend).
+function corregible(clave, id) {
+  const r = revisable(clave, id)
+  if (!r.error && r.t.video_disponible === false) return { error: fail(409, 'El video ya se borró: estos segundos ya no se corrigen ni se reinicia el análisis.') }
+  return r
+}
+
 // Especímenes de ejemplo de la tanda (los mismos de sus resultados).
 function especimenesDe({ exp, g, t }) {
   const propios = db.batchResults[[exp.clave, g.id, t.letra, 'DAY2'].join('/')]
@@ -72,7 +79,7 @@ export async function getRevision(clave, id) {
 // actualiza el nivel y borra los reportes guardados.
 export async function guardarSegundos(clave, id, especimenes) {
   if (USE_MOCKS) {
-    const r = revisable(clave, id)
+    const r = corregible(clave, id)
     if (r.error) return r.error
     const rev = (db.revisiones[r.t.id_analisis] ||= {})
     for (const e of especimenes) {
@@ -94,7 +101,7 @@ export async function guardarSegundos(clave, id, especimenes) {
 // deja el análisis en cola (D-60, D-68).
 export async function reiniciarAnalisis(clave, id) {
   if (USE_MOCKS) {
-    const r = revisable(clave, id)
+    const r = corregible(clave, id)
     if (r.error) return r.error
     const { exp, g, t } = r
     delete db.revisiones[t.id_analisis]

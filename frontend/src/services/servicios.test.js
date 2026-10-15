@@ -278,6 +278,14 @@ describe('pausa del análisis (R-15, D-89)', () => {
     expect((await listNotifications()).find((n) => n.tipo === 'ANALYSIS_PAUSED')).toMatchObject({ enlace: '/experimentos/EXP-2026-02/analisis/502/pausa' })
   })
 
+  it('sin video (ya se borró) la revisión se consulta pero no se corrige ni se reinicia', async () => {
+    sesion(1)
+    expect(await getRevision('EXP-2026-02', 404)).toMatchObject({ videoDisponible: false })
+    expect(await status(guardarSegundos('EXP-2026-02', 404, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: null, origen: 'humano' }] }]))).toBe(409)
+    expect(await status(reiniciarAnalisis('EXP-2026-02', 404))).toBe(409)
+    expect((await getBatchResults('EXP-2026-02', 'G-03', 'A')).video_disponible).toBe(false)
+  })
+
   it('solo quien subió el video o un Administrador ve la pausa', async () => {
     sesion(3)
     expect(await status(getPausa('EXP-2026-02', 502))).toBe(403)
