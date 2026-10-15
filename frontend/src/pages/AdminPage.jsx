@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
@@ -39,6 +39,18 @@ export default function AdminPage() {
   const [filtro, setFiltro] = useState({ rol: '', estado: '' })
   const crearRef = useRef(null)
   const { err, fail, clase, refs } = useErrorDeCampo({ nombre: useRef(), apellidos: useRef(), correo: useRef(), id: useRef() })
+  const dlgRef = useRef(null)
+
+  // El formulario de crear o editar cuenta es un modal (§9.6): el foco no sale de él y Escape
+  // lo cierra, como «Cancelar».
+  useAtraparFoco(dlgRef, crear)
+  useEffect(() => {
+    if (!crear) return
+    const onKey = (e) => { if (e.key === 'Escape') cancelar() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crear])
 
   if (errUsuarios) {
     return (
@@ -193,8 +205,10 @@ export default function AdminPage() {
         <FieldError msg={errAccion} style={{ marginTop: 10 }} />
 
         {crear && (
-          <form noValidate onSubmit={guardar} style={{ marginTop: 18, border: '2px solid var(--color-text)' }}>
-            <div className="nd" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-divider)', fontSize: 14 }}>
+          <div className="dialog-backdrop" onClick={(e) => { if (e.target === e.currentTarget) cancelar() }}>
+          <form ref={dlgRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgCuenta" noValidate onSubmit={guardar}
+            style={{ width: 'min(680px, 100%)', padding: 0, border: '2px solid var(--color-text)' }}>
+            <div className="nd" id="dlgCuenta" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-divider)', fontSize: 14 }}>
               {editando ? 'Editar cuenta · ' + nombreCorto(editando) : 'Crear cuenta'}
             </div>
             <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -224,6 +238,7 @@ export default function AdminPage() {
             )}
             <FieldError msg={err.msg} style={{ padding: '0 16px 14px', margin: 0 }} />
           </form>
+          </div>
         )}
         {aviso && (
           <div className="ok-bar" style={{ marginTop: 18, border: '2px solid var(--color-text)', borderLeft: '4px solid var(--color-text)' }}>
@@ -242,7 +257,7 @@ export default function AdminPage() {
             <div className="k" style={{ marginBottom: 12 }}>Cola de trabajos</div>
             {cola ? <ColaAdmin cola={cola.cola} /> : <p className="hint">Cargando…</p>}
             <p style={{ margin: '12px 0 0', fontSize: 11.5, lineHeight: 1.6, color: 'var(--muted-2)' }}>
-              <span className="trace">T-06</span> La cola se atiende en orden de llegada, un video a la vez; nadie la reordena. Reanalizar reemplaza el resultado anterior.
+              La cola se atiende en orden de llegada, un video a la vez; nadie la reordena. Reanalizar reemplaza el resultado anterior.
             </p>
           </div>
 

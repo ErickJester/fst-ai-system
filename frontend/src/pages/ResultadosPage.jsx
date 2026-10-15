@@ -38,7 +38,7 @@ function estadisticos(duracion) {
   return [
     { nombre: 'Media', f: (a) => r1(mean(a)) + ' s', nota: 'sobre ' + duracion + ' s de evaluación' },
     { nombre: 'Desviación estándar', f: (a) => r1(Math.sqrt(variance(a))), nota: 'muestral, n − 1' },
-    { nombre: 'Varianza', f: (a) => r1(variance(a)), nota: 'RF-31' },
+    { nombre: 'Varianza', f: (a) => r1(variance(a)), nota: 'muestral' },
   ]
 }
 
@@ -372,7 +372,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             </div>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
-              Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de RF-31 de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+              Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
             <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo, r.letra)}</div>
