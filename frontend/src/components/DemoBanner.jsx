@@ -12,8 +12,8 @@ export default function DemoBanner() {
     if (!window.confirm('¿Reiniciar los datos de ejemplo? Se pierden las cuentas, experimentos y videos agregados, y se cierra la sesión.')) return
     reiniciarDatos()
     try {
-      sessionStorage.removeItem(TOKEN_KEY)
-      sessionStorage.removeItem('fst.user')
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('fst.user')
     } catch {
       /* sin almacenamiento */
     }

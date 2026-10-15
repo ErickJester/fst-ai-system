@@ -5,6 +5,7 @@ import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '
 import { getExperiment } from '../services/experiments'
 import { createGroup, uploadBatchVideo } from '../services/groups'
 import { mensajeError, esCancelacion } from '../services/api'
+import { MAX_UPLOAD_MB } from '../services/config'
 import { useAsync } from '../hooks/useAsync'
 import { norm } from '../lib/fst'
 import { MUT60, btnLeft, mutedSub } from '../lib/estilos'
@@ -69,7 +70,10 @@ export default function CargarVideoPage() {
   const grupoNombre = grupo ? grupo.nombre : qt
   const showConfirm = (grupo || nuevo) && /^[A-Z]$/.test(tanda)
   const grupoOk = grupo || (nuevo && trat.trim())
-  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null
+  // Una tanda lleva un solo video por sesión: si ya tiene el de ese día, no se puede subir otro.
+  const tandaExistente = grupo ? exp.grupos.find((x) => x.id === grupo.id)?.tandas.find((t) => t.letra === tanda) : null
+  const yaTiene = !!tandaExistente && (sesion === '1' ? !!tandaExistente.dia1 : tandaExistente.estado !== 'SIN_VIDEO')
+  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null && !yaTiene
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
   function onGrupo(v) {
@@ -139,6 +143,10 @@ export default function CargarVideoPage() {
   function takeFile(f) {
     setRechazo(null)
     if (!/\.(mp4|mov)$/i.test(f.name)) return reject('El archivo no es .mp4 ni .mov', f.name + ' · solo se aceptan archivos .mp4 o .mov.')
+    // El tamaño se revisa antes de subir, para no esperar a que el servidor lo rechace (413).
+    if (f.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      return reject('El archivo pasa del límite de ' + MAX_UPLOAD_MB + ' MB', f.name + ' · ' + Math.ceil(f.size / 1024 / 1024) + ' MB.')
+    }
     setArchivo(f)
   }
 
@@ -176,6 +184,7 @@ export default function CargarVideoPage() {
       if (esCancelacion(err)) setCancelada(true)
       // 422: el servidor rechazó el video (vertical o que no se puede reproducir).
       else if (err.response?.status === 422) reject('El servidor rechazó el video', archivo.name + ' · ' + mensajeError(err, 'El video no se puede procesar.'))
+      else if (err.response?.status === 413) reject('El archivo pasa del límite de ' + MAX_UPLOAD_MB + ' MB', archivo.name)
       else setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
       setSubiendo(null)
       subidaRef.current = null
@@ -265,6 +274,11 @@ export default function CargarVideoPage() {
                 <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
               </Campo>
               <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
+              {yaTiene && (
+                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
+                  La Tanda {tanda} de {grupoNombre} ya tiene su video de {sesion === '1' ? 'Día 1' : 'Día 2'}. Cada tanda lleva un solo video por sesión: elige la otra sesión o una tanda nueva.
+                </div>
+              )}
             </div>
 
             {/* 4 · archivo */}
@@ -279,7 +293,7 @@ export default function CargarVideoPage() {
                   onDrop={onDrop}>
                   <div style={{ flex: 1 }}>
                     <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4 o .mov'}</div>
-                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión. Aquí se revisa el formato; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
+                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión, de hasta {MAX_UPLOAD_MB} MB. Aquí se revisan el formato y el tamaño; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
                   </div>
                   <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
                   <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden"

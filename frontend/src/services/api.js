@@ -6,7 +6,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -18,10 +18,10 @@ api.interceptors.response.use(
   (err) => {
     // Sesión vencida o inválida: se borra y se vuelve al login con aviso. El 401 del
     // propio login (contraseña incorrecta) lo muestra la pantalla de login.
-    const conSesion = !!sessionStorage.getItem(TOKEN_KEY)
+    const conSesion = !!localStorage.getItem(TOKEN_KEY)
     if (err.response?.status === 401 && conSesion && !err.config?.url?.startsWith('/auth/login')) {
-      sessionStorage.removeItem(TOKEN_KEY)
-      sessionStorage.removeItem('fst.user')
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem('fst.user')
       sessionStorage.setItem(AVISO_KEY, 'sesion-caducada')
       window.location.href = '/login'
     }
@@ -39,5 +39,14 @@ export default api
 // Petición cancelada por quien la hizo (AbortController), como al cancelar una subida.
 export const esCancelacion = (e) => e?.code === 'ERR_CANCELED'
 
-// Mensaje de error que manda el servidor, o el de respaldo si no hay.
-export const mensajeError = (e, respaldo) => e.response?.data?.error || respaldo
+// Mensaje de error que manda el servidor, o el de respaldo si no hay. Se lee primero
+// «mensaje» (el que da el backend de Spring; su «error» es el detalle técnico de la base),
+// luego la lista «errores» de validación y por último «error» (el formato del documento, §6).
+export function mensajeError(e, respaldo) {
+  const d = e?.response?.data
+  if (!d || typeof d !== 'object') return respaldo
+  if (typeof d.mensaje === 'string' && d.mensaje) return d.mensaje
+  if (Array.isArray(d.errores) && d.errores.length) return d.errores.join(' ')
+  if (typeof d.error === 'string' && d.error) return d.error
+  return respaldo
+}
