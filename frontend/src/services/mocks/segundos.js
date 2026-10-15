@@ -36,8 +36,8 @@ export function segundosDe(idAnalisis, base) {
   return segundosDeEjemplo(base).map((conducta) => ({ conducta, origen: 'maquina' }))
 }
 
-// Totales por conducta (s) y desglose por minuto a partir de los segundos, como el backend
-// recalcula INTERVALO y PRESENTA al guardar correcciones (R-14).
+// Totales por conducta (s) y desglose por minuto a partir de los segundos: el backend no los
+// guarda, los calcula desde SEGUNDO (D-52).
 export function totalesDe(segundos) {
   const t = Object.fromEntries(CONDUCTAS.map((c) => [c + '_s', 0]))
   for (const { conducta } of segundos) if (conducta) t[conducta + '_s']++

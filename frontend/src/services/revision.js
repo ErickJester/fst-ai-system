@@ -67,7 +67,8 @@ export async function getRevision(clave, id) {
 
 // PUT /experiments/:clave/analyses/:id/segundos { especimenes: [{ numeroCilindro, segundos:
 // [{ segundo, conducta, origen }] }] } con solo los segundos que cambiaron. El backend
-// recalcula los totales por minuto y el nivel, y borra los reportes guardados.
+// solo actualiza SEGUNDO (los totales por minuto no se guardan: se calculan desde ahí, D-52),
+// actualiza el nivel y borra los reportes guardados.
 export async function guardarSegundos(clave, id, especimenes) {
   if (USE_MOCKS) {
     const r = revisable(clave, id)

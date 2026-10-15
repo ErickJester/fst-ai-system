@@ -15,6 +15,7 @@ const conActivos = (exp) => exp.grupos.some((g) => g.tandas.some((t) => ACTIVOS.
 const posiciones = (t) => 'Especímenes 1–' + t.n_cilindros
 
 const LEGEND = [
+  { label: 'En espera del Día 2', style: { background: 'repeating-linear-gradient(90deg,var(--color-accent-200) 0 3px,var(--color-bg) 3px 6px)', border: '1px solid var(--color-divider)' } },
   { label: 'En cola', style: { background: 'var(--color-accent-200)', border: '1px solid var(--color-divider)' } },
   { label: 'Procesando', style: { background: 'var(--color-accent)' } },
   { label: 'En pausa', style: { background: 'repeating-linear-gradient(90deg,var(--color-accent) 0 4px,var(--color-bg) 4px 7px)', border: '1px solid var(--color-accent)' } },

@@ -123,7 +123,7 @@ function Comparacion({ g, c }) {
 const REPORTES = {
   csv: {
     boton: 'CSV', tipo: 'text/csv',
-    hara: 'una fila por espécimen con los segundos de Nado, Escalamiento, Inmovilidad y Conducta activa; el desglose por minuto (columna «Tiempo (min:seg)»); y la media, la desviación estándar y la varianza de cada conducta por grupo.',
+    hara: 'las columnas Grupo, Tanda, Espécimen, Tiempo (min:seg), Nado, Escalamiento, Inmovilidad y Conducta activa, con una fila por espécimen y por minuto, y al final la media, la desviación estándar y la varianza de lo que se ve.',
   },
   xlsx: {
     boton: 'XLSX', tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -277,6 +277,10 @@ function ResultadosTanda({ clave, gid, letra }) {
               </Link>
               <span className="hint" style={{ maxWidth: 360 }}>El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.</span>
             </nav>
+            {/* D-78: el sistema solo entrega la conducta de cada segundo; conviene revisarla. */}
+            <p className="hint" style={{ margin: '10px 0 0', maxWidth: 680 }}>
+              La conducta de cada segundo la asigna el sistema de forma automática y no es 100 % exacta: conviene revisarla con «Revisar segundo a segundo».
+            </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
               <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {agrupado ? 'agrupado' : 'preciso'}</span>
               {revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
