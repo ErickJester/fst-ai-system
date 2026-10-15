@@ -31,7 +31,7 @@ function videosDia2(e) {
 
 // Retención del video crudo: la última semana se resalta.
 function retencion(e) {
-  if (e.videos_borrados) return { texto: 'Videos borrados', color: 'var(--muted)' }
+  if (e.videos_borrados) return { texto: 'Videos borrados', color: 'var(--muted)', motivo: 'Se borraron 30 días después del análisis, o antes si el disco pasó del 90 %. Resultados y reportes se conservan.' }
   if (e.retencion_dias == null) return { texto: '—', color: 'var(--muted)' } // todavía sin videos
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
@@ -173,7 +173,7 @@ export default function ExperimentosPage() {
                   </td>
                   <td><span className={'tag ' + TAG[e.estado].cls} style={{ whiteSpace: 'nowrap', ...TAG[e.estado].style }}>{ESTADO_EXPERIMENTO[e.estado]}</span></td>
                   <td style={{ fontSize: 13 }}>{e.responsable}</td>
-                  <td className="num" style={{ fontSize: 12, color: ret.color }}>{ret.texto}</td>
+                  <td className="num" style={{ fontSize: 12, color: ret.color }} title={ret.motivo}>{ret.texto}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       {['CSV', 'XLSX', 'PDF'].map((x) => conReportes(e)

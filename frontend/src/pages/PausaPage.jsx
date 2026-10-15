@@ -108,7 +108,7 @@ export default function PausaPage() {
 
         <RecuadroEditable src={img} ancho={p.ancho} alto={p.alto} recuadro={recuadro} onChange={setRecuadro}
           otros={p.recuadros.filter((x) => x.cilindro !== p.cilindro)} etiqueta={'Recuadro del cilindro ' + p.cilindro}
-          sinImagen={img ? null : 'Aquí va la imagen fija del instante de la pausa (pausa.jpg): la guarda el pipeline y la entrega el servidor. Disponible cuando el backend esté conectado. Los recuadros sí vienen en los datos de la pausa y se pueden ajustar.'} />
+          sinImagen={img ? null : 'Aquí aparecerá la imagen del instante en que el sistema dejó de ver al espécimen. Todavía no está disponible en el modo demo. Los recuadros sí se pueden ajustar.'} />
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
           {CAMPOS.map(([k, label]) => (

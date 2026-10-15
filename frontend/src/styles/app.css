@@ -2,7 +2,8 @@
    El sistema de diseño vive en modernist.css y fst.css (copias de mockup/v2/assets). */
 
 /* — franja de modo demo, fija arriba de todas las pantallas — */
-:root{--demo-h:30px}
+:root{--demo-h:0px}
+:root:has(.demo-banner){--demo-h:30px}
 .demo-banner{position:sticky;top:0;z-index:100;height:var(--demo-h);display:flex;align-items:center;justify-content:center;gap:.6em;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
 @media print{.demo-banner{display:none}}
 

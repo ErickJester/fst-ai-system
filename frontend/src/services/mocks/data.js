@@ -28,6 +28,8 @@ export const experiments = [
 //   analiza: solo confirma que hubo sesión de habituación (D-54).
 // progreso: etapa (PipelineStage) y avance mientras corre; error: { etapa } en la que se
 //   detuvo, si falló (sin código: la pantalla arma el mensaje con la etapa).
+// video_disponible: false si el video del Día 2 ya se borró (30 días después del análisis o
+//   por falta de disco); resultados y reportes se conservan.
 const tanda = (letra, estado, extra = {}) => ({
   letra, desde: (letra.charCodeAt(0) - 65) * 4 + 1, n_cilindros: 4,
   fecha_dia1: '2026-02-18', fecha_dia2: '2026-02-19',
@@ -45,7 +47,7 @@ export const experimentDetail = {
       { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 402 }), tanda('B', 'DONE', { id_analisis: 403 })] },
       { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
-        tandas: [tanda('A', 'DONE', { id_analisis: 404 }), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
+        tandas: [tanda('A', 'DONE', { id_analisis: 404, video_disponible: false }), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
       { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'QUEUED', { id_analisis: 503 }), tanda('B', 'FAILED', { id_analisis: 498, error: { etapa: 'ROI_DETECTION' } })] },
     ],
@@ -213,7 +215,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 13
+const VERSION_DATOS = 14
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 

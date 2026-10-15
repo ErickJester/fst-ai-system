@@ -159,6 +159,20 @@ export default function CargarVideoPage() {
 
   // ── guardar ───────────────────────────────────────────────────────────────
   // Un grupo nuevo se crea antes de subir su primera tanda.
+  // Deja el formulario listo para otra tanda (otro grupo o la siguiente letra).
+  function otraTanda() {
+    setQ('')
+    setSel(null)
+    setSugOpen(false)
+    setTanda('')
+    setConfirmada(false)
+    setTrat('')
+    clearFile()
+    setErrGuardar('')
+    setCancelada(false)
+    window.scrollTo(0, 0)
+  }
+
   async function guardar() {
     setErrGuardar('')
     setCancelada(false)
@@ -314,6 +328,11 @@ export default function CargarVideoPage() {
                     {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
                   </button>
                   <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
+                </div>
+                {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+                  <button type="button" className="btn btn-secondary" style={btnLeft} disabled={subiendo != null} onClick={otraTanda}>+ Agregar otra tanda</button>
+                  <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendo != null} onClick={() => navigate(`/experimentos/${clave}`)}>Terminar</button>
                 </div>
                 <FieldError msg={errGuardar} style={{ marginTop: 10 }} />
               </div>
