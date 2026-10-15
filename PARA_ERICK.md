@@ -274,6 +274,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - Revisión: con `puedeCorregir: false` queda de solo lectura; el borrador se guarda por cuenta y «Cerrar sesión» los borra.
     - Sin jerga técnica en pantalla («pipeline», «worker», «backend»): ahora dice «el sistema» y «modo demo».
     - Cargar video: «+ Agregar otra tanda» y «Terminar» (§9.3).
+    - Con el video borrado, «Revisar segundo a segundo» queda en gris con «Video no disponible» (Resultados y Grupo). Los resultados de la tanda traen `video_disponible`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
