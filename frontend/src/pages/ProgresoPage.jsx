@@ -5,7 +5,8 @@ import { getQueue, getDiagnostico } from '../services/queue'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, PCT_ETAPA, enlacePausa, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PCT_ETAPA, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
+import { useAuth } from '../contexts/AuthContext'
 import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
 
@@ -45,6 +46,7 @@ export default function ProgresoPage() {
   const errores = data?.errores || []
   const pausas = data?.pausas || []
   const cancelados = data?.cancelados || []
+  const terminados = data?.terminados || []
   const actual = cola.find((j) => j.status === 'RUNNING')
   const proc = cola.filter((j) => j.status === 'RUNNING').length
 
@@ -84,6 +86,8 @@ export default function ProgresoPage() {
           </tbody>
         </table>
         {data && cola.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>No hay trabajos en la cola.</p>}
+
+        {terminados.length > 0 && <Terminados lista={terminados} />}
         <p className="hint" style={{ margin: '14px 0 0' }}>
           Al terminar cada trabajo llega una notificación en el sistema con el enlace a resultados. Si un video falla o queda en pausa, la cola sigue con el siguiente.
         </p>
@@ -238,5 +242,33 @@ function TrabajoCancelado({ j }) {
       </div>
       <span className="tag tag-accent" style={{ whiteSpace: 'nowrap', background: 'var(--color-accent-800)', color: 'var(--color-bg)' }}>Cancelado</span>
     </div>
+  )
+}
+
+// Completados recientemente (§9.4): al completarse un análisis se habilitan «Ver resultados» y
+// «Revisar segundo a segundo» (este, solo para quien subió el video o un Administrador).
+function Terminados({ lista }) {
+  const { user } = useAuth()
+  return (
+    <>
+      <div className="k" style={{ margin: '26px 0 12px' }}>Completados recientemente</div>
+      <table className="table">
+        <tbody>
+          {lista.map((j) => (
+            <tr key={j.job_id}>
+              <td>{nombreTrabajo(j)}</td>
+              <td className="num" style={{ width: 70 }}>{DIA[j.dia]}</td>
+              <td className="num" style={{ width: 110, fontSize: 12, color: MUT60 }}>{j.analisis_fecha ? fechaCorta(j.analisis_fecha) : ''}</td>
+              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <span style={{ display: 'inline-flex', gap: 14, fontSize: 12.5 }}>
+                  {(user.admin || j.subido_por === user.id) && <Link to={enlaceRevision(j.clave, j.job_id)}>Revisar segundo a segundo</Link>}
+                  <Link to={enlaceResultados(j.clave, j.gid, j.tanda)}>Ver resultados</Link>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }

@@ -188,7 +188,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 
 **Valores que usa el frontend:** estado de tanda `QUEUED | RUNNING | DONE | FAILED | SIN_VIDEO` (con `FAILED`, `error: { etapa }`); `dia1: { cargado: true } | null`; etapa `PREPROCESSING | ROI_DETECTION | CLASSIFICATION` (33, 67 y 100 %); estado de experimento `SIN_VIDEOS | ESPERA_DIA2 | QUEUED | RUNNING | PAUSED | DONE | FAILED | CANCELED`; tipo de grupo `CONTROL | REFERENCIA | EXPERIMENTAL`; rol `INVESTIGADOR | ADMIN`; día `DAY1 | DAY2`. Los primeros siguen a `backend/app/models.py`.
 
-**Sesión:** el token va en `sessionStorage` (`fst.token`) y se manda como `Authorization: Bearer`. Cerrar sesión es solo del frontend (borra el token). 401 con sesión → login con «Tu sesión caducó»; el 401 del propio login muestra «Correo o contraseña incorrectos» sin redirigir. 403 → Experimentos con «No tienes permiso para esa sección».
+**Sesión:** el token va en `localStorage` (`fst.token`) y se manda como `Authorization: Bearer`. Cerrar sesión es solo del frontend (borra el token). 401 con sesión → login con «Tu sesión caducó»; el 401 del propio login muestra «Correo o contraseña incorrectos» sin redirigir. 403 → Experimentos con «No tienes permiso para esa sección».
 
 ---
 
@@ -249,6 +249,12 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **D-99 (M-10)**: el CSV y el XLSX llevan `Grupo`, `Tanda`, `Espécimen`, `Tiempo (min:seg)`, `Nado`, `Escalamiento`, `Inmovilidad` y `Conducta activa`, una fila por espécimen y por minuto, y al final media, DE y varianza. **Le toca al backend.**
     - **D-100** (maquetas al día): leyenda «En espera del Día 2» en Experimento; en Progreso, la pausa dice en qué segundo fue y el cancelado aclara que no se guardó ningún resultado; la etiqueta «Cancelado» va en guinda oscuro; la pausa explica qué pasa si vencen los 5 minutos y quién puede atenderla.
     - D-90 y D-93 ya estaban aplicados (punto 34). D-102 (`CONDUCTA` como dominio cerrado) no cambia nada aquí: los cuatro nombres son los mismos. D-91, D-94, D-95, D-97, D-98 y D-101 son del documento o del clasificador.
+36. **Cinco ajustes más del documento:**
+    - **Un video por sesión en cada tanda:** Cargar video avisa y no deja guardar si la tanda ya tiene el video de ese día; el servicio responde 409 (§6.1).
+    - **Tamaño máximo** (`MAX_UPLOAD_MB`, 2048 por defecto; `VITE_MAX_UPLOAD_MB` en el frontend): se avisa antes de subir; el 413 del servidor también se muestra.
+    - **Progreso, «Completados recientemente»** (§9.4): cada análisis completado con «Ver resultados» y, para quien subió el video o un Administrador, «Revisar segundo a segundo». `GET /queue` trae `terminados` (los 5 más recientes, con `job_id` = id del análisis, `clave`, `gid`, `tanda`, `subido_por` y `analisis_fecha`).
+    - **La sesión dura:** el token y la cuenta se guardan en `localStorage` (sobreviven a cerrar la pestaña), como el JWT de una semana del documento (§11.1). «Cerrar sesión» los borra; un 401 lleva al login.
+    - **Mensajes de error:** el frontend lee `mensaje` (como responde tu backend de Spring), luego la lista `errores` y por último `error`. Así no se muestra el detalle técnico de la base. Conviene acordar uno solo.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
@@ -265,7 +271,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 |---|---|
 | Término para los sujetos | **«Espécimen 1»** dentro de una tanda; **«Tanda A · Espécimen 1»** al juntar tandas (D-55 de `INSTRUCCIONES-WEB.md`, que reemplaza a «Cilindro P1»); nunca «ratas». |
 | Contraseña temporal | Se muestra una sola vez al crear la cuenta. Sin caducidad por ahora. |
-| Dónde guardar el token | `sessionStorage` (falta decidir si la sesión debe sobrevivir al cerrar la pestaña). |
+| Dónde guardar el token | `localStorage`: la sesión sobrevive a cerrar la pestaña, como el JWT de una semana del documento (§11.1). |
 | Revisión segundo a segundo | Va en este frontend, construida al final (§12 del documento). Mientras, se usa `tools/fst_labeler`. |
 | Eliminar experimento (D-63) | Solo confirmación («¿Eliminar «…»?»), sin escribir el nombre ni la contraseña. El foco empieza en «Cancelar». Aplicado en la app y en `mockup/v2/experimento.html`. |
 | Respuesta 403 | Mensaje «No tienes permiso para esa sección» y regreso a Experimentos. |

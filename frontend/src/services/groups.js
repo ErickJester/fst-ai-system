@@ -52,6 +52,10 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
     if (/da[ñn]ado/i.test(nombre)) return fail(422, 'El video no se puede reproducir: el archivo está dañado o incompleto.')
     // La tanda queda registrada; si es Día 2, su análisis entra al final de la cola.
     let t = g.tandas.find((x) => x.letra === letra)
+    // Una tanda lleva un solo video por sesión: 409 si ya tiene el de ese día (§6.1).
+    if (t && (dia === 'DAY1' ? t.dia1 : t.estado !== 'SIN_VIDEO')) {
+      return fail(409, 'La Tanda ' + letra + ' ya tiene su video de ' + (dia === 'DAY1' ? 'Día 1' : 'Día 2') + '. Cada tanda lleva un solo video por sesión.')
+    }
     if (!t) {
       const desde = g.tandas.reduce((a, x) => a + x.n_cilindros, 0) + 1
       const hoy = new Date().toISOString().slice(0, 10)
