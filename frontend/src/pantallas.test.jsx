@@ -56,7 +56,7 @@ describe('acceso', () => {
     const user = abrir('/login')
     await entrar(user, 'mrivera@ipn.mx')
     expect(await screen.findByRole('heading', { name: 'Experimentos' })).toBeTruthy()
-    expect(screen.getByText('Compuesto CSR-14 · curva de dosis')).toBeTruthy()
+    expect(await screen.findByText('Compuesto CSR-14 · curva de dosis')).toBeTruthy() // la lista llega después del título
   })
 
   it('marca el correo que no tiene forma de correo', async () => {
