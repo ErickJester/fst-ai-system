@@ -383,7 +383,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
         <div style={{ marginTop: 16 }} role="status">
           {estado.error && <div className="note-bar">{estado.error}</div>}
           {!estado.error && (guardado && !totalCorr
-            ? <div className="ok-bar"><strong>Correcciones guardadas.</strong> Se recalcularon los totales por minuto y los reportes se regeneran con los datos nuevos.</div>
+            ? <div className="ok-bar"><strong>Correcciones guardadas.</strong> Los totales y el desglose por minuto se calculan desde los segundos guardados, y los reportes se regeneran con los datos nuevos.</div>
             : totalCorr || recuperado
               ? (
                 <div className="note-bar" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

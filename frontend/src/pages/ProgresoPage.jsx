@@ -211,6 +211,7 @@ function TrabajoEnPausa({ j }) {
       <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div className="nd" style={{ fontSize: 15 }}>{nombreTrabajo(j)}</div>
+          <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{duracion(j)} · pausa en el segundo {j.pausa.desde_segundo}</div>
           <div style={{ fontSize: 13, marginTop: 6 }}>No se ve al espécimen del cilindro {j.pausa.cilindro} (segundo {j.pausa.desde_segundo}).</div>
           <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--color-accent-700)' }}>
             {quedan > 0 ? 'Tiempo para responder: ' + mmss(quedan) : 'Pasaron los 5 minutos: se cancela.'}
@@ -232,10 +233,10 @@ function TrabajoCancelado({ j }) {
       <div style={{ flex: 1 }}>
         <div className="nd" style={{ fontSize: 14 }}>{nombreTrabajo(j)}</div>
         <div style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>
-          {j.motivo === 'plazo' ? 'Se canceló porque pasaron 5 minutos sin respuesta a la pausa.' : 'Se canceló desde la pantalla de pausa.'} Para analizarlo otra vez, sube el video de nuevo.
+          {j.motivo === 'plazo' ? 'Pasaron 5 minutos en pausa sin respuesta y el sistema canceló el análisis.' : 'Se canceló desde la pantalla de pausa.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
         </div>
       </div>
-      <span className="tag tag-outline" style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>Cancelado</span>
+      <span className="tag tag-accent" style={{ whiteSpace: 'nowrap', background: 'var(--color-accent-800)', color: 'var(--color-bg)' }}>Cancelado</span>
     </div>
   )
 }

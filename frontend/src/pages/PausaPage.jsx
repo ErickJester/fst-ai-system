@@ -127,7 +127,11 @@ export default function PausaPage() {
           <Link to="/analisis" style={{ fontSize: 12.5 }}>Volver a Análisis en curso</Link>
         </div>
         <FieldError msg={errAccion} style={{ marginTop: 10 }} />
-        {vencido && <p className="hint" style={{ marginTop: 10 }}>El análisis quedará cancelado. Para analizar este video otra vez, súbelo de nuevo.</p>}
+        <p className="hint" style={{ marginTop: 10 }}>
+          {vencido
+            ? 'El análisis ya se canceló: pasaron los 5 minutos sin respuesta y el sistema lo cerró. No se guardó ningún resultado de esta tanda; para analizarlo otra vez, sube el video de nuevo.'
+            : 'Si pasan 5 minutos sin respuesta, el sistema cancela el análisis. Solo quien subió el video o un Administrador puede ajustar o cancelar.'}
+        </p>
       </div>
     </div>
   )

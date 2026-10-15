@@ -9,12 +9,12 @@ const INK = 'var(--color-text)'
 // Por etiqueta de estado de tanda: clase, colores de la etiqueta y relleno de la barra de avance.
 const ESTADO = {
   'Sin video': { cls: 'tag-outline', bg: 'transparent', fg: 'var(--muted)', fill: 'transparent' },
-  'En espera del Día 2': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'transparent' },
+  'En espera del Día 2': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'repeating-linear-gradient(90deg, var(--color-accent-200) 0 3px, var(--color-bg) 3px 6px)' },
   'En cola': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'var(--color-accent-200)' },
   'Procesando': { cls: 'tag-accent', bg: 'var(--color-accent-100)', fg: 'var(--color-accent-700)', fill: 'var(--color-accent)' },
   'En pausa': { cls: 'tag-accent', bg: 'var(--color-bg)', fg: 'var(--color-accent-700)', fill: 'repeating-linear-gradient(90deg, var(--color-accent) 0 4px, var(--color-bg) 4px 7px)' },
   'Completado': { cls: 'tag-neutral', bg: 'var(--color-neutral-200)', fg: INK, fill: INK },
-  'Cancelado': { cls: 'tag-outline', bg: 'transparent', fg: 'var(--muted)', fill: 'color-mix(in srgb, var(--color-text) 25%, transparent)' },
+  'Cancelado': { cls: 'tag-accent', bg: 'var(--color-accent-800)', fg: 'var(--color-bg)', fill: 'color-mix(in srgb, var(--color-text) 25%, transparent)' },
   'Error': { cls: 'tag-accent', bg: 'var(--color-accent-800)', fg: 'var(--color-bg)', fill: 'repeating-linear-gradient(135deg, var(--color-accent-800) 0 3px, var(--color-bg) 3px 6px)' },
 }
 
