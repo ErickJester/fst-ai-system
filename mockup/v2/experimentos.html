@@ -53,6 +53,7 @@
   const MUT = 'var(--muted)';
   let experiments = [
     { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', trat: 'Compuesto CSR-14 Fluoxetina Placebo', fecha: '18 feb 2026', grupos: 4, especimenes: 32, videosTexto: '4 / 8', pct: '50%', estado: 'En análisis', tagClass: 'tag-accent', responsable: 'M. Rivera', retencion: '30 d', retFg: 'inherit', href: 'experimento.html' },
+    { clave: 'EXP-2026-03', titulo: 'Extracto de Passiflora · dosis única', trat: 'Passiflora', fecha: '12 oct 2026', grupos: 3, especimenes: 24, videosTexto: '3 / 6 cargados', pct: '50%', estado: 'En espera del Día 2', tagClass: 'tag-outline', responsable: 'M. Rivera', retencion: '30 d', retFg: 'inherit', href: 'experimento.html' },
     { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', trat: 'Salvia', fecha: '9 ene 2026', grupos: 4, especimenes: 32, videosTexto: '8 / 8', pct: '100%', estado: 'Concluido', tagClass: 'tag-neutral', responsable: 'J. Domínguez', retencion: '12 d', retFg: 'inherit' },
     { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', trat: 'Valeriana officinalis', fecha: '14 nov 2025', grupos: 5, especimenes: 38, videosTexto: '10 / 10', pct: '100%', estado: 'Concluido', tagClass: 'tag-neutral', responsable: 'M. Rivera', retencion: '4 d', retFg: 'var(--color-accent-700)' },
     { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', trat: '', fecha: '2 oct 2025', grupos: 4, especimenes: 24, videosTexto: '3 / 6 cargados', pct: '50%', estado: 'Carga incompleta', tagClass: 'tag-outline', responsable: 'C. Reyes', retencion: 'Videos borrados', retFg: MUT },
@@ -66,6 +67,7 @@
   const FILTROS = [
     { v: 'todos', label: 'Todos', test: () => true },
     { v: 'analisis', label: 'En análisis', test: e => e.estado === 'En análisis' },
+    { v: 'espera', label: 'En espera del Día 2', test: e => e.estado === 'En espera del Día 2' },
     { v: 'incompleta', label: 'Carga incompleta', test: e => e.estado === 'Carga incompleta' },
     { v: 'concluidos', label: 'Concluidos', test: e => e.estado === 'Concluido' }
   ];
@@ -92,7 +94,7 @@
         '<td class="num">' + e.grupos + '</td>' +
         '<td class="num">' + e.especimenes + '</td>' +
         '<td><div class="num" style="font-size:12px;margin-bottom:5px">' + e.videosTexto + '</div><div class="meter"><div style="width:' + e.pct + '"></div></div></td>' +
-        '<td><span class="tag ' + e.tagClass + '">' + e.estado + '</span></td>' +
+        '<td><span class="tag ' + e.tagClass + '" style="white-space:nowrap">' + e.estado + '</span></td>' +
         '<td style="font-size:13px">' + e.responsable + '</td>' +
         '<td class="num" style="font-size:12px;color:' + e.retFg + '">' + e.retencion + '</td>' +
         '<td><div style="display:flex;gap:4px">' + chip('CSV', 'resultados.html') + chip('XLSX', 'resultados.html') + chip('PDF', 'resultados.html') + '</div></td>' +

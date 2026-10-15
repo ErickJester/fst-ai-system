@@ -25,7 +25,7 @@
 
   // ── notificaciones (2k) ──────────────────────────────────────────────────
   const NOTIF_BASE = [
-    { id: 'n1', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. Confianza de detección 0.54, menor a 0.70.', enlace: 'Ver detalle del error', href: 'progreso.html', hora: '15:41', leida: false },
+    { id: 'n1', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los cilindros en el video.', enlace: 'Ver detalle del error', href: 'progreso.html', hora: '15:41', leida: false },
     { id: 'n2', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: 'Ver resultados', href: 'resultados.html', hora: '15:02', leida: false },
     { id: 'n3', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: 'Ver resultados', href: 'resultados.html', hora: 'ayer', leida: true }
   ];

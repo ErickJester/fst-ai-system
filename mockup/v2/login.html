@@ -22,7 +22,7 @@
   <form id="fLogin" novalidate style="padding:30px 34px 32px">
     <h3 style="margin:0 0 22px">Iniciar sesión</h3>
     <div style="display:flex;flex-direction:column;gap:16px">
-      <div class="field"><label for="lEmail">Correo institucional</label><input class="input num" id="lEmail" type="email" placeholder="nombre@ipn.mx" autocomplete="username"></div>
+      <div class="field"><label for="lEmail">Correo electrónico</label><input class="input num" id="lEmail" type="email" placeholder="nombre@ejemplo.com" autocomplete="username"></div>
       <div class="field"><label for="lPass">Contraseña</label><input class="input num" id="lPass" type="password" placeholder="••••••••••" autocomplete="current-password"></div>
       <div class="field-error hidden" id="lErr"></div>
       <button class="btn btn-primary btn-block" type="submit">Entrar</button>
@@ -36,23 +36,25 @@
   <form id="fRecover" novalidate style="padding:30px 34px 32px">
     <div class="nd" style="font-size:24px;color:var(--color-accent);margin-bottom:26px">FST</div>
     <h3 style="margin:0 0 10px">Recuperar contraseña</h3>
-    <p style="margin:0 0 22px;font-size:13px;line-height:1.6;color:color-mix(in srgb,var(--color-text) 70%,transparent);text-wrap:pretty">Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 30 minutos.</p>
+    <p style="margin:0 0 22px;font-size:13px;line-height:1.6;color:color-mix(in srgb,var(--color-text) 70%,transparent);text-wrap:pretty">Escribe el correo de tu cuenta y te enviamos un enlace de restablecimiento válido por 60 minutos.</p>
     <div style="display:flex;flex-direction:column;gap:16px">
-      <div class="field"><label for="rEmail">Correo institucional</label><input class="input num" id="rEmail" type="email" placeholder="nombre@ipn.mx"></div>
+      <div class="field"><label for="rEmail">Correo electrónico</label><input class="input num" id="rEmail" type="email" placeholder="nombre@ejemplo.com"></div>
       <div class="field-error hidden" id="rErr"></div>
       <button class="btn btn-primary btn-block" type="submit">Enviar enlace</button>
       <a href="#" id="toLogin" style="font-size:12.5px">Volver a iniciar sesión</a>
     </div>
     <div id="rSent" class="hidden">
       <hr class="hr">
-      <div class="ok-bar" style="padding:13px 15px;line-height:1.6"><strong>Enviado.</strong> Revisa <span id="rSentTo">nombre@ipn.mx</span>. Por seguridad este mensaje aparece igual exista o no la cuenta.</div>
+      <div class="ok-bar" style="padding:13px 15px;line-height:1.6"><strong>Enviado.</strong> Revisa <span id="rSentTo">tu correo</span>. Por seguridad este mensaje aparece igual exista o no la cuenta.</div>
     </div>
   </form>
 </div>
 
 <script>
   const $ = id => document.getElementById(id);
-  const ipn = v => /^[^\s@]+@ipn\.mx$/i.test(v.trim());
+  const correo = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  // Mockup sin servidor: las cuentas de ejemplo entran con la contraseña de prueba demo1234.
+  const CUENTAS = ['mrivera@ipn.mx', 'creyesl@ipn.mx', 'jdominguez@ipn.mx', 'lortega@ipn.mx'];
   function err(el, input, msg) {
     el.textContent = msg; el.classList.toggle('hidden', !msg);
     if (input) input.classList.toggle('error', !!msg);
@@ -64,8 +66,10 @@
   $('fLogin').onsubmit = e => {
     e.preventDefault();
     const email = $('lEmail').value, pass = $('lPass').value;
-    if (!ipn(email)) return err($('lErr'), $('lEmail'), 'Usa tu correo institucional @ipn.mx.');
+    if (!correo(email)) return err($("lErr"), $("lEmail"), "Escribe un correo válido.");
     if (!pass) return err($('lErr'), $('lPass'), 'Escribe tu contraseña.');
+    // RN-01: mensaje genérico, sin decir cuál campo falló
+    if (!CUENTAS.includes(email.trim().toLowerCase()) || pass !== "demo1234") return err($("lErr"), null, "Correo o contraseña incorrectos.");
     err($('lErr'), $('lEmail'), ''); $('lPass').classList.remove('error');
     location.href = 'experimentos.html';
   };
@@ -73,7 +77,7 @@
   $('fRecover').onsubmit = e => {
     e.preventDefault();
     const email = $('rEmail').value;
-    if (!ipn(email)) return err($('rErr'), $('rEmail'), 'Usa tu correo institucional @ipn.mx.');
+    if (!correo(email)) return err($("rErr"), $("rEmail"), "Escribe un correo válido.");
     err($('rErr'), $('rEmail'), '');
     $('rSentTo').textContent = email.trim();
     $('rSent').classList.remove('hidden');
