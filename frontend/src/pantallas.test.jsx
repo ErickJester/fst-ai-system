@@ -211,6 +211,19 @@ describe('cargar video', () => {
     expect(await screen.findByText('El archivo pasa del límite de 2048 MB')).toBeTruthy()
   })
 
+  it('«Agregar otra tanda» limpia el formulario y «Terminar» vuelve al experimento', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const grupo = await screen.findByRole('combobox')
+    await user.type(grupo, 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(grupo.value).not.toBe('')
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+    expect(screen.getByRole('combobox').value).toBe('')
+    expect(screen.getByLabelText('Tanda').value).toBe('')
+    await user.click(screen.getByRole('button', { name: 'Terminar' }))
+    expect(await screen.findByRole('heading', { name: 'Compuesto CSR-14 · curva de dosis' })).toBeTruthy()
+  })
+
   it('el navegador solo revisa la extensión; el servidor rechaza el video vertical (D-64)', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/cargar')
     await screen.findByRole('combobox')
@@ -231,13 +244,13 @@ describe('resultados', () => {
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
     // Cuatro columnas de conducta, también la conducta activa (R-12).
-    expect(screen.getByRole('columnheader', { name: 'Conducta activa' })).toBeTruthy()
+    expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
   })
 
   it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {
     const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
     await user.click(await screen.findByRole('button', { name: 'CSV' }))
-    expect((await screen.findByText(/Reporte CSV de la Tanda A./)).parentElement.textContent).toMatch(/Lo genera el servidor .*Tiempo \(min:seg\)/)
+    expect((await screen.findByText(/Reporte CSV de la Tanda A./)).parentElement.textContent).toMatch(/Lo prepara el sistema .*Tiempo \(min:seg\)/)
     expect(URL.createObjectURL).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'PDF · reporte de resultados' }))
     expect(screen.getByText(/Reporte PDF del experimento/)).toBeTruthy()
@@ -254,7 +267,7 @@ describe('resultados', () => {
     await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 especímenes' }))
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, grupo completo' })).toBeTruthy()
     expect(await filas()).toHaveLength(8)
-    expect(screen.getByText('Tanda B · Espécimen 4')).toBeTruthy()
+    expect(screen.getByRole('cell', { name: /Tanda B · Espécimen 4/ })).toBeTruthy()
     expect(media()).not.toBe(mediaTanda)
     expect(screen.getByText('8 de 8')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull() // la revisión es por tanda
@@ -269,9 +282,19 @@ describe('resultados', () => {
     expect(screen.getByText('4 de 8')).toBeTruthy()
   })
 
+  it('cada conducta con su porcentaje, y el desglose por minuto de cualquier espécimen', async () => {
+    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    const fila = await screen.findByRole('row', { name: /^1 Tanda A · Espécimen 1/ })
+    expect(fila.textContent).toMatch(/2:51 57 %/) // 171 s de 300 de nado activo
+    await user.selectOptions(screen.getByLabelText(/^Desglose por minuto/), 'A-3')
+    expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Espécimen 3/)
+    const minutos = screen.getAllByRole('row').filter((f) => /^\d:\d\d–\d:\d\d/.test(f.textContent))
+    expect(minutos).toHaveLength(5)
+  })
+
   it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
     await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
-    expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el servidor/)
+    expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el sistema/)
   })
 })
 
@@ -311,6 +334,17 @@ describe('sesión', () => {
   })
 })
 
+describe('sesión: versión y borradores', () => {
+  it('el menú de usuario muestra la versión y cerrar sesión borra los borradores de la revisión', async () => {
+    const user = await conSesion('/experimentos')
+    localStorage.setItem('fst.revision.1.EXP-2026-02.402', '{}')
+    await user.click(await screen.findByRole('button', { name: 'Menú de usuario' }))
+    expect(screen.getByText(/^FST v\d+\.\d+\.\d+$/)).toBeTruthy()
+    await user.click(screen.getByText('Cerrar sesión'))
+    expect(localStorage.getItem('fst.revision.1.EXP-2026-02.402')).toBeNull()
+  })
+})
+
 describe('progreso', () => {
   it('los análisis completados habilitan «Ver resultados» y «Revisar segundo a segundo» (§9.4)', async () => {
     await conSesion('/analisis')
@@ -327,6 +361,11 @@ describe('progreso', () => {
 })
 
 describe('grupo', () => {
+  it('avisa cuando el video de una tanda ya se borró', async () => {
+    await conSesion('/experimentos/EXP-2026-02/grupos/G-03')
+    expect(await screen.findByText(/El video ya se borró/)).toBeTruthy()
+  })
+
   it('lleva a los resultados del grupo completo o de cada tanda', async () => {
     await conSesion('/experimentos/EXP-2026-02/grupos/G-01')
     expect((await screen.findByRole('link', { name: 'Ver resultados del grupo completo' })).getAttribute('href')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-01')

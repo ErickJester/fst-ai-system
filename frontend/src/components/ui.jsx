@@ -147,7 +147,7 @@ export function NoEncontrado() {
       <Topbar><Brand /></Topbar>
       <div className="page">
         <h3 style={{ margin: '0 0 8px' }}>No encontrado</h3>
-        <p className="lead" style={{ marginBottom: 16 }}>Solo el experimento de ejemplo tiene detalle mientras no hay backend.</p>
+        <p className="lead" style={{ marginBottom: 16 }}>En el modo demo, solo el experimento de ejemplo tiene detalle.</p>
         <Link className="btn btn-secondary" to="/experimentos">Volver a experimentos</Link>
       </div>
     </div>

@@ -35,7 +35,10 @@ function resultadosDeEjemplo(clave, gid, letra, dia) {
   // id_analisis y subido_por: para la revisión segundo a segundo (solo quien subió el video o
   // un Administrador). Con correcciones guardadas, los totales salen de los segundos
   // revisados (R-14) y revisado lo indica.
-  const conAnalisis = { ...r, id_analisis: t.id_analisis, subido_por: t.subido_por, revisado: false }
+  // Desglose por minuto de cada espécimen (results/byminute): segundos de cada conducta en cada
+  // minuto, en tramos [conducta, segundos].
+  const lineas_tiempo = r.especimenes.map((e) => ({ numeroCilindro: e.numeroCilindro, minutos: minutosDe(segundosDe(t.id_analisis, e)) }))
+  const conAnalisis = { ...r, id_analisis: t.id_analisis, subido_por: t.subido_por, revisado: false, lineas_tiempo }
   const revision = db.revisiones[t.id_analisis]
   if (!revision) return conAnalisis
   const especimenes = r.especimenes.map((e) => ({ numeroCilindro: e.numeroCilindro, ...totalesDe(segundosDe(t.id_analisis, e)) }))

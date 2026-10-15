@@ -266,6 +266,14 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - La interfaz ya no muestra códigos internos (RF-18, RF-31, T-06).
     - Cada pantalla se descarga al abrirla (`React.lazy` en `router.jsx`): la carga inicial baja de ~408 kB a ~282 kB.
     - Accesibilidad: `src/accesibilidad.test.jsx` pasa axe-core por las 12 pantallas (sin problemas); el contenido va en `<main>`.
+39. **Lo que faltaba solo del frontend en la checklist (grupo A):**
+    - La franja «Modo demo» solo aparece con datos de ejemplo; la versión (`FST v0.4.0`) se ve en el menú de usuario.
+    - nginx acepta hasta 2048 MB, igual que `MAX_UPLOAD_MB` (§11.5); `frontend/.env.example` documenta `VITE_USE_MOCKS`, `VITE_API_BASE` y `VITE_MAX_UPLOAD_MB`.
+    - Resultados: porcentaje de cada conducta junto a su tiempo, y el desglose por minuto de cualquier espécimen (selector y tabla de segundos por minuto). La respuesta trae `lineas_tiempo` por espécimen (equivale a `results/byminute`).
+    - Video borrado (`video_disponible: false`, §11.13): Grupo lo avisa y la Revisión explica que ya no se reproduce; la lista explica el motivo al pasar el mouse por «Videos borrados». La revisión trae `videoDisponible`.
+    - Revisión: con `puedeCorregir: false` queda de solo lectura; el borrador se guarda por cuenta y «Cerrar sesión» los borra.
+    - Sin jerga técnica en pantalla («pipeline», «worker», «backend»): ahora dice «el sistema» y «modo demo».
+    - Cargar video: «+ Agregar otra tanda» y «Terminar» (§9.3).
 
 ### Diferencias visibles con tu v2 (a propósito)
 

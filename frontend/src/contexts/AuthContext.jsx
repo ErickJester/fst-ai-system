@@ -68,7 +68,13 @@ export function AuthProvider({ children }) {
   }, [setUser])
 
   // Cerrar sesión es solo del frontend: el servidor no guarda sesiones.
-  const logout = useCallback(() => setUser(null), [setUser])
+  // Cerrar sesión también borra los borradores de la revisión segundo a segundo.
+  const logout = useCallback(() => {
+    try {
+      Object.keys(localStorage).filter((k) => k.startsWith('fst.revision.')).forEach((k) => localStorage.removeItem(k))
+    } catch { /* sin almacenamiento */ }
+    setUser(null)
+  }, [setUser])
 
   // Cambia la contraseña (también la temporal del primer acceso).
   const cambiarPassword = useCallback(async (actual, nueva) => {
