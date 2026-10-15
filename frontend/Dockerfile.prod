@@ -6,7 +6,7 @@
 # Las variables VITE_* se graban al compilar, así que van como argumentos de construcción.
 
 # ── 1. Compilar ────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS compilar
+FROM node:22-alpine AS compilar
 WORKDIR /app
 
 # true: datos de ejemplo (modo demo). false: la app llama al backend.
