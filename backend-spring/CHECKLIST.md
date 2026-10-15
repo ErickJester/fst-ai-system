@@ -3,7 +3,8 @@
 Sale de `INSTRUCCIONES-WEB.md` (guía del proyecto TT 2026-B066), traducido de Flask a Spring Boot. Sigue el
 orden de construcción de la sección 12 de la guía. Entre paréntesis va la sección o regla de origen.
 
-No cubre el frontend ni el SQL y Docker de los anexos.
+No cubre el frontend ni el SQL y Docker de los anexos. Las decisiones de integración con el frontend del 15-oct-2026
+están reflejadas abajo y explicadas en `PARA_VANESA_API.md` (rama `feat/frontend-v2-servicios`).
 
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
@@ -14,7 +15,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
-- [ ] `.env.example` con todas las variables de §2. Hecho: DB, SMTP, `MAX_UPLOAD_MB`, disco y worker. Falta: `JWT_*`, `RESET_LINK_MINUTES` y `ADMIN_*`, que están comentadas
+- [ ] `.env.example` con todas las variables de §2. Hecho: DB, SMTP, `MAX_UPLOAD_MB`, disco y worker. Falta: `JWT_*`, `RESET_LINK_MINUTES` y `ADMIN_*`, que están comentadas, y `VIDEO_TOKEN_MINUTES` (120 por defecto), que es nueva
 - [x] `application.properties` lee de variables de entorno lo que existe hoy (DB, SMTP, límite de subida)
 - [x] Endpoint `/health`
 - [ ] Swagger con todas las rutas. Hecho: `/experiments/**` y `/health`
@@ -35,7 +36,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 
 ## 2. Autenticación
 - [ ] Spring Security con JWT de larga duración, configurable con `JWT_EXPIRES_HOURS` (§11.1)
-- [ ] `POST /auth/login` con error `401` genérico (R-01)
+- [ ] `POST /auth/login` con error `401` genérico (R-01). La respuesta trae `token`, `rol`, `nombre` y `cambioRequerido`, y además `idInstitucional`, `apellidos` y `correo` (el frontend los necesita)
 - [ ] `POST /auth/logout`, sin lista de bloqueo
 - [ ] `PATCH /auth/password`, y el cambio es obligatorio si `cambioRequerido`
 - [ ] `POST /auth/recover` envía un enlace JWT firmado por correo, con vigencia `RESET_LINK_MINUTES`
@@ -43,7 +44,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 - [ ] `PATCH /users/me` (perfil)
 - [ ] Todo exige JWT salvo login y recover
 - [ ] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6)
-- [ ] Manejo de errores global con `@RestControllerAdvice` en lugar de mapas armados a mano
+- [ ] Manejo de errores global con `@RestControllerAdvice` en lugar de mapas armados a mano. El mensaje va en el campo `error` del envoltorio, ya no en `mensaje`
 - [ ] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7)
 
 ## 3. Administración (§6, R-07, R-16)
@@ -57,8 +58,8 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 
 ## 4. Experimentos
 - [ ] `POST /experiments` con nombre único y fecha. Hecho: `201`, `400`, `404`, `409` y `500`. Falta: el creador debe salir del JWT, no del cuerpo (`idInstitucional`)
-- [ ] `GET /experiments` con filtros `estado`, `fecha` y `tratamiento`, paginado, con `nGrupos` y `avisoVencimiento`. Hecho: la lista completa con `nGrupos`
-- [ ] `GET /experiments/{id}` con el árbol de grupos, tandas y videos. Hecho: el experimento sin hijos (falta `@OneToMany`)
+- [ ] `GET /experiments` con filtros `estado`, `fecha` y `tratamiento`, paginado, con `nGrupos` y `avisoVencimiento`. Hecho: la lista completa con `nGrupos`. Falta además `creador: {idInstitucional, nombre, apellidos}` en cada experimento (el frontend lo usa para «Responsable» y para mostrar «Eliminar»)
+- [ ] `GET /experiments/{id}` con el árbol de grupos, tandas y videos. Hecho: el experimento sin hijos (falta `@OneToMany`). Cada video trae `subidoPor` (`idInstitucional`) y `videoDisponible`
 - [ ] El estado del experimento se calcula, no se guarda: `error` > `cancelado` > `en pausa` > `procesando` > `en cola` > `completado`, además de "sin videos" y "en espera del Día 2" (§4.8)
 - [ ] `GET /experiments/{id}/groups?q=` sugiere grupos y la siguiente tanda
 - [x] `PUT /experiments/{id}` con `404` y `409` por nombre repetido
@@ -88,7 +89,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
-- [ ] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa
+- [ ] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
 - [ ] Pausa:
   - [ ] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`
   - [ ] `GET .../pause/image`
@@ -101,6 +102,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
   - [ ] Solo para quien subió el video o un Administrador
   - [ ] En una transacción: borra `OBSERVACION` y `SEGUNDO`, borra los reportes y deja `en cola` con los valores de arranque
   - [ ] `409` en `error`, `en pausa`, `cancelado` o en curso
+  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo), porque reiniciar vuelve a correr el análisis sobre el video
 - [ ] `GET .../diagnostic` entrega el PDF de diagnóstico
 
 ## 7. Resultados y revisión
@@ -110,12 +112,17 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 - [ ] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12)
 - [x] Los totales se calculan desde `SEGUNDO`, nunca se guardan (D-52)
 - [ ] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos
-- [ ] `GET .../video` con soporte de `Range`
+- [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct)
+  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]
+  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas
+  - [ ] Sin query string en los logs de nginx ni de Spring
+  - [ ] Si el video ya se borró, responde que ya no existe (`404`)
 - [ ] `PUT .../segundos`:
   - [ ] Solo los segundos que cambiaron
   - [ ] `origen` en `confirmada`, `corregida` o `dudosa`
   - [ ] Solo el que subió el video o un Administrador
   - [ ] Solo sobre un análisis `completado`
+  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige
 
 ## 8. Reportes (§7, R-06)
 - [ ] CSV con las columnas `Grupo, Tanda, Espécimen, Tiempo, Nado, Escalamiento, Inmovilidad, Conducta activa`
@@ -130,7 +137,7 @@ de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker c
 ## 9. Notificaciones y correo (§11.2)
 - [x] `EmailService` genérico (destinatario, asunto, texto)
 - [x] Si el correo falla, no se detiene la operación
-- [ ] `GET /notifications` y `PATCH /notifications/{id}` para marcar como leída
+- [ ] `GET /notifications` y `PATCH /notifications/{id}` para marcar como leída. Cada notificación trae `tipo`, `mensaje`, `leido`, `fechaCreacion` e `idExperimento`; el frontend arma el título y el enlace
 - [ ] Solo las 6 notificaciones del dominio
 - [ ] Cada notificación se envía también por correo
 - [ ] Quitar el correo de demostración al crear un experimento, que no está en la guía
