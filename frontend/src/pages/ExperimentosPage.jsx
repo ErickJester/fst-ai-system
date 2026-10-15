@@ -161,6 +161,9 @@ export default function ExperimentosPage() {
                       ? <Link to={`/experimentos/${e.clave}`} className="nd" style={{ fontSize: 14, color: 'var(--color-text)', textDecoration: 'none' }}>{e.titulo}</Link>
                       : <div className="nd" style={{ fontSize: 14 }}>{e.titulo}</div>}
                     <div className="num" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{fechaCorta(e.fecha_inicio)}</div>
+                    {/* Sin backend, algunos experimentos de ejemplo solo traen su fila (vienen de las
+                        maquetas): no se pueden abrir. Con el backend todos tienen detalle. */}
+                    {!e.con_detalle && <div className="hint" style={{ fontSize: 11, marginTop: 3 }}>Sin detalle en el modo demo: solo se muestra su fila.</div>}
                   </td>
                   <td className="num">{e.n_grupos}</td>
                   <td className="num">{e.n_especimenes}</td>
@@ -175,7 +178,7 @@ export default function ExperimentosPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       {['CSV', 'XLSX', 'PDF'].map((x) => conReportes(e)
                         ? <Link key={x} className="chip" to={`/experimentos/${e.clave}/resultados`}>{x}</Link>
-                        : <span key={x} className="chip" style={chipInactivo} aria-disabled="true" title="Todavía no hay resultados">{x}</span>)}
+                        : <span key={x} className="chip" style={chipInactivo} aria-disabled="true" title={e.con_detalle ? 'Todavía no hay resultados' : 'Sin detalle en el modo demo'}>{x}</span>)}
                       {puedeEliminar(user, e) && (
                         <button type="button" className="linkbtn" style={{ fontSize: 12, marginLeft: 6, whiteSpace: 'nowrap' }}
                           aria-label={'Eliminar ' + e.titulo} onClick={() => setBorrar(e)}>Eliminar…</button>
