@@ -255,6 +255,11 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **Progreso, «Completados recientemente»** (§9.4): cada análisis completado con «Ver resultados» y, para quien subió el video o un Administrador, «Revisar segundo a segundo». `GET /queue` trae `terminados` (los 5 más recientes, con `job_id` = id del análisis, `clave`, `gid`, `tanda`, `subido_por` y `analisis_fecha`).
     - **La sesión dura:** el token y la cuenta se guardan en `localStorage` (sobreviven a cerrar la pestaña), como el JWT de una semana del documento (§11.1). «Cerrar sesión» los borra; un 401 lleva al login.
     - **Mensajes de error:** el frontend lee `mensaje` (como responde tu backend de Spring), luego la lista `errores` y por último `error`. Así no se muestra el detalle técnico de la base. Conviene acordar uno solo.
+37. **Calidad:**
+    - **Versiones nuevas:** React Router 7, Vite 8, Vitest 5 y jsdom 29. `npm audit` pasa de 8 avisos (2 críticos) a 0. Los Dockerfile usan Node 22 (Vite 8 pide 20.19 o más). El contenedor de producción se probó: compila y responde.
+    - **GitHub Actions** (`.github/workflows/frontend.yml`): en cada push o PR que toque `frontend/` corre lint, pruebas y build. Una prueba intermitente (esperaba la lista antes de que cargara) se corrigió.
+    - **Pantallas angostas:** a 1024 px nada se desborda; debajo de 1100 px, el panel lateral de Resultados y de Revisión pasa abajo.
+    - **Maquetas** `mockup/v2` copiadas del main de LaTeX (14-oct), con `pausa.html` y `revision.html`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
