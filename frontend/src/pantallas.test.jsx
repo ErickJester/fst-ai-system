@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
-import { reiniciarDatos } from './services/mocks/data'
+import { reiniciarDatos, experiments } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
 
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
@@ -102,6 +102,17 @@ describe('acceso', () => {
 })
 
 describe('administración', () => {
+  it('crear y editar cuenta se hacen en un modal que se cierra con Escape (§9.6)', async () => {
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Crear cuenta' })
+    expect(document.activeElement).toBe(within(dialogo).getByLabelText('Nombre'))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await user.click(screen.getAllByRole('button', { name: 'Editar' })[0])
+    expect(screen.getByRole('dialog', { name: /^Editar cuenta/ })).toBeTruthy()
+  })
+
   it('filtra las cuentas por rol y estado, con cuántos experimentos creó cada una (§9.6)', async () => {
     const user = await conSesion('/admin', 'creyesl@ipn.mx')
     await screen.findByRole('columnheader', { name: 'Experimentos' })
@@ -382,6 +393,15 @@ describe('revisión segundo a segundo (R-14)', () => {
 })
 
 describe('experimentos (dashboard)', () => {
+  it('sin experimentos invita a crear el primero (§9.2)', async () => {
+    experiments.splice(0, experiments.length)
+    const user = await conSesion('/experimentos')
+    expect(await screen.findByText('Aún no hay experimentos')).toBeTruthy()
+    expect(screen.queryByText('Ningún experimento coincide con los filtros.')).toBeNull()
+    await user.click(screen.getAllByRole('link', { name: 'Nuevo experimento' }).at(-1))
+    expect(await screen.findByRole('heading', { name: 'Datos generales' })).toBeTruthy()
+  })
+
   it('pagina de 10 en 10', async () => {
     for (let i = 0; i < 7; i++) await createExperiment({ titulo: 'Prueba ' + i, fecha_inicio: '2026-10-0' + (i + 1), notas: '' })
     const user = await conSesion('/experimentos')

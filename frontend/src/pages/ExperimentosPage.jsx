@@ -199,7 +199,15 @@ export default function ExperimentosPage() {
         )}
         {loading && <p className="hint" style={{ margin: '14px 0 0' }}>Cargando experimentos…</p>}
         {error && <p className="hint" style={{ margin: '14px 0 0', color: 'var(--color-accent-700)' }}>No se pudo cargar la lista de experimentos.</p>}
-        {data && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
+        {/* Sin ningún experimento (§9.2): se invita a crear el primero. Con filtros, otro aviso. */}
+        {data && experiments.length === 0 && (
+          <div style={{ marginTop: 18, padding: '28px 24px', border: '2px dashed var(--color-divider)', textAlign: 'center' }}>
+            <div className="nd" style={{ fontSize: 16, marginBottom: 8 }}>Aún no hay experimentos</div>
+            <p className="hint" style={{ margin: '0 0 16px' }}>Crea el primero: solo pide nombre, fecha y notas. Los grupos y los videos se agregan después.</p>
+            <Link className="btn btn-primary" to="/experimentos/nuevo">Nuevo experimento</Link>
+          </div>
+        )}
+        {data && experiments.length > 0 && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
         <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--muted)' }}>
           Eliminar un experimento es permanente e irreversible. Solo puede hacerlo quien lo creó o un Administrador, y no mientras un análisis esté procesando o en pausa.
         </p>
