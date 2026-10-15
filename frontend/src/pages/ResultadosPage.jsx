@@ -448,7 +448,7 @@ function ResultadosTanda({ clave, gid, letra }) {
                 {comparacion ? comparacion.map((g) => <Comparacion key={g.grupo} g={g} c={conducta} />) : <p className="hint">Cargando…</p>}
               </div>
               <p className="hint" style={{ margin: '12px 0 0' }}>
-                Promedio por espécimen de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los especímenes sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio.
+                Promedio por espécimen de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los especímenes sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio. Cada grupo entra con todas sus tandas, no solo la que se ve arriba.
               </p>
             </div>
 
