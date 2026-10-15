@@ -58,7 +58,7 @@ export default function ProgresoPage() {
         {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <h3 style={{ margin: '0 0 8px' }}>Análisis en curso</h3>
         <p className="lead" style={{ margin: '0 0 22px', maxWidth: 600 }}>
-          El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez y el <em>worker</em> informa su avance; esta pantalla se actualiza sola. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
+          El sistema analiza un video a la vez, en el orden en que se subieron; esta pantalla se actualiza sola. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
         </p>
 
         {error && <p className="hint" style={{ margin: '0 0 18px', color: 'var(--color-accent-700)' }}>No se pudo consultar la cola. Se vuelve a intentar en unos segundos.</p>}
@@ -191,7 +191,7 @@ function TrabajoFallido({ j }) {
         <FieldError msg={errDiag} />
         {diag === 'demo' && (
           <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
-            <strong>Reporte de diagnóstico.</strong> Lo genera el worker cuando el análisis falla y el servidor lo entrega; aquí solo se descarga. Será un PDF con el video, la etapa en que se detuvo y la causa: {mensajeErrorAnalisis(j.stage).toLowerCase()} Disponible cuando el backend esté conectado.
+            <strong>Reporte de diagnóstico.</strong> El sistema lo prepara cuando el análisis falla y aquí se descarga. Es un PDF con el video, la etapa en que se detuvo y la causa: {mensajeErrorAnalisis(j.stage).toLowerCase()} Todavía no está disponible en el modo demo.
           </div>
         )}
       </div>

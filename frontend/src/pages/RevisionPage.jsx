@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Cargando, Migas } from '../components/ui'
+import { useAuth } from '../contexts/AuthContext'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { useAsync } from '../hooks/useAsync'
 import { getRevision, guardarSegundos, reiniciarAnalisis } from '../services/revision'
@@ -48,7 +49,11 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   const navigate = useNavigate()
   const N = datos.duracion
   const ESP = datos.especimenes.map((e) => e.numeroCilindro)
-  const BORRADOR = 'fst.revision.' + clave + '.' + id
+  const { user } = useAuth()
+  // El borrador es de cada cuenta; «Cerrar sesión» borra los de todas (AuthContext).
+  const BORRADOR = 'fst.revision.' + user.id + '.' + clave + '.' + id
+  // Sin permiso para corregir, la revisión es de solo lectura (la respuesta lo dice).
+  const soloLectura = datos.puedeCorregir === false
 
   // Por espécimen: p (conducta que hay en el servidor), o (su origen), c (la de ahora) y v
   // (segundos vistos). Viven en una referencia; version vuelve a pintar.
@@ -159,6 +164,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   // Con el video corriendo: desde 0.4 s antes de la tecla hasta el siguiente cambio de color.
   // En pausa: solo el segundo donde estás.
   const aplicar = useCallback((c) => {
+    if (soloLectura) return
     const X = L.current[tubo]
     const s0 = play ? segDe(tRef.current - REACCION) : segDe(tRef.current)
     let s1 = s0
@@ -376,7 +382,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
           <div style={{ display: 'flex', gap: 8 }}>
             <Link className="btn btn-secondary" to={enlaceResultados(clave, datos.grupo.id, datos.tanda)}>Volver a resultados</Link>
             <button type="button" className="btn btn-secondary" onClick={() => { setPlay(false); setResumen(true) }}>Resumen</button>
-            <button type="button" className="btn btn-primary" disabled={estado.guardando} onClick={guardar}>{estado.guardando ? 'Guardando…' : 'Guardar correcciones'}</button>
+            {!soloLectura && <button type="button" className="btn btn-primary" disabled={estado.guardando} onClick={guardar}>{estado.guardando ? 'Guardando…' : 'Guardar correcciones'}</button>}
           </div>
         </div>
 
@@ -391,7 +397,9 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
                   <button type="button" className="linkbtn" style={{ fontSize: 12 }} onClick={descartar}>Descartar borrador</button>
                 </div>
               )
-              : <div className="hint">Cada segundo ya trae la conducta que puso el sistema. Si lo que ves no coincide con «Ahora», pulsa la conducta correcta. Solo se guarda lo que ya viste.</div>)}
+              : soloLectura
+                ? <div className="note-bar">Solo lectura: quien subió el video o un Administrador puede corregir estos segundos.</div>
+                : <div className="hint">Cada segundo ya trae la conducta que puso el sistema. Si lo que ves no coincide con «Ahora», pulsa la conducta correcta. Solo se guarda lo que ya viste.</div>)}
         </div>
 
         <div role="tablist" aria-label="Especímenes" style={{ display: 'flex', borderBottom: '2px solid var(--color-divider)', margin: '18px 0 20px' }}>
@@ -409,7 +417,9 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
                 ? <video ref={videoRef} src={datos.videoUrl} preload="auto" muted playsInline aria-label={'Video de la tanda ' + datos.tanda} />
                 : (
                   <p style={{ position: 'absolute', zIndex: 2, left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '10px 16px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)', background: 'var(--color-bg)', border: '1px solid var(--color-divider)' }}>
-                    Aquí va el video de la tanda (la copia H.264 de los últimos 300 s): la genera el worker al terminar el análisis y la entrega el servidor. Disponible cuando el backend esté conectado. Sin video, el cabezal avanza igual y se puede revisar con las teclas.
+                    {datos.videoDisponible === false
+                      ? 'El video ya se borró (30 días después del análisis o por falta de espacio). Las conductas de cada segundo se conservan: el cabezal avanza igual y se puede revisar con las teclas.'
+                      : 'Aquí aparecerá el video de la tanda (sus últimos 5 minutos). Todavía no está disponible en el modo demo. El cabezal avanza igual y se puede revisar con las teclas.'}
                   </p>
                 )}
               {/* Oscurece todo menos el tubo del espécimen que se revisa (cajas.json). */}
@@ -502,7 +512,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
             <div>
               <div className="k" style={{ marginBottom: 10 }}>Reiniciar el análisis</div>
               <p className="hint" style={{ margin: '0 0 10px' }}>Vuelve a analizar el video desde cero. Al empezar se borra el resultado actual, también las correcciones guardadas.</p>
-              <button type="button" className="btn btn-secondary" onClick={reiniciar}>Reiniciar el análisis…</button>
+              <button type="button" className="btn btn-secondary" disabled={soloLectura} onClick={reiniciar}>Reiniciar el análisis…</button>
             </div>
           </div>
         </div>

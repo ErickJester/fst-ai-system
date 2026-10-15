@@ -49,6 +49,7 @@ export async function getRevision(clave, id) {
     return reply({
       puedeCorregir: true,
       videoUrl: null,
+      videoDisponible: r.t.video_disponible !== false,
       experimento: { clave, titulo: r.exp.titulo },
       grupo: { id: r.g.id, nombre: r.g.nombre, tratamiento: r.g.tratamiento },
       tanda: r.t.letra,

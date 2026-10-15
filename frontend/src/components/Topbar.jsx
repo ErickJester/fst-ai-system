@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { listNotifications, setRead, markAllRead } from '../services/notifications'
 import { fechaCorta } from '../lib/fst'
+import { version } from '../../package.json'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 // 2k · Barra superior: lo que cada pantalla pone a la izquierda (children),
@@ -144,6 +145,7 @@ export default function Topbar({ children }) {
             </div>
             <Link className="menu-item" to="/perfil" style={{ borderBottom: '1px solid var(--color-divider)' }}>Mi perfil</Link>
             <a className="menu-item" href="/login" onClick={salir}>Cerrar sesión</a>
+            <div className="num" style={{ padding: '8px 14px', fontSize: 11, color: 'var(--muted)', borderTop: '1px solid var(--color-divider)' }}>FST v{version}</div>
           </div>
         )}
       </div>

@@ -115,6 +115,7 @@ export default function GrupoPage() {
                         <div style={{ flex: 1 }}>
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 2 · evaluación <span style={dur}>5 min · 24 h después</span></div>
                           <div style={sub}>{notaDia2(t)}</div>
+                          {t.video_disponible === false && <div style={{ ...sub, color: 'var(--color-accent-700)' }}>El video ya se borró (30 días después del análisis o por falta de espacio). Resultados y reportes se conservan.</div>}
                         </div>
                         <EstadoTag estado={estadoDeTanda(t)} />
                       </div>

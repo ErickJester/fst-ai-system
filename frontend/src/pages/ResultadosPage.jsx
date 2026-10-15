@@ -186,6 +186,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
   const [reporte, setReporte] = useState(null) // { formato, error } del último botón de reporte
+  const [lineaSel, setLineaSel] = useState('') // espécimen del desglose por minuto: «A-1»
   // Una tanda (letra) o el grupo completo (letra null). El grupo completo reúne solo las tandas
   // con análisis completado; las demás se señalan como faltantes (RN-12).
   const { data, error, loading } = useAsync(async () => {
@@ -219,6 +220,10 @@ function ResultadosTanda({ clave, gid, letra }) {
   const analizado = rs.map((x) => x.analizado_en).sort().at(-1)
   const vistaTexto = grupoCompleto ? 'del grupo completo' : 'de la Tanda ' + r.letra
   const enlaceGrupo = `/experimentos/${clave}/resultados?grupo=${gid}`
+  // Desglose por minuto de cada espécimen que se ve; se elige uno.
+  const lineas = rs.flatMap((x) => (x.lineas_tiempo || [x.linea_tiempo]).map((l) => ({ ...l, letra: x.letra, clave: x.letra + '-' + l.numeroCilindro })))
+  const linea = lineas.find((l) => l.clave === lineaSel) || lineas[0]
+  const enMinuto = (segs, k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
 
   // Pide el reporte al backend y lo descarga; sin backend, explica qué hará. CSV y XLSX son de
   // lo que se ve (el grupo completo o la tanda); el PDF, del experimento (D-93).
@@ -306,7 +311,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             <span style={{ flex: 1, lineHeight: 1.55 }}>
               {reporte.error || (
                 <>
-                  <strong>Reporte {REPORTES[reporte.formato].boton.split(' ·')[0]} {reporte.formato === 'pdf' ? 'del experimento' : vistaTexto}.</strong> Lo genera el servidor y aquí se descarga. Tendrá {REPORTES[reporte.formato].hara} Disponible cuando el backend esté conectado.
+                  <strong>Reporte {REPORTES[reporte.formato].boton.split(' ·')[0]} {reporte.formato === 'pdf' ? 'del experimento' : vistaTexto}.</strong> Lo prepara el sistema y aquí se descarga. Tendrá {REPORTES[reporte.formato].hara} Todavía no está disponible en el modo demo.
                 </>
               )}
             </span>
@@ -352,7 +357,11 @@ function ResultadosTanda({ clave, gid, letra }) {
                         <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{etiqueta(e, e.letra)}</span>
                       </div>
                     </td>
-                    {KEYS.map((k) => <td key={k} className="num" style={{ textAlign: 'right' }}>{fmt(e[k + '_s'])}</td>)}
+                    {KEYS.map((k) => (
+                      <td key={k} className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {fmt(e[k + '_s'])} <span style={{ fontSize: 11, color: MUT }}>{Math.round((e[k + '_s'] / r.duracion_s) * 100)} %</span>
+                      </td>
+                    ))}
                     <td>
                       <div style={{ display: 'flex', height: 16, border: '1px solid var(--color-divider)' }}>
                         {KEYS.map((k) => <div key={k} title={LBL[k]} style={{ background: CMAP[k], width: (e[k + '_s'] / r.duracion_s) * 100 + '%' }} />)}
@@ -375,10 +384,15 @@ function ResultadosTanda({ clave, gid, letra }) {
               Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
-            <div ref={refs.timeline} className="k" style={{ margin: '26px 0 12px' }}>{etiqueta(r.linea_tiempo, r.letra)}</div>
+            <div ref={refs.timeline} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '26px 0 12px' }}>
+              <label className="k" htmlFor="lineaSel" style={{ flex: 1 }}>Desglose por minuto · {etiqueta(linea, linea.letra)}</label>
+              <select className="input" id="lineaSel" style={{ width: 210, padding: '4px 6px', fontSize: 12 }} value={linea.clave} onChange={(e) => setLineaSel(e.target.value)}>
+                {lineas.map((l) => <option key={l.clave} value={l.clave}>{etiqueta(l, l.letra)}</option>)}
+              </select>
+            </div>
             <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {r.linea_tiempo.minutos.map((segs, i) => (
+                {linea.minutos.map((segs, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span className="num" style={{ width: 74, fontSize: 11.5, color: MUT60 }}>{fmt(i * 60)}–{fmt(i * 60 + 60)}</span>
                     <div style={{ flex: 1, display: 'flex', height: 18, border: '1px solid var(--color-divider)' }}>
@@ -387,6 +401,19 @@ function ResultadosTanda({ clave, gid, letra }) {
                   </div>
                 ))}
               </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table" style={{ marginTop: 10, fontSize: 12 }}>
+                <thead><tr><th>Minuto</th>{CONDUCTAS.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}</tr></thead>
+                <tbody>
+                  {linea.minutos.map((segs, i) => (
+                    <tr key={i}>
+                      <td className="num">{fmt(i * 60)}–{fmt(i * 60 + 60)}</td>
+                      {KEYS.map((k) => <td key={k} className="num" style={{ textAlign: 'right' }}>{enMinuto(segs, k)} s</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             <div ref={refs.bloques} className="k" style={{ margin: '26px 0 12px' }}>Bloques de 5 s</div>
@@ -462,7 +489,7 @@ function Bloques({ clave, gid, letras }) {
   if (!data) {
     return (
       <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
-        <strong>Bloques de 5 s.</strong> Los calcula el servidor con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Disponible cuando el backend esté conectado.
+        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Todavía no está disponible en el modo demo.
       </div>
     )
   }
