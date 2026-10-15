@@ -296,8 +296,10 @@ function ResultadosTanda({ clave, gid, letra }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }} className="no-print">
             {/* Corregir los segundos: solo quien subió el video o un Administrador (D-57). */}
-            {!grupoCompleto && r.id_analisis && (user.admin || r.subido_por === user.id) && (
-              <Link className="btn btn-secondary" to={enlaceRevision(clave, r.id_analisis)}>Revisar segundo a segundo</Link>
+            {/* Con el video ya borrado (30 días, R-05) el botón queda en gris con el motivo. */}
+            {!grupoCompleto && r.id_analisis && (user.admin || r.subido_por === user.id) && (r.video_disponible === false
+              ? <button type="button" className="btn btn-secondary" aria-disabled="true" title="Video no disponible">Revisar segundo a segundo</button>
+              : <Link className="btn btn-secondary" to={enlaceRevision(clave, r.id_analisis)}>Revisar segundo a segundo</Link>
             )}
             {Object.entries(REPORTES).map(([formato, x]) => (
               <button key={formato} type="button" className={'btn ' + (formato === 'pdf' ? 'btn-primary' : 'btn-secondary')} style={btnLeft}
