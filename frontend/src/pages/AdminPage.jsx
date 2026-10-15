@@ -260,8 +260,8 @@ export default function AdminPage() {
           </div>
 
           <div style={{ background: 'var(--color-bg)', padding: '18px 20px', gridColumn: '1 / -1', borderTop: '1px solid var(--color-divider)' }}>
-            <div className="k" style={{ marginBottom: 14 }}>Conductas y modelo</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)' }}>
+            <div className="k" style={{ marginBottom: 14 }}>Conductas</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
               {sistema && catalogos(sistema).map((c) => (
                 <div key={c.titulo} style={{ background: 'var(--color-bg)', paddingRight: 18 }}>
                   <div className="nd" style={{ fontSize: 13, marginBottom: 10 }}>{c.titulo}</div>
@@ -341,10 +341,9 @@ function Disco({ d }) {
   )
 }
 
-// Solo de consulta: ningún requisito permite cambiar las conductas, el modelo ni el umbral.
+// Solo de consulta: ningún requisito permite cambiar las conductas.
 const catalogos = (s) => [
   { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: c, m: 'sin duración mínima' })) },
-  { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: ' + s.modelo, m: 'no se cambia desde aquí' }] },
 ]
 
 // La contraseña temporal se muestra una sola vez: no se cierra con Escape ni al hacer clic

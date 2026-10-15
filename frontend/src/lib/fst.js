@@ -24,7 +24,7 @@ export const fechaRango = (desde, hasta) => {
 }
 
 // ── valores de la API → etiquetas de los mockups ───────────────────────────
-export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', QUEUED: 'En cola', RUNNING: 'Procesando', PAUSED: 'En pausa', DONE: 'Completado', FAILED: 'Error', CANCELED: 'Cancelado' }
+export const ESTADO_TANDA = { SIN_VIDEO: 'Sin video', ESPERA_DIA2: 'En espera del Día 2', QUEUED: 'En cola', RUNNING: 'Procesando', PAUSED: 'En pausa', DONE: 'Completado', FAILED: 'Error', CANCELED: 'Cancelado' }
 export const TIPO_GRUPO = { CONTROL: 'control', REFERENCIA: 'referencia', EXPERIMENTAL: 'tratamiento experimental' }
 export const DIA = { DAY1: 'Día 1', DAY2: 'Día 2' }
 // En el orden en que las recorre el pipeline: tres etapas, un tercio del avance cada una.
@@ -54,6 +54,9 @@ export const DE_BD = Object.fromEntries(Object.entries(CONDUCTA_BD).map(([k, v])
 
 // Revisión segundo a segundo de un análisis completado (R-14).
 export const enlaceRevision = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/revision`
+
+// Estado que se muestra de una tanda: con el Día 1 guardado y sin Día 2, «en espera del Día 2».
+export const estadoDeTanda = (t) => (t.estado === 'SIN_VIDEO' && t.dia1 ? 'ESPERA_DIA2' : t.estado)
 
 // Pantalla de pausa de un análisis (R-15): ahí se ajusta el recuadro o se cancela.
 export const enlacePausa = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/pausa`

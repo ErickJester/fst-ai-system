@@ -178,12 +178,11 @@ export const users = [
   { id: 4, nombre: 'L.', apellidos: 'Ortega Camacho', email: 'lortega@ipn.mx', identificador: '2020630417', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
 ]
 
-// Estado del sistema (2g): disco en GB, catálogo de conductas y modelo en uso.
+// Estado del sistema (2g): disco en GB y catálogo de conductas.
 export const system = {
   disco: { usado_gb: 412, total_gb: 500, videos_gb: 381, resultados_gb: 2.4, por_liberar_7d_gb: 48 },
   // Las cuatro conductas de la tabla CONDUCTA; ninguna tiene duración mínima (RF-18).
   conductas: ['Nado activo', 'Inmovilidad', 'Escalamiento', 'Conducta activa'],
-  modelo: 'clf-cascada v2.1',
 }
 
 // Notificaciones de la cuenta (2k). tipo: los seis de services/notifications.js.
@@ -214,7 +213,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 12
+const VERSION_DATOS = 13
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 

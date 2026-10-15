@@ -76,7 +76,7 @@ export async function setUserActive(id, isActive) {
   return (await api.patch(`/admin/users/${id}`, { is_active: isActive })).data
 }
 
-// GET /admin/system → disco, conductas y modelo en uso
+// GET /admin/system → disco y conductas
 export async function getSystem() {
   if (USE_MOCKS) return reply(db.system)
   return (await api.get('/admin/system')).data
