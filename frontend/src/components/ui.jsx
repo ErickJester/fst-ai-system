@@ -9,6 +9,7 @@ const INK = 'var(--color-text)'
 // Por etiqueta de estado de tanda: clase, colores de la etiqueta y relleno de la barra de avance.
 const ESTADO = {
   'Sin video': { cls: 'tag-outline', bg: 'transparent', fg: 'var(--muted)', fill: 'transparent' },
+  'En espera del Día 2': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'transparent' },
   'En cola': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'var(--color-accent-200)' },
   'Procesando': { cls: 'tag-accent', bg: 'var(--color-accent-100)', fg: 'var(--color-accent-700)', fill: 'var(--color-accent)' },
   'En pausa': { cls: 'tag-accent', bg: 'var(--color-bg)', fg: 'var(--color-accent-700)', fill: 'repeating-linear-gradient(90deg, var(--color-accent) 0 4px, var(--color-bg) 4px 7px)' },

@@ -4,7 +4,7 @@ import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, enlaceRevision, mensajeErrorAnalisis, especimen } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, enlaceRevision, mensajeErrorAnalisis, especimen, estadoDeTanda } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -14,13 +14,14 @@ const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
 
 // Nota del video de Día 2 según el estado de su análisis.
 function notaDia2(t) {
-  switch (t.estado) {
+  switch (estadoDeTanda(t)) {
     case 'DONE': return 'Video principal del sistema. Analizado completo.'
     case 'QUEUED': return 'En espera de turno en la cola: un trabajo a la vez.'
     case 'RUNNING': return ETAPA[t.progreso.etapa] + ' · en curso · ' + t.progreso.pct + ' %'
     case 'FAILED': return mensajeErrorAnalisis(t.error.etapa)
     case 'PAUSED': return 'En pausa: el sistema dejó de ver a un espécimen. Hay 5 minutos para ajustar el recuadro.'
     case 'CANCELED': return 'Análisis cancelado.'
+    case 'ESPERA_DIA2': return 'Aún no se sube el video del Día 2. El Día 1 ya está guardado; el análisis empieza cuando se cargue el del Día 2.'
     case 'SIN_VIDEO': return 'Todavía no se sube el video de Día 2.'
     default: return ''
   }
@@ -43,6 +44,7 @@ export default function GrupoPage() {
   if (error) return <NoEncontrado />
 
   const exp = g.experimento
+  const completadas = g.tandas.filter((t) => t.estado === 'DONE').length
 
   return (
     <div className="app">
@@ -52,14 +54,23 @@ export default function GrupoPage() {
       </Topbar>
 
       <div className="page">
-        <div style={{ marginBottom: 6 }}>
-          <h2 style={{ margin: '0 0 9px' }}>
-            {nombreGrupo} <TipoTag tipo={g.tipo} style={{ verticalAlign: 'middle', marginLeft: 8 }} />
-          </h2>
-          <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--muted-2)' }}>
-            <span>{g.tratamiento}</span>
-            <span className="num">{g.n_especimenes} especímenes</span>
-            <span className="num">{g.tandas.length} tandas · {g.tandas.map((t) => t.n_cilindros).join(' + ')} especímenes</span>
+        <div style={{ marginBottom: 6, display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ margin: '0 0 9px' }}>
+              {nombreGrupo} <TipoTag tipo={g.tipo} style={{ verticalAlign: 'middle', marginLeft: 8 }} />
+            </h2>
+            <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--muted-2)' }}>
+              <span>{g.tratamiento}</span>
+              <span className="num">{g.n_especimenes} especímenes</span>
+              <span className="num">{g.tandas.length} tandas · {g.tandas.map((t) => t.n_cilindros).join(' + ')} especímenes</span>
+            </div>
+          </div>
+          {/* Resultados del grupo completo (RF-19, D-93): reúne las tandas con análisis completado. */}
+          <div style={{ textAlign: 'right' }}>
+            {completadas
+              ? <Link className="btn btn-primary" to={`/experimentos/${exp.clave}/resultados?grupo=${g.id}`}>Ver resultados del grupo completo</Link>
+              : <button type="button" className="btn btn-primary" disabled title="Ninguna tanda tiene el Día 2 analizado">Ver resultados del grupo completo</button>}
+            <div className="hint" style={{ marginTop: 6 }}>Reúne las tandas con análisis completado: {completadas} de {g.tandas.length}</div>
           </div>
         </div>
 
@@ -74,7 +85,7 @@ export default function GrupoPage() {
                   <span className="nd" style={{ fontSize: 16 }}>Tanda {t.letra}</span>
                   <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{fechaRango(t.fecha_dia1, t.fecha_dia2)}</span>
                   <div style={{ flex: 1 }} />
-                  <EstadoTag estado={t.estado} />
+                  <EstadoTag estado={estadoDeTanda(t)} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '410px 1fr' }}>
                   <div style={{ padding: '18px 20px', borderRight: '2px solid var(--color-divider)' }}>
@@ -95,9 +106,9 @@ export default function GrupoPage() {
                         <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 16%,transparent) 0 5px,transparent 5px 10px)', color: MUT60 }}>cuadro<br />día 1</div>
                         <div style={{ flex: 1 }}>
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 1 · sesión de estrés <span style={dur}>20 min</span></div>
-                          <div style={sub}>{d1 ? 'Video cargado. No se analiza: confirma la sesión de habituación.' : 'Sin video de Día 1 (opcional)'}</div>
+                          <div style={sub}>{d1 ? 'Se guarda y no se analiza (habituación).' : 'Sin video de Día 1 (opcional)'}</div>
                         </div>
-                        {d1 && <span className="tag tag-neutral" style={{ whiteSpace: 'nowrap' }}>Cargado</span>}
+                        {d1 && <span className="tag" style={{ whiteSpace: 'nowrap' }}>Guardado</span>}
                       </div>
                       <div style={{ background: 'var(--color-accent-100)', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 15px', borderLeft: '4px solid var(--color-accent)' }}>
                         <div className="thumb grayscale" style={{ background: 'repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-accent) 34%,transparent) 0 5px,transparent 5px 10px)', color: 'var(--color-accent-800)' }}>cuadro<br />día 2</div>
@@ -105,7 +116,7 @@ export default function GrupoPage() {
                           <div className="nd" style={{ fontSize: 13.5 }}>Día 2 · evaluación <span style={dur}>5 min · 24 h después</span></div>
                           <div style={sub}>{notaDia2(t)}</div>
                         </div>
-                        <EstadoTag estado={t.estado} />
+                        <EstadoTag estado={estadoDeTanda(t)} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, fontSize: 11.5, color: MUT60 }}>
@@ -115,12 +126,14 @@ export default function GrupoPage() {
                         ? (
                           <span style={{ display: 'flex', gap: 14 }}>
                             {t.id_analisis && <Link to={enlaceRevision(exp.clave, t.id_analisis)}>Revisar segundo a segundo</Link>}
-                            <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados</Link>
+                            <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados de esta tanda</Link>
                           </span>
                         )
                         : t.estado === 'PAUSED'
                           ? <Link to={enlacePausa(exp.clave, t.id_analisis)}>Ajustar o cancelar →</Link>
-                          : <Link to="/analisis">Ver progreso del análisis →</Link>}
+                          : t.estado === 'SIN_VIDEO'
+                            ? <Link to={`/experimentos/${exp.clave}/cargar`}>Cargar el video del Día 2 →</Link>
+                            : <Link to="/analisis">Ver progreso del análisis →</Link>}
                     </div>
                   </div>
                 </div>

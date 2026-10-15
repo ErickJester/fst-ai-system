@@ -6,7 +6,7 @@ import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperi
 import { useAuth } from '../contexts/AuthContext'
 import { getExperiment } from '../services/experiments'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA, primeraTandaLista, enlaceResultados } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados } from '../lib/fst'
 
 // Hay análisis en cola, en curso o en pausa en alguna tanda (solo se analiza el Día 2).
 const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
@@ -75,7 +75,7 @@ export default function ExperimentoPage() {
             <div className="k" style={{ marginBottom: 8 }}>Avance · {completas} de {tandas.length} tandas con Día 2 completado</div>
             <div style={{ display: 'flex', gap: 2 }}>
               {tandas.map((t, i) => (
-                <div key={i} title={ESTADO_TANDA[t.estado]} style={{ flex: 1, height: 12, background: rellenoTanda(t.estado), border: '1px solid var(--color-divider)' }} />
+                <div key={i} title={ESTADO_TANDA[estadoDeTanda(t)]} style={{ flex: 1, height: 12, background: rellenoTanda(estadoDeTanda(t)), border: '1px solid var(--color-divider)' }} />
               ))}
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function ExperimentoPage() {
                   <span className="nd" style={{ fontSize: 13 }}>Tanda {t.letra}</span>
                   <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{posiciones(t)}</span>
                   <div style={{ flex: 1 }} />
-                  <EstadoTag estado={t.estado} />
+                  <EstadoTag estado={estadoDeTanda(t)} />
                 </div>
               ))}
               <Link className="btn btn-ghost" to={`/experimentos/${exp.clave}/grupos/${g.id}`} style={{ marginTop: 12 }}>Abrir grupo →</Link>
