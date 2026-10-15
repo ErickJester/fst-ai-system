@@ -1,21 +1,27 @@
-import React, { useEffect } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 
+// La entrada (login y lista de experimentos) va en la carga inicial; las demás pantallas se
+// descargan al abrirlas por primera vez, para que la app arranque más rápido.
 import LoginPage from './pages/LoginPage'
-import PrimerAccesoPage from './pages/PrimerAccesoPage'
-import RestablecerPage from './pages/RestablecerPage'
-import PerfilPage from './pages/PerfilPage'
 import ExperimentosPage from './pages/ExperimentosPage'
-import ExperimentoPage from './pages/ExperimentoPage'
-import NuevoExperimentoPage from './pages/NuevoExperimentoPage'
-import GrupoPage from './pages/GrupoPage'
-import CargarVideoPage from './pages/CargarVideoPage'
-import ProgresoPage from './pages/ProgresoPage'
-import PausaPage from './pages/PausaPage'
-import RevisionPage from './pages/RevisionPage'
-import ResultadosPage from './pages/ResultadosPage'
-import AdminPage from './pages/AdminPage'
+const PrimerAccesoPage = lazy(() => import('./pages/PrimerAccesoPage'))
+const RestablecerPage = lazy(() => import('./pages/RestablecerPage'))
+const PerfilPage = lazy(() => import('./pages/PerfilPage'))
+const ExperimentoPage = lazy(() => import('./pages/ExperimentoPage'))
+const NuevoExperimentoPage = lazy(() => import('./pages/NuevoExperimentoPage'))
+const GrupoPage = lazy(() => import('./pages/GrupoPage'))
+const CargarVideoPage = lazy(() => import('./pages/CargarVideoPage'))
+const ProgresoPage = lazy(() => import('./pages/ProgresoPage'))
+const PausaPage = lazy(() => import('./pages/PausaPage'))
+const RevisionPage = lazy(() => import('./pages/RevisionPage'))
+const ResultadosPage = lazy(() => import('./pages/ResultadosPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+
+// Mientras se descarga una pantalla. Sin barra superior: también la ven las pantallas públicas
+// (restablecer contraseña, primer acceso), donde no hay sesión de la que leer la cuenta.
+const Descargando = () => <div className="page"><p className="hint">Cargando…</p></div>
 
 // Sin sesión → login. Con contraseña temporal → solo primer acceso (2i).
 function Protegida({ children, admin }) {
@@ -65,6 +71,7 @@ export default function AppRouter() {
   return (
     <>
       <ScrollArriba />
+      <Suspense fallback={<Descargando />}>
       <Routes>
         <Route path="/login" element={<SinSesion><LoginPage /></SinSesion>} />
         <Route path="/restablecer" element={<RestablecerPage />} />
@@ -84,6 +91,7 @@ export default function AppRouter() {
 
         <Route path="*" element={<Inicio />} />
       </Routes>
+      </Suspense>
     </>
   )
 }
