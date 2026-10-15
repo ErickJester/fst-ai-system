@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FST · Revisión segundo a segundo</title>
+<link rel="stylesheet" href="assets/modernist.css">
+<link rel="stylesheet" href="assets/fst.css">
+<script src="assets/app.js"></script>
+<style>
+  .tab{font-family:var(--font-heading);font-weight:800;font-size:13px;padding:10px 15px;border:0;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;color:var(--color-text);cursor:pointer;display:flex;align-items:baseline;gap:8px}
+  .tab.on{background:var(--color-accent);color:var(--color-bg);border-bottom-color:var(--color-accent)}
+  .tab:not(.on):hover{background:color-mix(in srgb,var(--color-text) 7%,transparent)}
+  .tab small{font-family:var(--font-body);font-weight:400;font-size:11px;opacity:.75}
+  .sw{width:11px;height:11px;flex:none;border:1px solid var(--color-divider);display:inline-block}
+  .sw.activa{background:repeating-linear-gradient(135deg,var(--color-text) 0 3px,var(--color-neutral-400) 3px 6px)}
+  .sw.nove{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--color-text) 18%,transparent) 0 2px,transparent 2px 5px)}
+
+  /* escenario: el video con el tubo destacado */
+  .stage{position:relative;height:372px;background:#16181a;overflow:hidden;border:2px solid var(--color-text)}
+  .scene{position:absolute;inset:0;background:linear-gradient(180deg,#2c2e30 0%,#1f2123 60%,#171819 100%)}
+  .tubo{position:absolute;top:34px;bottom:30px;width:150px;border:2px solid #55585c;background:linear-gradient(180deg,#3a3d40 0%,#3b4a55 30%,#32414c 100%)}
+  .tubo .agua{position:absolute;left:0;right:0;top:64px;height:2px;background:rgba(220,230,240,.45)}
+  .tubo .esp{position:absolute;width:52px;height:28px;border-radius:26px;background:#e3e0da;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  .velo{position:absolute;background:rgba(0,0,0,.6);pointer-events:none}
+  .spot{position:absolute;border:3px solid var(--color-accent-300);pointer-events:none}
+  .spot span{position:absolute;top:-3px;left:-3px;transform:translateY(-100%);background:var(--color-accent-300);color:var(--color-text);font-family:var(--font-heading);font-weight:800;font-size:11px;padding:3px 8px;white-space:nowrap}
+  .badge{position:absolute;top:12px;right:12px;background:var(--color-bg);border:2px solid var(--color-text);padding:6px 10px;font-size:12px}
+  .pausa{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--color-bg);border:2px solid var(--color-text);border-left:4px solid var(--color-accent);padding:5px 12px;font-size:12px;white-space:nowrap}
+  .toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--color-bg);border:2px solid var(--color-text);padding:10px 20px;font-family:var(--font-heading);font-weight:800;font-size:17px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
+  .toast.on{opacity:1}
+
+  /* líneas de tiempo */
+  .tl-row{display:grid;grid-template-columns:118px 1fr;column-gap:12px;align-items:center}
+  canvas{display:block;width:100%;cursor:pointer}
+  .tl-labs div{height:22px;display:flex;align-items:center;font-size:11.5px;color:var(--muted)}
+  .tl-labs div.act{color:var(--color-accent-700);font-weight:700}
+
+  /* botones de conducta */
+  .cls{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;padding:0 8px;white-space:nowrap;border:2px solid var(--color-text);background:var(--color-bg);color:var(--color-text);font-family:var(--font-heading);font-weight:800;font-size:13px;cursor:pointer}
+  .cls:hover{background:color-mix(in srgb,var(--color-text) 7%,transparent)}
+  .cls.ahora{background:var(--color-text);color:var(--color-bg)}
+  .cls[data-c=""]{flex:.75}
+  .cls .sw{width:13px;height:13px}
+  .key{font-family:var(--font-body);font-weight:700;font-size:11px;padding:1px 6px;border:1px solid currentColor;opacity:.8}
+  .hit{animation:hit .18s ease}
+  @keyframes hit{40%{transform:scale(.96)}}
+  kbd{font-family:var(--font-body);font-size:11px;font-weight:700;padding:0 5px;border:1px solid var(--color-divider);background:var(--color-bg)}
+  .ahora-val{display:flex;align-items:center;gap:10px;font-family:var(--font-heading);font-weight:800;font-size:24px;line-height:1.15}
+  .ahora-val .sw{width:16px;height:16px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 2l · Revisión segundo a segundo -->
+  <nav class="nav" data-user="MR">
+    <span class="nav-brand" style="margin-right:0"><a href="experimentos.html" style="font-size:inherit">FST</a></span>
+    <span class="crumbs"><a href="experimentos.html">Experimentos</a> / <a href="experimento.html">Compuesto CSR-14 · curva de dosis</a> / <a href="grupo.html?g=G-02">Referencia</a> / <a href="resultados.html">Tanda A · Día 2</a> / <span class="here">Revisión segundo a segundo</span></span>
+  </nav>
+
+  <div class="page">
+    <div style="display:flex;align-items:flex-end;gap:24px">
+      <div style="flex:1">
+        <h2 style="margin:0 0 9px">Revisión segundo a segundo · Referencia, Tanda A</h2>
+        <div class="num" style="font-size:12.5px;color:var(--muted-2)">Fluoxetina 10 mg/kg · Día 2, 300 s de evaluación · analizado 24 feb 2026, 15:02</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <a class="btn btn-secondary" href="resultados.html">Volver a resultados</a>
+        <button type="button" class="btn btn-primary" id="btnGuardar">Guardar correcciones</button>
+      </div>
+    </div>
+
+    <div id="estado" style="margin-top:16px"></div>
+
+    <div id="tabs" style="display:flex;border-bottom:2px solid var(--color-divider);margin:18px 0 20px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:2px;background:var(--color-divider)">
+      <div style="background:var(--color-bg);padding-right:24px">
+        <div class="stage" id="stage">
+          <div class="scene" id="scene"></div>
+          <div class="velo"></div><div class="velo"></div><div class="velo"></div><div class="velo"></div>
+          <div class="spot" id="spot"><span id="spotTxt"></span></div>
+          <div class="badge num" id="info"></div>
+          <div class="pausa" id="pausa">En pausa · una tecla cambia solo este segundo</div>
+          <div class="toast" id="toast"></div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div class="tl-row">
+            <div class="k">Lupa · 40 s</div>
+            <canvas id="cvZoom"></canvas>
+          </div>
+          <div class="tl-row" style="margin-top:8px">
+            <div class="tl-labs" id="tlLabs"></div>
+            <canvas id="cvMain"></canvas>
+          </div>
+          <div class="tl-row" style="margin-top:2px">
+            <div></div>
+            <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>0:00</span><span>1:00</span><span>2:00</span><span>3:00</span><span>4:00</span><span>5:00</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:18px">
+          <button type="button" class="cls" data-c="nado"><span class="key">1</span><span class="sw" style="background:var(--color-text)"></span>Nado activo</button>
+          <button type="button" class="cls" data-c="inmov"><span class="key">2</span><span class="sw" style="background:var(--color-accent)"></span>Inmovilidad</button>
+          <button type="button" class="cls" data-c="escal"><span class="key">3</span><span class="sw" style="background:var(--color-neutral-400)"></span>Escalamiento</button>
+          <button type="button" class="cls" data-c="activa"><span class="key">4</span><span class="sw activa"></span>Conducta activa</button>
+          <button type="button" class="cls" data-c=""><span class="key">0</span><span class="sw nove"></span>No se ve</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap">
+          <span class="k">Velocidad</span>
+          <span class="seg" id="vel" style="display:inline-flex">
+            <span class="seg-opt" data-v="0.5">0.5×</span><span class="seg-opt" data-v="0.75">0.75×</span><span class="seg-opt on" data-v="1">1×</span><span class="seg-opt" data-v="1.5">1.5×</span><span class="seg-opt" data-v="2">2×</span>
+          </span>
+          <button type="button" class="btn btn-secondary" id="btnPlay" style="min-width:132px">Reproducir</button>
+        </div>
+        <p class="hint" style="margin:12px 0 0"><kbd>Espacio</kbd> pausa · <kbd>←</kbd> <kbd>→</kbd> 1 s · <kbd>Shift</kbd>+flecha 5 s · <kbd>R</kbd> vuelve 3 s · <kbd>Tab</kbd> siguiente espécimen · <kbd>Ctrl</kbd>+<kbd>Z</kbd> deshacer · clic en una línea para ir a ese segundo</p>
+      </div>
+
+      <div style="background:var(--color-bg);padding-left:24px;display:flex;flex-direction:column;gap:24px">
+        <div>
+          <div class="k" style="margin-bottom:10px">Ahora</div>
+          <div class="ahora-val" id="ahoraVal"></div>
+          <div style="font-size:12px;margin-top:6px;color:var(--muted-2)" id="ahoraSrc"></div>
+          <p class="hint" style="margin:10px 0 0">Si no coincide con lo que ves, pulsa la conducta correcta. Con el video corriendo, el cambio se aplica desde 0.4 s antes del clic hasta el siguiente cambio de color; en pausa, solo al segundo actual.</p>
+        </div>
+
+        <div>
+          <div class="k" style="margin-bottom:10px">Avance de este espécimen</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="meter" style="flex:1"><div id="meter" style="width:0"></div></div>
+            <span class="num nd" style="font-size:13px" id="pctVisto"></span>
+          </div>
+          <p class="hint" style="margin:8px 0 0">Solo cuenta como visto lo que pasó a 2× o más lento.</p>
+        </div>
+
+        <div>
+          <div class="k" style="margin-bottom:6px" id="lblTot">Segundos por conducta</div>
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;font-size:11px;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--color-divider)"><span></span><span>Sistema</span><span style="min-width:42px;text-align:right">Ahora</span></div>
+          <div id="totales"></div>
+        </div>
+
+        <div>
+          <div class="k" style="margin-bottom:10px">Nivel al guardar</div>
+          <span class="tag tag-accent" id="nivel"></span>
+          <p class="hint" style="margin:8px 0 0" id="nivelTxt"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const { fmt, store } = FST;
+const N = 300;               // segundos analizados
+const REACCION = 0.4;        // lo que tarda una persona en reaccionar
+const ZOOM_S = 40;           // segundos visibles en la lupa
+const CLASES = ['nado', 'inmov', 'escal', 'activa'];
+const NOMBRE = { nado: 'Nado activo', inmov: 'Inmovilidad', escal: 'Escalamiento', activa: 'Conducta activa', '': 'No se ve' };
+const TECLA = { '1': 'nado', '2': 'inmov', '3': 'escal', '4': 'activa', '0': '' };
+const ESPECIMENES = [1, 2, 3, 4];
+
+// ── colores tomados de los tokens, para pintar los canvas ──────────────────
+const css = getComputedStyle(document.documentElement);
+const tok = n => css.getPropertyValue(n).trim();
+const C = { ink: tok('--color-text'), acc: tok('--color-accent'), n400: tok('--color-neutral-400'), n200: tok('--color-neutral-200'), bg: tok('--color-bg'), a300: tok('--color-accent-300') };
+function rayas(a, b, paso) {
+  const c = document.createElement('canvas'); c.width = c.height = paso * 2;
+  const x = c.getContext('2d');
+  x.fillStyle = b; x.fillRect(0, 0, c.width, c.height);
+  x.strokeStyle = a; x.lineWidth = paso * 0.7;
+  for (let i = -2; i <= 2; i++) { x.beginPath(); x.moveTo(i * paso * 2, c.height); x.lineTo(i * paso * 2 + c.width, 0); x.stroke(); }
+  return c;
+}
+const PAT = { activa: rayas(C.ink, C.n400, 3), nove: rayas('#c9cacc', C.bg, 2.5) };
+const fillDe = (ctx, c) => c === 'nado' ? C.ink : c === 'inmov' ? C.acc : c === 'escal' ? C.n400 : c === 'activa' ? ctx.createPattern(PAT.activa, 'repeat') : ctx.createPattern(PAT.nove, 'repeat');
+
+// ── conducta del sistema (datos del mockup; nivel preciso: sin conducta activa) ──
+function conductaSistema(e) {
+  const base = {
+    1: [['nado', 58], ['escal', 7], ['nado', 20], ['inmov', 9], ['nado', 18], ['escal', 12], ['nado', 24], ['inmov', 14], ['nado', 20], ['inmov', 17], ['nado', 22], ['escal', 6], ['nado', 13], ['inmov', 22], ['nado', 10], ['inmov', 26], ['escal', 16], ['', 6]],
+    2: [['nado', 40], ['inmov', 12], ['nado', 26], ['escal', 9], ['inmov', 20], ['nado', 30], ['inmov', 24], ['nado', 18], ['escal', 11], ['inmov', 28], ['nado', 22], ['inmov', 20], ['nado', 15], ['escal', 8], ['inmov', 17]],
+    3: [['nado', 66], ['escal', 10], ['nado', 30], ['inmov', 8], ['nado', 26], ['escal', 14], ['nado', 30], ['inmov', 18], ['nado', 24], ['escal', 18], ['inmov', 22], ['nado', 20], ['inmov', 14]],
+    4: [['nado', 34], ['inmov', 16], ['nado', 22], ['escal', 8], ['inmov', 26], ['nado', 18], ['inmov', 30], ['escal', 9], ['nado', 20], ['inmov', 28], ['nado', 16], ['', 4], ['inmov', 30], ['escal', 8], ['nado', 12], ['inmov', 19]]
+  }[e];
+  const out = []; base.forEach(([c, d]) => { for (let i = 0; i < d; i++) out.push(c); });
+  while (out.length < N) out.push(out[out.length - 1]);
+  return out.slice(0, N);
+}
+
+// ── estado ──────────────────────────────────────────────────────────────────
+const S = { L: {}, tubo: 1, t: 0, play: false, rate: 1, hist: [], ultimo: -1, raf: 0, last: 0, guardado: false };
+ESPECIMENES.forEach(e => { const p = conductaSistema(e); S.L[e] = { p, c: p.slice(), v: new Uint8Array(N) }; });
+
+// borrador en el navegador hasta que se elige «Guardar»
+const BORR = 'revision.CSR-14.ref.tandaA.dia2';
+function guardarBorrador() {
+  const L = {}; ESPECIMENES.forEach(e => { L[e] = { c: S.L[e].c.join('|'), v: Array.from(S.L[e].v).join('') }; });
+  store.set(BORR, { L, tubo: S.tubo, t: S.t });
+}
+let recuperado = false;
+(function leerBorrador() {
+  const b = store.get(BORR, null);
+  if (!b || !b.L) return;
+  ESPECIMENES.forEach(e => {
+    const x = b.L[e]; if (!x) return;
+    const c = x.c.split('|'); if (c.length !== N) return;
+    S.L[e].c = c; S.L[e].v = Uint8Array.from(x.v, d => +d);
+  });
+  if (ESPECIMENES.includes(b.tubo)) S.tubo = b.tubo;
+  S.t = b.t || 0; recuperado = true;
+})();
+
+// ── tiempo ──────────────────────────────────────────────────────────────────
+const segDe = t => Math.max(0, Math.min(N - 1, Math.floor(t + 1e-6)));
+const seg = () => segDe(S.t);
+const corregidos = e => S.L[e].c.reduce((a, c, i) => a + (c !== S.L[e].p[i] ? 1 : 0), 0);
+const totalCorr = () => ESPECIMENES.reduce((a, e) => a + corregidos(e), 0);
+
+// ── etiquetar ───────────────────────────────────────────────────────────────
+// Reproduciendo: desde 0.4 s antes del clic hasta donde termina el tramo de
+// ese color. En pausa: solo el segundo actual.
+function aplicar(c, boton) {
+  const L = S.L[S.tubo];
+  const s0 = S.play ? segDe(S.t - REACCION) : seg();
+  let s1 = s0;
+  if (S.play) { const viejo = L.c[s0]; while (s1 + 1 < N && L.c[s1 + 1] === viejo) s1++; }
+  S.hist.push({ e: S.tubo, s0, c: L.c.slice(s0, s1 + 1) });
+  if (S.hist.length > 200) S.hist.shift();
+  for (let s = s0; s <= s1; s++) L.c[s] = c;
+  for (let s = s0; s <= seg(); s++) L.v[s] = 1;
+  if (boton) { boton.classList.remove('hit'); void boton.offsetWidth; boton.classList.add('hit'); }
+  aviso(NOMBRE[c] + ' · ' + (S.play ? 'desde ' + fmt(s0) : 'solo ' + fmt(s0)));
+  S.guardado = false; guardarBorrador(); pintar();
+}
+function deshacer() {
+  const u = S.hist.pop();
+  if (!u) { aviso('Nada que deshacer'); return; }
+  u.c.forEach((c, i) => { S.L[u.e].c[u.s0 + i] = c; });
+  aviso('Deshecho'); guardarBorrador(); pintar();
+}
+
+// ── reproducción simulada (el mockup no tiene video real) ─────────────────
+function bucle(now) {
+  const dt = (now - S.last) / 1000; S.last = now;
+  S.t = Math.min(N - 0.001, S.t + dt * S.rate);
+  const s = seg();
+  if (s !== S.ultimo) {
+    // un segundo cuenta como visto cuando el cabezal ya lo dejó atrás, a 2× o menos
+    if (S.rate <= 2 && S.ultimo >= 0 && s > S.ultimo && s - S.ultimo < 4) for (let k = S.ultimo; k < s; k++) S.L[S.tubo].v[k] = 1;
+    S.ultimo = s;
+    if (s % 5 === 0) guardarBorrador();
+  }
+  if (S.t >= N - 0.001) { S.L[S.tubo].v[N - 1] = 1; pausar(); aviso('Espécimen ' + S.tubo + ' terminado · Tab para el siguiente'); return; }
+  pintar();
+  S.raf = requestAnimationFrame(bucle);
+}
+function reproducir() { S.play = true; S.ultimo = seg(); S.last = performance.now(); cancelAnimationFrame(S.raf); S.raf = requestAnimationFrame(bucle); pintar(); }
+function pausar() { S.play = false; cancelAnimationFrame(S.raf); guardarBorrador(); pintar(); }
+const alternar = () => (S.play ? pausar() : reproducir());
+function ir(t) { S.t = Math.max(0, Math.min(N - 0.05, t)); S.ultimo = seg(); pintar(); }
+function elegir(e) { S.tubo = e; guardarBorrador(); pintar(); }
+
+// ── escena: cuatro cilindros, el del espécimen actual destacado ───────────
+$('scene').innerHTML = ESPECIMENES.map(e => '<div class="tubo" id="tubo' + e + '"><div class="agua"></div><div class="esp" id="esp' + e + '"></div></div>').join('');
+function escena() {
+  const st = $('stage'), W = st.clientWidth, H = st.clientHeight;
+  const X = ESPECIMENES.map((e, i) => Math.round(W / 4 * (i + 0.5) - 75));
+  ESPECIMENES.forEach((e, i) => { $('tubo' + e).style.left = X[i] + 'px'; });
+  const L = X[S.tubo - 1] - 10, T = 22, w = 170, h = H - 44;
+  Object.assign($('spot').style, { left: L + 'px', top: T + 'px', width: w + 'px', height: h + 'px' });
+  const cajas = [[0, 0, W, T], [0, T + h, W, H - T - h], [0, T, L, h], [L + w, T, W - L - w, h]];
+  document.querySelectorAll('.velo').forEach((d, k) => { const [x, y, a, b] = cajas[k]; Object.assign(d.style, { left: x + 'px', top: y + 'px', width: Math.max(0, a) + 'px', height: Math.max(0, b) + 'px' }); });
+  $('spotTxt').textContent = 'Espécimen ' + S.tubo + ' · P' + S.tubo;
+  // cada espécimen se mueve según lo que hace en ese segundo
+  ESPECIMENES.forEach(e => {
+    const c = S.L[e].p[seg()], el = $('esp' + e), f = S.t * (c === 'nado' ? 2.2 : c === 'escal' ? 3 : 0.4);
+    const x = 49 + Math.sin(f + e) * (c === 'nado' ? 34 : 6), y = c === 'escal' ? 34 + Math.sin(f * 2) * 6 : 62 + Math.cos(f + e) * 4;
+    Object.assign(el.style, { left: x + 'px', top: y + 'px', opacity: c === '' ? 0.15 : 1 });
+  });
+}
+
+// ── líneas de tiempo ────────────────────────────────────────────────────────
+function prep(cv, alto) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(alto * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(alto * dpr); cv.style.height = alto + 'px'; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, alto);
+  return [ctx, w];
+}
+function lineas() {
+  // los 300 s, un renglón por espécimen
+  const fila = 22, alto = fila * ESPECIMENES.length, [ctx, w] = prep($('cvMain'), alto), px = w / N;
+  ESPECIMENES.forEach((e, i) => {
+    const L = S.L[e], y = i * fila;
+    ctx.fillStyle = C.n200; ctx.fillRect(0, y + 3, w, fila - 6);
+    for (let s = 0; s < N; s++) {
+      ctx.globalAlpha = L.v[s] ? 1 : 0.45; ctx.fillStyle = fillDe(ctx, L.c[s]);
+      ctx.fillRect(s * px, y + 3, Math.max(px, 0.6) + 0.3, fila - 6);
+    }
+    ctx.globalAlpha = 1;
+    if (e === S.tubo) { ctx.strokeStyle = C.a300; ctx.lineWidth = 2; ctx.strokeRect(1, y + 2, w - 2, fila - 4); }
+  });
+  ctx.fillStyle = C.ink; ctx.fillRect(S.t / N * w - 1, 0, 2, alto);
+  $('tlLabs').innerHTML = ESPECIMENES.map(e => '<div class="' + (e === S.tubo ? 'act' : '') + '">Espécimen ' + e + ' · P' + e + '</div>').join('');
+
+  // lupa: 40 s alrededor del segundo actual; la franja superior marca lo corregido
+  const az = 52, [cz, wz] = prep($('cvZoom'), az), L = S.L[S.tubo];
+  const ini = Math.max(0, Math.min(N - ZOOM_S, S.t - ZOOM_S / 2)), pz = wz / ZOOM_S;
+  cz.font = '11px Archivo, system-ui'; cz.textAlign = 'left';
+  for (let s = Math.floor(ini); s < Math.min(N, ini + ZOOM_S + 1); s++) {
+    const x = (s - ini) * pz;
+    cz.globalAlpha = L.v[s] ? 1 : 0.45; cz.fillStyle = fillDe(cz, L.c[s]); cz.fillRect(x + 1, 6, pz - 2, 26);
+    cz.globalAlpha = 1;
+    if (L.c[s] !== L.p[s]) { cz.fillStyle = C.a300; cz.fillRect(x + 1, 0, pz - 2, 4); }
+    if (s % 5 === 0) { cz.fillStyle = C.ink; cz.fillRect(x, 33, 1, 5); cz.fillStyle = 'rgba(35,31,32,.6)'; cz.fillText(fmt(s), x + 2, 49); }
+  }
+  cz.fillStyle = C.ink; cz.fillRect((S.t - ini) * pz - 1, 0, 2, 38);
+}
+function clicLinea(ev, zoom) {
+  const r = ev.currentTarget.getBoundingClientRect(), x = ev.clientX - r.left;
+  if (zoom) { const ini = Math.max(0, Math.min(N - ZOOM_S, S.t - ZOOM_S / 2)); ir(Math.floor(ini + x / r.width * ZOOM_S) + 0.02); }
+  else { const e = ESPECIMENES[Math.floor((ev.clientY - r.top) / 22)]; if (e && e !== S.tubo) elegir(e); ir(Math.floor(x / r.width * N) + 0.02); }
+}
+
+// ── paneles ─────────────────────────────────────────────────────────────────
+const sw = c => c === 'activa' ? '<span class="sw activa"></span>' : c === '' ? '<span class="sw nove"></span>'
+  : '<span class="sw" style="background:' + (c === 'nado' ? 'var(--color-text)' : c === 'inmov' ? 'var(--color-accent)' : 'var(--color-neutral-400)') + '"></span>';
+function cuenta(arr) { const o = { nado: 0, inmov: 0, escal: 0, activa: 0, '': 0 }; arr.forEach(c => { o[c in o ? c : '']++; }); return o; }
+let tAviso = 0;
+function aviso(txt) { const t = $('toast'); t.textContent = txt; t.classList.add('on'); clearTimeout(tAviso); tAviso = setTimeout(() => t.classList.remove('on'), 900); }
+
+function pintar() {
+  const L = S.L[S.tubo], s = seg(), c = L.c[s];
+  $('tabs').innerHTML = ESPECIMENES.map(e => {
+    const vis = Math.round(100 * S.L[e].v.reduce((a, b) => a + b, 0) / N);
+    return '<button type="button" class="tab' + (e === S.tubo ? ' on' : '') + '" data-e="' + e + '">Espécimen ' + e + ' · P' + e + '<small class="num">' + vis + ' % visto</small></button>';
+  }).join('');
+  $('info').innerHTML = '<span class="nd">' + fmt(s) + '</span> / 5:00 · segundo ' + (s + 1) + ' de ' + N + ' · ' + S.rate + '×';
+  $('pausa').classList.toggle('hidden', S.play);
+  $('btnPlay').textContent = S.play ? 'Pausar' : 'Reproducir';
+  $('ahoraVal').innerHTML = sw(c) + '<span' + (c === '' ? ' style="color:var(--muted)"' : '') + '>' + NOMBRE[c] + '</span>';
+  $('ahoraSrc').textContent = c !== L.p[s] ? 'Corregido · el sistema puso ' + NOMBRE[L.p[s]].toLowerCase() : 'Conducta del sistema';
+  document.querySelectorAll('.cls').forEach(b => b.classList.toggle('ahora', b.dataset.c === c));
+  const vis = L.v.reduce((a, b) => a + b, 0);
+  $('meter').style.width = (100 * vis / N) + '%'; $('pctVisto').textContent = Math.round(100 * vis / N) + ' %';
+  $('lblTot').textContent = 'Segundos por conducta · espécimen ' + S.tubo;
+  const a = cuenta(L.p), b = cuenta(L.c);
+  $('totales').innerHTML = CLASES.concat(['']).map(k =>
+    '<div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:center;padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:12px">' +
+      '<span style="display:flex;align-items:center;gap:8px">' + sw(k) + NOMBRE[k] + '</span>' +
+      '<span class="num" style="text-align:right;color:var(--muted)">' + a[k] + ' s</span>' +
+      '<span class="num nd" style="text-align:right;min-width:42px;' + (a[k] !== b[k] ? 'color:var(--color-accent-700)' : '') + '">' + b[k] + ' s</span>' +
+    '</div>').join('');
+  const agrupado = ESPECIMENES.some(e => S.L[e].c.includes('activa'));
+  $('nivel').textContent = agrupado ? 'Agrupado' : 'Preciso (3 conductas)';
+  $('nivelTxt').innerHTML = agrupado
+    ? 'Al menos un segundo quedó como <strong>conducta activa</strong>: al guardar, el análisis pasa a nivel agrupado y los resultados lo avisan.'
+    : 'Ningún segundo está como conducta activa. Si marcas alguno, al guardar el análisis pasa a nivel <strong>agrupado</strong>.';
+  const n = totalCorr(), conCorr = ESPECIMENES.filter(e => corregidos(e)).length;
+  $('estado').innerHTML = S.guardado
+    ? '<div class="ok-bar"><strong>Correcciones guardadas.</strong> Quedó registrado el origen de cada segundo corregido y los totales por minuto ya reflejan los cambios. Los reportes del experimento se regeneran con los datos nuevos.</div>'
+    : n || recuperado
+      ? '<div class="note-bar" style="display:flex;align-items:center;gap:14px"><span style="flex:1"><strong>Borrador sin guardar</strong> · ' + n + (n === 1 ? ' segundo corregido' : ' segundos corregidos') + ' en ' + conCorr + (conCorr === 1 ? ' espécimen' : ' especímenes') + '. El avance vive en este navegador hasta que elijas «Guardar correcciones».</span><button type="button" class="linkbtn" id="btnDescartar" style="font-size:12px">Descartar borrador</button></div>'
+      : '<div class="hint">Cada segundo ya trae la conducta que puso el sistema. Se revisa un espécimen a la vez; las correcciones se guardan al elegir «Guardar correcciones».</div>';
+  escena(); lineas();
+}
+
+// ── eventos ─────────────────────────────────────────────────────────────────
+document.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTimeout(() => b.blur(), 0); }, true);
+document.querySelectorAll('.cls').forEach(b => b.addEventListener('click', () => aplicar(b.dataset.c, b)));
+$('tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) elegir(+t.dataset.e); });
+FST.bindSeg($('vel'), v => { S.rate = +v; pintar(); });
+$('btnPlay').addEventListener('click', alternar);
+$('cvMain').addEventListener('click', e => clicLinea(e, false));
+$('cvZoom').addEventListener('click', e => clicLinea(e, true));
+$('btnGuardar').addEventListener('click', () => {
+  if (S.play) pausar();
+  // en el sistema real: el backend registra las correcciones y reemplaza la conducta del sistema y guarda el origen
+  store.set(BORR, null); recuperado = false; S.guardado = true; S.hist = [];
+  ESPECIMENES.forEach(e => { S.L[e].p = S.L[e].c.slice(); });
+  pintar();
+});
+$('estado').addEventListener('click', e => {
+  if (e.target.id !== 'btnDescartar') return;
+  store.set(BORR, null); recuperado = false; S.hist = [];
+  ESPECIMENES.forEach(x => { S.L[x].c = S.L[x].p.slice(); S.L[x].v = new Uint8Array(N); });
+  S.t = 0; pintar();
+});
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); deshacer(); return; }
+  if (e.repeat || e.ctrlKey || e.metaKey) return;
+  const k = e.key;
+  if (k in TECLA) aplicar(TECLA[k], document.querySelector('.cls[data-c="' + TECLA[k] + '"]'));
+  else if (k === ' ') { e.preventDefault(); alternar(); }
+  else if (k === 'ArrowRight') { e.preventDefault(); ir(Math.floor(S.t) + (e.shiftKey ? 5 : 1)); }
+  else if (k === 'ArrowLeft') { e.preventDefault(); ir(Math.floor(S.t) - (e.shiftKey ? 5 : 1)); }
+  else if (k === 'r' || k === 'R') ir(S.t - 3);
+  else if (k === 'Tab') {
+    e.preventDefault();
+    const i = ESPECIMENES.indexOf(S.tubo), n = ESPECIMENES.length;
+    if (S.play) pausar();
+    elegir(ESPECIMENES[(i + (e.shiftKey ? n - 1 : 1)) % n]); ir(0);
+  }
+});
+window.addEventListener('resize', pintar);
+document.addEventListener('DOMContentLoaded', pintar);
+</script>
+</body>
+</html>
