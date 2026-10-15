@@ -260,6 +260,12 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
     - **GitHub Actions** (`.github/workflows/frontend.yml`): en cada push o PR que toque `frontend/` corre lint, pruebas y build. Una prueba intermitente (esperaba la lista antes de que cargara) se corrigió.
     - **Pantallas angostas:** a 1024 px nada se desborda; debajo de 1100 px, el panel lateral de Resultados y de Revisión pasa abajo.
     - **Maquetas** `mockup/v2` copiadas del main de LaTeX (14-oct), con `pausa.html` y `revision.html`.
+38. **Versión 0.4.0** y más ajustes:
+    - Experimentos sin ninguno muestra «Aún no hay experimentos» con el botón para crear el primero (§9.2).
+    - Administración: crear y editar cuenta en un modal (§9.6), con el foco dentro y Escape para cerrar.
+    - La interfaz ya no muestra códigos internos (RF-18, RF-31, T-06).
+    - Cada pantalla se descarga al abrirla (`React.lazy` en `router.jsx`): la carga inicial baja de ~408 kB a ~282 kB.
+    - Accesibilidad: `src/accesibilidad.test.jsx` pasa axe-core por las 12 pantallas (sin problemas); el contenido va en `<main>`.
 
 ### Diferencias visibles con tu v2 (a propósito)
 
