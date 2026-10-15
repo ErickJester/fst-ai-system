@@ -321,7 +321,7 @@ function ResultadosTanda({ clave, gid, letra }) {
           ))}
         </nav>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 2, background: 'var(--color-divider)' }}>
+        <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 26 }}>
             <div ref={refs.especimen} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
               <div className="k">Tiempo por conducta · min:seg</div>
@@ -333,6 +333,8 @@ function ResultadosTanda({ clave, gid, letra }) {
               </span>
             </div>
 
+            {/* Si la pantalla es angosta, la tabla se desplaza de lado en vez de empujar la página. */}
+            <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
@@ -367,6 +369,7 @@ function ResultadosTanda({ clave, gid, letra }) {
                 ))}
               </tbody>
             </table>
+            </div>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
               Cada segundo recibe una conducta y ninguna se descarta por durar poco (RF-18); el buceo se contabiliza como nado activo. Los tres renglones grises son los estadísticos de RF-31 de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.

@@ -402,7 +402,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 2, background: 'var(--color-divider)' }}>
+        <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 24 }}>
             <div className="rev-stage">
               {datos.videoUrl
