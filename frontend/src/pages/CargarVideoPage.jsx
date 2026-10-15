@@ -296,7 +296,7 @@ export default function CargarVideoPage() {
                     <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión, de hasta {MAX_UPLOAD_MB} MB. Aquí se revisan el formato y el tamaño; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
                   </div>
                   <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
-                  <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden"
+                  <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden" aria-label="Archivo de video"
                     onChange={(e) => { if (e.target.files[0]) takeFile(e.target.files[0]) }} />
                 </div>
                 {subiendo != null && (
