@@ -2,20 +2,28 @@
 // Las pantallas no los importan: los piden a la capa de servicios (../*.js),
 // que los entrega mientras VITE_USE_MOCKS no sea 'false'.
 //
-// estado: se calcula con las tandas (ESTADO_EXPERIMENTO en lib/fst.js): SIN_VIDEOS |
-//   ESPERA_DIA2 | QUEUED | RUNNING | PAUSED | DONE | FAILED | CANCELED
-// retencion_dias: días que le quedan al video crudo (null si ya se borró).
-// con_detalle: solo el experimento de ejemplo tiene detalle en los mockups;
-//   con la API real todos lo tendrán.
-// tratamientos: los de sus grupos (para el filtro). creador_id: idInstitucional de quien lo creó; solo esa
-//   cuenta o un Administrador puede eliminarlo.
+// Lista de experimentos (2a) con la forma de §6.1: { idExperimento, nombre, fecha, nGrupos,
+// estado, avisoVencimiento } y, de más sobre la guía, creador (PARA_VANESA_API.md §4) y los
+// campos que pide la maqueta de la lista (propuestos, por confirmar con Erick):
+// nEspecimenes, tratamientos (los de sus grupos, para el filtro), videosDia2 { analizados,
+// cargados, total }, diasRetencion (días que le quedan al video crudo; null sin videos o ya
+// borrados) y videosBorrados. avisoVencimiento lo calcula services/experiments.js.
+// estado: el de la guía ('sin videos', 'en espera del Día 2', 'en cola', 'procesando',
+// 'en pausa', 'completado', 'error' o 'cancelado'), calculado con las tandas.
+// idExperimento: por ahora la clave de los mockups; pasa a número en el paso 10.
+// conDetalle: solo en datos de ejemplo; solo el experimento de ejemplo tiene detalle.
+const RIVERA = { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' }
+const REYES = { idInstitucional: '2008630412', nombre: 'C. S.', apellidos: 'Reyes López' }
+const DOMINGUEZ = { idInstitucional: '2015630322', nombre: 'J.', apellidos: 'Domínguez Vera' }
+const fila = (idExperimento, nombre, fecha, creador, nGrupos, nEspecimenes, tratamientos, [analizados, cargados, total], estado, diasRetencion, videosBorrados, conDetalle = false) =>
+  ({ idExperimento, nombre, fecha, nGrupos, estado, creador, nEspecimenes, tratamientos, videosDia2: { analizados, cargados, total }, diasRetencion, videosBorrados, conDetalle })
 
 export const experiments = [
-  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], creador_id: '2019630871', fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
-  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], creador_id: '2015630322', fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
-  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], creador_id: '2019630871', fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
-  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], creador_id: '2008630412', fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
-  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], creador_id: '2008630412', fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  fila('EXP-2026-02', 'Compuesto CSR-14 · curva de dosis', '2026-02-18', RIVERA, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], [4, 8, 8], 'error', 30, false, true),
+  fila('EXP-2026-01', 'Extracto de Salvia · dosis única', '2026-01-09', DOMINGUEZ, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], [8, 8, 8], 'completado', 12, false),
+  fila('EXP-2025-11', 'Extracto de Valeriana officinalis', '2025-11-14', RIVERA, 5, 38, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], [10, 10, 10], 'completado', 4, false),
+  fila('EXP-2025-10', 'Réplica interanalista · control metodológico', '2025-10-02', REYES, 4, 24, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], [3, 3, 6], 'completado', null, true),
+  fila('EXP-2025-08', 'Fluoxetina · calibración del clasificador', '2025-08-19', REYES, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], [8, 8, 8], 'completado', null, true),
 ]
 
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
@@ -216,7 +224,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 15
+const VERSION_DATOS = 16
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 
