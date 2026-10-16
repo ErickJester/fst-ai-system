@@ -3,7 +3,8 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
-import { ESTADO } from '../lib/contrato'
+import { ESTADO, ETAPA, TIPO_GRUPO, ordinalDeLetra, letraDeOrdinal } from '../lib/contrato'
+import { getStatus } from './queue'
 
 // Fecha local de dentro de n días, como 'AAAA-MM-DD'.
 function enDias(n) {
@@ -85,13 +86,85 @@ export async function createExperiment({ titulo, fecha_inicio, notas }) {
   return { clave: d.idExperimento }
 }
 
-// GET /experiments/:clave → datos generales + grupos → tandas (pantalla 2c)
-export async function getExperiment(clave) {
-  if (USE_MOCKS) {
-    const exp = db.experimentDetail[clave]
-    return exp ? reply(exp) : fail(404, 'No existe ese experimento.')
+// Detalle de los datos de ejemplo con la forma de §6.1: grupos → tandas → videos. data.js
+// guarda lo que guardaría la base; aquí se arma la respuesta. De más sobre la guía: creador y
+// subidoPor (PARA_VANESA_API.md §4) y la fecha de cada video (propuesta, para la tanda).
+function detalleDe(clave) {
+  const exp = db.experimentDetail[clave]
+  const fila = db.experiments.find((e) => e.idExperimento === clave)
+  const video = (g, t, n, extra) => ({ idVideo: g.id + '/' + t.letra + '/' + n, sesion: 'Dia ' + n, duracion: 300, subidoPor: t.subido_por ?? null, ...extra })
+  return {
+    idExperimento: clave, nombre: exp.titulo, fecha: exp.fecha_inicio, notas: exp.notas ?? '',
+    estado: fila?.estado ?? 'sin videos', creador: fila?.creador ?? null,
+    grupos: exp.grupos.map((g) => ({
+      idGrupo: g.id, etiqueta: g.nombre, tipo: TIPO_GRUPO.aGuia[g.tipo], tratamiento: g.tratamiento,
+      tandas: g.tandas.map((t) => ({
+        idTanda: g.id + '/' + t.letra, ordinal: ordinalDeLetra(t.letra), letra: t.letra, nCilindros: t.n_cilindros,
+        videos: [
+          t.dia1 && video(g, t, 1, { videoDisponible: true, idAnalisis: null, fecha: t.fecha_dia1 }),
+          t.estado !== 'SIN_VIDEO' && video(g, t, 2, { videoDisponible: t.video_disponible !== false, idAnalisis: t.id_analisis, fecha: t.fecha_dia2 }),
+        ].filter(Boolean),
+      })),
+    })),
   }
-  return (await api.get(`/experiments/${clave}`)).data
+}
+
+// Detalle (§6.1) más el estado de sus análisis (/status) → forma de las pantallas. El estado,
+// la etapa y el avance de cada tanda salen del análisis de su video del Día 2.
+export function deDetalle(d, analisis = []) {
+  const porId = new Map(analisis.map((a) => [a.idAnalisis, a]))
+  return {
+    clave: d.idExperimento,
+    titulo: d.nombre,
+    fecha_inicio: d.fecha,
+    notas: d.notas ?? '',
+    estado: ESTADO.aFront[d.estado],
+    responsable: responsableDe(d.creador),
+    creador_id: d.creador?.idInstitucional ?? null,
+    grupos: d.grupos.map((g) => {
+      let desde = 1
+      const tandas = [...g.tandas].sort((a, b) => a.ordinal - b.ordinal).map((t) => {
+        const v1 = t.videos.find((v) => v.sesion === 'Dia 1')
+        const v2 = t.videos.find((v) => v.sesion === 'Dia 2')
+        const a = v2?.idAnalisis != null ? porId.get(v2.idAnalisis) : null
+        const estado = v2 ? ESTADO.aFront[a?.estado] || 'QUEUED' : 'SIN_VIDEO'
+        const etapa = a?.etapa ? ETAPA.aFront[a.etapa] : null
+        const x = {
+          letra: t.letra || letraDeOrdinal(t.ordinal),
+          desde,
+          n_cilindros: t.nCilindros,
+          fecha_dia1: v1?.fecha ?? v2?.fecha ?? d.fecha,
+          fecha_dia2: v2?.fecha ?? v1?.fecha ?? d.fecha,
+          estado,
+          dia1: v1 ? { cargado: true } : null,
+          progreso: estado === 'RUNNING' && etapa ? { etapa, pct: a.porcentaje } : null,
+          error: estado === 'FAILED' ? { etapa } : null,
+          id_analisis: v2?.idAnalisis ?? null,
+          subido_por: v2?.subidoPor ?? v1?.subidoPor ?? null,
+          analisis_fecha: estado === 'DONE' ? a?.fechaAnalisis ?? null : null,
+          ...(v2?.videoDisponible === false && { video_disponible: false }),
+        }
+        desde += t.nCilindros
+        return x
+      })
+      return {
+        id: g.idGrupo, nombre: g.etiqueta, tipo: TIPO_GRUPO.aFront[g.tipo], tratamiento: g.tratamiento,
+        n_especimenes: g.tandas.reduce((n, t) => n + t.nCilindros, 0), tandas,
+      }
+    }),
+  }
+}
+
+// GET /experiments/:clave (§6.1) y GET /experiments/:clave/status → datos generales + grupos →
+// tandas, con el estado de cada análisis (pantallas 2c y 2d).
+export async function getExperiment(clave) {
+  const [d, s] = await Promise.all([
+    USE_MOCKS
+      ? (db.experimentDetail[clave] ? reply(detalleDe(clave)) : fail(404, 'No existe ese experimento.'))
+      : api.get(`/experiments/${clave}`).then((r) => r.data),
+    getStatus(clave),
+  ])
+  return deDetalle(d, s.analisis)
 }
 
 // DELETE /experiments/:clave → borra el experimento con todo lo suyo. Según D-63 no pide
