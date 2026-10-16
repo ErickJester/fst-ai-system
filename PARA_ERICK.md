@@ -377,4 +377,8 @@ Si eres Claude trabajando en este repo:
     - `POST /experiments` `{nombre, fecha, notas}`: **la guía no dice qué responde.** Propongo `{idExperimento}` (201), que es lo que la pantalla necesita para abrir el experimento nuevo.
     - `idExperimento` ya es la clave de las rutas del frontend; en los datos de ejemplo sigue valiendo `EXP-2026-02` hasta el paso 10. La maqueta muestra esa clave bajo el nombre; con el backend se vería el número.
     - El detalle (`GET /experiments/{id}`) va en la siguiente fase junto con `/status`: la guía no trae el estado de cada análisis en el detalle, así que se completará con `/status`.
+44. **Detalle del experimento y del grupo con la guía (parte 2, segunda mitad).** `getExperiment` junta `GET /experiments/{id}` (grupos → tandas → videos, §6.1) y `GET /experiments/{id}/status`: el estado, la etapa y el avance de cada tanda salen del análisis de su video del Día 2. La pantalla de grupo ya no pide `GET .../groups/:gid` (la guía no la tiene): toma el grupo del mismo árbol.
+    - **Lo que necesito de `/status`:** que traiga **todos** los análisis vigentes del experimento, también los `completado`, no solo los activos; si no, el detalle no sabe qué tandas terminaron.
+    - **Campos de más (propuesta, confírmalos):** en cada video, `fecha` (para «18–19 feb 2026» de la tanda) y `subidoPor` (ya en tu §4); en cada análisis de `/status`, `fechaAnalisis` (para «Análisis vigente: …» y «Completados recientemente»).
+    - Sin `fecha` se usa la del experimento; sin `fechaAnalisis` se lee «Sin análisis todavía».
 

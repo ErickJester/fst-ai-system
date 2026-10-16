@@ -4,6 +4,8 @@ import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
+import { ESTADO, ETAPA } from '../lib/contrato'
+import { PCT_ETAPA } from '../lib/fst'
 
 // La cola, las pausas y los errores los produce el worker (equipo de backend). Sin backend,
 // los datos de ejemplo quedan fijos: aquí solo se responde lo que el servidor respondería.
@@ -28,6 +30,38 @@ function terminados() {
 export async function getQueue() {
   if (USE_MOCKS) return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs, terminados: terminados() })
   return (await api.get('/queue')).data
+}
+
+// GET /experiments/:clave/status → { analisis: [{ idAnalisis, tanda, sesion, estado, etapa,
+// porcentaje, pausa, diagnosticoDisponible }] } (§6.1), con los valores de la guía. Trae todos
+// los análisis vigentes del experimento, también los completados: el detalle toma de aquí el
+// estado de cada tanda. fechaAnalisis es un campo de más (propuesto) para «Análisis vigente».
+export async function getStatus(clave) {
+  if (USE_MOCKS) {
+    const exp = db.experimentDetail[clave]
+    if (!exp) return fail(404, 'No existe ese experimento.')
+    return reply({ analisis: exp.grupos.flatMap((g) => g.tandas.filter((t) => t.id_analisis && t.estado !== 'SIN_VIDEO').map((t) => analisisDe(g, t))) })
+  }
+  return (await api.get(`/experiments/${clave}/status`)).data
+}
+
+// Un análisis de los datos de ejemplo con la forma de /status.
+function analisisDe(g, t) {
+  const pausado = db.pausedJobs.find((j) => j.job_id === t.id_analisis)
+  const fallido = db.failedJobs.find((j) => j.job_id === t.id_analisis)
+  const etapa = t.progreso?.etapa || t.error?.etapa || pausado?.stage || null
+  const porcentaje = t.estado === 'DONE' ? 100 : t.progreso?.pct ?? pausado?.progress_pct ?? fallido?.progress_pct ?? (etapa ? PCT_ETAPA[etapa] : 0)
+  return {
+    idAnalisis: t.id_analisis,
+    tanda: g.nombre + ' · ' + t.letra,
+    sesion: 'Dia 2',
+    estado: ESTADO.aGuia[t.estado],
+    etapa: etapa ? ETAPA.aGuia[etapa] : null,
+    porcentaje,
+    pausa: pausado ? { cilindro: pausado.pausa.cilindro, segundosRestantes: restante(pausado) } : null,
+    diagnosticoDisponible: t.estado === 'FAILED',
+    fechaAnalisis: t.analisis_fecha,
+  }
 }
 
 // GET /experiments/:clave/analyses/:id/diagnostic → PDF de diagnóstico de un análisis con

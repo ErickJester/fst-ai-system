@@ -45,7 +45,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [ ] Subir video con `POST /experiments/{id}/groups/{grupo}/videos` y los campos `sesion`, `tipo`, `tratamiento`, `nCilindros` y `ordinal` (hoy crea el grupo con `POST .../groups` y sube a `.../groups/:gid/batches/:letra/videos` con `file`, `dia` y `n_cilindros`)
   - [ ] Respuesta de la subida `{idVideo, idAnalisis, estadoAnalisis}` (hoy `{job_id, posicion_cola}`)
   - [ ] Pasar la letra de la tanda al `ordinal` entero de la base
-  - [ ] Detalle de grupo tomado del árbol de `GET /experiments/{id}` (hoy pide `GET .../groups/:gid`, que la guía no tiene)
+  - [x] Detalle de grupo tomado del árbol de `GET /experiments/{id}`; el estado de cada tanda sale de `GET /experiments/{id}/status`
   - [ ] Sugerir grupos y la siguiente tanda con `GET /experiments/{id}/groups?q=` (hoy se calcula en el navegador)
   - [ ] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks` (hoy `.../batches/:letra/results`, `/group-comparison` y `.../blocks`)
   - [ ] Progreso con `GET /experiments/{id}/status` (hoy `GET /queue`, una cola global que la guía no define; la pantalla de pausa también la usa para su título). Decidido: se sigue la guía, y Administración toma la cola de `/admin/system`
