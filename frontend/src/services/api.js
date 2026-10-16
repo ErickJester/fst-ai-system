@@ -13,8 +13,16 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Toda respuesta JSON llega como { data, error, status } (§6): aquí se desenvuelve, una sola
+// vez, para que los servicios lean res.data como el resultado. Los archivos (reportes, PDF
+// de diagnóstico, imagen de la pausa) llegan tal cual y no se tocan.
+export const esEnvoltorio = (d) => !!d && typeof d === 'object' && !(d instanceof Blob) && 'data' in d && 'status' in d
+
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (esEnvoltorio(res.data)) res.data = res.data.data
+    return res
+  },
   (err) => {
     // Sesión vencida o inválida: se borra y se vuelve al login con aviso. El 401 del
     // propio login (contraseña incorrecta) lo muestra la pantalla de login.
@@ -39,14 +47,9 @@ export default api
 // Petición cancelada por quien la hizo (AbortController), como al cancelar una subida.
 export const esCancelacion = (e) => e?.code === 'ERR_CANCELED'
 
-// Mensaje de error que manda el servidor, o el de respaldo si no hay. Se lee primero
-// «mensaje» (el que da el backend de Spring; su «error» es el detalle técnico de la base),
-// luego la lista «errores» de validación y por último «error» (el formato del documento, §6).
+// Mensaje de error que manda el servidor (campo «error» del envoltorio, §6), o el de
+// respaldo si no hay.
 export function mensajeError(e, respaldo) {
   const d = e?.response?.data
-  if (!d || typeof d !== 'object') return respaldo
-  if (typeof d.mensaje === 'string' && d.mensaje) return d.mensaje
-  if (Array.isArray(d.errores) && d.errores.length) return d.errores.join(' ')
-  if (typeof d.error === 'string' && d.error) return d.error
-  return respaldo
+  return d && typeof d === 'object' && typeof d.error === 'string' && d.error ? d.error : respaldo
 }

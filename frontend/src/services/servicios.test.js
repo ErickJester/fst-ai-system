@@ -2,7 +2,7 @@
 // que el backend también tendrá que cumplir: contraseñas, administradores y experimentos.
 import { describe, it, expect, beforeEach } from 'vitest'
 import * as auth from './auth'
-import { mensajeError } from './api'
+import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
@@ -419,13 +419,18 @@ describe('cancelar la subida de un video', () => {
   })
 })
 
-describe('mensajes de error del servidor', () => {
+describe('envoltorio y mensajes de error del servidor (§6)', () => {
   const con = (data) => ({ response: { status: 409, data } })
-  it('lee «mensaje» (backend de Spring), luego «errores» y luego «error» (§6)', () => {
-    expect(mensajeError(con({ mensaje: 'Ya existe un experimento con ese nombre', error: 'duplicate key value…' }), 'x')).toBe('Ya existe un experimento con ese nombre')
-    expect(mensajeError(con({ errores: ["El campo 'nombre' no debe estar vacío"] }), 'x')).toBe("El campo 'nombre' no debe estar vacío")
-    expect(mensajeError(con({ error: 'No existe ese grupo.' }), 'x')).toBe('No existe ese grupo.')
+  it('el error se lee del campo «error» del envoltorio', () => {
+    expect(mensajeError(con({ data: null, error: 'No existe ese grupo.', status: 404 }), 'x')).toBe('No existe ese grupo.')
+    expect(mensajeError(con({ data: null, error: null, status: 500 }), 'respaldo')).toBe('respaldo')
     expect(mensajeError(con(new Blob(['x'])), 'respaldo')).toBe('respaldo')
     expect(mensajeError(new Error('sin respuesta'), 'respaldo')).toBe('respaldo')
+  })
+
+  it('se desenvuelve la respuesta JSON y no los archivos', () => {
+    expect(esEnvoltorio({ data: { idExperimento: 7 }, error: null, status: 200 })).toBe(true)
+    expect(esEnvoltorio(new Blob(['%PDF']))).toBe(false)
+    expect(esEnvoltorio({ idExperimento: 7 })).toBe(false)
   })
 })
