@@ -7,15 +7,15 @@
 // retencion_dias: días que le quedan al video crudo (null si ya se borró).
 // con_detalle: solo el experimento de ejemplo tiene detalle en los mockups;
 //   con la API real todos lo tendrán.
-// tratamientos: los de sus grupos (para el filtro). creador_id: quien lo creó; solo esa
+// tratamientos: los de sus grupos (para el filtro). creador_id: idInstitucional de quien lo creó; solo esa
 //   cuenta o un Administrador puede eliminarlo.
 
 export const experiments = [
-  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], creador_id: 1, fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
-  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], creador_id: 3, fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
-  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], creador_id: 1, fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
-  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], creador_id: 2, fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
-  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], creador_id: 2, fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], creador_id: '2019630871', fecha_inicio: '2026-02-18', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 4, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'FAILED', responsable: 'M. Rivera', retencion_dias: 30, videos_borrados: false, con_detalle: true },
+  { clave: 'EXP-2026-01', titulo: 'Extracto de Salvia · dosis única', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], creador_id: '2015630322', fecha_inicio: '2026-01-09', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'J. Domínguez', retencion_dias: 12, videos_borrados: false },
+  { clave: 'EXP-2025-11', titulo: 'Extracto de Valeriana officinalis', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], creador_id: '2019630871', fecha_inicio: '2025-11-14', n_grupos: 5, n_especimenes: 38, videos_dia2_listos: 10, videos_dia2_cargados: 10, videos_dia2_total: 10, estado: 'DONE', responsable: 'M. Rivera', retencion_dias: 4, videos_borrados: false },
+  { clave: 'EXP-2025-10', titulo: 'Réplica interanalista · control metodológico', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], creador_id: '2008630412', fecha_inicio: '2025-10-02', n_grupos: 4, n_especimenes: 24, videos_dia2_listos: 3, videos_dia2_cargados: 3, videos_dia2_total: 6, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
+  { clave: 'EXP-2025-08', titulo: 'Fluoxetina · calibración del clasificador', tratamientos: ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], creador_id: '2008630412', fecha_inicio: '2025-08-19', n_grupos: 4, n_especimenes: 32, videos_dia2_listos: 8, videos_dia2_cargados: 8, videos_dia2_total: 8, estado: 'DONE', responsable: 'C. Reyes', retencion_dias: null, videos_borrados: true },
 ]
 
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
@@ -33,14 +33,14 @@ export const experiments = [
 const tanda = (letra, estado, extra = {}) => ({
   letra, desde: (letra.charCodeAt(0) - 65) * 4 + 1, n_cilindros: 4,
   fecha_dia1: '2026-02-18', fecha_dia2: '2026-02-19',
-  estado, dia1: null, progreso: null, error: null, id_analisis: null, subido_por: 1,
+  estado, dia1: null, progreso: null, error: null, id_analisis: null, subido_por: '2019630871',
   analisis_fecha: estado === 'DONE' ? '2026-02-24' : null,
   ...extra,
 })
 
 export const experimentDetail = {
   'EXP-2026-02': {
-    clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: 1,
+    clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: '2019630871',
     grupos: [
       { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 401, dia1: { cargado: true } }), tanda('B', 'PAUSED', { id_analisis: 502 })] },
@@ -60,13 +60,13 @@ export const experimentDetail = {
 // Solo se analiza el Día 2 (D-54). subido_por: cuenta que subió el video (puede ajustar o
 // cancelar su pausa, igual que un Administrador).
 export const queue = [
-  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
-  { job_id: 503, posicion: 2, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
+  { job_id: 503, posicion: 2, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
 export const failedJobs = [
-  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
+  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
 ]
 
 // Análisis en pausa (R-15): salen de la cola mientras esperan el ajuste del recuadro. pausa:
@@ -74,7 +74,7 @@ export const failedJobs = [
 // La pausa la decide el worker; el de ejemplo ya está en pausa. hora_ms null: sin backend,
 // la pausa empieza la primera vez que se consulta (services/queue.js), para ver el plazo.
 export const pausedJobs = [
-  { job_id: 502, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: 1, status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
+  { job_id: 502, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
     pausa: { cilindro: 2, desde_segundo: 142, hora_ms: null, ancho: 1280, alto: 720, ajuste: null,
       // El recuadro del cilindro 2 quedó corrido: por eso el pipeline dejó de ver a su espécimen.
       recuadros: [{ cilindro: 1, x0: 50, y0: 130, x1: 270, y1: 640 }, { cilindro: 2, x0: 450, y0: 200, x1: 670, y1: 710 },
@@ -168,16 +168,17 @@ export const batchResults = {
 // La comparación entre grupos (media ± DE de cada conducta, 2f) ya no es fija: la calcula
 // services/results.js a partir de las tandas y sus resultados, como lo hará el servidor.
 
-// Cuentas (2g, 2h, 2i, 2j). role: INVESTIGADOR | ADMIN, como Role en backend/app/models.py.
-// must_change_password: la cuenta entró con contraseña temporal y debe cambiarla (2i).
+// Cuentas (2g, 2h, 2i, 2j), con la forma de §6.1: idInstitucional (boleta o número de
+// empleado) es el id de la cuenta; rol: Investigador | Administrador. cambioRequerido: la
+// cuenta entró con contraseña temporal y debe cambiarla (2i).
 // password: solo en datos de ejemplo (el servidor guarda únicamente el hash). Las cuentas
 // sin password entran con cualquier contraseña no vacía; las creadas en Admin, con su
 // contraseña temporal, y después con la que pongan en el primer acceso o al restablecerla.
 export const users = [
-  { id: 1, nombre: 'Mariana', apellidos: 'Rivera Alcántara', email: 'mrivera@ipn.mx', identificador: '2019630871', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
-  { id: 2, nombre: 'C. S.', apellidos: 'Reyes López', email: 'creyesl@ipn.mx', identificador: '2008630412', role: 'ADMIN', is_active: true, must_change_password: false },
-  { id: 3, nombre: 'J.', apellidos: 'Domínguez Vera', email: 'jdominguez@ipn.mx', identificador: '2015630322', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
-  { id: 4, nombre: 'L.', apellidos: 'Ortega Camacho', email: 'lortega@ipn.mx', identificador: '2020630417', role: 'INVESTIGADOR', is_active: true, must_change_password: false },
+  { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara', correo: 'mrivera@ipn.mx', rol: 'Investigador', activo: true, cambioRequerido: false },
+  { idInstitucional: '2008630412', nombre: 'C. S.', apellidos: 'Reyes López', correo: 'creyesl@ipn.mx', rol: 'Administrador', activo: true, cambioRequerido: false },
+  { idInstitucional: '2015630322', nombre: 'J.', apellidos: 'Domínguez Vera', correo: 'jdominguez@ipn.mx', rol: 'Investigador', activo: true, cambioRequerido: false },
+  { idInstitucional: '2020630417', nombre: 'L.', apellidos: 'Ortega Camacho', correo: 'lortega@ipn.mx', rol: 'Investigador', activo: true, cambioRequerido: false },
 ]
 
 // Estado del sistema (2g): disco en GB y catálogo de conductas.
@@ -206,7 +207,7 @@ export const notifications = [
   { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
 ]
 
-// Enlaces de recuperación pendientes (2h): token → { userId, vence (ms), usado }.
+// Enlaces de recuperación pendientes (2h): token → { idInstitucional, vence (ms), usado }.
 // Un token que no está aquí, como «vencido», responde igual que un enlace vencido.
 export const resetTokens = {}
 
@@ -215,7 +216,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 14
+const VERSION_DATOS = 15
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 

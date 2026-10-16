@@ -69,10 +69,10 @@ export async function uploadBatchVideo(clave, gid, letra, { file, dia, nCilindro
       return reply({ job_id: null, posicion_cola: null })
     }
     const job_id = Date.now()
-    Object.assign(t, { estado: 'QUEUED', id_analisis: job_id, subido_por: usuarioDeLaSesion()?.id ?? null, progreso: null, error: null, analisis_fecha: null })
+    Object.assign(t, { estado: 'QUEUED', id_analisis: job_id, subido_por: usuarioDeLaSesion()?.idInstitucional ?? null, progreso: null, error: null, analisis_fecha: null })
     const job = {
       job_id, posicion: db.queue.length + 1, clave, gid, creado_ms: Date.now(), experimento: db.experimentDetail[clave].titulo.split(' · ')[0],
-      grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, subido_por: usuarioDeLaSesion()?.id ?? null,
+      grupo: g.nombre, tanda: letra, dia, n_especimenes: nCilindros, subido_por: usuarioDeLaSesion()?.idInstitucional ?? null,
       status: 'QUEUED', stage: null, progress_pct: 0,
     }
     db.queue.push(job)
