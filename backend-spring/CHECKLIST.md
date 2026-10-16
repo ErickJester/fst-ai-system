@@ -9,9 +9,14 @@ están reflejadas abajo y explicadas en `PARA_VANESA_API.md` (rama `feat/fronten
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado:** el backend compila (`./mvnw compile`). El SQL, la consulta del PDF y los datos
-de prueba **no se han ejecutado** contra un PostgreSQL: pruébalos con `docker compose down -v` y
-`docker compose --profile dev up --build`.
+**Última revisión del estado (15-oct-2026):** el backend compila y arranca. El SQL, la consulta del PDF y los datos
+de prueba **se ejecutaron** en un PostgreSQL 16 temporal: el esquema se aplica sin errores (12 tablas, dominio
+`tipo_conducta`, sin `conducta`, `intervalo` ni `presenta`), las restricciones rechazan lo que deben (8 casos
+probados), `ddl-auto=validate` acepta las 12 entidades, y `/health`, `/experiments` y el PDF responden con los
+números esperados. **Sin probar:** `docker compose --profile dev up --build` completo, con el backend y el
+`worker_fake` en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker sigue con el esquema viejo de
+15 tablas y 14 experimentos de prueba; para aplicar el nuevo hay que correr `docker compose down -v` en
+`backend-spring/` (borra esos datos) y volver a levantar.
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
