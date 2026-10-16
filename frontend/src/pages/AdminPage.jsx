@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { FieldError, Campo, Cargando, Seg } from '../components/ui'
-import { listUsers, createUser, updateUser, resetTemporal, setUserActive, getSystem } from '../services/admin'
-import { getQueue } from '../services/queue'
+import { listUsers, createUser, updateUser, resetTemporal, setUserActive, getSystem, getColaSistema } from '../services/admin'
 import { useAsync, useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
@@ -28,7 +27,7 @@ export default function AdminPage() {
   const { data: usuarios, error: errUsuarios, reload } = useAsync(listUsers)
   const { data: sistema } = useAsync(getSystem)
   // La cola se vuelve a consultar sola, como en Progreso.
-  const { data: cola } = useAsyncVivo(getQueue, [], (c) => (c.cola.length ? CADA_ACTIVO_MS : CADA_INACTIVO_MS))
+  const { data: cola } = useAsyncVivo(getColaSistema, [], (c) => (c.cola.length ? CADA_ACTIVO_MS : CADA_INACTIVO_MS))
   const [errAccion, setErrAccion] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [crear, setCrear] = useState(false)

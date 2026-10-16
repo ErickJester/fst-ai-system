@@ -3,7 +3,7 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { deCuenta, cuentaPublica } from './auth'
-import { ROL } from '../lib/contrato'
+import { ROL, ESTADO, SESION } from '../lib/contrato'
 
 // Cuentas de administración con las formas de §6.1: { idInstitucional, nombre, apellidos,
 // correo, rol, activo, nExperimentos }. deCuenta las pasa a la forma de las pantallas.
@@ -88,8 +88,36 @@ export async function setUserActive(id, activo) {
   return deCuenta(d)
 }
 
-// GET /admin/system → disco y conductas
+// GET /admin/system → disco y cola (§6). La forma no está en §6.1; propuesta: { disco,
+// conductas, cola: [{ idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado }] },
+// la cola en orden de llegada y con el que se procesa primero.
+function sistema() {
+  const cola = []
+  for (const exp of Object.values(db.experimentDetail)) {
+    for (const g of exp.grupos) {
+      for (const t of g.tandas) {
+        if (t.id_analisis && (t.estado === 'RUNNING' || t.estado === 'QUEUED')) {
+          cola.push({ idAnalisis: t.id_analisis, idExperimento: exp.clave, experimento: exp.titulo.split(' · ')[0], grupo: g.nombre, letra: t.letra, sesion: 'Dia 2', estado: ESTADO.aGuia[t.estado] })
+        }
+      }
+    }
+  }
+  const primero = (j) => (j.estado === 'procesando' ? 0 : 1)
+  cola.sort((a, b) => primero(a) - primero(b) || a.idAnalisis - b.idAnalisis)
+  return reply({ ...db.system, cola })
+}
+
 export async function getSystem() {
-  if (USE_MOCKS) return reply(db.system)
-  return (await api.get('/admin/system')).data
+  return USE_MOCKS ? sistema() : (await api.get('/admin/system')).data
+}
+
+// La cola de /admin/system con la forma que usa Administración: { cola: [trabajos] }.
+export async function getColaSistema() {
+  const d = await getSystem()
+  return {
+    cola: (d.cola || []).map((j, i) => ({
+      job_id: j.idAnalisis, posicion: i + 1, clave: j.idExperimento, experimento: j.experimento, grupo: j.grupo,
+      tanda: j.letra, dia: SESION.aFront[j.sesion] || 'DAY2', status: ESTADO.aFront[j.estado],
+    })),
+  }
 }

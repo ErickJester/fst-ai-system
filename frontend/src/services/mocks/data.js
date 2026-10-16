@@ -68,8 +68,8 @@ export const experimentDetail = {
 // Solo se analiza el Día 2 (D-54). subido_por: cuenta que subió el video (puede ajustar o
 // cancelar su pausa, igual que un Administrador).
 export const queue = [
-  { job_id: 501, posicion: 1, clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
-  { job_id: 503, posicion: 2, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 501, posicion: 1, encolado: '2026-02-24T16:00:00', clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
+  { job_id: 503, posicion: 2, encolado: '2026-02-24T16:05:00', clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
@@ -82,7 +82,7 @@ export const failedJobs = [
 // La pausa la decide el worker; el de ejemplo ya está en pausa. hora_ms null: sin backend,
 // la pausa empieza la primera vez que se consulta (services/queue.js), para ver el plazo.
 export const pausedJobs = [
-  { job_id: 502, clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
+  { job_id: 502, encolado: '2026-02-24T16:01:00', clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
     pausa: { cilindro: 2, desde_segundo: 142, hora_ms: null, ancho: 1280, alto: 720, ajuste: null,
       // El recuadro del cilindro 2 quedó corrido: por eso el pipeline dejó de ver a su espécimen.
       recuadros: [{ cilindro: 1, x0: 50, y0: 130, x1: 270, y1: 640 }, { cilindro: 2, x0: 450, y0: 200, x1: 670, y1: 710 },
@@ -224,7 +224,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 16
+const VERSION_DATOS = 17
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 

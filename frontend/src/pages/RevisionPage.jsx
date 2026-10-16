@@ -243,7 +243,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
     try {
       await reiniciarAnalisis(clave, id)
       try { localStorage.removeItem(BORRADOR) } catch { /* sin almacenamiento */ }
-      navigate('/analisis', { state: { aviso: 'Análisis reiniciado: ' + datos.grupo.nombre + ' · Tanda ' + datos.tanda + ' volvió a la cola.' } })
+      navigate('/analisis?experimento=' + clave, { state: { aviso: 'Análisis reiniciado: ' + datos.grupo.nombre + ' · Tanda ' + datos.tanda + ' volvió a la cola.' } })
     } catch (e) {
       setEstado({ guardando: false, error: mensajeError(e, 'No se pudo reiniciar el análisis.') })
     }

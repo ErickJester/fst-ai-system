@@ -173,7 +173,7 @@ function SinResultados({ clave }) {
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link className="btn btn-primary" to={`/experimentos/${clave}`}>Volver al experimento</Link>
-          <Link className="btn btn-secondary" to="/analisis">Ver progreso del análisis</Link>
+          <Link className="btn btn-secondary" to={'/analisis?experimento=' + clave}>Ver progreso del análisis</Link>
         </div>
       </div>
     </div>
