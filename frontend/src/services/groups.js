@@ -4,16 +4,15 @@ import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion } from './mocks/sesion'
+import { getExperiment } from './experiments'
 
-// GET /experiments/:clave/groups/:gid → grupo con sus tandas y videos (pantalla 2d)
+// Grupo con sus tandas y videos (pantalla 2d). La guía no tiene ruta de grupo: sale del árbol
+// de GET /experiments/:clave (§6.1).
 export async function getGroup(clave, gid) {
-  if (USE_MOCKS) {
-    const exp = db.experimentDetail[clave]
-    const grupo = exp?.grupos.find((g) => g.id === gid)
-    if (!grupo) return fail(404, 'No existe ese grupo.')
-    return reply({ experimento: { clave: exp.clave, titulo: exp.titulo }, ...grupo })
-  }
-  return (await api.get(`/experiments/${clave}/groups/${gid}`)).data
+  const exp = await getExperiment(clave)
+  const grupo = exp.grupos.find((g) => g.id === gid)
+  if (!grupo) return fail(404, 'No existe ese grupo.')
+  return { experimento: { clave: exp.clave, titulo: exp.titulo }, ...grupo }
 }
 
 // POST /experiments/:clave/groups → { nombre, tipo, tratamiento }; el grupo nuevo empieza sin tandas

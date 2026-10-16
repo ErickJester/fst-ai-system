@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import * as auth from './auth'
 import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
-import { createExperiment, deleteExperiment, getExperiment, listExperiments, deFila } from './experiments'
+import { createExperiment, deleteExperiment, getExperiment, listExperiments, deFila, deDetalle } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue, getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
@@ -36,6 +36,24 @@ describe('lista de experimentos con la forma de §6.1', () => {
       creador: { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' } }
     expect(deFila(e)).toMatchObject({ clave: 7, titulo: 'Exp. A', fecha_inicio: '2026-10-01', n_grupos: 3, estado: 'ESPERA_DIA2',
       aviso_vencimiento: { fecha_borrado: '2026-11-12' }, responsable: 'M. Rivera', creador_id: '2019630871', tratamientos: [], con_detalle: true })
+  })
+})
+
+describe('detalle con la forma de §6.1 y el estado de /status', () => {
+  it('el ejemplo de la guía se pasa a la forma de las pantallas', () => {
+    const d = { idExperimento: 7, nombre: 'Exp. A', fecha: '2026-10-01', notas: '', estado: 'procesando',
+      grupos: [{ idGrupo: 1, etiqueta: 'Control', tipo: 'control', tratamiento: 'Salina',
+        tandas: [
+          { idTanda: 2, ordinal: 2, letra: 'B', nCilindros: 3, videos: [{ idVideo: 3, sesion: 'Dia 1', duracion: 300, videoDisponible: true, idAnalisis: null }] },
+          { idTanda: 1, ordinal: 1, letra: 'A', nCilindros: 4, videos: [{ idVideo: 1, sesion: 'Dia 2', duracion: 300, videoDisponible: false, idAnalisis: 1, subidoPor: '2019630871' }] },
+        ] }] }
+    const analisis = [{ idAnalisis: 1, tanda: 'Control · A', sesion: 'Dia 2', estado: 'procesando', etapa: 'cilindros', porcentaje: 67, pausa: null, diagnosticoDisponible: false }]
+    const e = deDetalle(d, analisis)
+    expect(e).toMatchObject({ clave: 7, titulo: 'Exp. A', estado: 'RUNNING' })
+    expect(e.grupos[0]).toMatchObject({ id: 1, nombre: 'Control', tipo: 'CONTROL', n_especimenes: 7 })
+    const [a, b] = e.grupos[0].tandas
+    expect(a).toMatchObject({ letra: 'A', desde: 1, estado: 'RUNNING', progreso: { etapa: 'ROI_DETECTION', pct: 67 }, id_analisis: 1, subido_por: '2019630871', video_disponible: false })
+    expect(b).toMatchObject({ letra: 'B', desde: 5, estado: 'SIN_VIDEO', dia1: { cargado: true }, id_analisis: null })
   })
 })
 
