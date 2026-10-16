@@ -2,9 +2,11 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
+import { deCuenta, cuentaPublica } from './auth'
+import { ROL } from '../lib/contrato'
 
-// Los datos de ejemplo guardan la contraseña; la API nunca la devuelve.
-const sinPassword = ({ password, ...u }) => u
+// Cuentas de administración con las formas de §6.1: { idInstitucional, nombre, apellidos,
+// correo, rol, activo, nExperimentos }. deCuenta las pasa a la forma de las pantallas.
 
 // Contraseña temporal de 12 caracteres, sin los que se confunden (0/O, 1/l/I).
 function temporal() {
@@ -12,68 +14,78 @@ function temporal() {
   return [...crypto.getRandomValues(new Uint32Array(12))].map((n) => abc[n % abc.length]).join('')
 }
 
-// GET /admin/users → cuentas con n_experimentos (los que creó cada una)
+const adminsActivos = () => db.users.filter((x) => x.rol === 'Administrador' && x.activo)
+
+const mock = {
+  listar() {
+    return reply(db.users.map((c) => ({ ...cuentaPublica(c), nExperimentos: db.experiments.filter((e) => e.creador_id === c.idInstitucional).length })))
+  },
+  crear({ idInstitucional, nombre, apellidos, correo }) {
+    const e = correo.toLowerCase()
+    if (db.users.some((c) => c.correo === e)) return fail(409, 'Ya existe una cuenta con ese correo.')
+    if (db.users.some((c) => c.idInstitucional === idInstitucional)) return fail(409, 'Ya existe una cuenta con ese identificador.')
+    const password = temporal()
+    db.users.push({ idInstitucional, nombre, apellidos, correo: e, rol: 'Investigador', activo: true, cambioRequerido: true, password })
+    return reply({ passwordTemporal: password })
+  },
+  modificar(id, cambios) {
+    const c = db.users.find((x) => x.idInstitucional === id)
+    if (!c) return fail(404, 'No existe esa cuenta.')
+    if (cambios.correo) {
+      cambios.correo = cambios.correo.toLowerCase()
+      if (db.users.some((x) => x.correo === cambios.correo && x !== c)) return fail(409, 'Ya existe una cuenta con ese correo.')
+    }
+    if (cambios.idInstitucional && db.users.some((x) => x.idInstitucional === cambios.idInstitucional && x !== c)) return fail(409, 'Ya existe una cuenta con ese identificador.')
+    const quitaAdmin = (cambios.rol && cambios.rol !== 'Administrador') || cambios.activo === false
+    if (c.rol === 'Administrador' && c.activo && quitaAdmin && adminsActivos().length <= 1) return fail(409, 'Debe existir al menos un Administrador activo.')
+    Object.assign(c, cambios)
+    return reply(cuentaPublica(c))
+  },
+  temporal(id) {
+    const c = db.users.find((x) => x.idInstitucional === id)
+    if (!c) return fail(404, 'No existe esa cuenta.')
+    const password = temporal()
+    Object.assign(c, { password, cambioRequerido: true })
+    return reply({ passwordTemporal: password })
+  },
+}
+
+// GET /admin/users → cuentas con nExperimentos (los que creó cada una)
 export async function listUsers() {
-  if (USE_MOCKS) return reply(db.users.map((u) => ({ ...sinPassword(u), n_experimentos: db.experiments.filter((e) => e.creador_id === u.id).length })))
-  return (await api.get('/admin/users')).data
+  const d = USE_MOCKS ? await mock.listar() : (await api.get('/admin/users')).data
+  return d.map(deCuenta)
 }
 
-// POST /admin/users → { nombre, apellidos, email, identificador }; se crea como Investigador.
-// El 201 trae la contraseña temporal (password_temporal) una sola vez: el servidor solo
-// guarda su hash y no la vuelve a dar. El correo, cuando exista, será un canal adicional.
-export async function createUser(data) {
-  if (USE_MOCKS) {
-    const email = data.email.toLowerCase()
-    if (db.users.some((u) => u.email === email)) return fail(409, 'Ya existe una cuenta con ese correo.')
-    const password = temporal()
-    const u = { id: Date.now(), role: 'INVESTIGADOR', is_active: true, must_change_password: true, ...data, email, password }
-    db.users.push(u)
-    return reply({ ...sinPassword(u), password_temporal: password })
-  }
-  return (await api.post('/admin/users', data)).data
+// POST /admin/users { idInstitucional, nombre, apellidos, correo }; se crea como Investigador.
+// El 201 trae { passwordTemporal } una sola vez: el servidor solo guarda su hash. Devuelve la
+// cuenta creada con password_temporal, que es lo que muestra la pantalla.
+export async function createUser({ nombre, apellidos, email, identificador }) {
+  const datos = { idInstitucional: identificador, nombre, apellidos, correo: email.toLowerCase() }
+  const d = USE_MOCKS ? await mock.crear(datos) : (await api.post('/admin/users', datos)).data
+  return { ...deCuenta({ ...datos, rol: 'Investigador', activo: true, cambioRequerido: true }), password_temporal: d.passwordTemporal }
 }
 
-// PATCH /admin/users/:id → { nombre, apellidos, email, identificador, role } (9.6, editar cuenta).
-// 409 si el correo ya existe o si deja el sistema sin administradores activos.
-export async function updateUser(id, cambios) {
-  if (USE_MOCKS) {
-    const u = db.users.find((x) => x.id === id)
-    if (!u) return fail(404, 'No existe esa cuenta.')
-    const email = cambios.email.toLowerCase()
-    if (db.users.some((x) => x.email === email && x.id !== id)) return fail(409, 'Ya existe una cuenta con ese correo.')
-    const admins = db.users.filter((x) => x.role === 'ADMIN' && x.is_active)
-    if (u.role === 'ADMIN' && cambios.role !== 'ADMIN' && u.is_active && admins.length <= 1) return fail(409, 'Debe existir al menos un Administrador activo.')
-    Object.assign(u, cambios, { email })
-    return reply(sinPassword(u))
-  }
-  return (await api.patch(`/admin/users/${id}`, cambios)).data
+// PATCH /admin/users/:idInstitucional { nombre, apellidos, correo, idInstitucional, rol } (9.6,
+// editar cuenta). 409 si el correo ya existe o si deja el sistema sin administradores activos (R-16).
+export async function updateUser(id, { nombre, apellidos, email, identificador, role }) {
+  const cambios = { nombre, apellidos, correo: email, idInstitucional: identificador, rol: ROL.aGuia[role] }
+  const d = USE_MOCKS ? await mock.modificar(id, cambios) : (await api.patch(`/admin/users/${id}`, cambios)).data
+  return deCuenta(d)
 }
 
-// POST /admin/users/:id/reset-temporal → { password_temporal }. Propuesta: el documento no la
-// define todavía. Genera otra temporal (se muestra una sola vez), invalida la contraseña
-// anterior y la cuenta vuelve a pedir el cambio en su próximo acceso.
+// POST /admin/users/:idInstitucional/reset-temporal → { passwordTemporal }. Propuesta: la guía
+// no la trae. Genera otra temporal (se muestra una sola vez), invalida la contraseña anterior
+// y la cuenta vuelve a pedir el cambio en su próximo acceso.
 export async function resetTemporal(id) {
-  if (USE_MOCKS) {
-    const u = db.users.find((x) => x.id === id)
-    if (!u) return fail(404, 'No existe esa cuenta.')
-    const password = temporal()
-    Object.assign(u, { password, must_change_password: true })
-    return reply({ password_temporal: password })
-  }
-  return (await api.post(`/admin/users/${id}/reset-temporal`)).data
+  const d = USE_MOCKS ? await mock.temporal(id) : (await api.post(`/admin/users/${id}/reset-temporal`)).data
+  return { password_temporal: d.passwordTemporal }
 }
 
-// PATCH /admin/users/:id → { is_active }; el servidor impide dejar el sistema sin administradores
-export async function setUserActive(id, isActive) {
-  if (USE_MOCKS) {
-    const u = db.users.find((x) => x.id === id)
-    if (!u) return fail(404, 'No existe esa cuenta.')
-    const admins = db.users.filter((x) => x.role === 'ADMIN' && x.is_active)
-    if (!isActive && u.role === 'ADMIN' && admins.length <= 1) return fail(409, 'Debe existir al menos un Administrador activo.')
-    u.is_active = isActive
-    return reply(sinPassword(u))
-  }
-  return (await api.patch(`/admin/users/${id}`, { is_active: isActive })).data
+// PATCH /admin/users/:idInstitucional { activo }; el servidor impide dejar el sistema sin
+// administradores (R-16).
+export async function setUserActive(id, activo) {
+  const d = USE_MOCKS ? await mock.modificar(id, { activo }) : (await api.patch(`/admin/users/${id}`, { activo })).data
+  return deCuenta(d)
 }
 
 // GET /admin/system → disco y conductas

@@ -21,7 +21,9 @@ globalThis.localStorage = {
   setItem: (k, v) => almacen.set(k, String(v)),
   removeItem: (k) => almacen.delete(k),
 }
-const sesion = (id) => localStorage.setItem('fst.token', 'mock-token-' + id) // 1 M. Rivera, 2 C. Reyes (Administrador)
+// Cuentas de ejemplo por número: 1 M. Rivera, 2 C. Reyes (Administrador), 3 J. Domínguez.
+const ID_INSTITUCIONAL = { 1: '2019630871', 2: '2008630412', 3: '2015630322' }
+const sesion = (n) => localStorage.setItem('fst.token', 'mock-token-' + ID_INSTITUCIONAL[n])
 
 beforeEach(() => {
   reiniciarDatos()
@@ -29,6 +31,11 @@ beforeEach(() => {
 })
 
 describe('inicio de sesión', () => {
+  it('la cuenta llega con la forma de §6.1 y se pasa a la de las pantallas', () => {
+    const c = { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera', correo: 'mrivera@ipn.mx', rol: 'Administrador', activo: false, cambioRequerido: true, nExperimentos: 2 }
+    expect(auth.deCuenta(c)).toEqual({ id: '2019630871', identificador: '2019630871', nombre: 'Mariana', apellidos: 'Rivera', email: 'mrivera@ipn.mx', role: 'ADMIN', is_active: false, must_change_password: true, n_experimentos: 2 })
+  })
+
   it('las cuentas de ejemplo entran con cualquier contraseña no vacía', async () => {
     const r = await auth.login('mrivera@ipn.mx', 'x')
     expect(r.user.email).toBe('mrivera@ipn.mx')

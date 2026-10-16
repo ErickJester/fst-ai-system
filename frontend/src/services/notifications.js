@@ -2,12 +2,12 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { usuarioDeLaSesion } from './mocks/sesion'
+import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 
 // Tipos (los seis del documento): ANALYSIS_DONE, ANALYSIS_FAILED, ANALYSIS_PAUSED,
 // ANALYSIS_CANCELED, DISK_ALERT (solo Administradores) y VIDEO_DELETED.
 // Sin backend, las que van solo a Administradores llevan solo_admin.
-const mias = () => db.notifications.filter((n) => !n.solo_admin || usuarioDeLaSesion()?.role === 'ADMIN')
+const mias = () => db.notifications.filter((n) => !n.solo_admin || esAdmin(usuarioDeLaSesion()))
 
 // GET /notifications → las de la cuenta, de la más nueva a la más vieja
 export async function listNotifications() {

@@ -2,7 +2,7 @@ import api from './api'
 import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
-import { usuarioDeLaSesion } from './mocks/sesion'
+import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 
 // Fecha local de dentro de n días, como 'AAAA-MM-DD'.
 function enDias(n) {
@@ -38,7 +38,7 @@ export async function createExperiment(data) {
     const clave = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
     const u = usuarioDeLaSesion()
     const responsable = u ? u.nombre[0] + '. ' + u.apellidos.split(' ')[0] : ''
-    const creador_id = u?.id ?? null
+    const creador_id = u?.idInstitucional ?? null
     db.experiments.unshift({
       clave, titulo: data.titulo, tratamientos: [], fecha_inicio: data.fecha_inicio, n_grupos: 0, n_especimenes: 0,
       videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'SIN_VIDEOS',
@@ -68,7 +68,7 @@ export async function deleteExperiment(clave) {
     const i = db.experiments.findIndex((e) => e.clave === clave)
     if (i < 0) return fail(404, 'No existe ese experimento.')
     const u = usuarioDeLaSesion()
-    if (!u || (u.role !== 'ADMIN' && db.experiments[i].creador_id !== u.id)) {
+    if (!u || (!esAdmin(u) && db.experiments[i].creador_id !== u.idInstitucional)) {
       return fail(403, 'Solo quien creó el experimento o un Administrador puede eliminarlo.')
     }
     const tandas = db.experimentDetail[clave]?.grupos.flatMap((g) => g.tandas) || []
