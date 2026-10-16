@@ -158,13 +158,18 @@ export function deDetalle(d, analisis = []) {
 // GET /experiments/:clave (§6.1) y GET /experiments/:clave/status → datos generales + grupos →
 // tandas, con el estado de cada análisis (pantallas 2c y 2d).
 export async function getExperiment(clave) {
+  return (await detalleConStatus(clave)).exp
+}
+
+// El detalle ya traducido y los análisis de /status tal como llegan (para Progreso).
+export async function detalleConStatus(clave) {
   const [d, s] = await Promise.all([
     USE_MOCKS
       ? (db.experimentDetail[clave] ? reply(detalleDe(clave)) : fail(404, 'No existe ese experimento.'))
       : api.get(`/experiments/${clave}`).then((r) => r.data),
     getStatus(clave),
   ])
-  return deDetalle(d, s.analisis)
+  return { exp: deDetalle(d, s.analisis), analisis: s.analisis }
 }
 
 // DELETE /experiments/:clave → borra el experimento con todo lo suyo. Según D-63 no pide

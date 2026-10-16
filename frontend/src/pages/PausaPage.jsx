@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Cargando, FieldError } from '../components/ui'
 import RecuadroEditable from '../components/RecuadroEditable'
-import { getQueue, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from '../services/queue'
+import { getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from '../services/queue'
+import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { useAsync, useAsyncVivo, CADA_ACTIVO_MS } from '../hooks/useAsync'
 import { DIA, mmss } from '../lib/fst'
@@ -20,7 +21,7 @@ export default function PausaPage() {
   const navigate = useNavigate()
   // Se vuelve a pedir cada 5 s para tener al día el tiempo que queda.
   const { data: p, error } = useAsyncVivo(() => getPausa(clave, id), [clave, id], () => CADA_ACTIVO_MS)
-  const { data: cola } = useAsync(getQueue)
+  const { data: cola } = useAsync(() => getQueue(clave), [clave])
   const [img, setImg] = useState(null)
   const [recuadro, setRecuadro] = useState(null)
   const [vence, setVence] = useState(null) // hora local en que se acaba el plazo
@@ -63,7 +64,7 @@ export default function PausaPage() {
     try {
       const { cilindro, x0, y0, x1, y1 } = recuadro
       await ajustarRecuadro(clave, id, { cilindro, x0, y0, x1, y1 })
-      navigate('/analisis', { state: { aviso: 'Recuadro del cilindro ' + cilindro + ' ajustado. El análisis volvió a la cola, por delante de los que llegaron después, y sigue desde el segundo ' + p.desdeSegundo + '.' } })
+      navigate('/analisis?experimento=' + clave, { state: { aviso: 'Recuadro del cilindro ' + cilindro + ' ajustado. El análisis volvió a la cola, por delante de los que llegaron después, y sigue desde el segundo ' + p.desdeSegundo + '.' } })
     } catch (e) {
       setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron los 5 minutos y se canceló.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
       setEnviando(false)
@@ -76,7 +77,7 @@ export default function PausaPage() {
     setErrAccion('')
     try {
       await cancelarAnalisis(clave, id)
-      navigate('/analisis', { state: { aviso: 'Análisis cancelado: ' + titulo + '.' } })
+      navigate('/analisis?experimento=' + clave, { state: { aviso: 'Análisis cancelado: ' + titulo + '.' } })
     } catch (e) {
       setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa.' : mensajeError(e, 'No se pudo cancelar el análisis. Inténtalo de nuevo.'))
       setEnviando(false)
