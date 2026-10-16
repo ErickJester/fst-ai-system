@@ -3,7 +3,7 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
-import { usuarioDeLaSesion } from './mocks/sesion'
+import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { segundosDe, totalesDe, cajasDe } from './mocks/segundos'
 import { CONDUCTA_BD, DE_BD } from '../lib/fst'
 
@@ -25,7 +25,7 @@ function revisable(clave, id) {
   const r = buscar(clave, id)
   if (!r) return { error: fail(404, 'No existe ese análisis.') }
   const u = usuarioDeLaSesion()
-  if (!u || (u.role !== 'ADMIN' && r.t.subido_por !== u.id)) {
+  if (!u || (!esAdmin(u) && r.t.subido_por !== u.idInstitucional)) {
     return { error: fail(403, 'Solo quien subió el video o un Administrador puede revisar este análisis.') }
   }
   if (r.t.estado !== 'DONE') return { error: fail(409, 'Solo se revisa un análisis completado.') }

@@ -3,7 +3,7 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
-import { usuarioDeLaSesion } from './mocks/sesion'
+import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 
 // La cola, las pausas y los errores los produce el worker (equipo de backend). Sin backend,
 // los datos de ejemplo quedan fijos: aquí solo se responde lo que el servidor respondería.
@@ -58,7 +58,7 @@ function pausaPropia(clave, id) {
   const i = db.pausedJobs.findIndex((j) => j.job_id === Number(id) && j.clave === clave)
   if (i < 0) return { error: fail(409, 'El análisis ya no está en pausa.') }
   const u = usuarioDeLaSesion()
-  if (!u || (u.role !== 'ADMIN' && db.pausedJobs[i].subido_por !== u.id)) {
+  if (!u || (!esAdmin(u) && db.pausedJobs[i].subido_por !== u.idInstitucional)) {
     return { error: fail(403, 'Solo quien subió el video o un Administrador puede atender esta pausa.') }
   }
   return { job: db.pausedJobs[i], i }

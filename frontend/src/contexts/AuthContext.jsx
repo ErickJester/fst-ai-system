@@ -17,7 +17,7 @@ const session = {
       sessionStorage.removeItem(TOKEN_KEY)
       const v = localStorage.getItem(KEY)
       const u = v ? JSON.parse(v) : null
-      return u?.id ? u : null // las sesiones sin id son de la versión sin servicios
+      return typeof u?.id === 'string' ? u : null // id = idInstitucional; las demás son de versiones anteriores
     } catch {
       return null
     }

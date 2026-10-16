@@ -361,3 +361,14 @@ Si eres Claude trabajando en este repo:
 - Si un dato o endpoint no existe en el backend, agrégalo primero a `services/mocks/data.js` con forma de API y documenta la ruta propuesta en el comentario de la función de servicio y en la tabla de la sección 6 de este archivo.
 - Verifica cada cambio: `npm test`, `npm run lint` y build sin errores, prueba en el navegador y consola limpia. Para refactors, compara el HTML antes y después.
 - Si cambias algo de este traspaso (contrato, decisiones, pendientes), actualiza este archivo en el mismo commit.
+
+## Integración con Spring (siguiendo `PARA_VANESA_API.md`)
+
+41. **Envoltorio y equivalencias (pasos 2 y 3).** `services/api.js` desenvuelve `{data, error, status}` en el interceptor (los archivos no se tocan) y `mensajeError` lee solo `error`. `src/lib/contrato.js` tiene las tablas de tu §7 en los dos sentidos (`ESTADO.aFront['en cola']` → `QUEUED`), más la letra de la tanda ↔ `ordinal`.
+42. **Cuentas en el formato de la guía (pasos 1 y 4, parte 1 del orden de conexión).** Los datos de ejemplo de las cuentas ya tienen la forma de §6.1 (`idInstitucional`, `correo`, `rol: "Investigador" | "Administrador"`, `activo`, `cambioRequerido`, `nExperimentos`), y los servicios usan la misma traducción con o sin backend. `idInstitucional` es el id de la cuenta en todo el frontend (`creador_id` y `subido_por` de los datos de ejemplo también).
+    - `POST /auth/login` `{correo, contrasena}` → `{token, rol, nombre, cambioRequerido, idInstitucional, apellidos, correo}`.
+    - `POST /auth/recover` `{correo}`; `POST /auth/reset` `{token, contrasenaNueva}`.
+    - `PATCH /auth/password` `{contrasenaActual, contrasenaNueva}` y `PATCH /users/me` `{nombre, apellidos, correo}`: **la guía no da los nombres del cuerpo ni la respuesta.** Propongo esos y que los dos devuelvan la cuenta como el login, sin `token`. Confírmalos.
+    - `/admin/users`: `GET` con la lista de §6.1; `POST` `{idInstitucional, nombre, apellidos, correo}` → `{passwordTemporal}`; `PATCH /admin/users/{idInstitucional}` con `{nombre, apellidos, correo, idInstitucional, rol}` o `{activo}` → la cuenta; `POST .../reset-temporal` → `{passwordTemporal}`.
+    - **Listo para probar contra el backend:** inicio de sesión, primer acceso, perfil y recuperar contraseña.
+

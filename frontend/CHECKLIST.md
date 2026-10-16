@@ -33,15 +33,15 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Token JWT en `localStorage`, enviado como `Authorization: Bearer` (§11.1)
 - [x] Un 401 con sesión lleva al login con el aviso «Tu sesión caducó»; el 401 del propio login muestra su error sin redirigir
 - [x] Un 403 lleva a Experimentos con el aviso «No tienes permiso para esa sección»
-- [x] El mensaje de error del servidor se lee de `mensaje`, de `errores` o de `error`
 - [x] Rutas que ya coinciden con §6: `/auth/login`, `/auth/reset`, `/experiments` (GET, POST y DELETE), `/pause`, `/pause/image`, `/pause/adjust`, `/cancel`, `/diagnostic`, `/review`, `/segundos`, `/restart`, `/report/{formato}`, `/admin/users`, `/admin/system` y `/notifications`
-- [ ] Desenvolver la respuesta `{data, error, status}` (§6). Hoy los servicios devuelven `res.data` tal cual, que con el backend sería el envoltorio completo
-- [ ] Leer el error solo del campo `error` del envoltorio, que es el formato acordado (§6). Hecho: el frontend acepta tres formas (`mensaje`, `errores` y `error`)
+- [x] Desenvolver la respuesta `{data, error, status}` (§6) en el interceptor de `services/api.js`; los archivos no se tocan
+- [x] Leer el error solo del campo `error` del envoltorio, que es el formato acordado (§6)
+- [x] Equivalencias guía ↔ pantallas en `src/lib/contrato.js`, en los dos sentidos
 - [ ] Rutas alineadas con §6 y §6.1. Hecho: las de arriba. Falta lo siguiente
-  - [ ] Recuperar contraseña: `POST /auth/recover` (hoy `/auth/forgot`)
-  - [ ] Cambiar contraseña: `PATCH /auth/password` (hoy `POST /auth/change-password`)
-  - [ ] Perfil: `PATCH /users/me` (hoy `PATCH /me`)
-  - [ ] Login con `{correo, contrasena}` y respuesta `{token, rol, nombre, cambioRequerido}` (hoy `{email, password}` y `{token, user}`)
+  - [x] Recuperar contraseña: `POST /auth/recover` con `{correo}`
+  - [x] Cambiar contraseña: `PATCH /auth/password` con `{contrasenaActual, contrasenaNueva}` (nombres por confirmar)
+  - [x] Perfil: `PATCH /users/me` con `{nombre, apellidos, correo}`
+  - [x] Login con `{correo, contrasena}` y respuesta `{token, rol, nombre, cambioRequerido}` más `idInstitucional`, `apellidos` y `correo`; `idInstitucional` es el id de la cuenta
   - [ ] Subir video con `POST /experiments/{id}/groups/{grupo}/videos` y los campos `sesion`, `tipo`, `tratamiento`, `nCilindros` y `ordinal` (hoy crea el grupo con `POST .../groups` y sube a `.../groups/:gid/batches/:letra/videos` con `file`, `dia` y `n_cilindros`)
   - [ ] Respuesta de la subida `{idVideo, idAnalisis, estadoAnalisis}` (hoy `{job_id, posicion_cola}`)
   - [ ] Pasar la letra de la tanda al `ordinal` entero de la base
