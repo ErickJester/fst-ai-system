@@ -3,6 +3,7 @@ import { USE_MOCKS } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
+import { ESTADO } from '../lib/contrato'
 
 // Fecha local de dentro de n días, como 'AAAA-MM-DD'.
 function enDias(n) {
@@ -12,42 +13,76 @@ function enDias(n) {
 }
 
 // Aviso de vencimiento (R-05): si los videos se borran en 7 días o menos, la fecha exacta.
-const conAviso = (e) => ({
-  ...e,
-  aviso_vencimiento: !e.videos_borrados && e.retencion_dias != null && e.retencion_dias <= 7 ? { fecha_borrado: enDias(e.retencion_dias) } : null,
+const avisoDe = (e) => (!e.videosBorrados && e.diasRetencion != null && e.diasRetencion <= 7 ? { fechaBorrado: enDias(e.diasRetencion) } : null)
+
+// «M. Rivera»: inicial del nombre y primer apellido de quien creó el experimento.
+const responsableDe = (c) => (c ? c.nombre[0] + '. ' + (c.apellidos || '').split(' ')[0] : '')
+
+// Fila de la lista (§6.1, más los campos de más de data.js) → forma de las pantallas. La
+// clave de las rutas es idExperimento.
+export const deFila = (e) => ({
+  clave: e.idExperimento,
+  titulo: e.nombre,
+  fecha_inicio: e.fecha,
+  n_grupos: e.nGrupos,
+  estado: ESTADO.aFront[e.estado],
+  aviso_vencimiento: e.avisoVencimiento ? { fecha_borrado: e.avisoVencimiento.fechaBorrado } : null,
+  responsable: responsableDe(e.creador),
+  creador_id: e.creador?.idInstitucional ?? null,
+  n_especimenes: e.nEspecimenes ?? null,
+  tratamientos: e.tratamientos || [],
+  videos_dia2_listos: e.videosDia2?.analizados ?? 0,
+  videos_dia2_cargados: e.videosDia2?.cargados ?? 0,
+  videos_dia2_total: e.videosDia2?.total ?? 0,
+  retencion_dias: e.diasRetencion ?? null,
+  videos_borrados: !!e.videosBorrados,
+  con_detalle: e.conDetalle ?? true, // con el backend, todos tienen detalle
 })
 
-// GET /experiments → lista con estado agregado y aviso de vencimiento (pantalla 2a)
-export async function listExperiments() {
-  if (USE_MOCKS) {
-    return reply(db.experiments.map(conAviso))
-  }
-  return (await api.get('/experiments')).data
-}
-
-// POST /experiments → paso 1, «Datos generales»: { titulo, fecha_inicio, notas } (nombre único,
-// fecha y notas opcionales, §7). El servidor asigna la clave y pone como responsable a la
-// cuenta de la sesión. 409 si ya existe un experimento con ese nombre.
-export async function createExperiment(data) {
-  if (USE_MOCKS) {
-    if (db.experiments.some((e) => e.titulo.trim().toLowerCase() === data.titulo.trim().toLowerCase())) {
+const mock = {
+  // Sin backend, una sola página con todo (el servidor pagina con ?pagina=).
+  listar() {
+    return reply({ pagina: 1, total: db.experiments.length, items: db.experiments.map((e) => ({ ...e, avisoVencimiento: avisoDe(e) })) })
+  },
+  crear({ nombre, fecha, notas }) {
+    if (db.experiments.some((e) => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase())) {
       return fail(409, 'Ya existe un experimento con ese nombre.')
     }
-    const anio = data.fecha_inicio.slice(0, 4)
-    const n = db.experiments.filter((e) => e.clave.startsWith('EXP-' + anio)).length + 1
-    const clave = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
+    const anio = fecha.slice(0, 4)
+    const n = db.experiments.filter((e) => e.idExperimento.startsWith('EXP-' + anio)).length + 1
+    const idExperimento = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
     const u = usuarioDeLaSesion()
-    const responsable = u ? u.nombre[0] + '. ' + u.apellidos.split(' ')[0] : ''
-    const creador_id = u?.idInstitucional ?? null
+    const creador = u ? { idInstitucional: u.idInstitucional, nombre: u.nombre, apellidos: u.apellidos } : null
     db.experiments.unshift({
-      clave, titulo: data.titulo, tratamientos: [], fecha_inicio: data.fecha_inicio, n_grupos: 0, n_especimenes: 0,
-      videos_dia2_listos: 0, videos_dia2_cargados: 0, videos_dia2_total: 0, estado: 'SIN_VIDEOS',
-      responsable, creador_id, retencion_dias: null, videos_borrados: false, con_detalle: true,
+      idExperimento, nombre, fecha, nGrupos: 0, estado: 'sin videos', creador, nEspecimenes: 0, tratamientos: [],
+      videosDia2: { analizados: 0, cargados: 0, total: 0 }, diasRetencion: null, videosBorrados: false, conDetalle: true,
     })
-    db.experimentDetail[clave] = { clave, titulo: data.titulo, fecha_inicio: data.fecha_inicio, responsable, creador_id, notas: data.notas, grupos: [] }
-    return reply({ clave })
+    // El detalle sigue con la forma anterior hasta la siguiente fase (con /status).
+    db.experimentDetail[idExperimento] = { clave: idExperimento, titulo: nombre, fecha_inicio: fecha, responsable: responsableDe(creador), creador_id: creador?.idInstitucional ?? null, notas, grupos: [] }
+    return reply({ idExperimento })
+  },
+}
+
+// GET /experiments?pagina= → { pagina, total, items } (§6.1). Los filtros y las páginas de la
+// pantalla siguen en el navegador: aquí se piden todas las páginas y se juntan.
+export async function listExperiments() {
+  const items = []
+  for (let pagina = 1; ; pagina++) {
+    const d = USE_MOCKS ? await mock.listar() : (await api.get('/experiments', { params: { pagina } })).data
+    items.push(...d.items)
+    if (!d.items.length || items.length >= d.total) break
   }
-  return (await api.post('/experiments', data)).data
+  return items.map(deFila)
+}
+
+// POST /experiments { nombre, fecha, notas } → { idExperimento }. Paso 1, «Datos generales»
+// (nombre único, fecha y notas opcionales, §7). El servidor pone como creador a la cuenta de
+// la sesión. 409 si ya existe un experimento con ese nombre. La respuesta no está en la guía:
+// por confirmar con Erick.
+export async function createExperiment({ titulo, fecha_inicio, notas }) {
+  const datos = { nombre: titulo, fecha: fecha_inicio, notas }
+  const d = USE_MOCKS ? await mock.crear(datos) : (await api.post('/experiments', datos)).data
+  return { clave: d.idExperimento }
 }
 
 // GET /experiments/:clave → datos generales + grupos → tandas (pantalla 2c)
@@ -65,10 +100,10 @@ export async function getExperiment(clave) {
 // pausa, y los que están en cola salen de la cola (R-08, D-87).
 export async function deleteExperiment(clave) {
   if (USE_MOCKS) {
-    const i = db.experiments.findIndex((e) => e.clave === clave)
+    const i = db.experiments.findIndex((e) => e.idExperimento === clave)
     if (i < 0) return fail(404, 'No existe ese experimento.')
     const u = usuarioDeLaSesion()
-    if (!u || (!esAdmin(u) && db.experiments[i].creador_id !== u.idInstitucional)) {
+    if (!u || (!esAdmin(u) && db.experiments[i].creador?.idInstitucional !== u.idInstitucional)) {
       return fail(403, 'Solo quien creó el experimento o un Administrador puede eliminarlo.')
     }
     const tandas = db.experimentDetail[clave]?.grupos.flatMap((g) => g.tandas) || []

@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import * as auth from './auth'
 import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
-import { createExperiment, deleteExperiment, getExperiment, listExperiments } from './experiments'
+import { createExperiment, deleteExperiment, getExperiment, listExperiments, deFila } from './experiments'
 import { createGroup, uploadBatchVideo } from './groups'
 import { getQueue, getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
@@ -28,6 +28,15 @@ const sesion = (n) => localStorage.setItem('fst.token', 'mock-token-' + ID_INSTI
 beforeEach(() => {
   reiniciarDatos()
   almacen.clear()
+})
+
+describe('lista de experimentos con la forma de §6.1', () => {
+  it('cada fila se pasa a la forma de las pantallas', () => {
+    const e = { idExperimento: 7, nombre: 'Exp. A', fecha: '2026-10-01', nGrupos: 3, estado: 'en espera del Día 2', avisoVencimiento: { fechaBorrado: '2026-11-12' },
+      creador: { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' } }
+    expect(deFila(e)).toMatchObject({ clave: 7, titulo: 'Exp. A', fecha_inicio: '2026-10-01', n_grupos: 3, estado: 'ESPERA_DIA2',
+      aviso_vencimiento: { fecha_borrado: '2026-11-12' }, responsable: 'M. Rivera', creador_id: '2019630871', tratamientos: [], con_detalle: true })
+  })
 })
 
 describe('inicio de sesión', () => {

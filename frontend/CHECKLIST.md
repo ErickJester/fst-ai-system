@@ -76,7 +76,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Eliminar» con confirmación explícita, solo para quien creó el experimento o un Administrador (R-08, D-63)
 - [x] Los errores 403 y 409 de eliminar se muestran en el diálogo
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
-- [ ] Filtros y paginación en el servidor. Hecho: se hacen en el navegador sobre la lista completa
+- [ ] Filtros y paginación en el servidor. Hecho: se hacen en el navegador sobre la lista completa. La lista ya usa `GET /experiments?pagina=` con `{pagina, total, items}` de §6.1 y junta todas las páginas
 - [x] La columna «Retención» dice «Videos borrados» y explica el motivo al pasar el mouse
 
 ## 4. Crear experimento y cargar video (§9.3, R-02, R-03, R-09)

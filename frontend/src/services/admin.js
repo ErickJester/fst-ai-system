@@ -18,7 +18,7 @@ const adminsActivos = () => db.users.filter((x) => x.rol === 'Administrador' && 
 
 const mock = {
   listar() {
-    return reply(db.users.map((c) => ({ ...cuentaPublica(c), nExperimentos: db.experiments.filter((e) => e.creador_id === c.idInstitucional).length })))
+    return reply(db.users.map((c) => ({ ...cuentaPublica(c), nExperimentos: db.experiments.filter((e) => e.creador?.idInstitucional === c.idInstitucional).length })))
   },
   crear({ idInstitucional, nombre, apellidos, correo }) {
     const e = correo.toLowerCase()
