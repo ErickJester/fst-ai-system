@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
-import { Link, useLocation } from 'react-router-dom'
-import { getQueue, getDiagnostico } from '../services/queue'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { getDiagnostico } from '../services/queue'
+import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
@@ -34,8 +35,10 @@ const REINTENTO_DIAGNOSTICO_MS = 4000
 // 2e · Progreso de análisis: tres etapas del pipeline, cola secuencial sin controles.
 export default function ProgresoPage() {
   const aviso = useLocation().state?.aviso // al llegar después de subir un video de Día 2
+  // ?experimento=: solo los análisis de ese experimento (§9.4, GET /experiments/{id}/status).
+  const experimento = useSearchParams()[0].get('experimento')
   const [activos, setActivos] = useState(true)
-  const { data, error } = usePolling(getQueue, activos ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
+  const { data, error } = usePolling(() => getQueue(experimento), activos ? CADA_ACTIVO_MS : CADA_INACTIVO_MS)
   useEffect(() => {
     if (data) setActivos(data.cola.length > 0 || data.pausas.length > 0)
   }, [data])
@@ -57,6 +60,11 @@ export default function ProgresoPage() {
       <div className="page" style={{ paddingBottom: 34 }}>
         {aviso && <div className="note-bar" role="status" style={{ marginBottom: 18 }}>{aviso}</div>}
         <h3 style={{ margin: '0 0 8px' }}>Análisis en curso</h3>
+        {experimento && (
+          <p className="hint" style={{ margin: '0 0 10px' }}>
+            Solo los análisis de este experimento. <Link to="/analisis">Ver los de todos los experimentos</Link>
+          </p>
+        )}
         <p className="lead" style={{ margin: '0 0 22px', maxWidth: 600 }}>
           El sistema analiza un video a la vez, en el orden en que se subieron; esta pantalla se actualiza sola. El orden lo fija el sistema al momento de la carga: aquí no se inicia, pausa, cancela ni reinicia. Si el sistema deja de ver a un espécimen, el análisis queda en pausa y se atiende en su pantalla.
         </p>

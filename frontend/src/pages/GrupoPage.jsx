@@ -136,7 +136,7 @@ export default function GrupoPage() {
                           ? <Link to={enlacePausa(exp.clave, t.id_analisis)}>Ajustar o cancelar →</Link>
                           : t.estado === 'SIN_VIDEO'
                             ? <Link to={`/experimentos/${exp.clave}/cargar`}>Cargar el video del Día 2 →</Link>
-                            : <Link to="/analisis">Ver progreso del análisis →</Link>}
+                            : <Link to={'/analisis?experimento=' + exp.clave}>Ver progreso del análisis →</Link>}
                     </div>
                   </div>
                 </div>

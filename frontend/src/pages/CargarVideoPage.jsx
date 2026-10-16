@@ -191,7 +191,7 @@ export default function CargarVideoPage() {
       await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
       // Día 2: a Progreso. Día 1: se guarda sin analizar y se vuelve al experimento (§9.3).
       const donde = grupoNombre + ' · Tanda ' + tanda
-      if (dia === 'DAY2') navigate('/analisis', { state: { aviso: 'Video almacenado. El análisis está en cola: ' + donde + ' · Día 2.' } })
+      if (dia === 'DAY2') navigate('/analisis?experimento=' + clave, { state: { aviso: 'Video almacenado. El análisis está en cola: ' + donde + ' · Día 2.' } })
       else navigate(`/experimentos/${clave}`, { state: { aviso: 'Video del Día 1 almacenado (' + donde + '). No se analiza.' } })
     } catch (err) {
       // Cancelar no es un error: el archivo queda elegido para volver a intentarlo.

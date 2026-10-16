@@ -381,4 +381,11 @@ Si eres Claude trabajando en este repo:
     - **Lo que necesito de `/status`:** que traiga **todos** los análisis vigentes del experimento, también los `completado`, no solo los activos; si no, el detalle no sabe qué tandas terminaron.
     - **Campos de más (propuesta, confírmalos):** en cada video, `fecha` (para «18–19 feb 2026» de la tanda) y `subidoPor` (ya en tu §4); en cada análisis de `/status`, `fechaAnalisis` (para «Análisis vigente: …» y «Completados recientemente»).
     - Sin `fecha` se usa la del experimento; sin `fechaAnalisis` se lee «Sin análisis todavía».
+45. **Progreso con `/status`; ya no existe `/queue` (paso 6).** «Análisis en curso» se arma con `GET /experiments/{id}/status`:
+    - Con `/analisis?experimento={id}` muestra solo ese experimento (la vista por experimento de §9.4). A ella llevan «Ver progreso del análisis», la subida de un Día 2, la pausa y el reinicio.
+    - Sin experimento (el enlace del menú), junta el `/status` de los experimentos que la lista marca `en cola`, `procesando`, `en pausa`, `error` o `cancelado`. «Completados recientemente» sale de esos mismos experimentos.
+    - **Orden de la cola:** `/status` no da posición. Uso `fechaAnalisis`, que mientras el análisis no termina es la hora en que entró a la cola (D-79): un análisis ajustado tras una pausa conserva la suya y vuelve por delante de los que llegaron después; uno reiniciado entra con la hora del reinicio. **Confírmame que `fechaAnalisis` viene en `/status` con ese significado.**
+    - **Campos de más en `/status` (propuesta):** `pausa.desdeSegundo` (la tarjeta dice «pausa en el segundo 142») y `motivoCancelacion` (`usuario` o `plazo`; §9.4 pide decir por qué se canceló). Sin ellos la tarjeta pierde ese dato, pero no se rompe.
+    - **Administración** toma la cola de `GET /admin/system`. Propuesta de forma (no está en §6.1): `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada y con el que se procesa primero.
+    - La pausa toma su título del `/status` de su experimento.
 

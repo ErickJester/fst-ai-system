@@ -7,35 +7,16 @@ import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { ESTADO, ETAPA } from '../lib/contrato'
 import { PCT_ETAPA } from '../lib/fst'
 
-// La cola, las pausas y los errores los produce el worker (equipo de backend). Sin backend,
-// los datos de ejemplo quedan fijos: aquí solo se responde lo que el servidor respondería.
-
-// Análisis completados, del más reciente al más viejo (sin backend, los de las tandas de ejemplo).
-const TERMINADOS = 5
-function terminados() {
-  const out = []
-  for (const exp of Object.values(db.experimentDetail)) {
-    for (const g of exp.grupos) {
-      for (const t of g.tandas) {
-        if (t.estado !== 'DONE' || !t.id_analisis) continue
-        out.push({ job_id: t.id_analisis, clave: exp.clave, gid: g.id, experimento: exp.titulo.split(' · ')[0], grupo: g.nombre, tanda: t.letra, dia: 'DAY2', subido_por: t.subido_por, analisis_fecha: t.analisis_fecha })
-      }
-    }
-  }
-  return out.sort((a, b) => (b.analisis_fecha || '').localeCompare(a.analisis_fecha || '')).slice(0, TERMINADOS)
-}
-
-// GET /queue → cola global en orden de llegada, análisis en pausa, con error, cancelados y
-// terminados recientes (pantalla 2e)
-export async function getQueue() {
-  if (USE_MOCKS) return reply({ cola: db.queue, pausas: db.pausedJobs.map(conRestante), errores: db.failedJobs, cancelados: db.canceledJobs, terminados: terminados() })
-  return (await api.get('/queue')).data
-}
+// El estado de los análisis, las pausas y los errores los produce el worker (equipo de
+// backend). Sin backend, los datos de ejemplo quedan fijos: aquí solo se responde lo que el
+// servidor respondería. «Análisis en curso» se arma con /status en services/progreso.js.
 
 // GET /experiments/:clave/status → { analisis: [{ idAnalisis, tanda, sesion, estado, etapa,
 // porcentaje, pausa, diagnosticoDisponible }] } (§6.1), con los valores de la guía. Trae todos
 // los análisis vigentes del experimento, también los completados: el detalle toma de aquí el
-// estado de cada tanda. fechaAnalisis es un campo de más (propuesto) para «Análisis vigente».
+// estado de cada tanda. De más sobre la guía (propuestos): fechaAnalisis, para «Análisis
+// vigente»; pausa.desdeSegundo; y motivoCancelacion ('usuario' o 'plazo'), para explicar por
+// qué se canceló (§9.4).
 export async function getStatus(clave) {
   if (USE_MOCKS) {
     const exp = db.experimentDetail[clave]
@@ -49,6 +30,7 @@ export async function getStatus(clave) {
 function analisisDe(g, t) {
   const pausado = db.pausedJobs.find((j) => j.job_id === t.id_analisis)
   const fallido = db.failedJobs.find((j) => j.job_id === t.id_analisis)
+  const enCola = db.queue.find((j) => j.job_id === t.id_analisis) || pausado
   const etapa = t.progreso?.etapa || t.error?.etapa || pausado?.stage || null
   const porcentaje = t.estado === 'DONE' ? 100 : t.progreso?.pct ?? pausado?.progress_pct ?? fallido?.progress_pct ?? (etapa ? PCT_ETAPA[etapa] : 0)
   return {
@@ -58,9 +40,11 @@ function analisisDe(g, t) {
     estado: ESTADO.aGuia[t.estado],
     etapa: etapa ? ETAPA.aGuia[etapa] : null,
     porcentaje,
-    pausa: pausado ? { cilindro: pausado.pausa.cilindro, segundosRestantes: restante(pausado) } : null,
+    pausa: pausado ? { cilindro: pausado.pausa.cilindro, desdeSegundo: pausado.pausa.desde_segundo, segundosRestantes: restante(pausado) } : null,
     diagnosticoDisponible: t.estado === 'FAILED',
-    fechaAnalisis: t.analisis_fecha,
+    // Mientras no termina, fechaAnalisis es la hora en que entró a la cola (D-79).
+    fechaAnalisis: t.estado === 'DONE' ? t.analisis_fecha : enCola?.encolado ?? (enCola?.creado_ms ? new Date(enCola.creado_ms).toISOString() : null),
+    motivoCancelacion: db.canceledJobs.find((j) => j.job_id === t.id_analisis)?.motivo ?? null,
   }
 }
 
@@ -83,7 +67,6 @@ function restante(job, ahora = Date.now()) {
   if (job.pausa.hora_ms == null) job.pausa.hora_ms = ahora
   return Math.max(0, Math.ceil((job.pausa.hora_ms + PLAZO_PAUSA_MS - ahora) / 1000))
 }
-const conRestante = (job) => ({ ...job, segundos_restantes: restante(job) })
 
 const buscarTanda = (job) => db.experimentDetail[job.clave]?.grupos.find((g) => g.id === job.gid)?.tandas.find((t) => t.letra === job.tanda)
 
