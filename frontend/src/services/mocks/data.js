@@ -196,8 +196,9 @@ export const system = {
   conductas: ['Nado activo', 'Inmovilidad', 'Escalamiento', 'Conducta activa'],
 }
 
-// Notificaciones de la cuenta (2k). tipo: los seis de services/notifications.js.
-// creada es relativa a hoy para que la barra muestre «15:41» y «ayer» como el mockup.
+// Notificaciones de la cuenta (2k), con los campos de la guía. tipo: los seis de la base
+// (services/notifications.js arma el título y el enlace).
+// fechaCreacion es relativa a hoy para que la barra muestre «15:41» y «ayer» como el mockup.
 const hace = (dias, hora) => {
   const d = new Date()
   d.setDate(d.getDate() - dias)
@@ -207,12 +208,12 @@ const hace = (dias, hora) => {
 }
 
 export const notifications = [
-  { id: 1, tipo: 'ANALYSIS_FAILED', titulo: 'Error en el análisis', texto: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', enlace: '/analisis', creada: hace(0, '15:41'), is_read: false },
-  { id: 2, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', creada: hace(0, '15:02'), is_read: false },
-  { id: 4, tipo: 'DISK_ALERT', titulo: 'Alerta de disco', texto: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', enlace: '/admin', creada: hace(0, '09:12'), is_read: false, solo_admin: true },
-  { id: 5, tipo: 'VIDEO_DELETED', titulo: 'Videos borrados', texto: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', enlace: '/experimentos', creada: hace(1, '03:00'), is_read: true },
-  { id: 6, tipo: 'ANALYSIS_PAUSED', titulo: 'Análisis en pausa', texto: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', enlace: '/experimentos/EXP-2026-02/analisis/502/pausa', creada: hace(0, '15:50'), is_read: false },
-  { id: 3, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', texto: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', enlace: '/experimentos/EXP-2026-02/resultados', creada: hace(1, '18:20'), is_read: true },
+  { idNotificacion: 1, tipo: 'error del pipeline', mensaje: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:41'), leido: false },
+  { idNotificacion: 2, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:02'), leido: false },
+  { idNotificacion: 4, tipo: 'alerta de disco', mensaje: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', idExperimento: null, fechaCreacion: hace(0, '09:12'), leido: false, soloAdmin: true },
+  { idNotificacion: 5, tipo: 'video borrado', mensaje: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', idExperimento: 'EXP-2025-10', fechaCreacion: hace(1, '03:00'), leido: true },
+  { idNotificacion: 6, tipo: 'analisis en pausa', mensaje: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:50'), leido: false },
+  { idNotificacion: 3, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(1, '18:20'), leido: true },
 ]
 
 // Enlaces de recuperación pendientes (2h): token → { idInstitucional, vence (ms), usado }.
@@ -224,7 +225,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 17
+const VERSION_DATOS = 18
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 
