@@ -5,7 +5,10 @@ import * as auth from './auth'
 import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
 import { createExperiment, deleteExperiment, getExperiment, listExperiments, deFila, deDetalle } from './experiments'
-import { createGroup, uploadBatchVideo } from './groups'
+import { subirVideo, sugerirGrupos } from './groups'
+
+// Sube el video de una tanda (por defecto, la A del grupo nuevo «Control», Día 2).
+const subir = (clave, extra = {}, alAvanzar) => subirVideo(clave, { grupo: 'Control', nuevo: true, tipo: 'CONTROL', tratamiento: 'Solución salina', letra: 'A', sesion: 'DAY2', nCilindros: 4, file: null, ...extra }, alAvanzar)
 import { getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
 import { getQueue } from './progreso'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
@@ -175,13 +178,12 @@ describe('experimentos', () => {
 
   it('subir el primer video crea la tanda, la encola y actualiza la lista', async () => {
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
-    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
     const avances = []
-    const r = await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 }, (p) => avances.push(p))
+    const r = await subir(clave, {}, (p) => avances.push(p))
 
     expect(avances).toEqual([25, 50, 75, 100])
-    expect(r.posicion_cola).toBe(3)
-    expect((await getQueue()).cola.at(-1)).toMatchObject({ grupo: 'Control', tanda: 'A', status: 'QUEUED' })
+    expect(r).toMatchObject({ estado: 'QUEUED' })
+    expect((await getQueue()).cola.at(-1)).toMatchObject({ job_id: r.job_id, grupo: 'Control', tanda: 'A', status: 'QUEUED', posicion: 3 })
     const tanda = (await getExperiment(clave)).grupos[0].tandas[0]
     expect(tanda).toMatchObject({ letra: 'A', desde: 1, n_cilindros: 4, estado: 'QUEUED' })
     const fila = (await listExperiments()).find((e) => e.clave === clave)
@@ -190,10 +192,9 @@ describe('experimentos', () => {
 
   it('el video de Día 1 se guarda pero no se analiza (D-54)', async () => {
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
-    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
-    const r = await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY1', nCilindros: 3 })
+    const r = await subir(clave, { sesion: 'DAY1', nCilindros: 3 })
 
-    expect(r).toEqual({ job_id: null, posicion_cola: null })
+    expect(r).toMatchObject({ job_id: null, estado: null })
     expect((await getQueue()).cola.some((j) => j.clave === clave)).toBe(false)
     const tanda = (await getExperiment(clave)).grupos[0].tandas[0]
     expect(tanda).toMatchObject({ letra: 'A', n_cilindros: 3, estado: 'SIN_VIDEO', dia1: { cargado: true } })
@@ -202,19 +203,25 @@ describe('experimentos', () => {
   })
 
   it('una tanda lleva un solo video por sesión: el segundo de ese día responde 409', async () => {
-    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-02', 'A', { file: null, dia: 'DAY2', nCilindros: 4 }))).toBe(409)
-    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-01', 'A', { file: null, dia: 'DAY1', nCilindros: 4 }))).toBe(409) // ya tiene su Día 1
-    expect(await status(uploadBatchVideo('EXP-2026-02', 'G-02', 'A', { file: null, dia: 'DAY1', nCilindros: 4 }))).toBe('ok') // su Día 1 faltaba
+    const existente = (grupo, sesion) => subir('EXP-2026-02', { grupo, nuevo: false, sesion, nCilindros: undefined })
+    expect(await status(existente('Referencia', 'DAY2'))).toBe(409)
+    expect(await status(existente('Control', 'DAY1'))).toBe(409) // ya tiene su Día 1
+    expect(await status(existente('Referencia', 'DAY1'))).toBe('ok') // su Día 1 faltaba
   })
 
   it('el servidor rechaza un video vertical o que no se puede reproducir (D-64)', async () => {
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
-    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
-    const subir = (name) => uploadBatchVideo(clave, g.id, 'A', { file: { name }, dia: 'DAY2', nCilindros: 2 })
-    expect(await status(subir('celular_vertical.mp4'))).toBe(422)
-    expect(await status(subir('dañado.mov'))).toBe(422)
+    const conArchivo = (name) => subir(clave, { file: { name }, nCilindros: 2 })
+    expect(await status(conArchivo('celular_vertical.mp4'))).toBe(422)
+    expect(await status(conArchivo('dañado.mov'))).toBe(422)
     expect((await getQueue()).cola.some((j) => j.clave === clave)).toBe(false)
-    expect(await status(subir('tanda_A.mp4'))).toBe('ok')
+    expect(await status(conArchivo('tanda_A.mp4'))).toBe('ok')
+  })
+
+  it('un grupo nuevo necesita tipo y tratamiento; uno existente sigue con su siguiente tanda', async () => {
+    expect(await status(subir('EXP-2026-02', { grupo: 'Nuevo', tipo: undefined }))).toBe(422)
+    expect(await sugerirGrupos('EXP-2026-02', 'fluox')).toEqual([{ id: 'G-02', nombre: 'Referencia', tratamiento: 'Fluoxetina 10 mg/kg', tipo: 'REFERENCIA', siguiente: 'C' }])
+    expect(await sugerirGrupos('EXP-2026-02', 'nada parecido')).toEqual([])
   })
 
   it('el estado del experimento sigue la precedencia del documento', async () => {
@@ -238,8 +245,7 @@ describe('experimentos', () => {
     expect(await status(getExperiment('EXP-2026-02'))).toBe('ok')
 
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
-    const g = await createGroup(clave, { nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Solución salina' })
-    await uploadBatchVideo(clave, g.id, 'A', { file: null, dia: 'DAY2', nCilindros: 4 })
+    await subir(clave)
     expect((await getQueue()).cola.at(-1).clave).toBe(clave)
     expect(await status(deleteExperiment(clave))).toBe('ok')
     const { cola } = await getQueue()
@@ -444,7 +450,7 @@ describe('comparación entre grupos calculada', () => {
 describe('cancelar la subida de un video', () => {
   it('no registra la tanda ni la encola, y falla como cancelación', async () => {
     const control = new AbortController()
-    const subida = uploadBatchVideo('EXP-2026-02', 'G-02', 'C', { file: null, dia: 'DAY2', nCilindros: 4, signal: control.signal })
+    const subida = subir('EXP-2026-02', { grupo: 'Referencia', nuevo: false, letra: 'C', signal: control.signal })
     control.abort()
     const error = await subida.catch((e) => e)
     expect(error.code).toBe('ERR_CANCELED')

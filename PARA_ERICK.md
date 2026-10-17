@@ -388,4 +388,8 @@ Si eres Claude trabajando en este repo:
     - **Campos de más en `/status` (propuesta):** `pausa.desdeSegundo` (la tarjeta dice «pausa en el segundo 142») y `motivoCancelacion` (`usuario` o `plazo`; §9.4 pide decir por qué se canceló). Sin ellos la tarjeta pierde ese dato, pero no se rompe.
     - **Administración** toma la cola de `GET /admin/system`. Propuesta de forma (no está en §6.1): `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada y con el que se procesa primero.
     - La pausa toma su título del `/status` de su experimento.
+46. **Subir video con una sola llamada (paso 5, parte 3 del orden de conexión).** `POST /experiments/{id}/groups/{grupo}/videos` (multipart) con `archivo`, `sesion` (`Dia 1` o `Dia 2`), `tipo` y `tratamiento` solo si el grupo es nuevo, `nCilindros` solo si la tanda es nueva y `ordinal` (A = 1). Ya no hay `POST .../groups` aparte. Respuesta `{idVideo, idAnalisis, estadoAnalisis}`.
+    - **`{grupo}` va como la etiqueta del grupo** (codificada en la URL), como tú lo veías probable. Si decides otra cosa, se cambia en `services/groups.js`.
+    - **Sugerencias:** `GET /experiments/{id}/groups?q=` mientras se escribe. **Forma propuesta** (no está en §6.1): `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`; busca en la etiqueta y el tratamiento, solo en ese experimento. Sin coincidencias, la pantalla trata el grupo como nuevo (tanda A, pide tipo y tratamiento).
+    - **Listo para probar contra el backend:** cargar video (Día 1 y Día 2, grupo nuevo y existente, 409, 413 y 422).
 
