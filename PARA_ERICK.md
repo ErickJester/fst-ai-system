@@ -392,4 +392,10 @@ Si eres Claude trabajando en este repo:
     - **`{grupo}` va como la etiqueta del grupo** (codificada en la URL), como tú lo veías probable. Si decides otra cosa, se cambia en `services/groups.js`.
     - **Sugerencias:** `GET /experiments/{id}/groups?q=` mientras se escribe. **Forma propuesta** (no está en §6.1): `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`; busca en la etiqueta y el tratamiento, solo en ese experimento. Sin coincidencias, la pantalla trata el grupo como nuevo (tanda A, pide tipo y tratamiento).
     - **Listo para probar contra el backend:** cargar video (Día 1 y Día 2, grupo nuevo y existente, 409, 413 y 422).
+47. **Resultados con las rutas de la guía (parte 5 del orden de conexión).** `GET /experiments/{id}/results`, `/results/byminute`, `/results/groups` y `/results/blocks`, todas del experimento completo; el filtro por grupo y tanda se hace en el navegador (D-93). Las peticiones simultáneas de una misma pantalla se comparten.
+    - Cada espécimen trae `tanda` («Control · A»), `ordinal`, `numeroCilindro`, `nivelClasif`, `revisado` y `totales` con `{segundos, porcentaje}` por conducta, como §6.1. **Propongo además `idGrupo`**: con él se filtra sin depender del texto de la etiqueta. Sin él, se compara «etiqueta · letra».
+    - `byminute`: cada espécimen con `minutos: [{minuto, "nado activo": s, inmovilidad: s, escalamiento: s, "conducta activa": s}]`.
+    - **`/results/groups`, forma propuesta** (la guía dice qué trae, no la forma): `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes: [{letra, nCilindros, estado}], nivelMixto, promedios: {"nado activo": {media, de}, …}, porNivel: [{letra, nivelClasif, n, promedios}] | null}]`.
+    - **`/results/blocks`, forma propuesta:** cada espécimen (con `tanda`, `ordinal`, `numeroCilindro`) y `bloques: [{inicio, conducta, matiz, segundos: [5 conductas o null]}]`, con los nombres de la base.
+    - **Listo para probar contra el backend:** resultados, comparación entre grupos y bloques (los reportes ya usaban la ruta de la guía).
 

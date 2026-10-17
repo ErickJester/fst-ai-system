@@ -42,12 +42,12 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] Cambiar contraseña: `PATCH /auth/password` con `{contrasenaActual, contrasenaNueva}` (nombres por confirmar)
   - [x] Perfil: `PATCH /users/me` con `{nombre, apellidos, correo}`
   - [x] Login con `{correo, contrasena}` y respuesta `{token, rol, nombre, cambioRequerido}` más `idInstitucional`, `apellidos` y `correo`; `idInstitucional` es el id de la cuenta
-  - [x] Subir video con `POST /experiments/{id}/groups/{grupo}/videos` y los campos `sesion`, `tipo`, `tratamiento`, `nCilindros` y `ordinal` (hoy crea el grupo con `POST .../groups` y sube a `.../groups/:gid/batches/:letra/videos` con `file`, `dia` y `n_cilindros`)
+  - [x] Subir video con `POST /experiments/{id}/groups/{grupo}/videos` y los campos `sesion`, `tipo`, `tratamiento`, `nCilindros` y `ordinal`; el grupo y la tanda se crean en la misma llamada
   - [x] Respuesta de la subida `{idVideo, idAnalisis, estadoAnalisis}`
   - [x] Pasar la letra de la tanda al `ordinal` entero de la base (`lib/contrato.js`)
   - [x] Detalle de grupo tomado del árbol de `GET /experiments/{id}`; el estado de cada tanda sale de `GET /experiments/{id}/status`
   - [x] Sugerir grupos y la siguiente tanda con `GET /experiments/{id}/groups?q=` (forma de la respuesta propuesta)
-  - [ ] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks` (hoy `.../batches/:letra/results`, `/group-comparison` y `.../blocks`)
+  - [x] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks`; el filtro por grupo o tanda, en el navegador (D-93)
   - [x] Progreso con `GET /experiments/{id}/status` (`/analisis?experimento=`; sin experimento junta los activos); Administración toma la cola de `/admin/system`. Ya no se usa `/queue`
   - [ ] `POST /admin/users/:id/reset-temporal` y `POST /notifications/read-all`: son propuestas del frontend que la guía no trae
 - [ ] Nombres de campo en `camelCase` de §6.1. Hecho: pausa, revisión y guardar segundos. Falta: login, usuarios, experimentos, detalle, estado y resultados, que hoy van en `snake_case` y con valores como `QUEUED`, `DONE` o `SIN_VIDEOS`

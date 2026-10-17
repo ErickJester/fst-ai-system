@@ -263,7 +263,7 @@ function ResultadosTanda({ clave, gid, letra }) {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
-            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}, {hora(analizado)}</div>
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}{analizado.length > 10 && ', ' + hora(analizado)}</div>
             {/* Ver una tanda o el grupo completo (RF-19, D-93). */}
             <nav aria-label="Ver" className="no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               <span className="k" style={{ marginRight: 4 }}>Ver</span>
