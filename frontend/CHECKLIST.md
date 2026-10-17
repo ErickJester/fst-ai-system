@@ -202,7 +202,7 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [ ] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor. Hecho: ambos mensajes
 - [ ] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo
 - [ ] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección
-- [ ] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado`. Hecho: así están puestos
+- [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [ ] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2». Hecho: ambos
 - [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a los 5 minutos, y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
 - [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
