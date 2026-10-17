@@ -15,7 +15,7 @@ function estadoExperimento(tandas) {
 // de sus grupos y tandas, como lo haría el servidor.
 export function resumir(clave) {
   const exp = db.experimentDetail[clave]
-  const fila = db.experiments.find((e) => e.idExperimento === clave)
+  const fila = db.experiments.find((e) => String(e.idExperimento) === String(clave))
   if (!exp || !fila) return
   const tandas = exp.grupos.flatMap((g) => g.tandas)
   const total = tandas.length

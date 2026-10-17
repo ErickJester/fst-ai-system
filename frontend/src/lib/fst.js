@@ -85,6 +85,9 @@ export function primeraTandaLista(exp) {
   return null
 }
 
+// Código del grupo como en la maqueta: «G-01» (el id de la base es un número).
+export const codigoGrupo = (id) => (/^\d+$/.test(String(id)) ? 'G-' + String(id).padStart(2, '0') : String(id))
+
 // Enlace a los resultados de una tanda.
 export const enlaceResultados = (clave, gid, letra) => `/experimentos/${clave}/resultados?grupo=${gid}&tanda=${letra}`
 

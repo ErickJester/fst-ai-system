@@ -25,14 +25,14 @@ const responsableDe = (c) => (c ? c.nombre[0] + '. ' + (c.apellidos || '').split
 // Fila de la lista (§6.1, más los campos de más de data.js) → forma de las pantallas. La
 // clave de las rutas es idExperimento.
 export const deFila = (e) => ({
-  clave: e.idExperimento,
+  clave: String(e.idExperimento),
   titulo: e.nombre,
   fecha_inicio: e.fecha,
   n_grupos: e.nGrupos,
   estado: ESTADO.aFront[e.estado],
   aviso_vencimiento: e.avisoVencimiento ? { fecha_borrado: e.avisoVencimiento.fechaBorrado } : null,
   responsable: responsableDe(e.creador),
-  creador_id: e.creador?.idInstitucional ?? null,
+  creador_id: e.creador?.idInstitucional != null ? String(e.creador.idInstitucional) : null,
   n_especimenes: e.nEspecimenes ?? null,
   tratamientos: e.tratamientos || [],
   videos_dia2_listos: e.videosDia2?.analizados ?? 0,
@@ -52,9 +52,7 @@ const mock = {
     if (db.experiments.some((e) => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase())) {
       return fail(409, 'Ya existe un experimento con ese nombre.')
     }
-    const anio = fecha.slice(0, 4)
-    const n = db.experiments.filter((e) => e.idExperimento.startsWith('EXP-' + anio)).length + 1
-    const idExperimento = 'EXP-' + anio + '-' + String(n).padStart(2, '0')
+    const idExperimento = Math.max(0, ...db.experiments.map((e) => e.idExperimento)) + 1
     const u = usuarioDeLaSesion()
     const creador = u ? { idInstitucional: u.idInstitucional, nombre: u.nombre, apellidos: u.apellidos } : null
     db.experiments.unshift({
@@ -86,7 +84,7 @@ export async function listExperiments() {
 export async function createExperiment({ titulo, fecha_inicio, notas }) {
   const datos = { nombre: titulo, fecha: fecha_inicio, notas }
   const d = USE_MOCKS ? await mock.crear(datos) : (await api.post('/experiments', datos)).data
-  return { clave: d.idExperimento }
+  return { clave: String(d.idExperimento) }
 }
 
 // Detalle de los datos de ejemplo con la forma de §6.1: grupos → tandas → videos. data.js
@@ -94,10 +92,10 @@ export async function createExperiment({ titulo, fecha_inicio, notas }) {
 // subidoPor (PARA_VANESA_API.md §4) y la fecha de cada video (propuesta, para la tanda).
 function detalleDe(clave) {
   const exp = db.experimentDetail[clave]
-  const fila = db.experiments.find((e) => e.idExperimento === clave)
+  const fila = db.experiments.find((e) => String(e.idExperimento) === String(clave))
   const video = (g, t, n, extra) => ({ idVideo: g.id + '/' + t.letra + '/' + n, sesion: 'Dia ' + n, duracion: 300, subidoPor: t.subido_por ?? null, ...extra })
   return {
-    idExperimento: clave, nombre: exp.titulo, fecha: exp.fecha_inicio, notas: exp.notas ?? '',
+    idExperimento: exp.clave, nombre: exp.titulo, fecha: exp.fecha_inicio, notas: exp.notas ?? '',
     estado: fila?.estado ?? 'sin videos', creador: fila?.creador ?? null,
     grupos: exp.grupos.map((g) => ({
       idGrupo: g.id, etiqueta: g.nombre, tipo: TIPO_GRUPO.aGuia[g.tipo], tratamiento: g.tratamiento,
@@ -117,13 +115,13 @@ function detalleDe(clave) {
 export function deDetalle(d, analisis = []) {
   const porId = new Map(analisis.map((a) => [a.idAnalisis, a]))
   return {
-    clave: d.idExperimento,
+    clave: String(d.idExperimento),
     titulo: d.nombre,
     fecha_inicio: d.fecha,
     notas: d.notas ?? '',
     estado: ESTADO.aFront[d.estado],
     responsable: responsableDe(d.creador),
-    creador_id: d.creador?.idInstitucional ?? null,
+    creador_id: d.creador?.idInstitucional != null ? String(d.creador.idInstitucional) : null,
     grupos: d.grupos.map((g) => {
       let desde = 1
       const tandas = [...g.tandas].sort((a, b) => a.ordinal - b.ordinal).map((t) => {
@@ -143,7 +141,7 @@ export function deDetalle(d, analisis = []) {
           progreso: estado === 'RUNNING' && etapa ? { etapa, pct: a.porcentaje } : null,
           error: estado === 'FAILED' ? { etapa } : null,
           id_analisis: v2?.idAnalisis ?? null,
-          subido_por: v2?.subidoPor ?? v1?.subidoPor ?? null,
+          subido_por: (v2?.subidoPor ?? v1?.subidoPor) != null ? String(v2?.subidoPor ?? v1?.subidoPor) : null,
           analisis_fecha: estado === 'DONE' ? a?.fechaAnalisis ?? null : null,
           ...(v2?.videoDisponible === false && { video_disponible: false }),
         }
@@ -151,7 +149,7 @@ export function deDetalle(d, analisis = []) {
         return x
       })
       return {
-        id: g.idGrupo, nombre: g.etiqueta, tipo: TIPO_GRUPO.aFront[g.tipo], tratamiento: g.tratamiento,
+        id: String(g.idGrupo), nombre: g.etiqueta, tipo: TIPO_GRUPO.aFront[g.tipo], tratamiento: g.tratamiento,
         n_especimenes: g.tandas.reduce((n, t) => n + t.nCilindros, 0), tandas,
       }
     }),
@@ -181,7 +179,7 @@ export async function detalleConStatus(clave) {
 // pausa, y los que están en cola salen de la cola (R-08, D-87).
 export async function deleteExperiment(clave) {
   if (USE_MOCKS) {
-    const i = db.experiments.findIndex((e) => e.idExperimento === clave)
+    const i = db.experiments.findIndex((e) => String(e.idExperimento) === String(clave))
     if (i < 0) return fail(404, 'No existe ese experimento.')
     const u = usuarioDeLaSesion()
     if (!u || (!esAdmin(u) && db.experiments[i].creador?.idInstitucional !== u.idInstitucional)) {
@@ -191,9 +189,9 @@ export async function deleteExperiment(clave) {
     if (tandas.some((t) => t.estado === 'RUNNING' || t.estado === 'PAUSED')) {
       return fail(409, 'No se puede eliminar mientras un análisis está procesando o en pausa. Inténtalo cuando termine.')
     }
-    quitar(db.queue, (j) => j.clave === clave)
+    quitar(db.queue, (j) => String(j.clave) === String(clave))
     db.queue.forEach((j, n) => { j.posicion = n + 1 })
-    quitar(db.failedJobs, (j) => j.clave === clave)
+    quitar(db.failedJobs, (j) => String(j.clave) === String(clave))
     db.experiments.splice(i, 1)
     delete db.experimentDetail[clave]
     return reply({ ok: true })

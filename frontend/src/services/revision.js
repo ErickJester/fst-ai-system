@@ -45,7 +45,7 @@ function corregible(clave, id) {
 // Especímenes de ejemplo de la tanda (los mismos de sus resultados).
 function especimenesDe({ exp, g, t }) {
   const propios = db.batchResults[[exp.clave, g.id, t.letra, 'DAY2'].join('/')]
-  return (propios || db.batchResults['EXP-2026-02/G-02/A/DAY2']).especimenes.slice(0, t.n_cilindros)
+  return (propios || db.batchResults['7/2/A/DAY2']).especimenes.slice(0, t.n_cilindros)
 }
 
 // POST /experiments/:clave/analyses/:id/video-token → { token } (propuesta de Erick,

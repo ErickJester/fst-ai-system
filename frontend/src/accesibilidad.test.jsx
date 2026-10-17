@@ -55,13 +55,13 @@ afterEach(() => cleanup())
 const PANTALLAS = [
   ['Experimentos', '/experimentos', 'Experimentos'],
   ['Nuevo experimento', '/experimentos/nuevo', 'Datos generales'],
-  ['Experimento', '/experimentos/EXP-2026-02', 'Compuesto CSR-14 · curva de dosis'],
-  ['Grupo', '/experimentos/EXP-2026-02/grupos/G-02', /^Referencia/],
-  ['Cargar video', '/experimentos/EXP-2026-02/cargar', 'Cargar video por tanda'],
+  ['Experimento', '/experimentos/7', 'Compuesto CSR-14 · curva de dosis'],
+  ['Grupo', '/experimentos/7/grupos/2', /^Referencia/],
+  ['Cargar video', '/experimentos/7/cargar', 'Cargar video por tanda'],
   ['Análisis en curso', '/analisis', 'Análisis en curso'],
-  ['Pausa', '/experimentos/EXP-2026-02/analisis/502/pausa', /No se ve al espécimen/],
-  ['Resultados', '/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A', /^Resultados/],
-  ['Revisión', '/experimentos/EXP-2026-02/analisis/402/revision', /^Revisión segundo a segundo/],
+  ['Pausa', '/experimentos/7/analisis/502/pausa', /No se ve al espécimen/],
+  ['Resultados', '/experimentos/7/resultados?grupo=2&tanda=A', /^Resultados/],
+  ['Revisión', '/experimentos/7/analisis/402/revision', /^Revisión segundo a segundo/],
   ['Mi perfil', '/perfil', 'Mi perfil'],
 ]
 

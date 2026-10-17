@@ -6,7 +6,7 @@ import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperi
 import { useAuth } from '../contexts/AuthContext'
 import { getExperiment } from '../services/experiments'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados, codigoGrupo } from '../lib/fst'
 
 // Hay análisis en cola, en curso o en pausa en alguna tanda (solo se analiza el Día 2).
 const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
@@ -97,7 +97,7 @@ export default function ExperimentoPage() {
                 <span className="nd" style={{ fontSize: 17 }}>{g.nombre}</span>
                 <TipoTag tipo={g.tipo} />
                 <div style={{ flex: 1 }} />
-                <span className="num" style={{ fontSize: 11, color: 'color-mix(in srgb,var(--color-text) 50%,transparent)' }}>{g.id}</span>
+                <span className="num" style={{ fontSize: 11, color: 'color-mix(in srgb,var(--color-text) 50%,transparent)' }}>{codigoGrupo(g.id)}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1.6fr .4fr', gap: 14, paddingBottom: 14, borderBottom: '1px solid var(--color-divider)' }}>
                 <div><div className="k">Tratamiento</div><div style={{ fontSize: 13, marginTop: 3 }}>{g.tratamiento}</div></div>

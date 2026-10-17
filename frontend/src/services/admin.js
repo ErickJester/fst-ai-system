@@ -119,7 +119,7 @@ export async function getColaSistema() {
   const d = await getSystem()
   return {
     cola: (d.cola || []).map((j, i) => ({
-      job_id: j.idAnalisis, posicion: i + 1, clave: j.idExperimento, experimento: j.experimento, grupo: j.grupo,
+      job_id: j.idAnalisis, posicion: i + 1, clave: String(j.idExperimento), experimento: j.experimento, grupo: j.grupo,
       tanda: j.letra, dia: SESION.aFront[j.sesion] || 'DAY2', status: ESTADO.aFront[j.estado],
     })),
   }

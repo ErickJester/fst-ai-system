@@ -29,7 +29,7 @@ function resultadosDeEjemplo(clave, gid, letra) {
   const t = g?.tandas.find((x) => x.letra === letra)
   if (!t || t.estado !== 'DONE') return null
   const propios = db.batchResults[[clave, gid, letra, 'DAY2'].join('/')]
-  const base = db.batchResults['EXP-2026-02/G-02/A/DAY2']
+  const base = db.batchResults['7/2/A/DAY2']
   const r = propios || { ...base, especimenes: base.especimenes.slice(0, t.n_cilindros) }
   const revision = db.revisiones[t.id_analisis]
   const especimenes = revision
@@ -86,7 +86,7 @@ function pedir(clave, ruta) {
 // El espécimen de la guía pertenece a esa tanda: por idGrupo si viene; si no, por el texto
 // «Control · A» que manda la guía. El ordinal siempre tiene que coincidir.
 const deLaTanda = (g, letra) => (e) =>
-  (e.idGrupo != null ? e.idGrupo === g.id : e.tanda === g.nombre + ' · ' + letra) && (e.ordinal == null || e.ordinal === ordinalDeLetra(letra))
+  (e.idGrupo != null ? String(e.idGrupo) === String(g.id) : e.tanda === g.nombre + ' · ' + letra) && (e.ordinal == null || e.ordinal === ordinalDeLetra(letra))
 
 const segundosPorConducta = (totales) => Object.fromEntries(CONDUCTAS.map((c) => [c + '_s', totales?.[CONDUCTA.aGuia[c]]?.segundos ?? 0]))
 
