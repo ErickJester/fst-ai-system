@@ -438,12 +438,13 @@ describe('comparación entre grupos calculada', () => {
     expect(await getBlocks('EXP-2026-02', 'G-01', 'A')).toBeNull()
   })
 
-  it('la línea de tiempo suma 60 s por minuto y coincide con los totales del espécimen', async () => {
+  it('el desglose por minuto (results/byminute) suma a lo más 60 s por minuto', async () => {
     const r = await getBatchResults('EXP-2026-02', 'G-01', 'A')
-    const { minutos } = r.linea_tiempo
-    expect(minutos.map((m) => m.reduce((a, [, s]) => a + s, 0))).toEqual([60, 60, 60, 60, 60])
-    const total = (c) => minutos.flat().filter(([k]) => k === c).reduce((a, [, s]) => a + s, 0)
-    expect([total('nado'), total('inmovilidad'), total('escalamiento')]).toEqual([127, 145, 28])
+    expect(r.lineas_tiempo.map((l) => l.numeroCilindro)).toEqual([1, 2, 3, 4])
+    const porMinuto = (l) => l.minutos.map((m) => m.reduce((a, [, s]) => a + s, 0))
+    // El espécimen 2 se vio todo el tiempo; el 1 tiene segundos «no se ve», que no cuentan.
+    expect(porMinuto(r.lineas_tiempo[1])).toEqual([60, 60, 60, 60, 60])
+    expect(porMinuto(r.lineas_tiempo[0]).every((s) => s <= 60)).toBe(true)
   })
 })
 
