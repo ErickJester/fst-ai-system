@@ -11,8 +11,8 @@ const USE_MOCKS = usaEjemplo('sesion')
 // backend: los datos de ejemplo ya tienen esa forma. deCuenta las pasa a la forma que usan
 // las pantallas. idInstitucional es el id de la cuenta (PARA_VANESA_API.md §4).
 export const deCuenta = (c) => ({
-  id: c.idInstitucional,
-  identificador: c.idInstitucional,
+  id: String(c.idInstitucional),
+  identificador: String(c.idInstitucional),
   nombre: c.nombre,
   apellidos: c.apellidos ?? '',
   email: c.correo,

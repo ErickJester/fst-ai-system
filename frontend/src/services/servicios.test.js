@@ -39,7 +39,7 @@ describe('lista de experimentos con la forma de §6.1', () => {
   it('cada fila se pasa a la forma de las pantallas', () => {
     const e = { idExperimento: 7, nombre: 'Exp. A', fecha: '2026-10-01', nGrupos: 3, estado: 'en espera del Día 2', avisoVencimiento: { fechaBorrado: '2026-11-12' },
       creador: { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' } }
-    expect(deFila(e)).toMatchObject({ clave: 7, titulo: 'Exp. A', fecha_inicio: '2026-10-01', n_grupos: 3, estado: 'ESPERA_DIA2',
+    expect(deFila(e)).toMatchObject({ clave: '7', titulo: 'Exp. A', fecha_inicio: '2026-10-01', n_grupos: 3, estado: 'ESPERA_DIA2',
       aviso_vencimiento: { fecha_borrado: '2026-11-12' }, responsable: 'M. Rivera', creador_id: '2019630871', tratamientos: [], con_detalle: true })
   })
 })
@@ -54,8 +54,8 @@ describe('detalle con la forma de §6.1 y el estado de /status', () => {
         ] }] }
     const analisis = [{ idAnalisis: 1, tanda: 'Control · A', sesion: 'Dia 2', estado: 'procesando', etapa: 'cilindros', porcentaje: 67, pausa: null, diagnosticoDisponible: false }]
     const e = deDetalle(d, analisis)
-    expect(e).toMatchObject({ clave: 7, titulo: 'Exp. A', estado: 'RUNNING' })
-    expect(e.grupos[0]).toMatchObject({ id: 1, nombre: 'Control', tipo: 'CONTROL', n_especimenes: 7 })
+    expect(e).toMatchObject({ clave: '7', titulo: 'Exp. A', estado: 'RUNNING' })
+    expect(e.grupos[0]).toMatchObject({ id: '1', nombre: 'Control', tipo: 'CONTROL', n_especimenes: 7 })
     const [a, b] = e.grupos[0].tandas
     expect(a).toMatchObject({ letra: 'A', desde: 1, estado: 'RUNNING', progreso: { etapa: 'ROI_DETECTION', pct: 67 }, id_analisis: 1, subido_por: '2019630871', video_disponible: false })
     expect(b).toMatchObject({ letra: 'B', desde: 5, estado: 'SIN_VIDEO', dia1: { cargado: true }, id_analisis: null })
@@ -193,9 +193,9 @@ describe('administradores', () => {
 })
 
 describe('experimentos', () => {
-  it('crear asigna la clave del año y empieza sin grupos', async () => {
+  it('crear asigna el id siguiente y empieza sin grupos', async () => {
     const { clave } = await createExperiment({ titulo: 'Ketamina · dosis única', fecha_inicio: '2026-10-01', notas: '' })
-    expect(clave).toBe('EXP-2026-03')
+    expect(clave).toBe('8')
     const exp = await getExperiment(clave)
     expect(exp.grupos).toEqual([])
     expect((await listExperiments())[0]).toMatchObject({ clave, estado: 'SIN_VIDEOS', n_grupos: 0 })
@@ -232,7 +232,7 @@ describe('experimentos', () => {
   })
 
   it('una tanda lleva un solo video por sesión: el segundo de ese día responde 409', async () => {
-    const existente = (grupo, sesion) => subir('EXP-2026-02', { grupo, nuevo: false, sesion, nCilindros: undefined })
+    const existente = (grupo, sesion) => subir('7', { grupo, nuevo: false, sesion, nCilindros: undefined })
     expect(await status(existente('Referencia', 'DAY2'))).toBe(409)
     expect(await status(existente('Control', 'DAY1'))).toBe(409) // ya tiene su Día 1
     expect(await status(existente('Referencia', 'DAY1'))).toBe('ok') // su Día 1 faltaba
@@ -248,30 +248,30 @@ describe('experimentos', () => {
   })
 
   it('un grupo nuevo necesita tipo y tratamiento; uno existente sigue con su siguiente tanda', async () => {
-    expect(await status(subir('EXP-2026-02', { grupo: 'Nuevo', tipo: undefined }))).toBe(422)
-    expect(await sugerirGrupos('EXP-2026-02', 'fluox')).toEqual([{ id: 'G-02', nombre: 'Referencia', tratamiento: 'Fluoxetina 10 mg/kg', tipo: 'REFERENCIA', siguiente: 'C' }])
-    expect(await sugerirGrupos('EXP-2026-02', 'nada parecido')).toEqual([])
+    expect(await status(subir('7', { grupo: 'Nuevo', tipo: undefined }))).toBe(422)
+    expect(await sugerirGrupos('7', 'fluox')).toEqual([{ id: '2', nombre: 'Referencia', tratamiento: 'Fluoxetina 10 mg/kg', tipo: 'REFERENCIA', siguiente: 'C' }])
+    expect(await sugerirGrupos('7', 'nada parecido')).toEqual([])
   })
 
   it('el estado del experimento sigue la precedencia del documento', async () => {
     // El de ejemplo tiene una tanda con error: «Con error» manda sobre las demás.
-    expect((await listExperiments()).find((e) => e.clave === 'EXP-2026-02').estado).toBe('FAILED')
+    expect((await listExperiments()).find((e) => e.clave === '7').estado).toBe('FAILED')
   })
 
   it('eliminar: solo quien lo creó o un Administrador, sin pedir nombre ni contraseña (D-63, R-08)', async () => {
     sesion(1) // M. Rivera
-    expect(await status(deleteExperiment('EXP-2026-01'))).toBe(403) // lo creó J. Domínguez
-    expect(await status(deleteExperiment('EXP-2025-11'))).toBe('ok')
-    expect((await listExperiments()).some((e) => e.clave === 'EXP-2025-11')).toBe(false)
-    expect(await status(deleteExperiment('EXP-2025-11'))).toBe(404)
+    expect(await status(deleteExperiment('6'))).toBe(403) // lo creó J. Domínguez
+    expect(await status(deleteExperiment('5'))).toBe('ok')
+    expect((await listExperiments()).some((e) => e.clave === '5')).toBe(false)
+    expect(await status(deleteExperiment('5'))).toBe(404)
     sesion(2) // Administrador
-    expect(await status(deleteExperiment('EXP-2026-01'))).toBe('ok')
+    expect(await status(deleteExperiment('6'))).toBe('ok')
   })
 
   it('no se elimina con un análisis procesando; los que están en cola salen de la cola (D-87)', async () => {
     sesion(1)
-    expect(await status(deleteExperiment('EXP-2026-02'))).toBe(409) // Experimental A · Tanda B se procesa
-    expect(await status(getExperiment('EXP-2026-02'))).toBe('ok')
+    expect(await status(deleteExperiment('7'))).toBe(409) // Experimental A · Tanda B se procesa
+    expect(await status(getExperiment('7'))).toBe('ok')
 
     const { clave } = await createExperiment({ titulo: 'Prueba', fecha_inicio: '2026-10-01', notas: '' })
     await subir(clave)
@@ -284,12 +284,12 @@ describe('experimentos', () => {
 
   it('avisa con la fecha exacta los videos que se borran en 7 días o menos (R-05)', async () => {
     const lista = await listExperiments()
-    const valeriana = lista.find((e) => e.clave === 'EXP-2025-11') // le quedan 4 días
+    const valeriana = lista.find((e) => e.clave === '5') // le quedan 4 días
     const d = new Date()
     d.setDate(d.getDate() + 4)
     expect(valeriana.aviso_vencimiento.fecha_borrado).toBe(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))
-    expect(lista.find((e) => e.clave === 'EXP-2026-01').aviso_vencimiento).toBeNull() // 12 días
-    expect(lista.find((e) => e.clave === 'EXP-2025-10').aviso_vencimiento).toBeNull() // ya se borraron
+    expect(lista.find((e) => e.clave === '6').aviso_vencimiento).toBeNull() // 12 días
+    expect(lista.find((e) => e.clave === '4').aviso_vencimiento).toBeNull() // ya se borraron
   })
 
   it('la alerta de disco solo llega a los Administradores', async () => {
@@ -302,17 +302,17 @@ describe('experimentos', () => {
 
 describe('resultados por tanda', () => {
   it('cada tanda terminada tiene los suyos, con su grupo y sus especímenes', async () => {
-    const control = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    const control = await getBatchResults('7', '1', 'A')
     expect(control.grupo.nombre).toBe('Control')
     expect(control.especimenes.map((e) => e.numeroCilindro)).toEqual([1, 2, 3, 4])
-    const refB = await getBatchResults('EXP-2026-02', 'G-02', 'B')
+    const refB = await getBatchResults('7', '2', 'B')
     expect(refB.letra).toBe('B')
     expect(refB.especimenes.map((e) => e.numeroCilindro)).toEqual([1, 2, 3, 4])
   })
 
   it('una tanda en cola o con error todavía no tiene resultados', async () => {
-    expect(await status(getBatchResults('EXP-2026-02', 'G-01', 'B'))).toBe(404)
-    expect(await status(getBatchResults('EXP-2026-02', 'G-04', 'B'))).toBe(404)
+    expect(await status(getBatchResults('7', '1', 'B'))).toBe(404)
+    expect(await status(getBatchResults('7', '4', 'B'))).toBe(404)
   })
 })
 
@@ -328,7 +328,7 @@ describe('cola de análisis (la avanza el worker)', () => {
     const { terminados } = await getQueue()
     expect(terminados.map((j) => j.job_id).sort()).toEqual([401, 402, 403, 404])
     expect(terminados.length).toBeGreaterThan(0)
-    expect(terminados[0]).toMatchObject({ clave: 'EXP-2026-02', dia: 'DAY2' })
+    expect(terminados[0]).toMatchObject({ clave: '7', dia: 'DAY2' })
     expect(terminados.every((j, i) => i === 0 || (terminados[i - 1].analisis_fecha || '') >= (j.analisis_fecha || ''))).toBe(true)
   })
 
@@ -339,49 +339,49 @@ describe('cola de análisis (la avanza el worker)', () => {
 })
 
 describe('pausa del análisis (R-15, D-89)', () => {
-  const tandaB = async () => (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-01').tandas[1]
+  const tandaB = async () => (await getExperiment('7')).grupos.find((g) => g.id === '1').tandas[1]
 
   it('el análisis en pausa está fuera de la cola y avisa', async () => {
     expect((await tandaB()).estado).toBe('PAUSED')
     const { pausas } = await getQueue()
     expect(pausas[0]).toMatchObject({ job_id: 502, status: 'PAUSED', pausa: { cilindro: 2, desde_segundo: 142 } })
-    expect((await listNotifications()).find((n) => n.tipo === 'ANALYSIS_PAUSED')).toMatchObject({ titulo: 'Análisis en pausa', enlace: '/analisis?experimento=EXP-2026-02' })
+    expect((await listNotifications()).find((n) => n.tipo === 'ANALYSIS_PAUSED')).toMatchObject({ titulo: 'Análisis en pausa', enlace: '/analisis?experimento=7' })
   })
 
   it('sin video (ya se borró) la revisión se consulta pero no se corrige ni se reinicia', async () => {
     sesion(1)
-    expect(await getRevision('EXP-2026-02', 404)).toMatchObject({ videoDisponible: false })
-    expect(await status(guardarSegundos('EXP-2026-02', 404, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: null, origen: 'humano' }] }]))).toBe(409)
-    expect(await status(reiniciarAnalisis('EXP-2026-02', 404))).toBe(409)
-    expect((await getBatchResults('EXP-2026-02', 'G-03', 'A')).video_disponible).toBe(false)
+    expect(await getRevision('7', 404)).toMatchObject({ videoDisponible: false })
+    expect(await status(guardarSegundos('7', 404, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: null, origen: 'humano' }] }]))).toBe(409)
+    expect(await status(reiniciarAnalisis('7', 404))).toBe(409)
+    expect((await getBatchResults('7', '3', 'A')).video_disponible).toBe(false)
   })
 
   it('solo quien subió el video o un Administrador ve la pausa', async () => {
     sesion(3)
-    expect(await status(getPausa('EXP-2026-02', 502))).toBe(403)
+    expect(await status(getPausa('7', 502))).toBe(403)
     sesion(1)
-    const p = await getPausa('EXP-2026-02', 502)
+    const p = await getPausa('7', 502)
     expect(p).toMatchObject({ cilindro: 2, desdeSegundo: 142, ancho: 1280, alto: 720 })
     expect(p.recuadros).toHaveLength(4)
     expect(p.segundosRestantes).toBeGreaterThan(290) // empieza al consultarla: quedan casi 5 min
     expect(p.segundosRestantes).toBeLessThanOrEqual(300)
-    expect(await getImagenPausa('EXP-2026-02', 502)).toBeNull() // la imagen la entrega el servidor
+    expect(await getImagenPausa('7', 502)).toBeNull() // la imagen la entrega el servidor
     sesion(2)
-    expect(await status(getPausa('EXP-2026-02', 502))).toBe('ok')
+    expect(await status(getPausa('7', 502))).toBe('ok')
   })
 
   it('ajustar devuelve el análisis a la cola por delante de los que llegaron después', async () => {
     sesion(1)
-    expect(await status(ajustarRecuadro('EXP-2026-02', 502, { cilindro: 2, x0: 370, y0: 130, x1: 590, y1: 640 }))).toBe('ok')
+    expect(await status(ajustarRecuadro('7', 502, { cilindro: 2, x0: 370, y0: 130, x1: 590, y1: 640 }))).toBe('ok')
     expect((await getQueue()).cola.map((j) => [j.job_id, j.posicion])).toEqual([[501, 1], [502, 2], [503, 3]])
     expect((await tandaB()).estado).toBe('QUEUED')
-    expect(await status(ajustarRecuadro('EXP-2026-02', 502, { cilindro: 2, x0: 0, y0: 0, x1: 99, y1: 99 }))).toBe(409)
+    expect(await status(ajustarRecuadro('7', 502, { cilindro: 2, x0: 0, y0: 0, x1: 99, y1: 99 }))).toBe(409)
   })
 
   it('cancelar lo termina; una segunda vez responde 409', async () => {
     sesion(1)
-    expect(await status(cancelarAnalisis('EXP-2026-02', 502))).toBe('ok')
-    expect(await status(cancelarAnalisis('EXP-2026-02', 502))).toBe(409)
+    expect(await status(cancelarAnalisis('7', 502))).toBe('ok')
+    expect(await status(cancelarAnalisis('7', 502))).toBe(409)
     expect((await getQueue()).cancelados[0]).toMatchObject({ job_id: 502, motivo: 'usuario' })
     expect((await tandaB()).estado).toBe('CANCELED')
   })
@@ -389,56 +389,56 @@ describe('pausa del análisis (R-15, D-89)', () => {
 
 describe('reportes (RF-22)', () => {
   it('los genera el backend: sin él no hay archivo', async () => {
-    for (const f of ['csv', 'xlsx', 'pdf']) expect(await getReporte('EXP-2026-02', f)).toBeNull()
+    for (const f of ['csv', 'xlsx', 'pdf']) expect(await getReporte('7', f)).toBeNull()
   })
 })
 
 describe('revisión segundo a segundo (R-14)', () => {
   it('solo de un análisis completado y para quien subió el video o un Administrador', async () => {
     sesion(3)
-    expect(await status(getRevision('EXP-2026-02', 402))).toBe(403)
+    expect(await status(getRevision('7', 402))).toBe(403)
     sesion(1)
-    expect(await status(getRevision('EXP-2026-02', 503))).toBe(409) // en cola
-    const r = await getRevision('EXP-2026-02', 402)
+    expect(await status(getRevision('7', 503))).toBe(409) // en cola
+    const r = await getRevision('7', 402)
     expect(r).toMatchObject({ puedeCorregir: true, tanda: 'A', duracion: 300 })
     expect(r.especimenes).toHaveLength(4)
     expect(r.especimenes[0].segundos).toHaveLength(300)
     expect(r.especimenes[0].segundos[0]).toMatchObject({ segundo: 1, origen: 'maquina' })
     expect(r.especimenes[0].segundos[0].conducta).toMatch(/^(nado activo|inmovilidad|escalamiento|conducta activa)$/)
     sesion(2)
-    expect(await status(getRevision('EXP-2026-02', 402))).toBe('ok')
+    expect(await status(getRevision('7', 402))).toBe('ok')
   })
 
   it('guardar cambia los segundos, recalcula los totales y marca la revisión', async () => {
     sesion(1)
-    const antes = (await getBatchResults('EXP-2026-02', 'G-02', 'A')).especimenes[0]
-    const primero = (await getRevision('EXP-2026-02', 402)).especimenes[0].segundos[0]
+    const antes = (await getBatchResults('7', '2', 'A')).especimenes[0]
+    const primero = (await getRevision('7', 402)).especimenes[0].segundos[0]
     expect(primero.conducta).not.toBe('escalamiento')
-    await guardarSegundos('EXP-2026-02', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }, { segundo: 2, conducta: null, origen: 'dudosa' }] }])
-    const r = await getRevision('EXP-2026-02', 402)
+    await guardarSegundos('7', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }, { segundo: 2, conducta: null, origen: 'dudosa' }] }])
+    const r = await getRevision('7', 402)
     expect(r.especimenes[0].segundos.slice(0, 2)).toEqual([
       { segundo: 1, conducta: 'escalamiento', origen: 'corregida' },
       { segundo: 2, conducta: null, origen: 'dudosa' },
     ])
-    const despues = await getBatchResults('EXP-2026-02', 'G-02', 'A')
+    const despues = await getBatchResults('7', '2', 'A')
     expect(despues.revisado).toBe(true)
     expect(despues.especimenes[0].escalamiento_s).toBeGreaterThan(antes.escalamiento_s - 1)
   })
 
   it('reiniciar borra la revisión y vuelve a encolar el análisis (D-60, D-68)', async () => {
     sesion(1)
-    await guardarSegundos('EXP-2026-02', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }] }])
-    expect(await status(reiniciarAnalisis('EXP-2026-02', 402))).toBe('ok')
+    await guardarSegundos('7', 402, [{ numeroCilindro: 1, segundos: [{ segundo: 1, conducta: 'escalamiento', origen: 'corregida' }] }])
+    expect(await status(reiniciarAnalisis('7', 402))).toBe('ok')
     expect((await getQueue()).cola.at(-1)).toMatchObject({ job_id: 402, grupo: 'Referencia', tanda: 'A', status: 'QUEUED' })
-    expect(await status(getBatchResults('EXP-2026-02', 'G-02', 'A'))).toBe(404)
-    expect(await status(getRevision('EXP-2026-02', 402))).toBe(409)
+    expect(await status(getBatchResults('7', '2', 'A'))).toBe(404)
+    expect(await status(getRevision('7', 402))).toBe(409)
   })
 })
 
 describe('comparación entre grupos calculada', () => {
 
   it('sale de las tandas: medias, pendientes y grupos que mezclan niveles', async () => {
-    const [control, referencia, expA, expB] = await getGroupComparison('EXP-2026-02')
+    const [control, referencia, expA, expB] = await getGroupComparison('7')
     expect(control).toMatchObject({ grupo: 'Control · Placebo (solución salina)', n: 4, n_total: 8,
       pendientes: [{ tanda: 'B', n: 4, estado: 'PAUSED' }] })
     // Promedio por espécimen de cada conducta (no suma).
@@ -455,20 +455,20 @@ describe('comparación entre grupos calculada', () => {
   })
 
   it('cada espécimen trae las cuatro conductas; con conducta activa el nivel es agrupado (R-12)', async () => {
-    const r = await getBatchResults('EXP-2026-02', 'G-02', 'B')
+    const r = await getBatchResults('7', '2', 'B')
     expect(r.nivel).toBe('AGRUPADO')
     expect(r.especimenes[0]).toEqual({ numeroCilindro: 1, nado_s: 40, inmovilidad_s: 83, escalamiento_s: 12, activa_s: 165 })
-    const preciso = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    const preciso = await getBatchResults('7', '1', 'A')
     expect(preciso.nivel).toBe('PRECISO')
     expect(preciso.especimenes.every((e) => e.activa_s === 0)).toBe(true)
   })
 
   it('los bloques de 5 s los calcula el backend: sin él no hay bloques', async () => {
-    expect(await getBlocks('EXP-2026-02', 'G-01', 'A')).toBeNull()
+    expect(await getBlocks('7', '1', 'A')).toBeNull()
   })
 
   it('el desglose por minuto (results/byminute) suma a lo más 60 s por minuto', async () => {
-    const r = await getBatchResults('EXP-2026-02', 'G-01', 'A')
+    const r = await getBatchResults('7', '1', 'A')
     expect(r.lineas_tiempo.map((l) => l.numeroCilindro)).toEqual([1, 2, 3, 4])
     const porMinuto = (l) => l.minutos.map((m) => m.reduce((a, [, s]) => a + s, 0))
     // El espécimen 2 se vio todo el tiempo; el 1 tiene segundos «no se ve», que no cuentan.
@@ -480,12 +480,12 @@ describe('comparación entre grupos calculada', () => {
 describe('cancelar la subida de un video', () => {
   it('no registra la tanda ni la encola, y falla como cancelación', async () => {
     const control = new AbortController()
-    const subida = subir('EXP-2026-02', { grupo: 'Referencia', nuevo: false, letra: 'C', signal: control.signal })
+    const subida = subir('7', { grupo: 'Referencia', nuevo: false, letra: 'C', signal: control.signal })
     control.abort()
     const error = await subida.catch((e) => e)
     expect(error.code).toBe('ERR_CANCELED')
     expect((await getQueue()).cola).toHaveLength(2)
-    const referencia = (await getExperiment('EXP-2026-02')).grupos.find((g) => g.id === 'G-02')
+    const referencia = (await getExperiment('7')).grupos.find((g) => g.id === '2')
     expect(referencia.tandas.map((t) => t.letra)).toEqual(['A', 'B'])
   })
 })

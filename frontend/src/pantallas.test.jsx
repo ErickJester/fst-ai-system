@@ -67,7 +67,7 @@ describe('acceso', () => {
   })
 
   it('sin sesión, cualquier ruta lleva al login', async () => {
-    abrir('/experimentos/EXP-2026-02')
+    abrir('/experimentos/7')
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeTruthy()
   })
 
@@ -160,7 +160,7 @@ describe('cargar video', () => {
   }
 
   it('elegir el grupo con el teclado, confirmar la tanda y encolar el video', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     const grupo = await screen.findByRole('combobox')
     await user.type(grupo, 'fluox')
     await user.keyboard('{ArrowDown}{Enter}')
@@ -178,7 +178,7 @@ describe('cargar video', () => {
   })
 
   it('el video de Día 1 se guarda sin encolar análisis y vuelve al experimento (D-71)', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
     await user.click(screen.getByRole('button', { name: 'Día 1 (20 min)' }))
     await prepararTandaC(user, 'tanda_C_dia1.mp4')
@@ -188,7 +188,7 @@ describe('cargar video', () => {
   })
 
   it('avisa si la tanda ya tiene el video de esa sesión y no deja guardar', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     await user.type(await screen.findByRole('combobox'), 'fluox')
     await user.keyboard('{ArrowDown}{Enter}')
     const campoTanda = screen.getByLabelText('Tanda')
@@ -203,7 +203,7 @@ describe('cargar video', () => {
   })
 
   it('rechaza antes de subir un archivo más grande que el límite', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
     const grande = new File(['video'], 'enorme.mp4', { type: 'video/mp4' })
     Object.defineProperty(grande, 'size', { value: 3 * 1024 * 1024 * 1024 })
@@ -212,7 +212,7 @@ describe('cargar video', () => {
   })
 
   it('«Agregar otra tanda» limpia el formulario y «Terminar» vuelve al experimento', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     const grupo = await screen.findByRole('combobox')
     await user.type(grupo, 'fluox')
     await user.keyboard('{ArrowDown}{Enter}')
@@ -225,7 +225,7 @@ describe('cargar video', () => {
   })
 
   it('el navegador solo revisa la extensión; el servidor rechaza el video vertical (D-64)', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/cargar')
+    const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
     await user.upload(document.querySelector('input[type=file]'), new File(['x'], 'notas.txt', { type: 'video/mp4' }), { applyAccept: false })
     expect(await screen.findByText('El archivo no es .mp4 ni .mov')).toBeTruthy()
@@ -239,7 +239,7 @@ describe('cargar video', () => {
 
 describe('resultados', () => {
   it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
-    await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
@@ -248,7 +248,7 @@ describe('resultados', () => {
   })
 
   it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     await user.click(await screen.findByRole('button', { name: 'CSV' }))
     expect((await screen.findByText(/Reporte CSV de la Tanda A./)).parentElement.textContent).toMatch(/Lo prepara el sistema .*Tiempo \(min:seg\)/)
     expect(URL.createObjectURL).not.toHaveBeenCalled()
@@ -259,7 +259,7 @@ describe('resultados', () => {
   })
 
   it('ver el grupo completo: todas sus tandas completadas, con los estadísticos recalculados (D-93)', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Espécimen \d/.test(f.textContent))
     expect(await filas()).toHaveLength(4)
     const media = () => screen.getByRole('row', { name: /^Media/ }).textContent
@@ -276,14 +276,14 @@ describe('resultados', () => {
   })
 
   it('en el grupo completo, las tandas sin análisis completado se señalan como faltantes', async () => {
-    await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01')
+    await conSesion('/experimentos/7/resultados?grupo=1')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo control, grupo completo' })).toBeTruthy()
     expect(screen.getByText(/Faltan Tanda B \(en pausa\)/)).toBeTruthy()
     expect(screen.getByText('4 de 8')).toBeTruthy()
   })
 
   it('cada conducta con su porcentaje, y el desglose por minuto de cualquier espécimen', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=A')
+    const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     const fila = await screen.findByRole('row', { name: /^1 Tanda A · Espécimen 1/ })
     expect(fila.textContent).toMatch(/2:51 57 %/) // 171 s de 300 de nado activo
     await user.selectOptions(screen.getByLabelText(/^Desglose por minuto/), 'A-3')
@@ -293,14 +293,14 @@ describe('resultados', () => {
   })
 
   it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
-    await conSesion('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
+    await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
     expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el sistema/)
   })
 })
 
 describe('eliminar experimento (D-63)', () => {
   it('desde el detalle pide solo confirmación; con un análisis procesando, no se puede (D-87)', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02')
+    const user = await conSesion('/experimentos/7')
     await user.click(await screen.findByRole('button', { name: 'Eliminar experimento…' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Eliminar experimento' })
     expect(within(dialogo).getByText(/¿Eliminar «Compuesto CSR-14 · curva de dosis»\?/)).toBeTruthy()
@@ -337,11 +337,11 @@ describe('sesión', () => {
 describe('sesión: versión y borradores', () => {
   it('el menú de usuario muestra la versión y cerrar sesión borra los borradores de la revisión', async () => {
     const user = await conSesion('/experimentos')
-    localStorage.setItem('fst.revision.1.EXP-2026-02.402', '{}')
+    localStorage.setItem('fst.revision.1.7.402', '{}')
     await user.click(await screen.findByRole('button', { name: 'Menú de usuario' }))
     expect(screen.getByText(/^FST v\d+\.\d+\.\d+$/)).toBeTruthy()
     await user.click(screen.getByText('Cerrar sesión'))
-    expect(localStorage.getItem('fst.revision.1.EXP-2026-02.402')).toBeNull()
+    expect(localStorage.getItem('fst.revision.1.7.402')).toBeNull()
   })
 })
 
@@ -362,15 +362,15 @@ describe('progreso', () => {
 
 describe('grupo', () => {
   it('avisa cuando el video de una tanda ya se borró', async () => {
-    await conSesion('/experimentos/EXP-2026-02/grupos/G-03')
+    await conSesion('/experimentos/7/grupos/3')
     expect(await screen.findByText(/El video ya se borró/)).toBeTruthy()
   })
 
   it('lleva a los resultados del grupo completo o de cada tanda', async () => {
-    await conSesion('/experimentos/EXP-2026-02/grupos/G-01')
-    expect((await screen.findByRole('link', { name: 'Ver resultados del grupo completo' })).getAttribute('href')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-01')
+    await conSesion('/experimentos/7/grupos/1')
+    expect((await screen.findByRole('link', { name: 'Ver resultados del grupo completo' })).getAttribute('href')).toBe('/experimentos/7/resultados?grupo=1')
     expect(screen.getByText('Reúne las tandas con análisis completado: 1 de 2')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ver resultados de esta tanda' }).getAttribute('href')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-01&tanda=A')
+    expect(screen.getByRole('link', { name: 'Ver resultados de esta tanda' }).getAttribute('href')).toBe('/experimentos/7/resultados?grupo=1&tanda=A')
     expect(screen.getByText('Guardado')).toBeTruthy() // el Día 1 se guarda y no se analiza
   })
 })
@@ -378,7 +378,7 @@ describe('grupo', () => {
 describe('pausa del análisis (R-15)', () => {
   // El trabajo 502 (Control · Tanda B) está en pausa en los datos de ejemplo.
   it('muestra la imagen con el recuadro, el tiempo que queda y ajusta', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
+    const user = await conSesion('/experimentos/7/analisis/502/pausa')
     expect(await screen.findByRole('heading', { name: 'No se ve al espécimen del cilindro 2 (segundo 142)' })).toBeTruthy()
     expect(screen.getByRole('timer').textContent).toMatch(/Tiempo para responder: [45]:\d\d/)
     const izquierda = screen.getByLabelText('Izquierda (px)')
@@ -392,7 +392,7 @@ describe('pausa del análisis (R-15)', () => {
 
   it('cancelar pide confirmación; después la pausa ya no está', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const user = await conSesion('/experimentos/EXP-2026-02/analisis/502/pausa')
+    const user = await conSesion('/experimentos/7/analisis/502/pausa')
     await user.click(await screen.findByRole('button', { name: 'Cancelar análisis' }))
     expect(window.confirm).toHaveBeenCalled()
     expect(await screen.findByText(/Análisis cancelado: Compuesto CSR-14 · Control · Tanda B/)).toBeTruthy()
@@ -400,14 +400,14 @@ describe('pausa del análisis (R-15)', () => {
     window.confirm.mockRestore()
 
     cleanup()
-    abrir('/experimentos/EXP-2026-02/analisis/502/pausa')
+    abrir('/experimentos/7/analisis/502/pausa')
     expect(await screen.findByRole('heading', { name: 'Este análisis ya no está en pausa' })).toBeTruthy()
   })
 })
 
 describe('revisión segundo a segundo (R-14)', () => {
   it('en pausa, una tecla cambia solo ese segundo; guardar deja la revisión', async () => {
-    const user = await conSesion('/experimentos/EXP-2026-02/analisis/402/revision')
+    const user = await conSesion('/experimentos/7/analisis/402/revision')
     expect(await screen.findByRole('heading', { name: 'Revisión segundo a segundo · Referencia, Tanda A' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Espécimen 1/ }).getAttribute('aria-selected')).toBe('true')
     await user.keyboard('3')
@@ -419,14 +419,14 @@ describe('revisión segundo a segundo (R-14)', () => {
 
   it('reiniciar pide confirmación y lleva a Análisis en curso', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const user = await conSesion('/experimentos/EXP-2026-02/analisis/402/revision')
+    const user = await conSesion('/experimentos/7/analisis/402/revision')
     await user.click(await screen.findByRole('button', { name: 'Reiniciar el análisis…' }))
     expect(await screen.findByText(/Análisis reiniciado: Referencia · Tanda A volvió a la cola/)).toBeTruthy()
     window.confirm.mockRestore()
   })
 
   it('sin permiso, lo explica', async () => {
-    await conSesion('/experimentos/EXP-2026-02/analisis/402/revision', 'jdominguez@ipn.mx')
+    await conSesion('/experimentos/7/analisis/402/revision', 'jdominguez@ipn.mx')
     expect(await screen.findByRole('heading', { name: 'No puedes revisar este análisis' })).toBeTruthy()
   })
 })

@@ -76,7 +76,7 @@ const buscarTanda = (job) => db.experimentDetail[job.clave]?.grupos.find((g) => 
 
 // Análisis en pausa con permiso para atenderlo: quien subió el video o un Administrador.
 function pausaPropia(clave, id) {
-  const i = db.pausedJobs.findIndex((j) => j.job_id === Number(id) && j.clave === clave)
+  const i = db.pausedJobs.findIndex((j) => j.job_id === Number(id) && String(j.clave) === String(clave))
   if (i < 0) return { error: fail(409, 'El análisis ya no está en pausa.') }
   const u = usuarioDeLaSesion()
   if (!u || (!esAdmin(u) && db.pausedJobs[i].subido_por !== u.idInstitucional)) {
