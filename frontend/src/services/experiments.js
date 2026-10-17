@@ -1,10 +1,13 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { ESTADO, ETAPA, TIPO_GRUPO, ordinalDeLetra, letraDeOrdinal } from '../lib/contrato'
 import { getStatus } from './queue'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('experimentos')
 
 // Fecha local de dentro de n días, como 'AAAA-MM-DD'.
 function enDias(n) {

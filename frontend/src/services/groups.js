@@ -1,5 +1,5 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
@@ -7,6 +7,9 @@ import { usuarioDeLaSesion } from './mocks/sesion'
 import { getExperiment } from './experiments'
 import { ESTADO, SESION, TIPO_GRUPO, ordinalDeLetra, letraDeOrdinal } from '../lib/contrato'
 import { norm } from '../lib/fst'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('videos')
 
 // Grupo con sus tandas y videos (pantalla 2d). La guía no tiene ruta de grupo: sale del árbol
 // de GET /experiments/:clave (§6.1).

@@ -1,11 +1,14 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { segundosDe, totalesDe, cajasDe } from './mocks/segundos'
 import { CONDUCTA_BD, DE_BD } from '../lib/fst'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('revision')
 
 // Revisión segundo a segundo (R-14, §9.7). Las formas siguen §6.1 del documento: camelCase
 // y las conductas con su nombre de la base ('nado activo', … o null).

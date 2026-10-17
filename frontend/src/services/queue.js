@@ -1,11 +1,14 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { ESTADO, ETAPA } from '../lib/contrato'
 import { PCT_ETAPA } from '../lib/fst'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('progreso')
 
 // El estado de los análisis, las pausas y los errores los produce el worker (equipo de
 // backend). Sin backend, los datos de ejemplo quedan fijos: aquí solo se responde lo que el
@@ -18,7 +21,8 @@ import { PCT_ETAPA } from '../lib/fst'
 // vigente»; pausa.desdeSegundo; y motivoCancelacion ('usuario' o 'plazo'), para explicar por
 // qué se canceló (§9.4).
 export async function getStatus(clave) {
-  if (USE_MOCKS) {
+  // El detalle del experimento no funciona sin /status: va con la parte «experimentos».
+  if (usaEjemplo('experimentos')) {
     const exp = db.experimentDetail[clave]
     if (!exp) return fail(404, 'No existe ese experimento.')
     return reply({ analisis: exp.grupos.flatMap((g) => g.tandas.filter((t) => t.id_analisis && t.estado !== 'SIN_VIDEO').map((t) => analisisDe(g, t))) })

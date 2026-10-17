@@ -1,9 +1,12 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { deCuenta, cuentaPublica } from './auth'
 import { ROL, ESTADO, SESION } from '../lib/contrato'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('admin')
 
 // Cuentas de administración con las formas de §6.1: { idInstitucional, nombre, apellidos,
 // correo, rol, activo, nExperimentos }. deCuenta las pasa a la forma de las pantallas.

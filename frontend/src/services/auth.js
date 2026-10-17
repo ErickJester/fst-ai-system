@@ -1,8 +1,11 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { ROL } from '../lib/contrato'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('sesion')
 
 // Las respuestas siguen §6.1 (camelCase, rol «Investigador» o «Administrador»), con o sin
 // backend: los datos de ejemplo ya tienen esa forma. deCuenta las pasa a la forma que usan
