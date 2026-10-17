@@ -6,6 +6,7 @@ import { resumir } from './mocks/resumen'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { segundosDe, totalesDe, cajasDe } from './mocks/segundos'
 import { CONDUCTA_BD, DE_BD } from '../lib/fst'
+import { getExperiment } from './experiments'
 
 // Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
 const USE_MOCKS = usaEjemplo('revision')
@@ -86,7 +87,22 @@ export async function getRevision(clave, id) {
       })),
     })
   }
-  const d = (await api.get(`/experiments/${clave}/analyses/${id}/review`)).data
+  const [d, exp] = await Promise.all([api.get(`/experiments/${clave}/analyses/${id}/review`).then((r) => r.data), getExperiment(clave)])
+  // La guía trae puedeCorregir, videoUrl y los especímenes; el resto de lo que usa la pantalla
+  // sale del detalle (experimento, grupo, tanda y si el video sigue). duracion, ancho y alto
+  // (tamaño del video, para los recuadros) son campos de más propuestos; sin ellos, 300 s y
+  // 1920 × 1080, como el ejemplo de la pausa en §6.1.
+  const g = exp.grupos.find((x) => x.tandas.some((t) => t.id_analisis === Number(id)))
+  const t = g?.tandas.find((x) => x.id_analisis === Number(id))
+  Object.assign(d, {
+    experimento: d.experimento || { clave: exp.clave, titulo: exp.titulo },
+    grupo: d.grupo || (g && { id: g.id, nombre: g.nombre, tratamiento: g.tratamiento }),
+    tanda: typeof d.tanda === 'string' && d.tanda.length === 1 ? d.tanda : t?.letra,
+    videoDisponible: d.videoDisponible ?? t?.video_disponible !== false,
+    duracion: d.duracion ?? 300,
+    ancho: d.ancho ?? 1920,
+    alto: d.alto ?? 1080,
+  })
   if (d.videoUrl && d.videoDisponible !== false) {
     d.videoRuta = d.videoUrl
     d.videoUrl = await urlDeVideo(clave, id, d.videoRuta)
