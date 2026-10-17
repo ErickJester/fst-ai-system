@@ -9,7 +9,7 @@ No cubre el backend, el worker ni el SQL y Docker de los anexos (ver `backend-sp
 ya existe una parte y la nota dice qué falta. Una casilla de pantalla marcada `[x]` significa que **la pantalla lo hace
 con datos de ejemplo**; que funcione contra el backend real se cuenta aparte, en las secciones 1 y 13.
 
-**Última revisión del estado (15-oct-2026):** rama `feat/frontend-v2-servicios`, versión 0.4.0, commit `a2f2235` (con
+**Última revisión del estado (17-oct-2026, Vanesa):** se conectaron los servicios a las formas y rutas de la guía (pasos 1 a 10 de `PARA_VANESA_API.md`, puntos 41 a 51 de `PARA_ERICK.md`). Pruebas, lint y build pasan. Lo que queda abierto depende del backend real, de una confirmación de Erick o de pruebas con personas. Revisión anterior (15-oct-2026):
 los tres commits de Vanesa del mismo día, que cerraron lo que era solo del frontend). Leí todo `frontend/src` y el diff
 posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo que se ponga en `false`) y
 **nada se ha probado contra el backend real**. Las pruebas, el lint y el build **no se ejecutaron en esta revisión**:
@@ -50,7 +50,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks`; el filtro por grupo o tanda, en el navegador (D-93)
   - [x] Progreso con `GET /experiments/{id}/status` (`/analisis?experimento=`; sin experimento junta los activos); Administración toma la cola de `/admin/system`. Ya no se usa `/queue`
   - [ ] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
-- [ ] Nombres de campo en `camelCase` de §6.1. Hecho: pausa, revisión y guardar segundos. Falta: login, usuarios, experimentos, detalle, estado y resultados, que hoy van en `snake_case` y con valores como `QUEUED`, `DONE` o `SIN_VIDEOS`
+- [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
 - [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring o contra `worker_fake`, y corregir lo que falle
 
@@ -94,7 +94,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Barra de progreso de la subida y botón para cancelarla
 - [x] Día 2: redirige a Progreso con el aviso de que el análisis está en cola. Día 1: vuelve al experimento con el aviso de que no se analiza
 - [x] Botones «+ Agregar otra tanda» y «Terminar» en el paso 2 (§9.3)
-- [ ] Pantalla de confirmación del paso 3. Hecho: la cubre el aviso de la pantalla de destino
+- [x] Confirmación del paso 3 (§9.3): Día 2 lleva a Progreso de ese experimento con «Video almacenado. El análisis está en cola»; Día 1 vuelve al experimento con «Video del Día 1 almacenado. No se analiza»
 
 ## 5. Detalle de experimento y de grupo (§9.2, maquetas `experimento` y `grupo`)
 - [x] Detalle: datos generales, notas, grupos con sus tandas y el estado de cada una, barra de avance y leyenda
@@ -120,7 +120,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Cuenta regresiva de 5 minutos, que se vuelve a pedir al servidor cada 5 s
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
-- [ ] Pantalla de progreso por experimento, con una barra por video y el encabezado «Experimento / Grupo / Tanda / Día». Hecho: la pantalla es global (`/analisis`)
+- [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
 - [ ] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje
 - [ ] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso
 
@@ -192,8 +192,8 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Revisión con axe-core sobre las 12 pantallas, y diálogos que atrapan el foco
 - [x] `ErrorBoundary` que evita la pantalla en blanco
 - [x] GitHub Actions en `.github/workflows/frontend.yml` con lint, pruebas y build
-- [ ] Pruebas, lint y build pasando en esta rama. No se ejecutaron: faltan `vitest` y `eslint` en `node_modules`
-- [ ] Pruebas de pantalla para Progreso, Pausa, Revisión y Administración. Hecho: acceso, primer acceso, recuperar, crear cuenta, cargar video y resultados
+- [x] Pruebas (110), lint y build pasando en esta rama, también en el CI de GitHub (`.github/workflows/frontend.yml`)
+- [x] Pruebas de pantalla para Progreso, Pausa, Revisión y Administración (`src/pantallas.test.jsx`), y revisión de accesibilidad con axe-core en 12 pantallas (`src/accesibilidad.test.jsx`)
 
 ## 13. Criterios de aceptación finales (§12)
 En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta verlo de punta a punta.

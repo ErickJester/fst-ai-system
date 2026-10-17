@@ -10,7 +10,7 @@
 // borrados) y videosBorrados. avisoVencimiento lo calcula services/experiments.js.
 // estado: el de la guía ('sin videos', 'en espera del Día 2', 'en cola', 'procesando',
 // 'en pausa', 'completado', 'error' o 'cancelado'), calculado con las tandas.
-// idExperimento: por ahora la clave de los mockups; pasa a número en el paso 10.
+// idExperimento e idGrupo: números, como en la base (paso 10).
 // conDetalle: solo en datos de ejemplo; solo el experimento de ejemplo tiene detalle.
 const RIVERA = { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' }
 const REYES = { idInstitucional: '2008630412', nombre: 'C. S.', apellidos: 'Reyes López' }
@@ -19,11 +19,11 @@ const fila = (idExperimento, nombre, fecha, creador, nGrupos, nEspecimenes, trat
   ({ idExperimento, nombre, fecha, nGrupos, estado, creador, nEspecimenes, tratamientos, videosDia2: { analizados, cargados, total }, diasRetencion, videosBorrados, conDetalle })
 
 export const experiments = [
-  fila('EXP-2026-02', 'Compuesto CSR-14 · curva de dosis', '2026-02-18', RIVERA, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], [4, 8, 8], 'error', 30, false, true),
-  fila('EXP-2026-01', 'Extracto de Salvia · dosis única', '2026-01-09', DOMINGUEZ, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], [8, 8, 8], 'completado', 12, false),
-  fila('EXP-2025-11', 'Extracto de Valeriana officinalis', '2025-11-14', RIVERA, 5, 38, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], [10, 10, 10], 'completado', 4, false),
-  fila('EXP-2025-10', 'Réplica interanalista · control metodológico', '2025-10-02', REYES, 4, 24, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], [3, 3, 6], 'completado', null, true),
-  fila('EXP-2025-08', 'Fluoxetina · calibración del clasificador', '2025-08-19', REYES, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], [8, 8, 8], 'completado', null, true),
+  fila(7, 'Compuesto CSR-14 · curva de dosis', '2026-02-18', RIVERA, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Compuesto CSR-14, 5 mg/kg', 'Compuesto CSR-14, 15 mg/kg'], [4, 8, 8], 'error', 30, false, true),
+  fila(6, 'Extracto de Salvia · dosis única', '2026-01-09', DOMINGUEZ, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Extracto de Salvia, 20 mg/kg'], [8, 8, 8], 'completado', 12, false),
+  fila(5, 'Extracto de Valeriana officinalis', '2025-11-14', RIVERA, 5, 38, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Valeriana officinalis, 50 mg/kg'], [10, 10, 10], 'completado', 4, false),
+  fila(4, 'Réplica interanalista · control metodológico', '2025-10-02', REYES, 4, 24, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg'], [3, 3, 6], 'completado', null, true),
+  fila(3, 'Fluoxetina · calibración del clasificador', '2025-08-19', REYES, 4, 32, ['Placebo (solución salina)', 'Fluoxetina 10 mg/kg', 'Fluoxetina 20 mg/kg'], [8, 8, 8], 'completado', null, true),
 ]
 
 // Detalle (2c, 2d). Solo el experimento de ejemplo lo tiene.
@@ -47,16 +47,16 @@ const tanda = (letra, estado, extra = {}) => ({
 })
 
 export const experimentDetail = {
-  'EXP-2026-02': {
-    clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: '2019630871',
+  7: {
+    clave: 7, titulo: 'Compuesto CSR-14 · curva de dosis', fecha_inicio: '2026-02-18', responsable: 'M. Rivera', creador_id: '2019630871',
     grupos: [
-      { id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
+      { id: 1, nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 401, dia1: { cargado: true } }), tanda('B', 'PAUSED', { id_analisis: 502 })] },
-      { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
+      { id: 2, nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 402 }), tanda('B', 'DONE', { id_analisis: 403 })] },
-      { id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
+      { id: 3, nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'DONE', { id_analisis: 404, video_disponible: false }), tanda('B', 'RUNNING', { id_analisis: 501, progreso: { etapa: 'CLASSIFICATION', pct: 100 } })] },
-      { id: 'G-04', nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
+      { id: 4, nombre: 'Experimental B', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 15 mg/kg', n_especimenes: 8,
         tandas: [tanda('A', 'QUEUED', { id_analisis: 503 }), tanda('B', 'FAILED', { id_analisis: 498, error: { etapa: 'ROI_DETECTION' } })] },
     ],
   },
@@ -68,13 +68,13 @@ export const experimentDetail = {
 // Solo se analiza el Día 2 (D-54). subido_por: cuenta que subió el video (puede ajustar o
 // cancelar su pausa, igual que un Administrador).
 export const queue = [
-  { job_id: 501, posicion: 1, encolado: '2026-02-24T16:00:00', clave: 'EXP-2026-02', gid: 'G-03', experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
-  { job_id: 503, posicion: 2, encolado: '2026-02-24T16:05:00', clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'QUEUED', stage: null, progress_pct: 0, error: null },
+  { job_id: 501, posicion: 1, encolado: '2026-02-24T16:00:00', clave: 7, gid: 3, experimento: 'Compuesto CSR-14', grupo: 'Experimental A', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'RUNNING', stage: 'CLASSIFICATION', progress_pct: 100, error: null },
+  { job_id: 503, posicion: 2, encolado: '2026-02-24T16:05:00', clave: 7, gid: 4, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'A', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'QUEUED', stage: null, progress_pct: 0, error: null },
 ]
 
 // Trabajos que fallaron recientemente: salen de la cola y quedan con su causa.
 export const failedJobs = [
-  { job_id: 498, clave: 'EXP-2026-02', gid: 'G-04', experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
+  { job_id: 498, clave: 7, gid: 4, experimento: 'Compuesto CSR-14', grupo: 'Experimental B', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'FAILED', stage: 'ROI_DETECTION', progress_pct: 67 },
 ]
 
 // Análisis en pausa (R-15): salen de la cola mientras esperan el ajuste del recuadro. pausa:
@@ -82,7 +82,7 @@ export const failedJobs = [
 // La pausa la decide el worker; el de ejemplo ya está en pausa. hora_ms null: sin backend,
 // la pausa empieza la primera vez que se consulta (services/queue.js), para ver el plazo.
 export const pausedJobs = [
-  { job_id: 502, encolado: '2026-02-24T16:01:00', clave: 'EXP-2026-02', gid: 'G-01', experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
+  { job_id: 502, encolado: '2026-02-24T16:01:00', clave: 7, gid: 1, experimento: 'Compuesto CSR-14', grupo: 'Control', tanda: 'B', dia: 'DAY2', n_especimenes: 4, subido_por: '2019630871', status: 'PAUSED', stage: 'CLASSIFICATION', progress_pct: 100,
     pausa: { cilindro: 2, desde_segundo: 142, hora_ms: null, ancho: 1280, alto: 720, ajuste: null,
       // El recuadro del cilindro 2 quedó corrido: por eso el pipeline dejó de ver a su espécimen.
       recuadros: [{ cilindro: 1, x0: 50, y0: 130, x1: 270, y1: 640 }, { cilindro: 2, x0: 450, y0: 200, x1: 670, y1: 710 },
@@ -102,7 +102,7 @@ export const revisiones = {}
 // escalamiento_s y activa_s (conducta activa: no inmóvil, sin decidir entre nado y
 // escalamiento). Un mismo análisis puede mezclar las cuatro.
 // nivel (nivelClasif): AGRUPADO si algún segundo quedó como conducta activa; si no, PRECISO.
-const EXPERIMENTO_EJEMPLO = { clave: 'EXP-2026-02', titulo: 'Compuesto CSR-14 · curva de dosis' }
+const EXPERIMENTO_EJEMPLO = { clave: 7, titulo: 'Compuesto CSR-14 · curva de dosis' }
 
 // Línea de tiempo por minuto del primer espécimen: reparte sus segundos de cada conducta
 // en tramos alternados de hasta 12 s, minuto por minuto.
@@ -140,12 +140,12 @@ function resultados(grupo, letra, nivel, filas, analizado_en) {
 
 const preciso = (nado, inmovilidad, escalamiento) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento, activa_s: 0 })
 const mixto = (nado, inmovilidad, escalamiento, activa) => ({ nado_s: nado, inmovilidad_s: inmovilidad, escalamiento_s: escalamiento, activa_s: activa })
-const REFERENCIA = { id: 'G-02', nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' }
+const REFERENCIA = { id: 2, nombre: 'Referencia', tipo: 'REFERENCIA', tratamiento: 'Fluoxetina 10 mg/kg' }
 
 export const batchResults = {
-  'EXP-2026-02/G-01/A/DAY2': resultados({ id: 'G-01', nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)' }, 'A', 'PRECISO',
+  '7/1/A/DAY2': resultados({ id: 1, nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Placebo (solución salina)' }, 'A', 'PRECISO',
     [preciso(127, 145, 28), preciso(113, 162, 25), preciso(99, 171, 30), preciso(82, 196, 22)], '2026-02-23T11:40:00'),
-  'EXP-2026-02/G-02/A/DAY2': {
+  '7/2/A/DAY2': {
     experimento: EXPERIMENTO_EJEMPLO, grupo: REFERENCIA,
     letra: 'A', dia: 'DAY2', duracion_s: 300, duracion_analizada_s: 300, analizado_en: '2026-02-24T15:02:00', modelo: 'clf-cascada v2.1',
     nivel: 'PRECISO',
@@ -167,9 +167,9 @@ export const batchResults = {
       ],
     },
   },
-  'EXP-2026-02/G-02/B/DAY2': resultados(REFERENCIA, 'B', 'AGRUPADO',
+  '7/2/B/DAY2': resultados(REFERENCIA, 'B', 'AGRUPADO',
     [mixto(40, 83, 12, 165), mixto(38, 99, 9, 154), mixto(35, 103, 11, 151), mixto(30, 120, 8, 142)], '2026-02-24T16:10:00'),
-  'EXP-2026-02/G-03/A/DAY2': resultados({ id: 'G-03', nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg' }, 'A', 'PRECISO',
+  '7/3/A/DAY2': resultados({ id: 3, nombre: 'Experimental A', tipo: 'EXPERIMENTAL', tratamiento: 'Compuesto CSR-14, 5 mg/kg' }, 'A', 'PRECISO',
     [preciso(164, 98, 38), preciso(151, 114, 35), preciso(139, 128, 33), preciso(125, 145, 30)], '2026-02-24T12:25:00'),
 }
 
@@ -208,12 +208,12 @@ const hace = (dias, hora) => {
 }
 
 export const notifications = [
-  { idNotificacion: 1, tipo: 'error del pipeline', mensaje: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:41'), leido: false },
-  { idNotificacion: 2, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:02'), leido: false },
+  { idNotificacion: 1, tipo: 'error del pipeline', mensaje: 'Compuesto CSR-14 · Experimental B · Tanda B · Día 2. No se encontraron los tubos en el video.', idExperimento: 7, fechaCreacion: hace(0, '15:41'), leido: false },
+  { idNotificacion: 2, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', idExperimento: 7, fechaCreacion: hace(0, '15:02'), leido: false },
   { idNotificacion: 4, tipo: 'alerta de disco', mensaje: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', idExperimento: null, fechaCreacion: hace(0, '09:12'), leido: false, soloAdmin: true },
-  { idNotificacion: 5, tipo: 'video borrado', mensaje: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', idExperimento: 'EXP-2025-10', fechaCreacion: hace(1, '03:00'), leido: true },
-  { idNotificacion: 6, tipo: 'analisis en pausa', mensaje: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(0, '15:50'), leido: false },
-  { idNotificacion: 3, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', idExperimento: 'EXP-2026-02', fechaCreacion: hace(1, '18:20'), leido: true },
+  { idNotificacion: 5, tipo: 'video borrado', mensaje: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', idExperimento: 4, fechaCreacion: hace(1, '03:00'), leido: true },
+  { idNotificacion: 6, tipo: 'analisis en pausa', mensaje: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', idExperimento: 7, fechaCreacion: hace(0, '15:50'), leido: false },
+  { idNotificacion: 3, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', idExperimento: 7, fechaCreacion: hace(1, '18:20'), leido: true },
 ]
 
 // Enlaces de recuperación pendientes (2h): token → { idInstitucional, vence (ms), usado }.
@@ -225,7 +225,7 @@ export const resetTokens = {}
 // (incluidas las contraseñas de ejemplo; con el backend nada de esto existe).
 // Si cambia la forma de los datos, subir VERSION_DATOS descarta lo guardado.
 const CLAVE = 'fst.demo'
-const VERSION_DATOS = 18
+const VERSION_DATOS = 19
 const colecciones = { experiments, experimentDetail, queue, failedJobs, pausedJobs, canceledJobs, revisiones, batchResults, users, system, notifications, resetTokens }
 const inicial = structuredClone(colecciones)
 

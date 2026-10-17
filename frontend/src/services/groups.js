@@ -36,7 +36,7 @@ export async function sugerirGrupos(clave, q) {
   } else {
     d = (await api.get(`/experiments/${clave}/groups`, { params: { q } })).data
   }
-  return d.map((g) => ({ id: g.idGrupo, nombre: g.etiqueta, tratamiento: g.tratamiento, tipo: TIPO_GRUPO.aFront[g.tipo], siguiente: letraDeOrdinal(g.siguienteOrdinal) }))
+  return d.map((g) => ({ id: String(g.idGrupo), nombre: g.etiqueta, tratamiento: g.tratamiento, tipo: TIPO_GRUPO.aFront[g.tipo], siguiente: letraDeOrdinal(g.siguienteOrdinal) }))
 }
 
 // Simula la subida, la validación del servidor y lo que guarda (sin backend).
@@ -59,7 +59,8 @@ async function subirDeEjemplo(clave, grupo, { archivo, sesion, tipo, tratamiento
   let g = exp.grupos.find((x) => x.nombre === grupo)
   if (!g) {
     if (!tipo || !tratamiento) return fail(422, 'Un grupo nuevo necesita tipo y tratamiento.')
-    g = { id: 'G-' + String(exp.grupos.length + 1).padStart(2, '0'), nombre: grupo, tipo: TIPO_GRUPO.aFront[tipo], tratamiento, n_especimenes: 0, tandas: [] }
+    const ids = Object.values(db.experimentDetail).flatMap((x) => x.grupos.map((y) => y.id))
+    g = { id: Math.max(0, ...ids) + 1, nombre: grupo, tipo: TIPO_GRUPO.aFront[tipo], tratamiento, n_especimenes: 0, tandas: [] }
     exp.grupos.push(g)
   }
   const letra = letraDeOrdinal(ordinal || Math.max(0, ...g.tandas.map((t) => ordinalDeLetra(t.letra))) + 1)
