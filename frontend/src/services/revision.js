@@ -45,9 +45,22 @@ function especimenesDe({ exp, g, t }) {
   return (propios || db.batchResults['EXP-2026-02/G-02/A/DAY2']).especimenes.slice(0, t.n_cilindros)
 }
 
+// POST /experiments/:clave/analyses/:id/video-token → { token } (propuesta de Erick,
+// PARA_VANESA_API.md §6): un token de solo lectura de ese análisis, de 2 horas. La etiqueta
+// <video> no puede mandar el Authorization, y el JWT de sesión nunca va en una URL. Devuelve la
+// URL completa del video con ?vt=. No se escribe en consola ni en pantalla.
+export async function urlDeVideo(clave, id, ruta) {
+  const { token } = (await api.post(`/experiments/${clave}/analyses/${id}/video-token`)).data
+  const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+  const r = ruta || `/experiments/${clave}/analyses/${id}/video`
+  return base + r + (r.includes('?') ? '&' : '?') + 'vt=' + encodeURIComponent(token)
+}
+
 // GET /experiments/:clave/analyses/:id/review → { puedeCorregir, videoUrl, tanda, duracion,
 // especimenes: [{ numeroCilindro, recuadro, segundos: [{ segundo, conducta, origen }] }] }.
-// videoUrl apunta a la copia H.264 (web.mp4, con Range); sin backend no hay video (null).
+// videoUrl apunta a la copia H.264 (web.mp4, con Range) y es relativa a la API: aquí se le
+// pone el token de video (videoRuta guarda la ruta, para pedir otro token si vence). Sin
+// backend no hay video (null).
 export async function getRevision(clave, id) {
   if (USE_MOCKS) {
     const r = revisable(clave, id)
@@ -70,7 +83,12 @@ export async function getRevision(clave, id) {
       })),
     })
   }
-  return (await api.get(`/experiments/${clave}/analyses/${id}/review`)).data
+  const d = (await api.get(`/experiments/${clave}/analyses/${id}/review`)).data
+  if (d.videoUrl && d.videoDisponible !== false) {
+    d.videoRuta = d.videoUrl
+    d.videoUrl = await urlDeVideo(clave, id, d.videoRuta)
+  }
+  return d
 }
 
 // PUT /experiments/:clave/analyses/:id/segundos { especimenes: [{ numeroCilindro, segundos:
