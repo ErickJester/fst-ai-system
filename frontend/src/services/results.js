@@ -1,11 +1,14 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { segundosDe, totalesDe, minutosDe, CONDUCTAS, DURACION_S } from './mocks/segundos'
 import { getExperiment } from './experiments'
 import { CONDUCTA, ESTADO, NIVEL, TIPO_GRUPO, ordinalDeLetra } from '../lib/contrato'
 import { mean, variance } from '../lib/fst'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('resultados')
 
 // Resultados con las rutas de la guía (§6, §6.1), todas del experimento completo:
 // /results (totales por espécimen), /results/byminute (lo mismo con sus minutos),
