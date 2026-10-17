@@ -15,10 +15,10 @@ const CADA_MS = 30000
 const ENLACE = {
   ANALYSIS_DONE: 'Ver resultados',
   ANALYSIS_FAILED: 'Ver detalle del error',
-  ANALYSIS_PAUSED: 'Ajustar o cancelar el análisis',
+  ANALYSIS_PAUSED: 'Ver el análisis en pausa',
   ANALYSIS_CANCELED: 'Ver el análisis',
   DISK_ALERT: 'Ver el estado del sistema',
-  VIDEO_DELETED: 'Ver los experimentos',
+  VIDEO_DELETED: 'Ver el experimento',
 }
 
 // Hoy → «15:41»; ayer → «ayer»; antes → «18 feb 2026».
