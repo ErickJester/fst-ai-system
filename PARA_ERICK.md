@@ -398,4 +398,7 @@ Si eres Claude trabajando en este repo:
     - **`/results/groups`, forma propuesta** (la guía dice qué trae, no la forma): `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes: [{letra, nCilindros, estado}], nivelMixto, promedios: {"nado activo": {media, de}, …}, porNivel: [{letra, nivelClasif, n, promedios}] | null}]`.
     - **`/results/blocks`, forma propuesta:** cada espécimen (con `tanda`, `ordinal`, `numeroCilindro`) y `bloques: [{inicio, conducta, matiz, segundos: [5 conductas o null]}]`, con los nombres de la base.
     - **Listo para probar contra el backend:** resultados, comparación entre grupos y bloques (los reportes ya usaban la ruta de la guía).
+48. **Notificaciones con los campos de la guía (paso 7).** `GET /notifications` con `{idNotificacion, tipo, mensaje, leido, fechaCreacion, idExperimento}`; el título y el enlace los arma el frontend con `tipo` e `idExperimento`. «Análisis completado» abre los resultados del experimento; error, pausa y cancelado abren su progreso (`/analisis?experimento=`), donde `/status` dice qué análisis fue; «video borrado», el experimento; «alerta de disco», Administración.
+    - **`idNotificacion`:** la guía no nombra el id; propongo ese nombre, como `idExperimento`.
+    - `PATCH /notifications/{id}` con `{leido}`. **«Marcar todas como leídas» ya no usa `POST /notifications/read-all`:** hace un `PATCH` por cada no leída, así no hace falta una ruta que la guía no tiene.
 

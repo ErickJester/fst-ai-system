@@ -13,7 +13,7 @@ import { getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnal
 import { getQueue } from './progreso'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
 import { reiniciarDatos, resetTokens } from './mocks/data'
-import { listNotifications } from './notifications'
+import { listNotifications, markAllRead, deNotificacion } from './notifications'
 import { getRevision, guardarSegundos, reiniciarAnalisis } from './revision'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
@@ -58,6 +58,22 @@ describe('detalle con la forma de §6.1 y el estado de /status', () => {
     const [a, b] = e.grupos[0].tandas
     expect(a).toMatchObject({ letra: 'A', desde: 1, estado: 'RUNNING', progreso: { etapa: 'ROI_DETECTION', pct: 67 }, id_analisis: 1, subido_por: '2019630871', video_disponible: false })
     expect(b).toMatchObject({ letra: 'B', desde: 5, estado: 'SIN_VIDEO', dia1: { cargado: true }, id_analisis: null })
+  })
+})
+
+describe('notificaciones con los campos de la guía', () => {
+  it('el título y el enlace salen del tipo y del experimento', () => {
+    const n = (tipo, idExperimento = 7) => deNotificacion({ idNotificacion: 1, tipo, mensaje: 'x', leido: false, fechaCreacion: '2026-10-15T15:41:00', idExperimento })
+    expect(n('analisis completado')).toMatchObject({ id: 1, tipo: 'ANALYSIS_DONE', titulo: 'Análisis completado', enlace: '/experimentos/7/resultados', texto: 'x', is_read: false })
+    expect(n('error del pipeline').enlace).toBe('/analisis?experimento=7')
+    expect(n('video borrado').enlace).toBe('/experimentos/7')
+    expect(n('alerta de disco', null).enlace).toBe('/admin')
+  })
+
+  it('marcar todas como leídas usa PATCH por cada una (no hay ruta para todas)', async () => {
+    sesion(1)
+    await markAllRead()
+    expect((await listNotifications()).every((n) => n.is_read)).toBe(true)
   })
 })
 
@@ -316,7 +332,7 @@ describe('pausa del análisis (R-15, D-89)', () => {
     expect((await tandaB()).estado).toBe('PAUSED')
     const { pausas } = await getQueue()
     expect(pausas[0]).toMatchObject({ job_id: 502, status: 'PAUSED', pausa: { cilindro: 2, desde_segundo: 142 } })
-    expect((await listNotifications()).find((n) => n.tipo === 'ANALYSIS_PAUSED')).toMatchObject({ enlace: '/experimentos/EXP-2026-02/analisis/502/pausa' })
+    expect((await listNotifications()).find((n) => n.tipo === 'ANALYSIS_PAUSED')).toMatchObject({ titulo: 'Análisis en pausa', enlace: '/analisis?experimento=EXP-2026-02' })
   })
 
   it('sin video (ya se borró) la revisión se consulta pero no se corrige ni se reinicia', async () => {

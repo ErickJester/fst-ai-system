@@ -49,9 +49,9 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] Sugerir grupos y la siguiente tanda con `GET /experiments/{id}/groups?q=` (forma de la respuesta propuesta)
   - [x] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks`; el filtro por grupo o tanda, en el navegador (D-93)
   - [x] Progreso con `GET /experiments/{id}/status` (`/analisis?experimento=`; sin experimento junta los activos); Administración toma la cola de `/admin/system`. Ya no se usa `/queue`
-  - [ ] `POST /admin/users/:id/reset-temporal` y `POST /notifications/read-all`: son propuestas del frontend que la guía no trae
+  - [ ] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
 - [ ] Nombres de campo en `camelCase` de §6.1. Hecho: pausa, revisión y guardar segundos. Falta: login, usuarios, experimentos, detalle, estado y resultados, que hoy van en `snake_case` y con valores como `QUEUED`, `DONE` o `SIN_VIDEOS`
-- [ ] Notificaciones con los campos de la guía (`tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`). Hecho: los seis tipos. Falta: la guía no trae título ni enlace. Decidido: el frontend los arma con `tipo` e `idExperimento`, y el aviso de pausa abre el progreso de ese experimento, donde `/status` indica el análisis en pausa
+- [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
 - [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring o contra `worker_fake`, y corregir lo que falle
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
