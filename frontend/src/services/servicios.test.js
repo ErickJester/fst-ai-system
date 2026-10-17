@@ -1,6 +1,7 @@
 // Pruebas de la capa de servicios con datos de ejemplo (USE_MOCKS). Cubren las reglas
 // que el backend también tendrá que cumplir: contraseñas, administradores y experimentos.
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import api from './api'
 import * as auth from './auth'
 import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
@@ -14,7 +15,7 @@ import { getQueue } from './progreso'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
 import { reiniciarDatos, resetTokens } from './mocks/data'
 import { listNotifications, markAllRead, deNotificacion } from './notifications'
-import { getRevision, guardarSegundos, reiniciarAnalisis } from './revision'
+import { getRevision, guardarSegundos, reiniciarAnalisis, urlDeVideo } from './revision'
 
 const status = (promesa) => promesa.then(() => 'ok', (e) => e.response.status)
 
@@ -74,6 +75,18 @@ describe('notificaciones con los campos de la guía', () => {
     sesion(1)
     await markAllRead()
     expect((await listNotifications()).every((n) => n.is_read)).toBe(true)
+  })
+})
+
+describe('video de la revisión con token (?vt=)', () => {
+  it('pide el token con la sesión y lo pone en la URL del video, no el JWT', async () => {
+    localStorage.setItem('fst.token', 'jwt-de-sesion')
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { token: 'tok/1' } })
+    const url = await urlDeVideo(7, 1, '/experiments/7/analyses/1/video')
+    expect(post).toHaveBeenCalledWith('/experiments/7/analyses/1/video-token')
+    expect(url).toBe(api.defaults.baseURL.replace(/\/$/, '') + '/experiments/7/analyses/1/video?vt=tok%2F1')
+    expect(url).not.toContain('jwt-de-sesion')
+    post.mockRestore()
   })
 })
 

@@ -5,7 +5,7 @@ import { Cargando, Migas } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { useAsync } from '../hooks/useAsync'
-import { getRevision, guardarSegundos, reiniciarAnalisis } from '../services/revision'
+import { getRevision, guardarSegundos, reiniciarAnalisis, urlDeVideo } from '../services/revision'
 import { mensajeError } from '../services/api'
 import { CONDUCTA_BD, DE_BD, fmt, enlaceResultados, especimen } from '../lib/fst'
 
@@ -93,6 +93,11 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   const [resumen, setResumen] = useState(false)
   const [estado, setEstado] = useState({ guardando: false, error: '' })
   const videoRef = useRef(null)
+  // Video con su token (?vt=). Si el token vence, el video falla: se pide otro y se sigue en el
+  // mismo segundo. A lo más una vez cada 10 s, para no insistir si el problema es otro.
+  const [videoSrc, setVideoSrc] = useState(datos.videoUrl)
+  const ultimaRenovacion = useRef(0)
+  const reanudarEn = useRef(null)
   const raizRef = useRef(null)
   const cvMain = useRef(null)
   const cvLupa = useRef(null)
@@ -115,6 +120,23 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
       localStorage.setItem(BORRADOR, JSON.stringify({ L: b }))
     } catch { /* sin almacenamiento: el avance dura hasta salir */ }
   }, [BORRADOR, ESP])
+
+  async function renovarVideo() {
+    if (!datos.videoRuta || Date.now() - ultimaRenovacion.current < 10000) return
+    ultimaRenovacion.current = Date.now()
+    const momento = tRef.current
+    try {
+      const url = await urlDeVideo(clave, id, datos.videoRuta)
+      reanudarEn.current = momento
+      setVideoSrc(url)
+    } catch { /* sin permiso o sin video: la revisión sigue sin reproducción */ }
+  }
+
+  function alCargarVideo() {
+    if (reanudarEn.current == null || !videoRef.current) return
+    videoRef.current.currentTime = reanudarEn.current
+    reanudarEn.current = null
+  }
 
   // ── tiempo ────────────────────────────────────────────────────────────────
   const ir = useCallback((x) => {
@@ -417,8 +439,9 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
         <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 24 }}>
             <div className="rev-stage">
-              {datos.videoUrl
-                ? <video ref={videoRef} src={datos.videoUrl} preload="auto" muted playsInline aria-label={'Video de la tanda ' + datos.tanda} />
+              {videoSrc
+                ? <video ref={videoRef} src={videoSrc} preload="auto" muted playsInline aria-label={'Video de la tanda ' + datos.tanda}
+                    onError={renovarVideo} onLoadedMetadata={alCargarVideo} />
                 : (
                   <p style={{ position: 'absolute', zIndex: 2, left: 0, right: 0, top: '38%', margin: '0 auto', maxWidth: 520, padding: '10px 16px', textAlign: 'center', fontSize: 12.5, lineHeight: 1.55, color: 'var(--muted-2)', background: 'var(--color-bg)', border: '1px solid var(--color-divider)' }}>
                     {datos.videoDisponible === false

@@ -163,9 +163,9 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Borrador en el navegador, resumen antes de guardar y «Guardar correcciones»
 - [x] «Reiniciar el análisis» con confirmación, solo en esta pantalla (R-04, D-60)
 - [ ] Reproducir el video real con un token de video (decidido: la URL lleva `?vt=`, nunca el JWT de sesión). Hecho: la pantalla lee `videoUrl`. Falta lo siguiente
-  - [ ] Pedir `POST .../video-token` con el JWT por header antes de abrir la revisión y poner `?vt=` en el `<video>` [PROPUESTA]
-  - [ ] Si el video responde 401 o 403 por token vencido, pedir otro y seguir en el mismo segundo
-  - [ ] No escribir la URL del video con su token en consola ni en pantalla
+  - [x] Pedir `POST .../video-token` con el JWT por header antes de abrir la revisión y poner `?vt=` en el `<video>` [PROPUESTA]
+  - [x] Si el video responde 401 o 403 por token vencido, pedir otro y seguir en el mismo segundo
+  - [x] No escribir la URL del video con su token en consola ni en pantalla
   - [ ] Probar `Range` (adelantar y retroceder) con un `web.mp4` real
 - [x] Borrador guardado por cuenta, y «Cerrar sesión» borra los de la revisión
 - [x] Sin video (ya se borró) la revisión es de solo lectura: explica el motivo y quita «Guardar correcciones» y «Reiniciar el análisis»
