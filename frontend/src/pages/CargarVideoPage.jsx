@@ -1,24 +1,17 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
 import { getExperiment } from '../services/experiments'
-import { createGroup, uploadBatchVideo } from '../services/groups'
+import { sugerirGrupos, subirVideo } from '../services/groups'
 import { mensajeError, esCancelacion } from '../services/api'
 import { MAX_UPLOAD_MB } from '../services/config'
 import { useAsync } from '../hooks/useAsync'
 import { norm } from '../lib/fst'
 import { MUT60, btnLeft, mutedSub } from '../lib/estilos'
 
-const nextLetter = (arr) => (arr.length ? String.fromCharCode(arr[arr.length - 1].charCodeAt(0) + 1) : 'A')
-
-// Grupo del experimento → sugerencia del autocompletado.
-const sugerencia = (g) => ({
-  id: g.id,
-  nombre: g.nombre + ' · ' + g.tratamiento,
-  tipo: g.tipo,
-  cargadas: g.tandas.map((t) => t.letra),
-})
+// Texto de una sugerencia del autocompletado: grupo y tratamiento.
+const etiqueta = (g) => g.nombre + ' · ' + g.tratamiento
 
 // Resalta en la sugerencia la parte que coincide con lo escrito.
 function Hi({ label, q }) {
@@ -40,7 +33,8 @@ export default function CargarVideoPage() {
   const navigate = useNavigate()
   const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState(null)
+  const [elegido, setElegido] = useState(null) // sugerencia elegida (grupo existente)
+  const [sug, setSug] = useState({ q: '', lista: [] }) // sugerencias del servidor para q
   const [sugOpen, setSugOpen] = useState(false)
   const [activa, setActiva] = useState(-1) // sugerencia resaltada con el teclado
   const [tanda, setTanda] = useState('')
@@ -58,16 +52,33 @@ export default function CargarVideoPage() {
   const [over, setOver] = useState(false)
   const fileRef = useRef(null)
   const tandaRef = useRef(null)
+  const qt = q.trim()
+
+  // Sugerencias del servidor (GET .../groups?q=) mientras se escribe un grupo que no se ha
+  // elegido. Si no hay ninguna, es un grupo nuevo y su primera tanda es la A.
+  useEffect(() => {
+    if (!qt || elegido) return undefined
+    let vigente = true
+    sugerirGrupos(clave, qt).then(
+      (lista) => {
+        if (!vigente) return
+        setSug({ q: qt, lista })
+        setSugOpen(lista.length > 0)
+        setTanda(lista.length ? '' : 'A')
+      },
+      () => vigente && setSug({ q: qt, lista: [] }),
+    )
+    return () => { vigente = false }
+  }, [clave, qt, elegido])
 
   if (error) return <NoEncontrado />
   if (!exp) return <Cargando />
 
-  const grupos = exp.grupos.map(sugerencia)
-  const qt = q.trim()
-  const grupo = sel != null ? grupos.find((g) => g.id === sel) : null
-  const matches = qt ? grupos.filter((g) => norm(g.nombre).includes(norm(qt))) : []
-  const nuevo = !grupo && !!qt && matches.length === 0
-  const grupoNombre = grupo ? grupo.nombre : qt
+  const grupo = elegido
+  const respondido = !!qt && sug.q === qt
+  const matches = respondido && !grupo ? sug.lista : []
+  const nuevo = !grupo && respondido && sug.lista.length === 0
+  const grupoNombre = grupo ? etiqueta(grupo) : qt
   const showConfirm = (grupo || nuevo) && /^[A-Z]$/.test(tanda)
   const grupoOk = grupo || (nuevo && trat.trim())
   // Una tanda lleva un solo video por sesión: si ya tiene el de ese día, no se puede subir otro.
@@ -77,22 +88,20 @@ export default function CargarVideoPage() {
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
   function onGrupo(v) {
-    const t = v.trim()
-    const m = t ? grupos.filter((g) => norm(g.nombre).includes(norm(t))) : []
     setQ(v)
-    setSel(null)
-    setSugOpen(m.length > 0)
+    setElegido(null)
+    setSugOpen(false)
     setActiva(-1)
-    setTanda(t && m.length === 0 ? 'A' : '')
+    setTanda('')
     setConfirmada(false)
   }
 
   function pick(g) {
-    setSel(g.id)
-    setQ(g.nombre)
+    setElegido(g)
+    setQ(etiqueta(g))
     setSugOpen(false)
     setActiva(-1)
-    setTanda(nextLetter(g.cargadas))
+    setTanda(g.siguiente)
     setConfirmada(false)
   }
 
@@ -158,11 +167,10 @@ export default function CargarVideoPage() {
   }
 
   // ── guardar ───────────────────────────────────────────────────────────────
-  // Un grupo nuevo se crea antes de subir su primera tanda.
   // Deja el formulario listo para otra tanda (otro grupo o la siguiente letra).
   function otraTanda() {
     setQ('')
-    setSel(null)
+    setElegido(null)
     setSugOpen(false)
     setTanda('')
     setConfirmada(false)
@@ -180,15 +188,12 @@ export default function CargarVideoPage() {
     const control = new AbortController()
     subidaRef.current = control
     try {
-      let gid = grupo?.id
-      if (!gid) {
-        const g = await createGroup(clave, { nombre: qt, tipo, tratamiento: trat.trim() })
-        gid = g.id
-        setSel(gid)
-        setQ(sugerencia(g).nombre)
-      }
+      // Una sola llamada: el servidor crea el grupo y la tanda si no existen (§6.1).
       const dia = sesion === '1' ? 'DAY1' : 'DAY2'
-      await uploadBatchVideo(clave, gid, tanda, { file: archivo, dia, nCilindros: Number(cil), signal: control.signal }, setSubiendo)
+      await subirVideo(clave, {
+        grupo: grupo ? grupo.nombre : qt, nuevo: !grupo, tipo, tratamiento: trat.trim(),
+        letra: tanda, sesion: dia, nCilindros: tandaExistente ? undefined : Number(cil), file: archivo, signal: control.signal,
+      }, setSubiendo)
       // Día 2: a Progreso. Día 1: se guarda sin analizar y se vuelve al experimento (§9.3).
       const donde = grupoNombre + ' · Tanda ' + tanda
       if (dia === 'DAY2') navigate('/analisis?experimento=' + clave, { state: { aviso: 'Video almacenado. El análisis está en cola: ' + donde + ' · Día 2.' } })
@@ -238,16 +243,16 @@ export default function CargarVideoPage() {
                       <div key={g.nombre} id={'sug-' + i} role="option" aria-selected={i === activa}
                         className={'sug' + (i === activa ? ' active' : '')}
                         onMouseEnter={() => setActiva(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(g)}>
-                        <span className="nd" style={{ fontSize: 13 }}><Hi label={g.nombre} q={qt} /></span>
+                        <span className="nd" style={{ fontSize: 13 }}><Hi label={etiqueta(g)} q={qt} /></span>
                         <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
                         <div style={{ flex: 1 }} />
                         <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: MUT60 }}>
-                          tandas cargadas: {g.cargadas.join(', ') || '—'}
+                          tandas cargadas: {exp.grupos.find((x) => x.id === g.id)?.tandas.map((t) => t.letra).join(', ') || '—'}
                         </span>
                       </div>
                     ))}
                     </div>
-                    <div style={{ padding: '8px 12px', fontSize: 11.5, color: 'var(--muted)' }}>Solo se sugieren los {grupos.length} grupos de este experimento, nunca los de otros experimentos.</div>
+                    <div style={{ padding: '8px 12px', fontSize: 11.5, color: 'var(--muted)' }}>Solo se sugieren los {exp.grupos.length} grupos de este experimento, nunca los de otros experimentos.</div>
                   </div>
                 )}
               </div>
