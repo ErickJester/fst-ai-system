@@ -1,9 +1,12 @@
 import api from './api'
-import { USE_MOCKS } from './config'
+import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { NOTIFICACION } from '../lib/contrato'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('notificaciones')
 
 // Notificaciones con los campos de la guía: { idNotificacion, tipo, mensaje, leido,
 // fechaCreacion, idExperimento } (PARA_VANESA_API.md §3, decisión 5). tipo vale uno de los seis
