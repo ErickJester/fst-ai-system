@@ -21,14 +21,15 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
-- [ ] `.env.example` con todas las variables de §2. Hecho: DB, SMTP, `MAX_UPLOAD_MB`, disco y worker. Falta: `JWT_*`, `RESET_LINK_MINUTES` y `ADMIN_*`, que están comentadas, y `VIDEO_TOKEN_MINUTES` (120 por defecto), que es nueva
+- [x] `.env.example` con todas las variables de §2, más `VIDEO_TOKEN_MINUTES` (120). Las de autenticación y `ADMIN_*` el backend las lee desde la sección 2
 - [x] `application.properties` lee de variables de entorno lo que existe hoy (DB, SMTP, límite de subida)
 - [x] Endpoint `/health`
-- [ ] Swagger con todas las rutas. Hecho: `/experiments/**` y `/health`
+- [x] Swagger con todas las rutas: sin `paths-to-match`, springdoc documenta también las que se agreguen (verificado en `/v3/api-docs`)
 - [x] CORS para el frontend (`localhost:5173`)
 - [ ] Rutas guardadas en la BD relativas a la raíz del volumen, que en el contenedor es `/data/archivos` (§2). Todavía no se guarda ningún archivo
-- [ ] Límite de subida configurable, y `413` si se excede (§11.5). Hecho: las propiedades `multipart.max-*`. Falta el `413`
-- [ ] ffmpeg en el Dockerfile del backend (hace falta para §5)
+- [x] Límite de subida configurable, y `413` si se excede (§11.5): `ManejadorErrores` responde `{data: null, error, status: 413}`; probado con `MAX_UPLOAD_MB=1` y un archivo de 3 MB
+- [x] ffmpeg en el Dockerfile del backend (hace falta para §5); `ffprobe -version` corre en el contenedor
+- [ ] Puerto del backend: el `8080` choca en esta máquina con Traefik de CVAT (otro proyecto). Por decidir si compose publica en otro puerto, y avisarle a Vanesa
 
 ## 1. Base de datos
 - [x] SQL del Anexo B con los dominios cerrados, `UNIQUE` y llaves foráneas `NO ACTION` (§5), incluido `tipo_conducta`
@@ -50,7 +51,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [ ] `PATCH /users/me` (perfil)
 - [ ] Todo exige JWT salvo login y recover
 - [ ] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6)
-- [ ] Manejo de errores global con `@RestControllerAdvice` en lugar de mapas armados a mano. El mensaje va en el campo `error` del envoltorio, ya no en `mensaje`
+- [ ] Manejo de errores global con `@RestControllerAdvice` en lugar de mapas armados a mano. El mensaje va en el campo `error` del envoltorio, ya no en `mensaje`. Hecho: `ManejadorErrores`, solo con el `413`. Falta además que los errores por defecto de Spring (p. ej. `415`) no incluyan el `trace`
 - [ ] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7)
 
 ## 3. Administración (§6, R-07, R-16)

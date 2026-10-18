@@ -10,6 +10,8 @@ RUN mvn -q package -DskipTests
 # Etapa 2: solo el JRE y el jar, sin Maven ni el código fuente.
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+# ffprobe (viene con ffmpeg) valida que el video sea reproducible y horizontal al subirlo (sección 5).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
