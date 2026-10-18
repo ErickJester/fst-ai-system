@@ -4,7 +4,8 @@ Sale de `INSTRUCCIONES-WEB.md` (guía del proyecto TT 2026-B066), traducido de F
 orden de construcción de la sección 12 de la guía. Entre paréntesis va la sección o regla de origen.
 
 No cubre el frontend ni el SQL y Docker de los anexos. Las decisiones de integración con el frontend del 15-oct-2026
-están reflejadas abajo y explicadas en `PARA_VANESA_API.md` (rama `feat/frontend-v2-servicios`).
+están reflejadas abajo y explicadas en `PARA_VANESA_API.md` (rama `feat/frontend-v2-servicios`). Lo que Vanesa
+propuso después (18-oct-2026) está en la sección 12.
 
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
@@ -171,3 +172,24 @@ modelo de 12 tablas. No lo he revisado punto por punto contra esta lista.
 - [ ] Un reporte se regenera si hay un análisis más nuevo
 - [ ] Cuatro sesiones simultáneas responden en 3 s o menos
 - [ ] El resumen final anota los puntos [ABIERTO] que se resolvieron con el valor por defecto
+
+## 12. Decisiones por tomar con el frontend (18-oct-2026)
+Vanesa conectó el frontend a la guía de la API (`PARA_ERICK.md`, puntos 41 a 52, rama `feat/frontend-v2-servicios`).
+Lo que sigue son formas que la guía no define y que ella propone. Cada casilla se marca cuando se decide y el
+endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuesta y no se rompe.
+- [ ] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
+- [ ] `POST /experiments` responde `201` con `{idExperimento}`
+- [ ] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
+- [ ] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
+- [ ] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
+- [ ] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion` (`usuario` o `plazo`)
+- [ ] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
+- [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
+- [ ] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
+- [ ] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
+- [ ] `/results`: cada espécimen trae además `idGrupo`
+- [ ] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
+- [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
+- [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080)
+- [ ] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
+- [ ] `POST .../video-token` responde `{token}`; probar `Range` con un `web.mp4` real
