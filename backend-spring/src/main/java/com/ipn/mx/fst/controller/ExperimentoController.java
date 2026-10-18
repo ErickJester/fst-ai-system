@@ -13,7 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,8 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 // la guía (Respuesta). Las reglas viven en el servicio, que lanza ErrorApi, y ManejadorErrores convierte
 // cualquier error en el envoltorio; por eso aquí no hay try/catch ni BindingResult.
 // Las rutas son las de la guía (/experiments), que es el contrato con el frontend.
-// CORS: el frontend (React + Vite) corre en localhost:5173 en desarrollo.
-@CrossOrigin(origins = {"http://localhost:5173"})
+// CORS: ya no se declara aquí; con Spring Security va centralizado en SeguridadConfig. Todas las rutas piden
+// el token de sesión.
 @RestController
 @RequestMapping("/experiments")
 public class ExperimentoController {
@@ -71,10 +71,11 @@ public class ExperimentoController {
 	}
 
 	// Crea un experimento. @Valid revisa nombre y fecha (400 lo da ManejadorErrores); el servicio revisa el
-	// creador (404) y el nombre repetido (409). Responde 201 con el id nuevo, que es lo que pidió el frontend.
+	// nombre repetido (409). Responde 201 con el id nuevo, que es lo que pidió el frontend.
 	@PostMapping
-	public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody Experimento experimento) {
-		Experimento experimentoNuevo = experimentoService.crear(experimento);
+	public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody Experimento experimento, Authentication authentication) {
+		// El creador es el usuario del token (authentication.getName() es su idInstitucional).
+		Experimento experimentoNuevo = experimentoService.crear(experimento, authentication.getName());
 
 		// DEMOSTRACIÓN del servicio de correo: la guía no pide avisar al crear un experimento (solo define
 		// seis notificaciones, que dependen del worker). Se deja para probar el envío mientras tanto.
@@ -91,10 +92,11 @@ public class ExperimentoController {
 		return Respuesta.ok(experimentoService.actualizar(id, experimento), HttpStatus.OK);
 	}
 
-	// Elimina un experimento. Por ahora solo los que no tienen grupos (409 si los tiene, 404 si no existe).
+	// Elimina un experimento: solo su creador o un Administrador (403). Por ahora solo los que no tienen
+	// grupos (409 si los tiene, 404 si no existe).
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Map<String, Object>> delete(@PathVariable Integer id) {
-		experimentoService.eliminar(id);
+	public ResponseEntity<Map<String, Object>> delete(@PathVariable Integer id, Authentication authentication) {
+		experimentoService.eliminar(id, authentication);
 
 		// 204 "sin contenido": por estándar no lleva cuerpo, así que tampoco lleva envoltorio.
 		return ResponseEntity.noContent().build();

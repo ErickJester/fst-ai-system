@@ -12,6 +12,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -93,6 +95,19 @@ public class ManejadorErrores {
 	public ResponseEntity<Map<String, Object>> errorDeBase(DataAccessException e) {
 		log.error("Error de la base de datos", e);
 		return Respuesta.error("Error de la base de datos", HttpStatus.INTERNAL_SERVER_ERROR);
+	}
+
+	// Los filtros de seguridad responden solos (SeguridadConfig), pero una excepción de seguridad lanzada desde
+	// un controller o un servicio llegaría al catch-all de abajo y saldría como 500. Mismos textos que
+	// SeguridadConfig.
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<Map<String, Object>> sinPermiso(AccessDeniedException e) {
+		return Respuesta.error("No tienes permiso para esta acción", HttpStatus.FORBIDDEN);
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	public ResponseEntity<Map<String, Object>> sesionNoValida(AuthenticationException e) {
+		return Respuesta.error("Sesión no válida o vencida", HttpStatus.UNAUTHORIZED);
 	}
 
 	// Lo que ningún handler de arriba atrapó.
