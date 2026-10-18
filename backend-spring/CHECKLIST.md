@@ -29,7 +29,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [ ] Rutas guardadas en la BD relativas a la raíz del volumen, que en el contenedor es `/data/archivos` (§2). Todavía no se guarda ningún archivo
 - [x] Límite de subida configurable, y `413` si se excede (§11.5): `ManejadorErrores` responde `{data: null, error, status: 413}`; probado con `MAX_UPLOAD_MB=1` y un archivo de 3 MB
 - [x] ffmpeg en el Dockerfile del backend (hace falta para §5); `ffprobe -version` corre en el contenedor
-- [ ] Puerto del backend: el `8080` choca en esta máquina con Traefik de CVAT (otro proyecto). Por decidir si compose publica en otro puerto, y avisarle a Vanesa
+- [x] Puerto del backend `8084`, dentro y fuera de Docker: el `8080` lo ocupa Traefik de CVAT en esta máquina. Falta avisarle a Vanesa (`VITE_API_BASE=http://localhost:8084`)
 
 ## 1. Base de datos
 - [x] SQL del Anexo B con los dominios cerrados, `UNIQUE` y llaves foráneas `NO ACTION` (§5), incluido `tipo_conducta`

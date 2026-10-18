@@ -38,8 +38,8 @@ docker compose --profile dev up --build
 
 | Qué | Dónde |
 |---|---|
-| API | http://localhost:8080 |
-| Swagger | http://localhost:8080/documentacion/swagger-ui.html |
+| API | http://localhost:8084 |
+| Swagger | http://localhost:8084/documentacion/swagger-ui.html |
 | Correos de prueba (MailHog) | http://localhost:8025 |
 | PostgreSQL | `localhost:5433` (usuario y base `fst`) |
 
@@ -69,4 +69,4 @@ El PDF de un experimento sin análisis dice "Sin resultados". Para ver la tabla 
 docker compose exec -T db psql -U fst -d fst < db/pruebas/datos_prueba_pdf.sql
 ```
 
-Imprime el id del experimento de prueba; abre `http://localhost:8080/experiments/{id}/report/pdf`.
+Imprime el id del experimento de prueba; abre `http://localhost:8084/experiments/{id}/report/pdf`.

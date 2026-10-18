@@ -9,7 +9,7 @@
 --
 -- No se ejecuta solo (no esta en db/init). Se corre a mano:
 --   docker compose exec -T db psql -U fst -d fst < db/pruebas/datos_prueba_pdf.sql
--- y luego se abre http://localhost:8080/experiments/{id}/report/pdf con el id que imprime.
+-- y luego se abre http://localhost:8084/experiments/{id}/report/pdf con el id que imprime.
 --
 -- Ese experimento tiene un grupo, asi que DELETE /experiments/{id} responde 409 (es lo esperado).
 
