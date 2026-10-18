@@ -50,8 +50,8 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [ ] `POST /auth/reset`
 - [ ] `PATCH /users/me` (perfil)
 - [ ] Todo exige JWT salvo login y recover
-- [ ] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6)
-- [ ] Manejo de errores global con `@RestControllerAdvice` en lugar de mapas armados a mano. El mensaje va en el campo `error` del envoltorio, ya no en `mensaje`. Hecho: `ManejadorErrores`, solo con el `413`. Falta además que los errores por defecto de Spring (p. ej. `415`) no incluyan el `trace`
+- [ ] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6). Hecho: `Respuesta.ok/error` y todo `/experiments`. Falta `/health`, que responde `{"status":"ok"}` sin envoltorio
+- [x] Manejo de errores global con `@RestControllerAdvice` (`ManejadorErrores` + `ErrorApi`) en lugar de mapas armados a mano: 400, 404, 405, 409, 413, 415 y 500, con el mensaje en `error`, sin `trace` y sin la causa en los 500
 - [ ] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7)
 
 ## 3. Administración (§6, R-07, R-16)
@@ -179,7 +179,7 @@ Vanesa conectó el frontend a la guía de la API (`PARA_ERICK.md`, puntos 41 a 5
 Lo que sigue son formas que la guía no define y que ella propone. Cada casilla se marca cuando se decide y el
 endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuesta y no se rompe.
 - [ ] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
-- [ ] `POST /experiments` responde `201` con `{idExperimento}`
+- [x] `POST /experiments` responde `201` con `{idExperimento}`
 - [ ] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
 - [ ] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [ ] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
