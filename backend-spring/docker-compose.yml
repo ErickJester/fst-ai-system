@@ -43,7 +43,7 @@ services:
     volumes:
       - videos_reportes:/data/archivos
     ports:
-      - "8080:8080"
+      - "8084:8084"
 
   # Simulador del worker (../worker_fake, en Python). Cumple el contrato de la sección 4 de la guía con
   # datos inventados; el worker real (pipeline) lo reemplazará con la misma base y el mismo volumen.
