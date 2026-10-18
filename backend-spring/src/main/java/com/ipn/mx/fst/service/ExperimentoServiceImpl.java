@@ -39,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,16 +86,13 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// capturan después, al subir el primer video de cada uno (todavía no implementado).
 	@Override
 	@Transactional
-	public Experimento crear(Experimento experimento) {
-		// idInstitucional no lleva @NotBlank en la entidad (el PUT no lo pide), así que se revisa aquí.
-		// Se quitará cuando el creador salga del token.
-		if (experimento.getIdInstitucional() == null || experimento.getIdInstitucional().isBlank()) {
-			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El campo 'idInstitucional' no debe estar vacío");
-		}
+	public Experimento crear(Experimento experimento, String idCreador) {
+		// El creador es quien tiene la sesión abierta: se ignora el idInstitucional que venga en el cuerpo,
+		// para que nadie cree experimentos a nombre de otro.
+		experimento.setIdInstitucional(idCreador);
 
-		Usuario creador = usuarioRepository.findById(experimento.getIdInstitucional())
-				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND,
-						"El usuario " + experimento.getIdInstitucional() + " no existe"));
+		Usuario creador = usuarioRepository.findById(idCreador)
+				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND, "El usuario " + idCreador + " no existe"));
 
 		if (experimentoRepository.existsByNombre(experimento.getNombre())) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe un experimento con el nombre '" + experimento.getNombre() + "'");
@@ -142,8 +140,18 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// una sola transacción: si algo falla, no se borra nada.
 	@Override
 	@Transactional
-	public void eliminar(Integer id) {
-		buscar(id);
+	public void eliminar(Integer id, Authentication authentication) {
+		Experimento experimento = buscar(id);
+
+		// R-08: solo quien creó el experimento o un Administrador. Los permisos ya vienen en el Authentication
+		// (ConvertidorJwt los leyó de la base en esta petición), no hace falta otra consulta.
+		boolean esCreador = experimento.getIdInstitucional().equals(authentication.getName());
+		boolean esAdministrador = authentication.getAuthorities().stream()
+				.anyMatch(permiso -> permiso.getAuthority().equals("ROLE_ADMINISTRADOR"));
+		if (!esCreador && !esAdministrador) {
+			throw new ErrorApi(HttpStatus.FORBIDDEN,
+					"Solo quien creó el experimento o un Administrador puede eliminarlo");
+		}
 
 		if (grupoRepository.existsByExperimentoIdExperimento(id)) {
 			throw new ErrorApi(HttpStatus.CONFLICT,

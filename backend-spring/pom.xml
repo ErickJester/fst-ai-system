@@ -61,6 +61,17 @@
 			<version>5.5.13.3</version>
 		</dependency>
 
+		<!-- Seguridad: Spring Security y su soporte de JWT (Nimbus). No se usa jjwt porque arrastra Jackson 2 y
+		     Spring Boot 4 trae Jackson 3 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
+
 		<!-- Swagger: springdoc 3.x es la que corresponde a Spring Boot 4 -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

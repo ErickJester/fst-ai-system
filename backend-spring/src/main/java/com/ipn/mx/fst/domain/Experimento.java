@@ -40,8 +40,8 @@ public class Experimento implements Serializable {
 	@Column(name = "idexperimento")
 	private Integer idExperimento;
 
-	// Quién creó el experimento. Mientras no haya inicio de sesión llega en el cuerpo del POST; cuando lo
-	// haya, saldrá del token. No lleva @NotBlank porque el PUT no lo pide: el controlador lo revisa en el POST.
+	// Quién creó el experimento. Sale del token de sesión, no del cuerpo: si el POST trae otro valor, el
+	// servicio lo sobrescribe. No lleva @NotBlank porque el cliente no lo manda.
 	@Size(max = 10, message = "debe tener como máximo 10 caracteres")
 	@Column(name = "idinstitucional", length = 10, nullable = false)
 	private String idInstitucional;

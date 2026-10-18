@@ -38,21 +38,21 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] `ANALISIS.idVideo` único
 - [x] `rutaDiagnostico` solo se llena si `estado = 'error'` (`CHECK` en el SQL)
 - [ ] Cardinalidades validadas en el servicio, sin `CHECK` de conteo: tanda de 2 a 4 especímenes, grupo con 1 o más tandas, mínimo 2 especímenes por grupo (§5)
-- [ ] Contraseñas con bcrypt, nunca en texto plano. Hecho: la columna y `@JsonIgnore` para no exponerla
+- [x] Contraseñas con bcrypt, nunca en texto plano: `BCryptPasswordEncoder` en el login y en `AdminInicial`, y el hash con `@JsonIgnore`
 - [ ] Valores de dominio como enums de Java en lugar de `String` (opcional)
 
 ## 2. Autenticación
-- [ ] Spring Security con JWT de larga duración, configurable con `JWT_EXPIRES_HOURS` (§11.1)
-- [ ] `POST /auth/login` con error `401` genérico (R-01). La respuesta trae `token`, `rol`, `nombre` y `cambioRequerido`, y además `idInstitucional`, `apellidos` y `correo` (el frontend los necesita)
-- [ ] `POST /auth/logout`, sin lista de bloqueo
+- [x] Spring Security con JWT de larga duración, configurable con `JWT_EXPIRES_HOURS` (§11.1): Nimbus HS256 con `tipo = sesion`, token solo en la cabecera (en la URL o alterado da `401`), y `ConvertidorJwt` revisa en la base en cada petición si la cuenta sigue activa (desactivada da `401` aunque el token no haya vencido) y si es Administrador. No arranca con un `JWT_SECRET` de menos de 32 caracteres
+- [x] `POST /auth/login` con error `401` genérico (R-01), el mismo con contraseña mala, correo inexistente o cuenta inactiva. La respuesta trae `token`, `idInstitucional`, `nombre`, `apellidos`, `correo`, `rol` y `cambioRequerido`, sin el hash
+- [x] `POST /auth/logout`, sin lista de bloqueo: pide token (§6) y responde `200`
 - [ ] `PATCH /auth/password`, y el cambio es obligatorio si `cambioRequerido`
 - [ ] `POST /auth/recover` envía un enlace JWT firmado por correo, con vigencia `RESET_LINK_MINUTES`
 - [ ] `POST /auth/reset`
 - [ ] `PATCH /users/me` (perfil)
-- [ ] Todo exige JWT salvo login y recover
-- [ ] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6). Hecho: `Respuesta.ok/error` y todo `/experiments`. Falta `/health`, que responde `{"status":"ok"}` sin envoltorio
+- [x] Todo exige JWT salvo login, recover, reset, `/health` y Swagger: sin token se responde `401` con envoltorio; CORS centralizado y el preflight de `localhost:5173` pasa
+- [x] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6): `Respuesta.ok/error` en `/experiments` y `/health`, y `401`/`403` de Spring Security escritos con la misma forma
 - [x] Manejo de errores global con `@RestControllerAdvice` (`ManejadorErrores` + `ErrorApi`) en lugar de mapas armados a mano: 400, 404, 405, 409, 413, 415 y 500, con el mensaje en `error`, sin `trace` y sin la causa en los 500
-- [ ] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7)
+- [x] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7): `AdminInicial` al arrancar; idempotente (al reiniciar dice "ya existe" y no duplica), sin escribir la contraseña en el log; con `ADMIN_ID` vacío solo avisa
 
 ## 3. Administración (§6, R-07, R-16)
 - [ ] Verificación de rol Administrador en el backend en cada `/admin/*`, con `403` si no lo es
@@ -64,7 +64,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [ ] `GET /admin/system` con disco y cola
 
 ## 4. Experimentos
-- [ ] `POST /experiments` con nombre único y fecha. Hecho: `201`, `400`, `404`, `409` y `500`. Falta: el creador debe salir del JWT, no del cuerpo (`idInstitucional`)
+- [x] `POST /experiments` con nombre único y fecha: `201`, `400`, `404`, `409` y `500`; el creador sale del JWT y se ignora el `idInstitucional` del cuerpo
 - [ ] `GET /experiments` con filtros `estado`, `fecha` y `tratamiento`, paginado, con `nGrupos` y `avisoVencimiento`. Hecho: la lista completa con `nGrupos`. Falta además `creador: {idInstitucional, nombre, apellidos}` en cada experimento (el frontend lo usa para «Responsable» y para mostrar «Eliminar»)
 - [ ] `GET /experiments/{id}` con el árbol de grupos, tandas y videos. Hecho: el experimento sin hijos (falta `@OneToMany`). Cada video trae `subidoPor` (`idInstitucional`) y `videoDisponible`
 - [ ] El estado del experimento se calcula, no se guarda: `error` > `cancelado` > `en pausa` > `procesando` > `en cola` > `completado`, además de "sin videos" y "en espera del Día 2" (§4.8)
@@ -74,7 +74,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
   - [x] `404` si no existe y `409` si el nombre ya es de otro
 - [ ] `DELETE /experiments/{id}`: solo el creador o un Administrador (R-08)
   - [x] `404` si no existe
-  - [ ] `403` si es otro usuario
+  - [ ] `403` si es otro usuario. Hecho: implementado; se prueba en la sección 3, con una segunda cuenta
   - [ ] `409` si hay un análisis `procesando` o `en pausa`. Hecho: `409` si tiene grupos (temporal, hasta tener el borrado completo)
   - [ ] Los `en cola` salen de la cola
   - [ ] Borra de las hojas hacia arriba, en una transacción: `SEGUNDO`, `OBSERVACION`, `ANALISIS`, `VIDEO`, `ESPECIMEN`, `TANDA`, `GRUPO`, `REPORTE`, `NOTIFICACION`, `EXPERIMENTO`. Hecho: `REPORTE` y `NOTIFICACION`, en una transacción
