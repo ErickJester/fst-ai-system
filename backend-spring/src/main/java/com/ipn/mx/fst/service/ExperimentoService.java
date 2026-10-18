@@ -1,28 +1,26 @@
 package com.ipn.mx.fst.service;
 
 import com.ipn.mx.fst.domain.Experimento;
-import com.ipn.mx.fst.domain.Usuario;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 
-// Lo que el controlador puede pedirle a la capa de servicio sobre experimentos.
+// Lo que el controlador puede pedirle a la capa de servicio sobre experimentos. Las reglas de negocio viven
+// aquí: cuando una rechaza la petición, el servicio lanza ErrorApi con el código HTTP que corresponde.
 public interface ExperimentoService {
 
 	List<Experimento> findAll();
 
-	Experimento findById(Integer id);
+	// 404 si no existe.
+	Experimento buscar(Integer id);
 
-	Experimento save(Experimento experimento);
+	// 400 sin idInstitucional, 404 si el usuario no existe, 409 si el nombre ya existe.
+	Experimento crear(Experimento experimento);
 
-	// Borra el experimento junto con sus reportes y notificaciones.
-	void delete(Integer id);
+	// 404 si no existe, 409 si el nombre ya lo tiene otro experimento. El creador no cambia.
+	Experimento actualizar(Integer id, Experimento datos);
 
-	Usuario findUsuarioById(String idInstitucional);
-
-	// idExcluido: el experimento que se está editando (null al crear).
-	boolean existeNombre(String nombre, Integer idExcluido);
-
-	boolean tieneGrupos(Integer id);
+	// 404 si no existe, 409 si tiene grupos. Borra también sus reportes y notificaciones.
+	void eliminar(Integer id);
 
 	// Reporte de resultados en PDF, generado en memoria.
 	ByteArrayInputStream generarReporte(Integer idExperimento);

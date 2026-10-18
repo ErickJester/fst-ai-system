@@ -9,6 +9,7 @@ import com.ipn.mx.fst.repository.NotificacionRepository;
 import com.ipn.mx.fst.repository.ReporteRepository;
 import com.ipn.mx.fst.repository.SegundoRepository;
 import com.ipn.mx.fst.repository.UsuarioRepository;
+import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
 import com.itextpdf.text.Document;
@@ -35,7 +36,9 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,46 +76,83 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public Experimento findById(Integer id) {
-		return experimentoRepository.findById(id).orElse(null);
+	public Experimento buscar(Integer id) {
+		return experimentoRepository.findById(id)
+				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + id + " no existe"));
 	}
 
+	// Crea un experimento: solo nombre (único), fecha y notas opcionales, más el creador. Los grupos se
+	// capturan después, al subir el primer video de cada uno (todavía no implementado).
 	@Override
 	@Transactional
-	public Experimento save(Experimento experimento) {
-		return experimentoRepository.save(experimento);
+	public Experimento crear(Experimento experimento) {
+		// idInstitucional no lleva @NotBlank en la entidad (el PUT no lo pide), así que se revisa aquí.
+		// Se quitará cuando el creador salga del token.
+		if (experimento.getIdInstitucional() == null || experimento.getIdInstitucional().isBlank()) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El campo 'idInstitucional' no debe estar vacío");
+		}
+
+		Usuario creador = usuarioRepository.findById(experimento.getIdInstitucional())
+				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND,
+						"El usuario " + experimento.getIdInstitucional() + " no existe"));
+
+		if (experimentoRepository.existsByNombre(experimento.getNombre())) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe un experimento con el nombre '" + experimento.getNombre() + "'");
+		}
+
+		// El id lo asigna PostgreSQL; si el JSON trae uno, se ignora para que siempre sea un INSERT.
+		experimento.setIdExperimento(null);
+		// La columna se escribe con idInstitucional; este campo (insertable = false) solo deja a mano al
+		// creador ya cargado para que el controller lea su correo sin otra consulta.
+		experimento.setUsuario(creador);
+
+		try {
+			return experimentoRepository.saveAndFlush(experimento);
+		} catch (DataIntegrityViolationException e) {
+			// Por si otro usuario guardó el mismo nombre justo entre la revisión de arriba y este INSERT.
+			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe un experimento con el nombre '" + experimento.getNombre() + "'");
+		}
 	}
 
+	// Actualiza nombre, fecha y notas. El creador no cambia aunque venga otro en el JSON.
+	@Override
+	@Transactional
+	public Experimento actualizar(Integer id, Experimento datos) {
+		Experimento actual = buscar(id);
+
+		if (experimentoRepository.existsByNombreAndIdExperimentoNot(datos.getNombre(), id)) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe otro experimento con el nombre '" + datos.getNombre() + "'");
+		}
+
+		actual.setNombre(datos.getNombre());
+		actual.setFecha(datos.getFecha());
+		actual.setNotas(datos.getNotas());
+
+		try {
+			return experimentoRepository.saveAndFlush(actual);
+		} catch (DataIntegrityViolationException e) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe otro experimento con el nombre '" + datos.getNombre() + "'");
+		}
+	}
+
+	// Por ahora solo se borran los experimentos sin grupos: borrar grupos, tandas, videos y resultados (de las
+	// hojas hacia arriba) llega con la carga de video.
 	// Todas las llaves foráneas son ON DELETE NO ACTION: la base no borra en cascada. Por eso primero se
 	// borra lo que cuelga del experimento (reportes y notificaciones) y al final el experimento, todo en
 	// una sola transacción: si algo falla, no se borra nada.
 	@Override
 	@Transactional
-	public void delete(Integer id) {
+	public void eliminar(Integer id) {
+		buscar(id);
+
+		if (grupoRepository.existsByExperimentoIdExperimento(id)) {
+			throw new ErrorApi(HttpStatus.CONFLICT,
+					"El experimento " + id + " tiene grupos y todavía no se puede eliminar");
+		}
+
 		reporteRepository.deleteByExperimentoIdExperimento(id);
 		notificacionRepository.deleteByExperimentoIdExperimento(id);
 		experimentoRepository.deleteById(id);
-	}
-
-	@Override
-	@Transactional(readOnly = true)
-	public Usuario findUsuarioById(String idInstitucional) {
-		return usuarioRepository.findById(idInstitucional).orElse(null);
-	}
-
-	@Override
-	@Transactional(readOnly = true)
-	public boolean existeNombre(String nombre, Integer idExcluido) {
-		if (idExcluido == null) {
-			return experimentoRepository.existsByNombre(nombre);
-		}
-		return experimentoRepository.existsByNombreAndIdExperimentoNot(nombre, idExcluido);
-	}
-
-	@Override
-	@Transactional(readOnly = true)
-	public boolean tieneGrupos(Integer id) {
-		return grupoRepository.existsByExperimentoIdExperimento(id);
 	}
 
 	// Reporte de resultados con iText 5, igual que generarReporte de la práctica: se arma en memoria y se
@@ -165,8 +205,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 			documento.close();
 		} catch (DocumentException e) {
-			// A diferencia de la práctica (que imprimía el error y devolvía el PDF a medias), aquí se avisa
-			// al controlador para que responda 500.
+			// A diferencia de la práctica (que imprimía el error y devolvía el PDF a medias), aquí la excepción
+			// sube hasta ManejadorErrores, que responde 500.
 			log.error("No se pudo generar el PDF del experimento {}: {}", idExperimento, e.getMessage());
 			throw new IllegalStateException("No se pudo generar el PDF", e);
 		}
