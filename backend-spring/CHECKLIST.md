@@ -152,6 +152,12 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 ## 10. `worker_fake` y tareas programadas
 El `worker_fake` está en `../worker_fake` y es Python, no Spring. Ya escribe `OBSERVACION` y `SEGUNDO` con el
 modelo de 12 tablas. No lo he revisado punto por punto contra esta lista.
+Desde el 18-oct hay además un **worker real** (`../worker`, servicio `worker` del compose; `worker_fake` quedó en el
+perfil `fake`). Usa el modelo `fst_cnn_seg.pt` con el código de `fst_auto` copiado sin cambios en `../pipeline`.
+Probado con `AcuBN1.MOV`: completado, 4 × 300 segundos en `SEGUNDO`, `web.mp4`, `cajas.json`, PDF y notificación,
+y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo (100 %),
+pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
+nace al medir los fotogramas, antes de la red). No hace la pausa de R-15.
 - [ ] Toma un análisis a la vez, el más antiguo primero
 - [ ] Caso exitoso: pasa por las etapas, escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación
 - [ ] Caso de error con la palabra `falla`: PDF de diagnóstico, estado `error` y notificación
