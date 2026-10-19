@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, enHoraLocal } from './fst'
 
 describe('estadísticos y formato', () => {
   it('media y varianza muestral (n − 1), como en Resultados', () => {
@@ -17,6 +17,14 @@ describe('estadísticos y formato', () => {
 })
 
 describe('fechas', () => {
+  it('una fecha con hora y zona del backend se lee en la hora local', () => {
+    process.env.TZ = 'America/Mexico_City'
+    expect(fechaCorta('2026-10-19T19:22:13.854102Z')).toBe('19 oct 2026')
+    expect(enHoraLocal('2026-10-20T03:00:00Z')).toBe('2026-10-19T21:00') // en México todavía es el 19
+    expect(enHoraLocal('2026-02-24T15:02:00')).toBe('2026-02-24T15:02:00') // sin zona, igual
+    expect(fechaCorta('2026-02-18')).toBe('18 feb 2026')
+  })
+
   it('fecha corta sin depender de la zona horaria', () => {
     expect(fechaCorta('2026-02-18')).toBe('18 feb 2026')
     expect(fechaCorta('2025-12-01')).toBe('1 dic 2025')
