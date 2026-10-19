@@ -10,7 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 // Mientras la cuenta tenga cambioRequerido (contraseña temporal, guía sección 7), la sesión solo sirve para
-// cambiar la contraseña o cerrar sesión; todo lo demás responde 403. ConvertidorJwt marca esa situación con
+// cambiar la contraseña o cerrar sesión; todo lo demás responde 401 (ver el porqué abajo). ConvertidorJwt marca esa situación con
 // la authority CAMBIO_PENDIENTE, que se lee de la base en cada petición: en cuanto la contraseña cambia, el
 // mismo token deja de estar bloqueado, sin pedir uno nuevo.
 // No es @Component a propósito: Spring Boot registraría además un segundo filtro fuera de la cadena de
@@ -27,7 +27,13 @@ public class FiltroCambioPendiente extends OncePerRequestFilter {
 				.anyMatch(permiso -> permiso.getAuthority().equals(AUTHORITY));
 
 		if (pendiente && !permitida(peticion)) {
-			SeguridadConfig.escribir(respuesta, 403, "Debes cambiar tu contraseña antes de continuar");
+			// 401 y NO 403, a propósito. El interceptor del frontend (services/api.js) manda cada 403 a
+			// /experimentos con window.location.href: si el navegador guardó un token de una cuenta que
+			// volvió a tener contraseña temporal, GET /experiments y /notifications dan 403, la página
+			// recarga /experimentos, vuelve a dar 403 y así en un ciclo sin fin. Con 401 el interceptor
+			// borra el token y lleva al login; al entrar de nuevo, la respuesta del login trae
+			// cambioRequerido: true y el frontend lleva a /primer-acceso. Este 401 obliga a volver a entrar.
+			SeguridadConfig.escribir(respuesta, 401, "Debes cambiar tu contraseña antes de continuar");
 			return;
 		}
 		cadena.doFilter(peticion, respuesta);
