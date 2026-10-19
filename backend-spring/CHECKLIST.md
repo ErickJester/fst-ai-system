@@ -26,7 +26,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] Endpoint `/health`
 - [x] Swagger con todas las rutas: sin `paths-to-match`, springdoc documenta también las que se agreguen (verificado en `/v3/api-docs`)
 - [x] CORS para el frontend (`localhost:5173`)
-- [ ] Rutas guardadas en la BD relativas a la raíz del volumen, que en el contenedor es `/data/archivos` (§2). Todavía no se guarda ningún archivo
+- [x] Rutas guardadas en la BD relativas a la raíz del volumen, que en el contenedor es `/data/archivos` (§2): `videos/{idVideo}.{ext}`
 - [x] Límite de subida configurable, y `413` si se excede (§11.5): `ManejadorErrores` responde `{data: null, error, status: 413}`; probado con `MAX_UPLOAD_MB=1` y un archivo de 3 MB
 - [x] ffmpeg en el Dockerfile del backend (hace falta para §5); `ffprobe -version` corre en el contenedor
 - [x] Puerto del backend `8084`, dentro y fuera de Docker: el `8080` lo ocupa Traefik de CVAT en esta máquina. Falta avisarle a Vanesa (`VITE_API_BASE=http://localhost:8084`)
@@ -82,17 +82,17 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
 
 ## 5. Carga de video (§4.1, R-02, R-03, R-09)
-- [ ] `POST /experiments/{id}/groups/{grupo}/videos` en `multipart/form-data`
-- [ ] Extensión `.mp4` o `.mov` revisada en el servidor
-- [ ] Reproducible y en horizontal, validado con ffprobe, y `422` con mensaje claro si falla
-- [ ] `409` si la tanda ya tiene un video de esa sesión
-- [ ] Crea el grupo si es nuevo, con `tipo` y `tratamiento`
-- [ ] Crea la tanda si es nueva, con `nCilindros` de 2 a 4 y `ordinal`
-- [ ] Crea los especímenes
-- [ ] Guarda el archivo en `videos/{idVideo}.{ext}`
-- [ ] Solo el Día 2 crea `ANALISIS` con `estado='en cola'`, `etapa='preprocesamiento'`, `nivelClasif='preciso'` y `fechaAnalisis=ahora` (D-79)
-- [ ] El Día 1 se guarda sin análisis
-- [ ] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
+- [x] `POST /experiments/{id}/groups/{grupo}/videos` en `multipart/form-data` (probado hasta con 940 MB: unos 2 min, sin cargar el archivo en memoria)
+- [x] Extensión `.mp4` o `.mov` revisada en el servidor
+- [x] Reproducible y en horizontal, validado con ffprobe (con la marca de giro), y `422` con mensaje claro si falla
+- [x] `409` si la tanda ya tiene un video de esa sesión
+- [x] Crea el grupo si es nuevo, con `tipo` y `tratamiento`
+- [x] Crea la tanda si es nueva, con `nCilindros` de 2 a 4 y `ordinal`
+- [x] Crea los especímenes
+- [x] Guarda el archivo en `videos/{idVideo}.{ext}`; un rechazo o una falla no deja archivos ni filas
+- [x] Solo el Día 2 crea `ANALISIS` con `estado='en cola'`, `etapa='preprocesamiento'`, `nivelClasif='preciso'` y `fechaAnalisis=ahora` (D-79), y el worker real lo toma solo
+- [x] El Día 1 se guarda sin análisis
+- [x] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
@@ -174,7 +174,7 @@ nace al medir los fotogramas, antes de la red). No hace la pausa de R-15.
 - [ ] `docker compose up` arranca en una máquina limpia, y en una segunda máquina
 - [ ] Un investigador recibe `403` en `/admin/*`
 - [ ] No se puede quitar al último Administrador
-- [ ] Un Día 1 se guarda sin análisis
+- [x] Un Día 1 se guarda sin análisis
 - [ ] Con dos análisis en cola, el worker los procesa uno a la vez
 - [ ] Un reporte se regenera si hay un análisis más nuevo
 - [ ] Cuatro sesiones simultáneas responden en 3 s o menos
@@ -193,7 +193,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [ ] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
-- [ ] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
+- [x] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
 - [ ] `/results`: cada espécimen trae además `idGrupo`
 - [ ] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
 - [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`

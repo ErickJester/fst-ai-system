@@ -36,6 +36,7 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
+      ARCHIVOS_DIR: /data/archivos
       SMTP_HOST: ${SMTP_HOST:-mailhog}
     depends_on:
       db:

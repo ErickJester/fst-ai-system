@@ -4,6 +4,7 @@ import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.ipn.mx.fst.utilerias.Respuesta;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,6 +62,13 @@ public class ManejadorErrores {
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<Map<String, Object>> parametroInvalido(MethodArgumentTypeMismatchException e) {
 		return Respuesta.error("El parámetro '" + e.getName() + "' no tiene un valor válido", HttpStatus.BAD_REQUEST);
+	}
+
+	// Un parámetro de la URL (o del formulario) con bytes que no son UTF-8, por ejemplo ?q=s%E1lina: Tomcat
+	// lo rechaza y, sin este handler, saldría como 500. Es un error del cliente.
+	@ExceptionHandler(InvalidParameterException.class)
+	public ResponseEntity<Map<String, Object>> codificacionInvalida(InvalidParameterException e) {
+		return Respuesta.error("Parámetro con codificación no válida", HttpStatus.BAD_REQUEST);
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)
