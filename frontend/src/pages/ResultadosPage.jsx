@@ -6,7 +6,7 @@ import { getBatchResults, getGroupComparison, getBlocks, getReporte } from '../s
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, fechaCorta, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -32,7 +32,7 @@ const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
 // El espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
 const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
 const nombreGrupo = (g) => (g.tipo === 'CONTROL' ? 'Grupo control' : 'Grupo ' + g.nombre[0].toLowerCase() + g.nombre.slice(1))
-const hora = (iso) => iso.slice(11, 16)
+const hora = (iso) => enHoraLocal(iso).slice(11, 16)
 
 function estadisticos(duracion) {
   return [
