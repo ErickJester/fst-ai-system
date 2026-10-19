@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -106,13 +107,17 @@ public class SeguridadConfig {
 						.accessDeniedHandler((peticion, respuesta, e) -> escribir(respuesta, 403, "No tienes permiso para esta acción")))
 				.exceptionHandling(errores -> errores
 						.authenticationEntryPoint((peticion, respuesta, e) -> escribir(respuesta, 401, "Sesión no válida o vencida"))
-						.accessDeniedHandler((peticion, respuesta, e) -> escribir(respuesta, 403, "No tienes permiso para esta acción")));
+						.accessDeniedHandler((peticion, respuesta, e) -> escribir(respuesta, 403, "No tienes permiso para esta acción")))
+				// Debe ir después de la autenticación del token: necesita saber quién es y si le falta cambiar
+				// la contraseña.
+				.addFilterAfter(new FiltroCambioPendiente(), BearerTokenAuthenticationFilter.class);
 		return http.build();
 	}
 
 	// Los filtros de seguridad actúan antes que los controllers, así que ManejadorErrores no los ve. El texto
 	// es fijo, por eso el envoltorio {data, error, status} se escribe a mano.
-	private void escribir(HttpServletResponse respuesta, int codigo, String mensaje) throws IOException {
+	// static y sin private: también lo usa FiltroCambioPendiente.
+	static void escribir(HttpServletResponse respuesta, int codigo, String mensaje) throws IOException {
 		respuesta.setStatus(codigo);
 		respuesta.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
 		respuesta.getWriter().write("{\"data\":null,\"error\":\"" + mensaje + "\",\"status\":" + codigo + "}");
