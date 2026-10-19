@@ -1,0 +1,27 @@
+package com.ipn.mx.fst.service;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+// Progreso y resultados de un experimento para las pantallas (secciones 6.1 y 7 de la guía). Todo es de
+// lectura y cualquier usuario autenticado puede verlo (R-07). Todos lanzan 404 si el experimento no existe.
+public interface ResultadosService {
+
+	// {"analisis": [...]}: todos los análisis del experimento, también los completados, con su avance.
+	Map<String, Object> estado(Integer idExperimento);
+
+	// {"especimenes": [...]}: los especímenes con análisis completado y los totales de cada conducta.
+	Map<String, Object> resultados(Integer idExperimento);
+
+	// Lo mismo que resultados y, en cada espécimen, los segundos de cada conducta por minuto.
+	Map<String, Object> resultadosPorMinuto(Integer idExperimento);
+
+	// Un renglón por grupo con el promedio y la desviación estándar de cada conducta (guía 7).
+	List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento);
+
+	// Ruta del PDF de diagnóstico de un análisis en error. 404 si el análisis no es de ese experimento, no
+	// está en error o el archivo no existe.
+	Path diagnostico(Integer idExperimento, Integer idAnalisis);
+
+}

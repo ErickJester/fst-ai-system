@@ -96,7 +96,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
-- [ ] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
+- [x] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
 - [ ] Pausa:
   - [ ] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`
   - [ ] `GET .../pause/image`
@@ -110,12 +110,12 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
   - [ ] En una transacción: borra `OBSERVACION` y `SEGUNDO`, borra los reportes y deja `en cola` con los valores de arranque
   - [ ] `409` en `error`, `en pausa`, `cancelado` o en curso
   - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo), porque reiniciar vuelve a correr el análisis sobre el video
-- [ ] `GET .../diagnostic` entrega el PDF de diagnóstico
+- [x] `GET .../diagnostic` entrega el PDF de diagnóstico
 
 ## 7. Resultados y revisión
-- [ ] `GET .../results`, con totales y porcentaje por conducta y la bandera `revisado`
-- [ ] `GET .../results/byminute`. Hecho: la consulta `SegundoRepository.buscarResultados` ya cuenta segundos por minuto y conducta
-- [ ] `GET .../results/groups`, con promedio (no suma), datos faltantes y aviso si mezcla `preciso` y `agrupado`
+- [x] `GET .../results`, con totales y porcentaje por conducta y la bandera `revisado`
+- [x] `GET .../results/byminute`: cada espécimen con sus minutos (las cuatro conductas siempre), desde `SEGUNDO`
+- [x] `GET .../results/groups`, con promedio (no suma), datos faltantes y aviso si mezcla `preciso` y `agrupado`
 - [ ] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12)
 - [x] Los totales se calculan desde `SEGUNDO`, nunca se guardan (D-52)
 - [ ] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos
@@ -187,15 +187,15 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
 - [x] `POST /experiments` responde `201` con `{idExperimento}`
 - [x] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
-- [ ] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
-- [ ] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
-- [ ] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion` (`usuario` o `plazo`)
-- [ ] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
+- [x] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
+- [x] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
+- [ ] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion` (`usuario` o `plazo`). Hecho: `pausa.desdeSegundo`. Falta `motivoCancelacion`, que no se guarda en ningún lado (sale `null`)
+- [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
 - [x] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
-- [ ] `/results`: cada espécimen trae además `idGrupo`
-- [ ] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
+- [x] `/results`: cada espécimen trae además `idGrupo`
+- [x] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
 - [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
 - [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080)
 - [ ] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
