@@ -3,11 +3,15 @@ package com.ipn.mx.fst.service;
 import com.ipn.mx.fst.domain.Experimento;
 import com.ipn.mx.fst.domain.Usuario;
 import com.ipn.mx.fst.repository.ExperimentoRepository;
+import com.ipn.mx.fst.repository.FilaExperimento;
+import com.ipn.mx.fst.repository.FilaGrupo;
 import com.ipn.mx.fst.repository.FilaResultado;
+import com.ipn.mx.fst.repository.FilaTandaVideo;
 import com.ipn.mx.fst.repository.GrupoRepository;
 import com.ipn.mx.fst.repository.NotificacionRepository;
 import com.ipn.mx.fst.repository.ReporteRepository;
 import com.ipn.mx.fst.repository.SegundoRepository;
+import com.ipn.mx.fst.repository.TandaRepository;
 import com.ipn.mx.fst.repository.UsuarioRepository;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.itextpdf.text.BaseColor;
@@ -26,18 +30,25 @@ import com.itextpdf.text.pdf.PdfWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.text.Normalizer;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -50,6 +61,14 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// Las cuatro conductas en el orden de las columnas del reporte (sección 7 de la guía).
 	private static final String[] CONDUCTAS = {"nado activo", "escalamiento", "inmovilidad", "conducta activa"};
+
+	private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
+	private static final int POR_PAGINA = 20;
+	// R-05: el video se borra 30 días después de un análisis completado; con 7 días o menos la lista avisa.
+	private static final int DIAS_RETENCION = 30;
+	private static final int DIAS_AVISO = 7;
+	// Estados de un análisis de mayor a menor precedencia, para el estado del experimento (guía 4.8).
+	private static final List<String> PRECEDENCIA = List.of("error", "cancelado", "en pausa", "procesando", "en cola", "completado");
 
 	@Autowired
 	private ExperimentoRepository experimentoRepository;
@@ -69,10 +88,233 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Autowired
 	private SegundoRepository segundoRepository;
 
+	@Autowired
+	private TandaRepository tandaRepository;
+
+	// --- Lista y detalle: la forma de la guía 6.1, armada con consultas agregadas (proyecciones Fila*) y
+	// mapas, no con la entidad Experimento (sus relaciones LAZY no se pueden serializar). ---
+
 	@Override
 	@Transactional(readOnly = true)
-	public List<Experimento> findAll() {
-		return experimentoRepository.findAll(Sort.by("idExperimento"));
+	public Map<String, Object> listar(int pagina) {
+		if (pagina < 1) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'pagina' no tiene un valor válido");
+		}
+
+		List<FilaExperimento> filas = experimentoRepository.buscarPagina(POR_PAGINA, (long) (pagina - 1) * POR_PAGINA);
+		List<Map<String, Object>> items = new ArrayList<>();
+		if (!filas.isEmpty()) {
+			// Una consulta de grupos y otra de tandas con videos para TODA la página, no una por experimento.
+			List<Integer> ids = filas.stream().map(FilaExperimento::getIdExperimento).toList();
+			Map<Integer, List<FilaGrupo>> gruposDe = grupoRepository.buscarGrupos(ids).stream()
+					.collect(Collectors.groupingBy(FilaGrupo::getIdExperimento));
+			Map<Integer, List<FilaTandaVideo>> tandasDe = tandaRepository.buscarTandasYVideos(ids).stream()
+					.collect(Collectors.groupingBy(FilaTandaVideo::getIdExperimento));
+			for (FilaExperimento fila : filas) {
+				items.add(itemDeLista(fila, gruposDe.getOrDefault(fila.getIdExperimento(), List.of()),
+						tandasDe.getOrDefault(fila.getIdExperimento(), List.of())));
+			}
+		}
+
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("pagina", pagina);
+		datos.put("total", experimentoRepository.count());
+		datos.put("items", items);
+		return datos;
+	}
+
+	private Map<String, Object> itemDeLista(FilaExperimento fila, List<FilaGrupo> grupos, List<FilaTandaVideo> filas) {
+		Set<Integer> tandas = new HashSet<>();
+		Set<Integer> tandasConDia2 = new HashSet<>();
+		Set<Integer> tandasAnalizadas = new HashSet<>();
+		int especimenes = 0;
+		boolean videosBorrados = false;
+		Integer diasRetencion = null;
+		for (FilaTandaVideo f : filas) {
+			// La consulta trae una fila por video; la tanda se cuenta una sola vez.
+			if (tandas.add(f.getIdTanda())) {
+				especimenes += f.getCilindros().intValue();
+			}
+			if (f.getIdVideo() == null) {
+				continue;
+			}
+			if (!f.getVideoDisponible()) {
+				videosBorrados = true;
+			}
+			boolean dia2 = "Dia 2".equals(f.getSesion());
+			boolean completado = "completado".equals(f.getEstadoAnalisis());
+			if (dia2) {
+				tandasConDia2.add(f.getIdTanda());
+				if (completado) {
+					tandasAnalizadas.add(f.getIdTanda());
+				}
+			}
+			// R-05: el video se borra 30 días después de un análisis completado. Solo cuentan los videos que
+			// todavía existen; el experimento muestra el que está más cerca de borrarse.
+			if (completado && f.getVideoDisponible()) {
+				int restantes = Math.max(0, DIAS_RETENCION - f.getDiasDesdeAnalisis().intValue());
+				diasRetencion = diasRetencion == null ? restantes : Math.min(diasRetencion, restantes);
+			}
+		}
+
+		Map<String, Object> videosDia2 = new LinkedHashMap<>();
+		videosDia2.put("analizados", tandasAnalizadas.size());
+		videosDia2.put("cargados", tandasConDia2.size());
+		videosDia2.put("total", tandas.size());
+
+		Map<String, String> avisoVencimiento = null;
+		if (diasRetencion != null && diasRetencion <= DIAS_AVISO) {
+			avisoVencimiento = Map.of("fechaBorrado", LocalDate.now(ZONA).plusDays(diasRetencion).toString());
+		}
+
+		Map<String, Object> item = new LinkedHashMap<>();
+		item.put("idExperimento", fila.getIdExperimento());
+		item.put("nombre", fila.getNombre());
+		item.put("fecha", fila.getFecha());
+		item.put("notas", fila.getNotas());
+		item.put("nGrupos", grupos.size());
+		item.put("estado", calcularEstado(filas));
+		item.put("avisoVencimiento", avisoVencimiento);
+		item.put("creador", creador(fila));
+		item.put("nEspecimenes", especimenes);
+		item.put("tratamientos", grupos.stream().map(FilaGrupo::getTratamiento).distinct()
+				.sorted(String.CASE_INSENSITIVE_ORDER).toList());
+		item.put("videosDia2", videosDia2);
+		item.put("diasRetencion", diasRetencion);
+		item.put("videosBorrados", videosBorrados);
+		return item;
+	}
+
+	// El estado del experimento no se guarda: se calcula (guía 4.8). Este es el ÚNICO lugar que lo decide, y
+	// lo usan la lista y el detalle. Sin videos: "sin videos". Con videos pero sin ningún análisis (solo Día 1):
+	// "en espera del Día 2". Con análisis: el de mayor precedencia entre todos los suyos.
+	private String calcularEstado(List<FilaTandaVideo> filas) {
+		boolean hayVideos = false;
+		Set<String> estados = new HashSet<>();
+		for (FilaTandaVideo f : filas) {
+			if (f.getIdVideo() == null) {
+				continue;
+			}
+			hayVideos = true;
+			if (f.getIdAnalisis() != null) {
+				estados.add(f.getEstadoAnalisis());
+			}
+		}
+		if (!hayVideos) {
+			return "sin videos";
+		}
+		if (estados.isEmpty()) {
+			return "en espera del Día 2";
+		}
+		for (String estado : PRECEDENCIA) {
+			if (estados.contains(estado)) {
+				return estado;
+			}
+		}
+		return estados.iterator().next();
+	}
+
+	private Map<String, Object> creador(FilaExperimento fila) {
+		Map<String, Object> creador = new LinkedHashMap<>();
+		creador.put("idInstitucional", fila.getCreadorId());
+		creador.put("nombre", fila.getCreadorNombre());
+		creador.put("apellidos", fila.getCreadorApellidos());
+		return creador;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Map<String, Object> detalle(Integer id) {
+		FilaExperimento fila = experimentoRepository.buscarFila(id)
+				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + id + " no existe"));
+		List<FilaGrupo> grupos = grupoRepository.buscarGrupos(List.of(id));
+		List<FilaTandaVideo> filas = tandaRepository.buscarTandasYVideos(List.of(id));
+
+		// Las tandas de cada grupo y los videos de cada tanda, en el orden en que llegan (ya ordenados por
+		// la consulta: tandas por ordinal, 'Dia 1' antes que 'Dia 2'). Una tanda sin video llega en una
+		// sola fila con el video en null.
+		Map<Integer, List<Map<String, Object>>> tandasDe = new HashMap<>();
+		Map<Integer, List<Map<String, Object>>> videosDe = new HashMap<>();
+		for (FilaTandaVideo f : filas) {
+			List<Map<String, Object>> videos = videosDe.get(f.getIdTanda());
+			if (videos == null) {
+				videos = new ArrayList<>();
+				videosDe.put(f.getIdTanda(), videos);
+				Map<String, Object> tanda = new LinkedHashMap<>();
+				tanda.put("idTanda", f.getIdTanda());
+				tanda.put("ordinal", f.getOrdinal().intValue());
+				tanda.put("letra", String.valueOf((char) ('A' + f.getOrdinal().intValue() - 1)));
+				tanda.put("nCilindros", f.getCilindros().intValue());
+				tanda.put("videos", videos);
+				tandasDe.computeIfAbsent(f.getIdGrupo(), k -> new ArrayList<>()).add(tanda);
+			}
+			if (f.getIdVideo() != null) {
+				Map<String, Object> video = new LinkedHashMap<>();
+				video.put("idVideo", f.getIdVideo());
+				video.put("sesion", f.getSesion());
+				video.put("duracion", f.getDuracion());
+				video.put("fecha", f.getFecha());
+				video.put("videoDisponible", f.getVideoDisponible());
+				video.put("idAnalisis", f.getIdAnalisis());
+				// Limitación conocida: la tabla VIDEO no guarda quién subió el video, así que se usa al
+				// creador del experimento. Cuando varios investigadores suban videos al mismo experimento,
+				// habrá que guardarlo (una columna idinstitucional en VIDEO).
+				video.put("subidoPor", fila.getCreadorId());
+				videos.add(video);
+			}
+		}
+
+		List<Map<String, Object>> arbol = new ArrayList<>();
+		for (FilaGrupo g : grupos) {
+			Map<String, Object> grupo = new LinkedHashMap<>();
+			grupo.put("idGrupo", g.getIdGrupo());
+			grupo.put("etiqueta", g.getEtiqueta());
+			grupo.put("tipo", g.getTipo());
+			grupo.put("tratamiento", g.getTratamiento());
+			grupo.put("tandas", tandasDe.getOrDefault(g.getIdGrupo(), List.of()));
+			arbol.add(grupo);
+		}
+
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("idExperimento", fila.getIdExperimento());
+		datos.put("nombre", fila.getNombre());
+		datos.put("fecha", fila.getFecha());
+		datos.put("notas", fila.getNotas() == null ? "" : fila.getNotas());
+		datos.put("estado", calcularEstado(filas));
+		datos.put("creador", creador(fila));
+		datos.put("grupos", arbol);
+		return datos;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Map<String, Object>> buscarGrupos(Integer id, String q) {
+		if (!experimentoRepository.existsById(id)) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + id + " no existe");
+		}
+		String buscado = sinAcentos(q == null ? "" : q.trim());
+
+		List<Map<String, Object>> resultado = new ArrayList<>();
+		for (FilaGrupo g : grupoRepository.buscarGrupos(List.of(id))) {
+			// Se busca en el mismo texto que ve el usuario: "etiqueta · tratamiento". Con q vacío entran todos.
+			if (!sinAcentos(g.getEtiqueta() + " · " + g.getTratamiento()).contains(buscado)) {
+				continue;
+			}
+			Map<String, Object> grupo = new LinkedHashMap<>();
+			grupo.put("idGrupo", g.getIdGrupo());
+			grupo.put("etiqueta", g.getEtiqueta());
+			grupo.put("tipo", g.getTipo());
+			grupo.put("tratamiento", g.getTratamiento());
+			grupo.put("siguienteOrdinal", g.getSiguienteOrdinal().intValue());
+			resultado.add(grupo);
+		}
+		return resultado;
+	}
+
+	// Minúsculas y sin acentos, en Java (java.text.Normalizer) y no con una extensión de PostgreSQL:
+	// NFD separa cada letra de su acento y \p{M} borra los acentos.
+	private static String sinAcentos(String texto) {
+		return Normalizer.normalize(texto, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
 	}
 
 	@Override
