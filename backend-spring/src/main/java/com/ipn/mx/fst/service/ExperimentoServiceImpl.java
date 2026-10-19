@@ -333,8 +333,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		// para que nadie cree experimentos a nombre de otro.
 		experimento.setIdInstitucional(idCreador);
 
-		Usuario creador = usuarioRepository.findById(idCreador)
-				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND, "El usuario " + idCreador + " no existe"));
+		if (!usuarioRepository.existsById(idCreador)) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El usuario " + idCreador + " no existe");
+		}
 
 		if (experimentoRepository.existsByNombre(experimento.getNombre())) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe un experimento con el nombre '" + experimento.getNombre() + "'");
@@ -342,9 +343,6 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 		// El id lo asigna PostgreSQL; si el JSON trae uno, se ignora para que siempre sea un INSERT.
 		experimento.setIdExperimento(null);
-		// La columna se escribe con idInstitucional; este campo (insertable = false) solo deja a mano al
-		// creador ya cargado para que el controller lea su correo sin otra consulta.
-		experimento.setUsuario(creador);
 
 		try {
 			return experimentoRepository.saveAndFlush(experimento);

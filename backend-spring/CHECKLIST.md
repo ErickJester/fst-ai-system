@@ -144,10 +144,10 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 ## 9. Notificaciones y correo (§11.2)
 - [x] `EmailService` genérico (destinatario, asunto, texto)
 - [x] Si el correo falla, no se detiene la operación
-- [ ] `GET /notifications` y `PATCH /notifications/{id}` para marcar como leída. Cada notificación trae `tipo`, `mensaje`, `leido`, `fechaCreacion` e `idExperimento`; el frontend arma el título y el enlace
-- [ ] Solo las 6 notificaciones del dominio
+- [x] `GET /notifications` y `PATCH /notifications/{id}` para marcar como leída. Cada notificación trae `tipo`, `mensaje`, `leido`, `fechaCreacion` e `idExperimento`; el frontend arma el título y el enlace
+- [x] Solo las 6 notificaciones del dominio: las crea solo el worker; el backend no agrega otras
 - [ ] Cada notificación se envía también por correo
-- [ ] Quitar el correo de demostración al crear un experimento, que no está en la guía
+- [x] Quitar el correo de demostración al crear un experimento, que no está en la guía
 
 ## 10. `worker_fake` y tareas programadas
 El `worker_fake` está en `../worker_fake` y es Python, no Spring. Ya escribe `OBSERVACION` y `SEGUNDO` con el
@@ -198,5 +198,5 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
 - [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
 - [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080)
-- [ ] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
+- [x] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
 - [ ] `POST .../video-token` responde `{token}`; probar `Range` con un `web.mp4` real
