@@ -45,10 +45,10 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] Spring Security con JWT de larga duración, configurable con `JWT_EXPIRES_HOURS` (§11.1): Nimbus HS256 con `tipo = sesion`, token solo en la cabecera (en la URL o alterado da `401`), y `ConvertidorJwt` revisa en la base en cada petición si la cuenta sigue activa (desactivada da `401` aunque el token no haya vencido) y si es Administrador. No arranca con un `JWT_SECRET` de menos de 32 caracteres
 - [x] `POST /auth/login` con error `401` genérico (R-01), el mismo con contraseña mala, correo inexistente o cuenta inactiva. La respuesta trae `token`, `idInstitucional`, `nombre`, `apellidos`, `correo`, `rol` y `cambioRequerido`, sin el hash
 - [x] `POST /auth/logout`, sin lista de bloqueo: pide token (§6) y responde `200`
-- [ ] `PATCH /auth/password`, y el cambio es obligatorio si `cambioRequerido`
+- [x] `PATCH /auth/password`, y el cambio es obligatorio si `cambioRequerido`: mientras no la cambie, todo salvo esta ruta y el logout responde `403`; mínimo 8 caracteres y máximo 72 bytes (límite de bcrypt)
 - [ ] `POST /auth/recover` envía un enlace JWT firmado por correo, con vigencia `RESET_LINK_MINUTES`
 - [ ] `POST /auth/reset`
-- [ ] `PATCH /users/me` (perfil)
+- [x] `PATCH /users/me` (perfil): nombre, apellidos y correo, `409` si el correo es de otra cuenta
 - [x] Todo exige JWT salvo login, recover, reset, `/health` y Swagger: sin token se responde `401` con envoltorio; CORS centralizado y el preflight de `localhost:5173` pasa
 - [x] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6): `Respuesta.ok/error` en `/experiments` y `/health`, y `401`/`403` de Spring Security escritos con la misma forma
 - [x] Manejo de errores global con `@RestControllerAdvice` (`ManejadorErrores` + `ErrorApi`) en lugar de mapas armados a mano: 400, 404, 405, 409, 413, 415 y 500, con el mensaje en `error`, sin `trace` y sin la causa en los 500
@@ -184,7 +184,7 @@ nace al medir los fotogramas, antes de la red). No hace la pausa de R-15.
 Vanesa conectó el frontend a la guía de la API (`PARA_ERICK.md`, puntos 41 a 52, rama `feat/frontend-v2-servicios`).
 Lo que sigue son formas que la guía no define y que ella propone. Cada casilla se marca cuando se decide y el
 endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuesta y no se rompe.
-- [ ] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
+- [x] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
 - [x] `POST /experiments` responde `201` con `{idExperimento}`
 - [ ] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
 - [ ] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`

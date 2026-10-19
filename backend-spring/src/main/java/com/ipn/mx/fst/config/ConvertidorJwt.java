@@ -3,6 +3,7 @@ package com.ipn.mx.fst.config;
 import com.ipn.mx.fst.domain.Usuario;
 import com.ipn.mx.fst.repository.AdministradorRepository;
 import com.ipn.mx.fst.repository.UsuarioRepository;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.convert.converter.Converter;
@@ -39,7 +40,12 @@ public class ConvertidorJwt implements Converter<Jwt, AbstractAuthenticationToke
 		}
 
 		String rol = administradorRepository.existsById(id) ? "ROLE_ADMINISTRADOR" : "ROLE_INVESTIGADOR";
-		List<GrantedAuthority> permisos = List.of(new SimpleGrantedAuthority(rol));
+		List<GrantedAuthority> permisos = new ArrayList<>();
+		permisos.add(new SimpleGrantedAuthority(rol));
+		// Contraseña temporal: FiltroCambioPendiente bloquea todo menos cambiarla (guía sección 7).
+		if (usuario.getCambioRequerido()) {
+			permisos.add(new SimpleGrantedAuthority(FiltroCambioPendiente.AUTHORITY));
+		}
 
 		// El tercer argumento es el nombre: así authentication.getName() es el idInstitucional.
 		return new JwtAuthenticationToken(jwt, permisos, id);

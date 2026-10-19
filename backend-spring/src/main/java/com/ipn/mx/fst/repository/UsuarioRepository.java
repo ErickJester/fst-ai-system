@@ -12,4 +12,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, String> {
 
 	boolean existsByCorreoIgnoreCase(String correo);
 
+	// ¿Otra cuenta (no la de idInstitucional) usa ya este correo? Para cambiar el propio correo.
+	boolean existsByCorreoIgnoreCaseAndIdInstitucionalNot(String correo, String idInstitucional);
+
 }
