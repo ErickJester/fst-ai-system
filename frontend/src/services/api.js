@@ -24,17 +24,22 @@ api.interceptors.response.use(
     return res
   },
   (err) => {
+    // Ninguna redirección se repite si ya se está en el destino: asignar window.location.href recarga la
+    // página, y si esa pantalla vuelve a pedir lo mismo y vuelve a fallar, el navegador recarga sin fin
+    // (ciclo de recargas visto el 19-oct con un token viejo en /experimentos).
     // Sesión vencida o inválida: se borra y se vuelve al login con aviso. El 401 del
     // propio login (contraseña incorrecta) lo muestra la pantalla de login.
     const conSesion = !!localStorage.getItem(TOKEN_KEY)
     if (err.response?.status === 401 && conSesion && !err.config?.url?.startsWith('/auth/login')) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('fst.user')
-      sessionStorage.setItem(AVISO_KEY, 'sesion-caducada')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/login') {
+        sessionStorage.setItem(AVISO_KEY, 'sesion-caducada')
+        window.location.href = '/login'
+      }
     }
     // Sin permiso para esa sección (por ejemplo, /admin sin ser administrador).
-    if (err.response?.status === 403 && conSesion) {
+    if (err.response?.status === 403 && conSesion && window.location.pathname !== '/experimentos') {
       sessionStorage.setItem(AVISO_KEY, 'sin-permiso')
       window.location.href = '/experimentos'
     }
