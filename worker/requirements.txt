@@ -1,0 +1,12 @@
+# torch y torchvision NO van aquí: se instalan aparte, de la rueda de CPU (ver el Dockerfile).
+#
+# El pipeline de fst_auto (pipeline/) pide, como mínimo, numpy 2, opencv, pandas y scikit-learn 1.9.
+opencv-python-headless
+numpy>=2.0
+pandas>=2.0
+# fst_cnn.py la importa al cargar (GroupKFold), aunque aquí solo se predice
+scikit-learn>=1.9,<1.10
+# worker_fake: conexión a la base y PDF de diagnóstico
+psycopg2-binary
+pillow
+tzdata

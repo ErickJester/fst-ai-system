@@ -1,0 +1,20 @@
+# Ignorados al construir worker/Dockerfile (el contexto es la raíz del repositorio). Este archivo solo
+# vale para ese Dockerfile; no afecta a los demás builds.
+.git
+.claude
+**/__pycache__
+**/*.pyc
+**/node_modules
+frontend
+backend
+backend-spring
+poc-backend-java
+mockup
+tools
+data
+modelos
+C:
+*.mp4
+*.mov
+*.MOV
+*.pt

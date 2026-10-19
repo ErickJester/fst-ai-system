@@ -45,9 +45,36 @@ services:
     ports:
       - "8084:8084"
 
-  # Simulador del worker (../worker_fake, en Python). Cumple el contrato de la sección 4 de la guía con
-  # datos inventados; el worker real (pipeline) lo reemplazará con la misma base y el mismo volumen.
+  # Worker REAL (../worker): analiza los videos con el modelo de fst_auto (../pipeline) y guarda los
+  # resultados en la misma base y el mismo volumen que el simulador. El contexto del build es la raíz del
+  # repositorio, porque la imagen reutiliza el código de ../worker_fake y copia ../pipeline. El modelo
+  # (fst_cnn_seg.pt) NO va en la imagen ni en git: está en ../modelos y se monta de solo lectura.
   worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      ARCHIVOS_DIR: /data/archivos
+      MODELO_CNN: /data/modelos/fst_cnn_seg.pt
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - videos_reportes:/data/archivos
+      - ../modelos:/data/modelos:ro
+
+  # Simulador del worker (../worker_fake, en Python). Cumple el contrato de la sección 4 de la guía con
+  # datos inventados, sin analizar ningún video. Solo con el perfil fake (--profile fake). NO levantar este
+  # y el worker real a la vez: los dos toman análisis de la misma cola y se los quitarían uno al otro.
+  worker-fake:
+    profiles: ["fake"]
     build: ../worker_fake
     restart: unless-stopped
     env_file:
@@ -57,14 +84,12 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       ARCHIVOS_DIR: /data/archivos
-      MODELOS_DIR: /data/modelos
       SMTP_HOST: ${SMTP_HOST:-mailhog}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - videos_reportes:/data/archivos
-      - modelos:/data/modelos:ro
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -76,4 +101,3 @@ services:
 volumes:
   pgdata:
   videos_reportes:   # videos, copias para revisión, pausas y diagnósticos; compartido backend y worker
-  modelos:           # modelos entrenados, solo lectura para el worker (el worker_fake no los usa)

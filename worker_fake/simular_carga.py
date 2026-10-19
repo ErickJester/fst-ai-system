@@ -1,7 +1,7 @@
 """Hace lo que hará el backend cuando existan la carga de video y la pantalla de pausa (secciones 4.1
 y 4.3 de la guía, todavía sin construir en backend-spring), para poder probar el worker_fake.
 
-  python simular_carga.py encolar "Prueba normal" [--cilindros 3] [--duracion 316] [--sesion "Dia 1"]
+  python simular_carga.py encolar "Prueba normal" [--cilindros 3] [--duracion 316] [--sesion "Dia 1"] [--video RUTA]
   python simular_carga.py ajustar ID_ANALISIS
   python simular_carga.py cancelar ID_ANALISIS
   python simular_carga.py estado
@@ -9,18 +9,46 @@ y 4.3 de la guía, todavía sin construir en backend-spring), para poder probar 
 Dentro de Docker: docker compose exec worker python simular_carga.py ...
 "encolar" crea un experimento con ese nombre (con "falla" o "pausa" en el nombre se prueban esos
 casos), un grupo, una tanda con sus especímenes, el video y, si es del Día 2, su análisis en cola.
+Con --video RUTA el video no es texto falso sino ese archivo real (para probar el worker real); si
+hay ffprobe, la duración sale del propio video y --duracion se ignora.
 """
 
 import argparse
 import json
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import psycopg2
 
 from comun import ARCHIVOS, ahora, carpeta_analisis, conectar
 
 
+def duracion_real(ruta):
+    """Segundos del video según ffprobe; None si ffprobe no está instalado o no puede leer el archivo."""
+    if not shutil.which("ffprobe"):
+        return None
+    try:
+        salida = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(ruta)],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout.strip()
+        return round(float(salida), 2)
+    except (subprocess.SubprocessError, ValueError):
+        return None
+
+
 def encolar(conn, args):
+    origen = Path(args.video) if args.video else None
+    duracion = args.duracion
+    if origen is not None:
+        if not origen.is_file():
+            print(f"No existe el video {args.video}")
+            return 1
+        # Si ffprobe no puede leerlo (por ejemplo, un archivo dañado a propósito), queda --duracion.
+        duracion = duracion_real(origen) or duracion
+
     with conn.cursor() as cur:
         try:
             cur.execute(
@@ -49,12 +77,17 @@ def encolar(conn, args):
         # Igual que el backend (sección 4.1): primero el archivo en videos/{idVideo}.mp4, luego la fila.
         cur.execute(
             "INSERT INTO video (idtanda, sesion, duracion) VALUES (%s, %s, %s) RETURNING idvideo",
-            (id_tanda, args.sesion, args.duracion),
+            (id_tanda, args.sesion, duracion),
         )
         id_video = cur.fetchone()[0]
-        ruta = f"videos/{id_video}.mp4"
+        # Un video real conserva su extensión (.mp4 o .mov); el simulado es siempre .mp4.
+        extension = origen.suffix.lower() if origen else ".mp4"
+        ruta = f"videos/{id_video}{extension}"
         (ARCHIVOS / "videos").mkdir(parents=True, exist_ok=True)
-        (ARCHIVOS / ruta).write_bytes(b"video simulado por simular_carga.py\n")
+        if origen:
+            shutil.copyfile(origen, ARCHIVOS / ruta)
+        else:
+            (ARCHIVOS / ruta).write_bytes(b"video simulado por simular_carga.py\n")
         cur.execute("UPDATE video SET archivo = %s WHERE idvideo = %s", (ruta, id_video))
 
         id_analisis = None
@@ -64,7 +97,7 @@ def encolar(conn, args):
             cur.execute("INSERT INTO analisis (idvideo) VALUES (%s) RETURNING idanalisis", (id_video,))
             id_analisis = cur.fetchone()[0]
     conn.commit()
-    print(f"experimento {id_experimento}, video {id_video} ({args.sesion}), "
+    print(f"experimento {id_experimento}, video {id_video} ({args.sesion}, {duracion} s, {ruta}), "
           + (f"análisis {id_analisis} en cola" if id_analisis else "sin análisis (el Día 1 no se analiza)"))
     return 0
 
@@ -142,6 +175,7 @@ def main():
     p.add_argument("--duracion", type=float, default=316, help="segundos del video (por defecto 316)")
     p.add_argument("--sesion", default="Dia 2", choices=["Dia 1", "Dia 2"])
     p.add_argument("--usuario", default="DEV0000001", help="idInstitucional del creador")
+    p.add_argument("--video", default=None, help="ruta de un video real, en lugar del texto falso")
     p.set_defaults(funcion=encolar)
 
     for nombre, funcion in (("ajustar", ajustar), ("cancelar", cancelar)):
