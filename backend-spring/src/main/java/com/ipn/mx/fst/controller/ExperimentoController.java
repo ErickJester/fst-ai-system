@@ -3,7 +3,6 @@ package com.ipn.mx.fst.controller;
 import com.ipn.mx.fst.domain.Experimento;
 import com.ipn.mx.fst.service.ExperimentoService;
 import com.ipn.mx.fst.utilerias.Respuesta;
-import com.ipn.mx.fst.utilerias.service.EmailService;
 import jakarta.validation.Valid;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
@@ -37,9 +36,6 @@ public class ExperimentoController {
 
 	@Autowired
 	private ExperimentoService experimentoService;
-
-	@Autowired
-	private EmailService emailService;
 
 	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
 	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400.
@@ -87,13 +83,6 @@ public class ExperimentoController {
 	public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody Experimento experimento, Authentication authentication) {
 		// El creador es el usuario del token (authentication.getName() es su idInstitucional).
 		Experimento experimentoNuevo = experimentoService.crear(experimento, authentication.getName());
-
-		// DEMOSTRACIÓN del servicio de correo: la guía no pide avisar al crear un experimento (solo define
-		// seis notificaciones, que dependen del worker). Se deja para probar el envío mientras tanto.
-		emailService.enviarCorreo(experimentoNuevo.getUsuario().getCorreo(), "Experimento creado",
-				"Se creó el experimento " + experimentoNuevo.getNombre()
-						+ " con fecha " + experimentoNuevo.getFecha() + ".");
-
 		return Respuesta.ok(Map.of("idExperimento", experimentoNuevo.getIdExperimento()), HttpStatus.CREATED);
 	}
 
