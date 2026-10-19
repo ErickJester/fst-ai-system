@@ -365,7 +365,7 @@ def marcar_error_imprevisto(conn, id_analisis, error):
 #  Bucle principal
 # ---------------------------------------------------------------------------
 
-def vuelta(conn):
+def vuelta(conn, procesar_analisis):
     revisar_pausas(conn)
     tareas_programadas.correr_si_toca(conn)
     if not hay_en_cola(conn):
@@ -376,7 +376,7 @@ def vuelta(conn):
     if id_analisis is None:
         return
     try:
-        procesar(conn, id_analisis)
+        procesar_analisis(conn, id_analisis)
     except psycopg2.OperationalError:
         raise
     except Exception as e:  # noqa: BLE001 - D-88: ningún fallo del pipeline tumba al worker
@@ -385,7 +385,9 @@ def vuelta(conn):
         marcar_error_imprevisto(conn, id_analisis, e)
 
 
-def main():
+def main(procesar_analisis=procesar):
+    """procesar_analisis es lo único que cambia entre el simulador y el worker real (worker/worker.py):
+    la cola, las pausas, las tareas diarias y la reconexión son las mismas, así que no se duplican."""
     configurar_log()
     log.info("worker_fake: cola cada %s s, etapas de %s s, tareas diarias a las %s h, pausa de %s min",
              POLL_SECONDS, STAGE_SECONDS, DAILY_HOUR, PAUSE_TIMEOUT_MINUTES)
@@ -398,7 +400,7 @@ def main():
                 if arrancando:
                     reencolar_huerfanos(conn)
                     arrancando = False
-            vuelta(conn)
+            vuelta(conn, procesar_analisis)
         except psycopg2.OperationalError as e:
             log.error("Sin conexión a la base (%s); reintento en 5 s", e)
             try:

@@ -15,6 +15,9 @@ CLAUDE.md
 # restos locales de la herramienta de etiquetado (ahora en su propio repo)
 /tools/
 
+# modelos entrenados (fst_cnn_seg.pt pesa ~125 MB): se copian a mano desde fst_auto, ver pipeline/README.md
+/modelos/
+
 # frontend: dependencias (se reinstalan con npm install) y salida del build
 node_modules/
 /frontend/dist/
