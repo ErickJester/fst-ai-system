@@ -65,10 +65,10 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 
 ## 4. Experimentos
 - [x] `POST /experiments` con nombre único y fecha: `201`, `400`, `404`, `409` y `500`; el creador sale del JWT y se ignora el `idInstitucional` del cuerpo
-- [ ] `GET /experiments` con filtros `estado`, `fecha` y `tratamiento`, paginado, con `nGrupos` y `avisoVencimiento`. Hecho: la lista completa con `nGrupos`. Falta además `creador: {idInstitucional, nombre, apellidos}` en cada experimento (el frontend lo usa para «Responsable» y para mostrar «Eliminar»)
-- [ ] `GET /experiments/{id}` con el árbol de grupos, tandas y videos. Hecho: el experimento sin hijos (falta `@OneToMany`). Cada video trae `subidoPor` (`idInstitucional`) y `videoDisponible`
-- [ ] El estado del experimento se calcula, no se guarda: `error` > `cancelado` > `en pausa` > `procesando` > `en cola` > `completado`, además de "sin videos" y "en espera del Día 2" (§4.8)
-- [ ] `GET /experiments/{id}/groups?q=` sugiere grupos y la siguiente tanda
+- [ ] `GET /experiments` con filtros `estado`, `fecha` y `tratamiento`, paginado, con `nGrupos` y `avisoVencimiento`. Hecho: `{pagina, total, items}` de 20 en 20, con `nGrupos`, `avisoVencimiento`, `creador` y los campos de la sección 12, en 4 consultas por página. Falta: los filtros en el servidor (hoy el frontend filtra en el navegador)
+- [x] `GET /experiments/{id}` con el árbol de grupos, tandas y videos; cada video trae `fecha`, `videoDisponible`, `idAnalisis` y `subidoPor`. Limitación: `VIDEO` no guarda quién lo subió, así que `subidoPor` es el creador del experimento
+- [x] El estado del experimento se calcula, no se guarda: `error` > `cancelado` > `en pausa` > `procesando` > `en cola` > `completado`, además de "sin videos" y "en espera del Día 2" (§4.8)
+- [x] `GET /experiments/{id}/groups?q=` sugiere grupos y la siguiente tanda (sin distinguir mayúsculas ni acentos)
 - [x] `PUT /experiments/{id}` con `404` y `409` por nombre repetido
   - [x] Nombre, fecha y notas; el creador no cambia
   - [x] `404` si no existe y `409` si el nombre ya es de otro
@@ -186,13 +186,13 @@ Lo que sigue son formas que la guía no define y que ella propone. Cada casilla 
 endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuesta y no se rompe.
 - [x] `PATCH /auth/password` y `PATCH /users/me`: cuerpo `{contrasenaActual, contrasenaNueva}` y `{nombre, apellidos, correo}`; ambos devuelven la cuenta como el login, sin `token`
 - [x] `POST /experiments` responde `201` con `{idExperimento}`
-- [ ] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
+- [x] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
 - [ ] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [ ] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
 - [ ] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion` (`usuario` o `plazo`)
 - [ ] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
-- [ ] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
+- [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
 - [ ] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
 - [ ] `/results`: cada espécimen trae además `idGrupo`
 - [ ] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`

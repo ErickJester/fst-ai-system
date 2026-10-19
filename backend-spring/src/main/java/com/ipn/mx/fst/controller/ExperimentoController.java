@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // CRUD de experimentos, con la misma estructura que EventoController de la práctica, pero sin los mapas
@@ -40,10 +41,11 @@ public class ExperimentoController {
 	@Autowired
 	private EmailService emailService;
 
-	// Lista todos los experimentos. Todos los investigadores ven los de todos (R-07).
+	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
+	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400.
 	@GetMapping
-	public ResponseEntity<Map<String, Object>> readAll() {
-		return Respuesta.ok(experimentoService.findAll(), HttpStatus.OK);
+	public ResponseEntity<Map<String, Object>> readAll(@RequestParam(defaultValue = "1") int pagina) {
+		return Respuesta.ok(experimentoService.listar(pagina), HttpStatus.OK);
 	}
 
 	// Reporte de resultados en PDF (sección 8 de la guía). Es de las pocas respuestas que no llevan el
@@ -65,9 +67,18 @@ public class ExperimentoController {
 				.body(new InputStreamResource(pdf));
 	}
 
+	// Detalle con el árbol de grupos, tandas y videos (guía 6.1).
 	@GetMapping("/{id}")
 	public ResponseEntity<Map<String, Object>> read(@PathVariable Integer id) {
-		return Respuesta.ok(experimentoService.buscar(id), HttpStatus.OK);
+		return Respuesta.ok(experimentoService.detalle(id), HttpStatus.OK);
+	}
+
+	// Grupos del experimento para el autocompletado al subir un video: q filtra por "etiqueta · tratamiento"
+	// sin distinguir mayúsculas ni acentos, y cada grupo trae el ordinal de su siguiente tanda.
+	@GetMapping("/{id}/groups")
+	public ResponseEntity<Map<String, Object>> groups(@PathVariable Integer id,
+			@RequestParam(required = false) String q) {
+		return Respuesta.ok(experimentoService.buscarGrupos(id, q), HttpStatus.OK);
 	}
 
 	// Crea un experimento. @Valid revisa nombre y fecha (400 lo da ManejadorErrores); el servicio revisa el

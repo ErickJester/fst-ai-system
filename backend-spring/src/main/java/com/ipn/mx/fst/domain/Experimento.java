@@ -25,7 +25,9 @@ import lombok.ToString;
 import org.hibernate.annotations.Formula;
 
 // Tabla experimento. Igual que el Evento de la práctica, esta clase es a la vez la tabla y el JSON que
-// entra y sale de la API: {"idExperimento", "idInstitucional", "nombre", "fecha", "notas", "nGrupos"}.
+// entra y sale de la API en el POST y el PUT: {"idExperimento", "idInstitucional", "nombre", "fecha",
+// "notas", "nGrupos"}. La lista y el detalle (GET /experiments y /experiments/{id}) ya NO salen de esta
+// entidad: ExperimentoServiceImpl los arma con consultas agregadas, con la forma que lee el frontend.
 @Data
 @NoArgsConstructor
 @Entity
