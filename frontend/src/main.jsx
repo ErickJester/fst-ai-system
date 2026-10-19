@@ -5,6 +5,10 @@ import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 
 // Sistema de diseño de los mockups v2 (Modernist + capa FST) y piezas por pantalla.
+// Fuente Archivo incluida en la app (antes venía de Google Fonts).
+import '@fontsource/archivo/400.css'
+import '@fontsource/archivo/600.css'
+import '@fontsource/archivo/800.css'
 import './styles/modernist.css'
 import './styles/fst.css'
 import './styles/app.css'

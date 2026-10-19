@@ -1,5 +1,5 @@
 /* Modernist — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
+/* Archivo (400, 600, 800) viene con la app desde @fontsource/archivo (ver main.jsx): no depende de internet. */
 
 :root {
   --color-bg: #f3f2f2;
@@ -122,7 +122,7 @@ figcaption {
   border-radius: var(--radius-md);
 }
 .btn svg { display: block; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
 .btn-primary { background: var(--color-accent); color: var(--color-bg); }
 .btn-primary:hover { background: var(--color-accent-600); }
 .btn-primary:active { background: var(--color-accent-700); }

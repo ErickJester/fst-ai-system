@@ -1,0 +1,155 @@
+import api from './api'
+import { usaEjemplo } from './config'
+import { reply, fail } from './mocks/delay'
+import * as db from './mocks/data'
+import { resumir } from './mocks/resumen'
+import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
+import { segundosDe, totalesDe, cajasDe } from './mocks/segundos'
+import { CONDUCTA_BD, DE_BD } from '../lib/fst'
+import { getExperiment } from './experiments'
+
+// Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
+const USE_MOCKS = usaEjemplo('revision')
+
+// Revisión segundo a segundo (R-14, §9.7). Las formas siguen §6.1 del documento: camelCase
+// y las conductas con su nombre de la base ('nado activo', … o null).
+
+// Tanda de un análisis, con su experimento y grupo (sin backend se busca en los datos).
+function buscar(clave, id) {
+  const exp = db.experimentDetail[clave]
+  for (const g of exp?.grupos || []) {
+    const t = g.tandas.find((x) => x.id_analisis === Number(id))
+    if (t) return { exp, g, t }
+  }
+  return null
+}
+
+// Solo un análisis completado, y solo quien subió el video o un Administrador (D-57).
+function revisable(clave, id) {
+  const r = buscar(clave, id)
+  if (!r) return { error: fail(404, 'No existe ese análisis.') }
+  const u = usuarioDeLaSesion()
+  if (!u || (!esAdmin(u) && r.t.subido_por !== u.idInstitucional)) {
+    return { error: fail(403, 'Solo quien subió el video o un Administrador puede revisar este análisis.') }
+  }
+  if (r.t.estado !== 'DONE') return { error: fail(409, 'Solo se revisa un análisis completado.') }
+  return r
+}
+
+// Corregir o reiniciar necesita el video: si ya se borró responde 409 (propuesta para el backend).
+function corregible(clave, id) {
+  const r = revisable(clave, id)
+  if (!r.error && r.t.video_disponible === false) return { error: fail(409, 'El video ya se borró: estos segundos ya no se corrigen ni se reinicia el análisis.') }
+  return r
+}
+
+// Especímenes de ejemplo de la tanda (los mismos de sus resultados).
+function especimenesDe({ exp, g, t }) {
+  const propios = db.batchResults[[exp.clave, g.id, t.letra, 'DAY2'].join('/')]
+  return (propios || db.batchResults['7/2/A/DAY2']).especimenes.slice(0, t.n_cilindros)
+}
+
+// POST /experiments/:clave/analyses/:id/video-token → { token } (propuesta de Erick,
+// PARA_VANESA_API.md §6): un token de solo lectura de ese análisis, de 2 horas. La etiqueta
+// <video> no puede mandar el Authorization, y el JWT de sesión nunca va en una URL. Devuelve la
+// URL completa del video con ?vt=. No se escribe en consola ni en pantalla.
+export async function urlDeVideo(clave, id, ruta) {
+  const { token } = (await api.post(`/experiments/${clave}/analyses/${id}/video-token`)).data
+  const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+  const r = ruta || `/experiments/${clave}/analyses/${id}/video`
+  return base + r + (r.includes('?') ? '&' : '?') + 'vt=' + encodeURIComponent(token)
+}
+
+// GET /experiments/:clave/analyses/:id/review → { puedeCorregir, videoUrl, tanda, duracion,
+// especimenes: [{ numeroCilindro, recuadro, segundos: [{ segundo, conducta, origen }] }] }.
+// videoUrl apunta a la copia H.264 (web.mp4, con Range) y es relativa a la API: aquí se le
+// pone el token de video (videoRuta guarda la ruta, para pedir otro token si vence). Sin
+// backend no hay video (null).
+export async function getRevision(clave, id) {
+  if (USE_MOCKS) {
+    const r = revisable(clave, id)
+    if (r.error) return r.error
+    const cajas = cajasDe(r.t.n_cilindros)
+    return reply({
+      puedeCorregir: true,
+      videoUrl: null,
+      videoDisponible: r.t.video_disponible !== false,
+      experimento: { clave, titulo: r.exp.titulo },
+      grupo: { id: r.g.id, nombre: r.g.nombre, tratamiento: r.g.tratamiento },
+      tanda: r.t.letra,
+      duracion: 300,
+      ancho: 1280,
+      alto: 720,
+      especimenes: especimenesDe(r).map((e) => ({
+        numeroCilindro: e.numeroCilindro,
+        recuadro: cajas[e.numeroCilindro - 1],
+        segundos: segundosDe(r.t.id_analisis, e).map((x, i) => ({ segundo: i + 1, conducta: x.conducta ? CONDUCTA_BD[x.conducta] : null, origen: x.origen })),
+      })),
+    })
+  }
+  const [d, exp] = await Promise.all([api.get(`/experiments/${clave}/analyses/${id}/review`).then((r) => r.data), getExperiment(clave)])
+  // La guía trae puedeCorregir, videoUrl y los especímenes; el resto de lo que usa la pantalla
+  // sale del detalle (experimento, grupo, tanda y si el video sigue). duracion, ancho y alto
+  // (tamaño del video, para los recuadros) son campos de más propuestos; sin ellos, 300 s y
+  // 1920 × 1080, como el ejemplo de la pausa en §6.1.
+  const g = exp.grupos.find((x) => x.tandas.some((t) => t.id_analisis === Number(id)))
+  const t = g?.tandas.find((x) => x.id_analisis === Number(id))
+  Object.assign(d, {
+    experimento: d.experimento || { clave: exp.clave, titulo: exp.titulo },
+    grupo: d.grupo || (g && { id: g.id, nombre: g.nombre, tratamiento: g.tratamiento }),
+    tanda: typeof d.tanda === 'string' && d.tanda.length === 1 ? d.tanda : t?.letra,
+    videoDisponible: d.videoDisponible ?? t?.video_disponible !== false,
+    duracion: d.duracion ?? 300,
+    ancho: d.ancho ?? 1920,
+    alto: d.alto ?? 1080,
+  })
+  if (d.videoUrl && d.videoDisponible !== false) {
+    d.videoRuta = d.videoUrl
+    d.videoUrl = await urlDeVideo(clave, id, d.videoRuta)
+  }
+  return d
+}
+
+// PUT /experiments/:clave/analyses/:id/segundos { especimenes: [{ numeroCilindro, segundos:
+// [{ segundo, conducta, origen }] }] } con solo los segundos que cambiaron. El backend
+// solo actualiza SEGUNDO (los totales por minuto no se guardan: se calculan desde ahí, D-52),
+// actualiza el nivel y borra los reportes guardados.
+export async function guardarSegundos(clave, id, especimenes) {
+  if (USE_MOCKS) {
+    const r = corregible(clave, id)
+    if (r.error) return r.error
+    const rev = (db.revisiones[r.t.id_analisis] ||= {})
+    for (const e of especimenes) {
+      const base = especimenesDe(r).find((x) => x.numeroCilindro === e.numeroCilindro)
+      if (!base) return fail(400, 'No existe el espécimen ' + e.numeroCilindro + '.')
+      const actual = rev[e.numeroCilindro] || segundosDe(r.t.id_analisis, base).map((x) => [x.conducta, x.origen])
+      for (const s of e.segundos) actual[s.segundo - 1] = [s.conducta ? DE_BD[s.conducta] : null, s.origen]
+      rev[e.numeroCilindro] = actual
+    }
+    resumir(clave)
+    return reply({
+      especimenes: especimenesDe(r).map((e) => ({ numeroCilindro: e.numeroCilindro, ...totalesDe(segundosDe(r.t.id_analisis, e)) })),
+    })
+  }
+  return (await api.put(`/experiments/${clave}/analyses/${id}/segundos`, { especimenes })).data
+}
+
+// POST /experiments/:clave/analyses/:id/restart → borra el resultado anterior al empezar y
+// deja el análisis en cola (D-60, D-68).
+export async function reiniciarAnalisis(clave, id) {
+  if (USE_MOCKS) {
+    const r = corregible(clave, id)
+    if (r.error) return r.error
+    const { exp, g, t } = r
+    delete db.revisiones[t.id_analisis]
+    Object.assign(t, { estado: 'QUEUED', progreso: null, error: null, analisis_fecha: null })
+    db.queue.push({
+      job_id: t.id_analisis, posicion: db.queue.length + 1, clave, gid: g.id, creado_ms: Date.now(),
+      experimento: exp.titulo.split(' · ')[0], grupo: g.nombre, tanda: t.letra, dia: 'DAY2', n_especimenes: t.n_cilindros,
+      subido_por: t.subido_por, status: 'QUEUED', stage: null, progress_pct: 0,
+    })
+    resumir(clave)
+    return reply({ ok: true })
+  }
+  return (await api.post(`/experiments/${clave}/analyses/${id}/restart`)).data
+}
