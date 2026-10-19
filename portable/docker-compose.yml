@@ -1,0 +1,95 @@
+# Sistema FST, version portable: una sola carpeta que se lleva a otra PC con Windows y Docker Desktop.
+# Se usa con iniciar.bat (que prepara el .env y llama a "docker compose up -d --build").
+#
+# El nombre del proyecto (fst-portable) hace que sus contenedores, su red y sus volumenes sean propios y no se
+# mezclen con los del entorno de desarrollo (backend-spring, proyecto fst-spring).
+#
+# Solo el servicio "web" publica un puerto (PUERTO_WEB, por defecto 8088): el navegador habla con nginx y
+# nginx reenvia /api/ al backend. La base y el backend no se pueden alcanzar desde fuera.
+name: fst-portable
+
+services:
+  # Base de datos. El esquema solo se aplica la primera vez, con el volumen vacio. Se monta SOLO
+  # 001_esquema.sql y no toda la carpeta backend-spring/db/init: 002_dev_usuario.sql es una cuenta de prueba
+  # del entorno de desarrollo y no debe existir en una instalacion para otra PC. Si se agrega un script nuevo
+  # que SI haga falta (003_...), hay que montarlo aqui tambien.
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fst}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fst}
+      POSTGRES_DB: ${POSTGRES_DB:-fst}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../backend-spring/db/init/001_esquema.sql:/docker-entrypoint-initdb.d/001_esquema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # El backend (Spring Boot). Se llama "api" y escucha en el 8000 porque el nginx del frontend
+  # (frontend/nginx.conf) reenvia /api/ a http://api:8000: asi no hace falta tocar ese archivo.
+  api:
+    build: ../backend-spring
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      SERVER_PORT: "8000"
+      ARCHIVOS_DIR: /data/archivos
+      # La pagina se abre en http://localhost:PUERTO_WEB. nginx reenvia el Host sin el puerto y el backend
+      # tomaria la peticion del navegador (que trae Origin con puerto) como de otro origen y la rechazaria
+      # con 403; con esto reconoce la direccion de la pagina como propia.
+      CORS_ORIGINS: "http://localhost:${PUERTO_WEB:-8088},http://127.0.0.1:${PUERTO_WEB:-8088}"
+    volumes:
+      - videos_reportes:/data/archivos
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # El que analiza los videos con el modelo (../modelos/fst_cnn_seg.pt, que no va dentro de la imagen).
+  # Toma de la base un analisis a la vez y guarda los resultados en la misma base y el mismo volumen.
+  worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      ARCHIVOS_DIR: /data/archivos
+      MODELO_CNN: /data/modelos/fst_cnn_seg.pt
+    volumes:
+      - videos_reportes:/data/archivos
+      - ../modelos:/data/modelos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # La pagina (React) servida por nginx. VITE_* se graban al compilar, por eso van como argumentos de
+  # construccion: sin datos de ejemplo (VITE_USE_MOCKS=false) y llamando al backend por /api.
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_USE_MOCKS: "false"
+        VITE_API_BASE: /api
+        VITE_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-2048}
+    restart: unless-stopped
+    ports:
+      - "${PUERTO_WEB:-8088}:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  videos_reportes:   # videos, copias para revision y diagnosticos: se conservan al apagar

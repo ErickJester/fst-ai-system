@@ -75,10 +75,15 @@ public class SeguridadConfig {
 
 	// Con Spring Security el CORS va aquí y no en cada controller (@CrossOrigin): el preflight (OPTIONS)
 	// llega antes que el controller y debe poder pasar sin token.
+	// Los orígenes permitidos (las páginas que pueden llamar a la API desde un navegador) vienen de
+	// CORS_ORIGINS, separados por comas; por omisión, el frontend de desarrollo (Vite). En la versión
+	// portable la página y la API salen por el mismo nginx, pero nginx reenvía el Host SIN el puerto y
+	// Spring no reconoce la petición como del mismo origen (responde 403 "Invalid CORS request" aunque el
+	// navegador no esté haciendo nada raro): por eso el compose portable declara ahí su propia dirección.
 	@Bean
-	public CorsConfigurationSource corsConfigurationSource() {
+	public CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.origenes}") List<String> origenes) {
 		CorsConfiguration cors = new CorsConfiguration();
-		cors.setAllowedOrigins(List.of("http://localhost:5173"));
+		cors.setAllowedOrigins(origenes);
 		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 
