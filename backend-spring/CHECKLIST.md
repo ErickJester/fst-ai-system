@@ -173,6 +173,7 @@ real con sesión (la hará el usuario en otra PC).
   - [ ] Borrar videos vencidos a los 30 días
   - [ ] Aviso a 7 días
   - [ ] Vigilar el disco: alerta al 80 %, borrado al 90 %
+  - [ ] Respaldar la base con `pg_dump` cada día, conservar los últimos 7 y borrar los más viejos (§8, D-18, agregado a la guía el 20-oct). Respalda la base, no los videos
 - [ ] `ultima_corrida_tareas.txt`
 
 ## 11. Criterios de aceptación finales (§12)
