@@ -289,15 +289,17 @@ export default function CargarVideoPage() {
             {/* 3 · sesión */}
             <div className="step">
               <span className="step-n num">3</span>
-              <Campo label="Sesión">
-                <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
-              </Campo>
-              <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
-              {yaTiene && (
-                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
-                  La Tanda {tanda} de {grupoNombre} ya tiene su video de {sesion === '1' ? 'Día 1' : 'Día 2'}. Cada tanda lleva un solo video por sesión: elige la otra sesión o una tanda nueva.
-                </div>
-              )}
+              <div>
+                <Campo label="Sesión">
+                  <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
+                </Campo>
+                <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
+                {yaTiene && (
+                  <div className="note-bar" role="status" style={{ marginTop: 10 }}>
+                    La Tanda {tanda} de {grupoNombre} ya tiene su video de {sesion === '1' ? 'Día 1' : 'Día 2'}. Cada tanda lleva un solo video por sesión: elige la otra sesión o una tanda nueva.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 4 · archivo */}
