@@ -115,7 +115,9 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("sesion", rs.getString("sesion"));
 			item.put("estado", estado);
 			item.put("etapa", etapa);
-			item.put("porcentaje", porcentaje(estado, etapa));
+			Avance avance = avance(idAnalisis, estado, etapa);
+			item.put("porcentaje", avance.general());
+			item.put("porcentajeEtapa", avance.etapa());
 			item.put("pausa", "en pausa".equals(estado) ? pausa(idAnalisis) : null);
 			item.put("diagnosticoDisponible", diagnosticoDisponible(estado, rs.getString("rutadiagnostico")));
 			// Mientras el análisis no termina es la hora en que se encoló (D-79); el worker la reemplaza al
@@ -132,8 +134,51 @@ public class ResultadosServiceImpl implements ResultadosService {
 		return datos;
 	}
 
-	// Avance en porcentaje (guía 6.1; el frontend usa los mismos valores en lib/fst.js): en cola 0, completado
-	// 100 y, en cualquier otro estado, el de su etapa.
+	// El avance de un análisis: el general (0 a 100) y el de su etapa (0 a 100, o null si no se conoce).
+	private record Avance(int general, Integer etapa) {
+	}
+
+	// En cola: 0 y 0. Completado: 100 y 100. En cualquier otro estado (procesando, en pausa, error, cancelado):
+	// lo que dejó el worker en analisis/{id}/progreso.json, si existe y su etapa es la misma que la de la base;
+	// si no (un análisis de antes de que existiera el archivo, o uno que acaba de empezar), el mapeo viejo por
+	// etapa (33, 67, 100) y el avance de la etapa en null, para que nada se rompa.
+	private Avance avance(int idAnalisis, String estado, String etapa) {
+		if ("en cola".equals(estado)) {
+			return new Avance(0, 0);
+		}
+		if ("completado".equals(estado)) {
+			return new Avance(100, 100);
+		}
+		Avance leido = leerProgreso(idAnalisis, etapa);
+		return leido != null ? leido : new Avance(porcentaje(estado, etapa), null);
+	}
+
+	// progreso.json: {"etapa", "porcentajeEtapa", "porcentaje", "actualizado"}. Mismo cuidado que con pausa.json: si
+	// el archivo está roto, null y un aviso en el log (si no existe es lo normal en un análisis viejo: sin aviso).
+	private Avance leerProgreso(int idAnalisis, String etapaDeLaBase) {
+		Path archivo = raiz.resolve("analisis").resolve(String.valueOf(idAnalisis)).resolve("progreso.json");
+		if (!Files.isRegularFile(archivo)) {
+			return null;
+		}
+		try {
+			JsonNode progreso = JSON.readTree(Files.readString(archivo));
+			if (!etapaDeLaBase.equals(progreso.path("etapa").asText())) {
+				return null;
+			}
+			if (!progreso.has("porcentaje") || !progreso.has("porcentajeEtapa")) {
+				return null;
+			}
+			int general = Math.max(0, Math.min(100, progreso.path("porcentaje").asInt()));
+			int deLaEtapa = Math.max(0, Math.min(100, progreso.path("porcentajeEtapa").asInt()));
+			return new Avance(general, deLaEtapa);
+		} catch (IOException | JacksonException e) {
+			log.warn("No se pudo leer {}: {}", archivo, e.getMessage());
+			return null;
+		}
+	}
+
+	// Avance en porcentaje por etapa (el de antes de progreso.json, y el respaldo): en cola 0, completado 100 y,
+	// en cualquier otro estado, el de su etapa.
 	private static int porcentaje(String estado, String etapa) {
 		if ("en cola".equals(estado)) {
 			return 0;

@@ -35,6 +35,19 @@ export const ETAPA = {
 }
 // Porcentaje que informa el backend en cada etapa (33, 67 y 100; 0 en cola).
 export const PCT_ETAPA = { PREPROCESSING: 33, ROI_DETECTION: 67, CLASSIFICATION: 100 }
+// Cuánto pesa cada etapa en la barra general (suman 100): son los pesos que MIDIÓ el worker con un video real
+// (worker_fake/progreso.py). Solo sirven para dibujar dónde empieza cada etapa en la barra.
+export const PESO_ETAPA = { PREPROCESSING: 1, ROI_DETECTION: 9, CLASSIFICATION: 90 }
+
+// Porcentaje propio de una etapa de un análisis en curso: hecha 100; en curso, el que informa el backend
+// (stage_pct) o, si no lo trae, el de la etapa; pendiente 0.
+export function pctDeEtapa(j, etapa, etapas) {
+  const i = etapas.indexOf(etapa)
+  const iActual = etapas.indexOf(j.stage)
+  if (i < iActual) return 100
+  if (i > iActual) return 0
+  return j.stage_pct ?? PCT_ETAPA[etapa]
+}
 
 // Estado de un experimento: no se guarda, se calcula con sus tandas (§4.8 del documento).
 export const ESTADO_EXPERIMENTO = {

@@ -6,7 +6,7 @@ import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, PCT_ETAPA, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PESO_ETAPA, pctDeEtapa, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
 import { useAuth } from '../contexts/AuthContext'
 import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
@@ -117,10 +117,13 @@ function TrabajoActual({ j }) {
         </div>
         <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{duracion(j)} · {j.n_especimenes} especímenes</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(' + ETAPAS.length + ',1fr)', gap: 2 }}>
-            {ETAPAS.map((s, i) => (
-              <div key={s} style={{ height: 10, background: i < iActual ? 'var(--color-text)' : i === iActual ? 'var(--color-accent)' : 'color-mix(in srgb,var(--color-text) 12%,transparent)' }} />
-            ))}
+          {/* Una sola barra, de 0 a 100: el ancho es el avance GENERAL. Las marcas finas dicen dónde empieza cada etapa */}
+          <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={j.progress_pct} aria-label="Avance general del análisis" style={{ flex: 1, position: 'relative', height: 10, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)' }}>
+            <div style={{ width: j.progress_pct + '%', height: '100%', background: 'var(--color-accent)', transition: 'width 1s linear' }} />
+            {ETAPAS.slice(1).map((s, k) => {
+              const inicio = ETAPAS.slice(0, k + 1).reduce((suma, e) => suma + PESO_ETAPA[e], 0)
+              return <div key={s} style={{ position: 'absolute', top: 0, bottom: 0, left: inicio + '%', width: 2, background: 'var(--color-bg)' }} />
+            })}
           </div>
           <span className="num nd" style={{ fontSize: 15, whiteSpace: 'nowrap' }}>{j.progress_pct} %</span>
         </div>
@@ -130,8 +133,9 @@ function TrabajoActual({ j }) {
         const hecha = i < iActual
         const enCurso = i === iActual
         const color = hecha || enCurso ? INK : 'var(--muted)'
+        const pct = pctDeEtapa(j, s, ETAPAS)
         return (
-          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid var(--color-divider)' }}>
+          <div key={s} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid var(--color-divider)' }}>
             <span className="num nd" style={{ width: 26, height: 26, flex: 'none', background: hecha ? INK : enCurso ? 'var(--color-accent)' : 'transparent', color: hecha || enCurso ? 'var(--color-bg)' : 'var(--muted)', border: '1px solid var(--color-divider)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{hecha ? '✓' : i + 1}</span>
             <div style={{ width: 250 }}>
               <div className="nd" style={{ fontSize: 13.5, color }}>{ETAPA[s]}</div>
@@ -139,7 +143,11 @@ function TrabajoActual({ j }) {
             </div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, whiteSpace: 'nowrap', color }}>{hecha ? 'hecha' : enCurso ? 'en curso' : 'pendiente'}</span>
-            <span className="num nd" style={{ width: 56, textAlign: 'right', fontSize: 13, color }}>{PCT_ETAPA[s]} %</span>
+            <span className="num nd" style={{ width: 56, textAlign: 'right', fontSize: 13, color }}>{pct} %</span>
+            {/* barra fina de la propia etapa, pegada al borde de abajo de la fila */}
+            <div style={{ position: 'absolute', left: 20, right: 20, bottom: 4, height: 3, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)' }}>
+              <div style={{ width: pct + '%', height: '100%', background: hecha ? INK : 'var(--color-accent)', transition: 'width 1s linear' }} />
+            </div>
           </div>
         )
       })}
