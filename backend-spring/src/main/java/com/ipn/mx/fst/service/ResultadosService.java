@@ -29,6 +29,18 @@ public interface ResultadosService {
 	// null en los videos anteriores al 20-oct-2026), duracionVideo (segundos) e idAnalisis.
 	List<Map<String, Object>> videosAnalizados(Integer idExperimento);
 
+	// Lo que se descarga con "Segundos": el nombre del archivo (un CSV, o un ZIP si es de todo el grupo), si es ZIP y
+	// los archivos que lleva (nombre dentro del ZIP o de la descarga -> ruta en el volumen).
+	record SalidaSegundos(String nombre, boolean zip, Map<String, Path> archivos) {
+	}
+
+	// La salida por segundo del modelo TAL CUAL la deja fst_auto (trabajo/{idVideo}_cnnseg.csv): la de la tanda (con
+	// letra) o, sin letra, la de cada tanda del grupo con análisis completado y su _cnnseg_resumen.csv. Es la salida
+	// CRUDA del modelo, del video completo y con probabilidades: NO trae las correcciones de la revisión. Solo con
+	// MODO_DESARROLLADOR=true; sin él, 404 como si la ruta no existiera. 400 sin grupo; 404 si la tanda no tiene análisis
+	// completado o el archivo.
+	SalidaSegundos segundosDelModelo(Integer idExperimento, Integer idGrupo, String letra);
+
 	// Ruta de la imagen de control que dejó el pipeline (trabajo/{idVideo}_control.jpg): los tubos que encontró. 404 si
 	// el análisis no es de ese experimento o la imagen no existe.
 	Path control(Integer idExperimento, Integer idAnalisis);

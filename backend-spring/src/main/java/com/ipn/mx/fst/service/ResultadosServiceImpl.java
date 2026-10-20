@@ -620,6 +620,98 @@ public class ResultadosServiceImpl implements ResultadosService {
 	}
 
 	// ---------------------------------------------------------------------------
+	//  Salida por segundo del modelo (solo modo desarrollador)
+	// ---------------------------------------------------------------------------
+
+	@Override
+	@Transactional(readOnly = true)
+	public SalidaSegundos segundosDelModelo(Integer idExperimento, Integer idGrupo, String letra) {
+		// Las probabilidades del modelo solo salen en modo desarrollador: sin él, la ruta "no existe".
+		if (!modoDesarrollador) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "No encontrado");
+		}
+		if (idGrupo == null) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "Falta el grupo: ?grupo=<idGrupo> (y tanda=<letra> para una sola).");
+		}
+		existe(idExperimento);
+		List<String> etiquetas = jdbc.queryForList("SELECT etiqueta FROM grupo WHERE idgrupo = ? AND idexperimento = ?",
+				String.class, idGrupo, idExperimento);
+		if (etiquetas.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El grupo " + idGrupo + " no existe en el experimento " + idExperimento);
+		}
+
+		boolean deUnaTanda = letra != null && !letra.isBlank();
+		List<Object> parametros = new ArrayList<>(List.of(idExperimento, idGrupo));
+		String filtro = "";
+		if (deUnaTanda) {
+			String l = letra.trim().toUpperCase(java.util.Locale.ROOT);
+			if (l.length() != 1 || l.charAt(0) < 'A' || l.charAt(0) > 'Z') {
+				throw new ErrorApi(HttpStatus.BAD_REQUEST, "La tanda debe ser una letra, por ejemplo A.");
+			}
+			filtro = " AND t.ordinal = ?";
+			parametros.add(l.charAt(0) - 'A' + 1);
+		}
+		// Solo tandas con análisis completado. Los nombres de los archivos salen del idVideo de la base (y el del
+		// archivo descargado, del nombre original), nunca de la petición.
+		List<Map<String, Object>> filas = jdbc.queryForList("""
+				SELECT t.ordinal, v.idvideo, a.idanalisis, v.nombreoriginal
+				FROM analisis a
+				JOIN video v ON v.idvideo = a.idvideo
+				JOIN tanda t ON t.idtanda = v.idtanda
+				JOIN grupo g ON g.idgrupo = t.idgrupo
+				WHERE g.idexperimento = ? AND g.idgrupo = ? AND a.estado = 'completado'
+				""" + filtro + " ORDER BY t.ordinal", parametros.toArray());
+
+		Map<String, Path> archivos = new LinkedHashMap<>();
+		for (Map<String, Object> fila : filas) {
+			int idAnalisis = ((Number) fila.get("idanalisis")).intValue();
+			int idVideo = ((Number) fila.get("idvideo")).intValue();
+			Path csv = rutaTrabajo(idAnalisis, idVideo + "_cnnseg.csv");
+			if (!Files.isRegularFile(csv)) {
+				continue;
+			}
+			String base = nombreBase((String) fila.get("nombreoriginal"), idVideo);
+			if (archivos.containsKey(base + "_cnnseg.csv")) {
+				base = base + "_tanda" + letra(((Number) fila.get("ordinal")).intValue());   // dos videos con el mismo nombre
+			}
+			archivos.put(base + "_cnnseg.csv", csv);
+			Path resumen = rutaTrabajo(idAnalisis, idVideo + "_cnnseg_resumen.csv");
+			if (!deUnaTanda && Files.isRegularFile(resumen)) {
+				archivos.put(base + "_cnnseg_resumen.csv", resumen);
+			}
+		}
+		if (archivos.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "Esta tanda no tiene la salida por segundo del modelo");
+		}
+		if (deUnaTanda) {
+			return new SalidaSegundos(archivos.keySet().iterator().next(), false, archivos);
+		}
+		return new SalidaSegundos(paraNombreDeArchivo(etiquetas.get(0)) + "_segundos.zip", true, archivos);
+	}
+
+	// analisis/{id}/trabajo/{nombre}, normalizada: tiene que seguir DENTRO de la raíz (si no, una ruta que no existe).
+	private Path rutaTrabajo(int idAnalisis, String nombre) {
+		Path ruta = raiz.resolve("analisis").resolve(String.valueOf(idAnalisis)).resolve("trabajo").resolve(nombre).normalize();
+		return ruta.startsWith(raiz) ? ruta : raiz.resolve("no-existe");
+	}
+
+	// El nombre original del video sin su extensión ("acu-yintang2.mp4" -> "acu-yintang2"), o "video<idVideo>" si no lo tiene.
+	private static String nombreBase(String nombreOriginal, int idVideo) {
+		if (nombreOriginal == null || nombreOriginal.isBlank()) {
+			return "video" + idVideo;
+		}
+		int punto = nombreOriginal.lastIndexOf('.');
+		String sinExtension = punto > 0 ? nombreOriginal.substring(0, punto) : nombreOriginal;
+		String limpio = paraNombreDeArchivo(sinExtension);
+		return limpio.isBlank() ? "video" + idVideo : limpio;
+	}
+
+	// Sin los caracteres que no valen en un nombre de archivo (rutas, comodines, de control).
+	private static String paraNombreDeArchivo(String texto) {
+		return texto.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").trim();
+	}
+
+	// ---------------------------------------------------------------------------
 	//  Imagen de control
 	// ---------------------------------------------------------------------------
 
