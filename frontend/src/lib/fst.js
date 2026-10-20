@@ -75,7 +75,30 @@ export const estadoDeTanda = (t) => (t.estado === 'SIN_VIDEO' && t.dia1 ? 'ESPER
 export const enlacePausa = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/pausa`
 
 // «3:41» a partir de segundos.
-export const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0')
+// m:ss, o h:mm:ss si pasa de una hora.
+export function mmss(s) {
+  const t = Math.floor(s)
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const seg = String(t % 60).padStart(2, '0')
+  return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + seg : m + ':' + seg
+}
+
+// Segundos que pasaron desde una hora ISO hasta ahoraMs (nunca negativos: el reloj del navegador y el del
+// worker pueden diferir unos segundos).
+export const segundosDesde = (iso, ahoraMs) => Math.max(0, Math.floor((ahoraMs - Date.parse(iso)) / 1000))
+
+// El equipo de un análisis, como se muestra: su nombre o, si no tiene, el modelo del procesador.
+export const nombreEquipo = (equipo) => equipo?.nombre || equipo?.cpu || null
+
+// Segundos de una etapa de un análisis en curso (j.tiempos, de services/progreso.js): hecha → los que midió el worker;
+// en curso → los que lleva, contados desde su inicio; sin empezar (o sin registro) → null, que se muestra «—».
+export function tiempoDeEtapa(j, etapa, ahoraMs) {
+  const e = j.tiempos?.etapas?.[etapa]
+  if (!e) return null
+  if (e.segundos != null) return e.segundos
+  return e.fin ? Math.max(0, Math.round((Date.parse(e.fin) - Date.parse(e.inicio)) / 1000)) : segundosDesde(e.inicio, ahoraMs)
+}
 
 // Un espécimen se distingue por su posición en el cuadro; como el número se repite en cada
 // tanda del grupo, donde se juntan tandas va con la tanda: «Tanda A · Espécimen 2» (D-55).

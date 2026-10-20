@@ -91,6 +91,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Autowired
 	private TandaRepository tandaRepository;
 
+	// Los tiempos de cada análisis (tiempos.json) para la sección "Tiempos de análisis" del PDF.
+	@Autowired
+	private ResultadosService resultadosService;
+
 	// --- Lista y detalle: la forma de la guía 6.1, armada con consultas agregadas (proyecciones Fila*) y
 	// mapas, no con la entidad Experimento (sus relaciones LAZY no se pueden serializar). ---
 
@@ -449,6 +453,19 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				documento.add(new Paragraph("Segundos de cada conducta en cada minuto. Un minuto suma menos de "
 						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió).",
 						letraNota));
+
+				// Cuánto tardó cada tanda analizada y en qué equipo, para comparar entre computadoras. Solo en modo
+				// desarrollador: sin él, tiemposDelExperimento devuelve una lista vacía y la sección no sale.
+				List<Map<String, Object>> tiempos = resultadosService.tiemposDelExperimento(idExperimento);
+				if (!tiempos.isEmpty()) {
+					documento.add(Chunk.NEWLINE);
+					Paragraph subtitulo = new Paragraph("Tiempos de análisis", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+					subtitulo.setSpacingAfter(6);
+					documento.add(subtitulo);
+					documento.add(armarTablaTiempos(tiempos));
+					documento.add(new Paragraph("Tiempo que el worker trabajó en el análisis (no incluye la espera en la "
+							+ "cola). \"sin registro\": análisis de antes de que se midiera el tiempo.", letraNota));
+				}
 			}
 
 			documento.close();
@@ -506,6 +523,71 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			}
 		}
 		return tabla;
+	}
+
+	// Una fila por tanda analizada: grupo y tanda, duración del video, tiempo total, tiempo de cada etapa y equipo.
+	private PdfPTable armarTablaTiempos(List<Map<String, Object>> tandas) throws DocumentException {
+		PdfPTable tabla = new PdfPTable(7);
+		tabla.setWidthPercentage(100);
+		tabla.setWidths(new float[] {2.6f, 1.2f, 1.3f, 1.4f, 1.3f, 1.5f, 3.2f});
+
+		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
+		Stream.of("Grupo · Tanda", "Video (mm:ss)", "Total (mm:ss)", "Preprocesamiento", "Cilindros",
+				"Clasificación", "Equipo")
+				.forEach(textoEncabezado -> {
+					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
+					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
+					encabezado.setPadding(4);
+					tabla.addCell(encabezado);
+				});
+
+		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 8);
+		for (Map<String, Object> tanda : tandas) {
+			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda"), letraTexto)));
+			tabla.addCell(celdaCentrada(mmss((Number) tanda.get("duracionVideo")), letraTexto));
+
+			@SuppressWarnings("unchecked")
+			Map<String, Object> tiempos = (Map<String, Object>) tanda.get("tiempos");
+			if (tiempos == null) {
+				// Análisis de antes de que el worker midiera el tiempo.
+				tabla.addCell(celdaCentrada("sin registro", letraTexto));
+				for (int i = 0; i < 4; i++) {
+					tabla.addCell(celdaCentrada("—", letraTexto));
+				}
+				continue;
+			}
+			tabla.addCell(celdaCentrada(mmss((Number) tiempos.get("totalSegundos")), letraTexto));
+			Map<String, Number> porEtapa = new HashMap<>();
+			for (Object etapa : (List<?>) tiempos.get("etapas")) {
+				Map<?, ?> e = (Map<?, ?>) etapa;
+				porEtapa.put((String) e.get("etapa"), (Number) e.get("segundos"));
+			}
+			for (String etapa : List.of("preprocesamiento", "cilindros", "clasificacion")) {
+				tabla.addCell(celdaCentrada(mmss(porEtapa.get(etapa)), letraTexto));
+			}
+			tabla.addCell(new PdfPCell(new Phrase(textoDelEquipo((Map<?, ?>) tiempos.get("equipo")), letraTexto)));
+		}
+		return tabla;
+	}
+
+	// "Laptop Erick · 8 núcleos": el nombre (o, si no tiene, el CPU) y los núcleos.
+	private static String textoDelEquipo(Map<?, ?> equipo) {
+		Object quien = equipo.get("nombre") != null ? equipo.get("nombre") : equipo.get("cpu");
+		String texto = quien != null ? quien.toString() : "equipo desconocido";
+		return equipo.get("nucleos") != null ? texto + " · " + equipo.get("nucleos") + " núcleos" : texto;
+	}
+
+	// mm:ss, o h:mm:ss si pasa de una hora; "—" si no hay dato.
+	private static String mmss(Number segundos) {
+		if (segundos == null) {
+			return "—";
+		}
+		long total = Math.round(segundos.doubleValue());
+		long horas = total / 3600;
+		long minutos = (total % 3600) / 60;
+		long resto = total % 60;
+		return horas > 0 ? String.format("%d:%02d:%02d", horas, minutos, resto) : String.format("%d:%02d", minutos, resto);
 	}
 
 	private PdfPCell celdaCentrada(String texto, Font letra) {

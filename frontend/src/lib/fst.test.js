@@ -1,5 +1,42 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa } from './fst'
+
+describe('tiempos del análisis', () => {
+  it('mmss: m:ss y, pasada la hora, h:mm:ss', () => {
+    expect(mmss(0)).toBe('0:00')
+    expect(mmss(59.9)).toBe('0:59')
+    expect(mmss(65)).toBe('1:05')
+    expect(mmss(1205)).toBe('20:05')
+    expect(mmss(3599)).toBe('59:59')
+    expect(mmss(3600)).toBe('1:00:00')
+    expect(mmss(3725)).toBe('1:02:05')
+  })
+
+  it('segundosDesde nunca es negativo (relojes distintos)', () => {
+    const inicio = '2026-10-19T12:00:00-06:00'
+    const ms = Date.parse(inicio)
+    expect(segundosDesde(inicio, ms + 90_500)).toBe(90)
+    expect(segundosDesde(inicio, ms - 3000)).toBe(0)
+  })
+
+  it('el equipo es su nombre o, si no tiene, el CPU', () => {
+    expect(nombreEquipo({ nombre: 'Laptop Erick', cpu: 'Intel' })).toBe('Laptop Erick')
+    expect(nombreEquipo({ nombre: null, cpu: 'Intel i7' })).toBe('Intel i7')
+    expect(nombreEquipo(null)).toBeNull()
+  })
+
+  it('tiempo de una etapa: hecha fijo, en curso cronometrada, pendiente sin dato', () => {
+    const ms = Date.parse('2026-10-19T12:10:00-06:00')
+    const j = { tiempos: { etapas: {
+      PREPROCESSING: { inicio: '2026-10-19T12:00:00-06:00', fin: '2026-10-19T12:00:01-06:00', segundos: 1 },
+      ROI_DETECTION: { inicio: '2026-10-19T12:00:01-06:00', fin: null, segundos: null },
+    } } }
+    expect(tiempoDeEtapa(j, 'PREPROCESSING', ms)).toBe(1)
+    expect(tiempoDeEtapa(j, 'ROI_DETECTION', ms)).toBe(599)
+    expect(tiempoDeEtapa(j, 'CLASSIFICATION', ms)).toBeNull()
+    expect(tiempoDeEtapa({}, 'PREPROCESSING', ms)).toBeNull()
+  })
+})
 
 describe('porcentaje de cada etapa en Progreso', () => {
   const ETAPAS = ['PREPROCESSING', 'ROI_DETECTION', 'CLASSIFICATION']

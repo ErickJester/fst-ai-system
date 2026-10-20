@@ -46,6 +46,12 @@ public class ResultadosServiceImpl implements ResultadosService {
 	@Value("${app.archivos.raiz}")
 	private String raizConfigurada;
 
+	// MODO_DESARROLLADOR: los tiempos de cada análisis (tiempos.json) son solo para quien desarrolla. Con false no
+	// salen en /status, ni en /results, ni en el PDF, aunque exista un tiempos.json de antes. El avance
+	// (progreso.json) no depende de esto: la barra de 0 a 100 % es para todos.
+	@Value("${app.modo-desarrollador:false}")
+	private boolean modoDesarrollador;
+
 	// Minutos que espera un análisis en pausa antes de cancelarse (la misma variable que usa el worker).
 	@Value("${PAUSE_TIMEOUT_MINUTES:5}")
 	private int minutosDePausa;
@@ -64,8 +70,8 @@ public class ResultadosServiceImpl implements ResultadosService {
 	}
 
 	// Una fila de la consulta de resultados: las veces que un espécimen tuvo una conducta en un minuto.
-	private record FilaConteo(int idGrupo, String etiqueta, int ordinal, int cilindro, String nivel, int minuto,
-			String conducta, long segundos, boolean revisado) {
+	private record FilaConteo(int idGrupo, String etiqueta, int ordinal, int cilindro, String nivel, int idAnalisis,
+			int minuto, String conducta, long segundos, boolean revisado) {
 	}
 
 	// Un espécimen con sus conteos ya sumados. filas incluye los segundos sin conducta (NULL): cuentan en el
@@ -76,6 +82,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		int ordinal;
 		int cilindro;
 		String nivel;
+		int idAnalisis;
 		boolean revisado;
 		long filas;
 		final Map<String, Long> total = new HashMap<>();
@@ -126,6 +133,9 @@ public class ResultadosServiceImpl implements ResultadosService {
 					.atZoneSameInstant(ZONA).toOffsetDateTime());
 			// Todavía no se guarda en ningún lado por qué se canceló un análisis.
 			item.put("motivoCancelacion", null);
+			// Un análisis en cola puede traer el archivo de una corrida anterior (se reencoló): no es de esta
+			// espera, así que no se muestra. Los demás estados leen tiempos.json, o null si no existe.
+			item.put("tiempos", modoDesarrollador && !"en cola".equals(estado) ? tiempos(idAnalisis) : null);
 			return item;
 		}, idExperimento);
 
@@ -175,6 +185,101 @@ public class ResultadosServiceImpl implements ResultadosService {
 			log.warn("No se pudo leer {}: {}", archivo, e.getMessage());
 			return null;
 		}
+	}
+
+	// tiempos.json: lo que el worker midió de un análisis (cuándo empezó cada etapa y cuánto tardó, y en qué equipo).
+	// Mismo cuidado que con progreso.json: null si no existe (los análisis de antes no lo tienen: sin aviso) y null
+	// con un aviso en el log si está roto.
+	private JsonNode leerTiempos(int idAnalisis) {
+		Path archivo = raiz.resolve("analisis").resolve(String.valueOf(idAnalisis)).resolve("tiempos.json");
+		if (!Files.isRegularFile(archivo)) {
+			return null;
+		}
+		try {
+			return JSON.readTree(Files.readString(archivo));
+		} catch (IOException | JacksonException e) {
+			log.warn("No se pudo leer {}: {}", archivo, e.getMessage());
+			return null;
+		}
+	}
+
+	// Lo de tiempos.json que necesita la pantalla de progreso. De la etapa en curso segundos es null y viene su
+	// inicio, para que el navegador la cronometre; el total y el fin también son null mientras el análisis corre.
+	private Map<String, Object> tiempos(int idAnalisis) {
+		JsonNode t = leerTiempos(idAnalisis);
+		if (t == null) {
+			return null;
+		}
+		List<Map<String, Object>> etapas = new ArrayList<>();
+		for (JsonNode e : t.path("etapas")) {
+			Map<String, Object> etapa = new LinkedHashMap<>();
+			etapa.put("etapa", valor(e.path("etapa")));
+			etapa.put("inicio", valor(e.path("inicio")));
+			etapa.put("fin", valor(e.path("fin")));
+			etapa.put("segundos", valor(e.path("segundos")));
+			etapas.add(etapa);
+		}
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("inicio", valor(t.path("inicio")));
+		datos.put("fin", valor(t.path("fin")));
+		datos.put("totalSegundos", valor(t.path("totalSegundos")));
+		datos.put("etapas", etapas);
+		datos.put("equipo", equipo(t));
+		return datos;
+	}
+
+	private Map<String, Object> equipo(JsonNode t) {
+		Map<String, Object> equipo = new LinkedHashMap<>();
+		for (String campo : List.of("nombre", "cpu", "nucleos", "memoriaGB", "dockerCPU")) {
+			equipo.put(campo, valor(t.path("equipo").path(campo)));
+		}
+		return equipo;
+	}
+
+	// El valor de un campo de tiempos.json como número o texto, o null si falta o es null.
+	private static Object valor(JsonNode nodo) {
+		if (nodo == null || nodo.isMissingNode() || nodo.isNull()) {
+			return null;
+		}
+		return nodo.isNumber() ? nodo.numberValue() : nodo.asText();
+	}
+
+	// Lo que /results muestra de cada análisis: cuánto tardó y en qué equipo (el nombre y, si no tiene, el CPU).
+	private Map<String, Object> tiempoAnalisis(int idAnalisis) {
+		JsonNode t = leerTiempos(idAnalisis);
+		if (t == null) {
+			return null;
+		}
+		Object nombre = valor(t.path("equipo").path("nombre"));
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("totalSegundos", valor(t.path("totalSegundos")));
+		datos.put("equipo", nombre != null ? nombre : valor(t.path("equipo").path("cpu")));
+		return datos;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Map<String, Object>> tiemposDelExperimento(Integer idExperimento) {
+		existe(idExperimento);
+		if (!modoDesarrollador) {
+			return List.of();      // sin modo desarrollador el PDF no lleva la sección de tiempos
+		}
+		return jdbc.query("""
+				SELECT a.idanalisis, g.etiqueta, t.ordinal, v.duracion
+				FROM analisis a
+				JOIN video v ON v.idvideo = a.idvideo
+				JOIN tanda t ON t.idtanda = v.idtanda
+				JOIN grupo g ON g.idgrupo = t.idgrupo
+				WHERE g.idexperimento = ? AND a.estado = 'completado'
+				ORDER BY g.idgrupo, t.ordinal
+				""", (rs, fila) -> {
+			Map<String, Object> item = new LinkedHashMap<>();
+			item.put("grupo", rs.getString("etiqueta"));
+			item.put("tanda", letra(rs.getInt("ordinal")));
+			item.put("duracionVideo", rs.getDouble("duracion"));
+			item.put("tiempos", tiempos(rs.getInt("idanalisis")));
+			return item;
+		}, idExperimento);
 	}
 
 	// Avance en porcentaje por etapa (el de antes de progreso.json, y el respaldo): en cola 0, completado 100 y,
@@ -251,6 +356,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	// /results y /results/byminute comparten la consulta y el armado; el segundo solo agrega los minutos.
 	private Map<String, Object> respuestaDeEspecimenes(List<Espec> especimenes, boolean conMinutos) {
 		List<Map<String, Object>> lista = new ArrayList<>();
+		Map<Integer, Map<String, Object>> tiempoDe = new HashMap<>();    // un archivo por análisis, no por espécimen
 		for (Espec e : especimenes) {
 			Map<String, Object> item = new LinkedHashMap<>();
 			item.put("idGrupo", e.idGrupo);
@@ -260,6 +366,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("nivelClasif", e.nivel);
 			item.put("revisado", e.revisado);
 			item.put("totales", totales(e));
+			item.put("tiempoAnalisis", modoDesarrollador ? tiempoDe.computeIfAbsent(e.idAnalisis, this::tiempoAnalisis) : null);
 			if (conMinutos) {
 				item.put("minutos", minutos(e));
 			}
@@ -307,7 +414,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	// tanda y cilindro.
 	private List<Espec> leerEspecimenes(Integer idExperimento) {
 		List<FilaConteo> filas = jdbc.query("""
-				SELECT g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif,
+				SELECT g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis,
 				       ((s.segundo - 1) / 60) + 1 AS minuto,
 				       s.conducta,
 				       COUNT(*) AS segundos,
@@ -320,11 +427,11 @@ public class ResultadosServiceImpl implements ResultadosService {
 				JOIN observacion o ON o.idespecimen = e.idespecimen AND o.idvideo = v.idvideo
 				JOIN segundo s     ON s.idobservacion = o.idobservacion
 				WHERE g.idexperimento = ? AND a.estado = 'completado'
-				GROUP BY g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif,
+				GROUP BY g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis,
 				         ((s.segundo - 1) / 60) + 1, s.conducta
 				ORDER BY g.idgrupo, t.ordinal, e.numerocilindro, minuto
 				""", (rs, fila) -> new FilaConteo(rs.getInt("idgrupo"), rs.getString("etiqueta"),
-				rs.getInt("ordinal"), rs.getInt("numerocilindro"), rs.getString("nivelclasif"),
+				rs.getInt("ordinal"), rs.getInt("numerocilindro"), rs.getString("nivelclasif"), rs.getInt("idanalisis"),
 				rs.getInt("minuto"), rs.getString("conducta"), rs.getLong("segundos"), rs.getBoolean("revisado")),
 				idExperimento);
 
@@ -337,6 +444,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 				nuevo.ordinal = f.ordinal();
 				nuevo.cilindro = f.cilindro();
 				nuevo.nivel = f.nivel();
+				nuevo.idAnalisis = f.idAnalisis();
 				return nuevo;
 			});
 			e.filas += f.segundos();

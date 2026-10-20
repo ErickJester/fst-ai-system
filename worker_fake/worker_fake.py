@@ -22,6 +22,7 @@ from psycopg2.extras import execute_values
 
 import tareas_programadas
 from progreso import RegistroProgreso
+from tiempos import RegistroTiempos, cerrar_archivo
 from comun import (
     ARCHIVOS, DAILY_HOUR, PAUSE_TIMEOUT_MINUTES, POLL_SECONDS, STAGE_SECONDS,
     ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, datos_analisis,
@@ -157,8 +158,12 @@ def procesar(conn, id_analisis):
              "retoma tras el ajuste" if retoma else "empieza")
 
     progreso = RegistroProgreso(id_analisis)
+    # El cronómetro del análisis arranca aquí, cuando el worker lo toma: la espera en la cola no cuenta.
+    tiempos = RegistroTiempos(id_analisis)
+    tiempos.video(d["duracion"])
     for etapa in etapas:
         poner_etapa(conn, id_analisis, etapa)
+        tiempos.etapa(etapa)
         # En lugar de dormir STAGE_SECONDS de golpe, la etapa avanza de 0 a 100 en ese tiempo, para que las
         # pruebas con el simulador muestren el mismo progreso que el worker real.
         progreso.avanzar_por_tiempo(etapa, STAGE_SECONDS)
@@ -175,7 +180,7 @@ def procesar(conn, id_analisis):
         elif etapa == "clasificacion" and "pausa" in texto and not retoma:
             return pausar(conn, d, especimenes)
 
-    completar(conn, d, especimenes, progreso)
+    completar(conn, d, especimenes, progreso, tiempos)
 
 
 def recuadros(especimenes):
@@ -207,6 +212,7 @@ def marcar_error(conn, d, etapa, mensaje):
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' terminó con error "
                   f"en la etapa '{etapa}': {mensaje}", d["idexperimento"])
     conn.commit()
+    cerrar_archivo(d["idanalisis"])     # el cronómetro se detiene donde llegó
     enviar_correos(pendientes)
     log.info("Análisis %s en error (%s): %s", d["idanalisis"], etapa, mensaje)
 
@@ -275,6 +281,7 @@ def pausar(conn, d, especimenes):
                   f"al espécimen del cilindro {cilindro}. Ajusta el recuadro en los próximos "
                   f"{PAUSE_TIMEOUT_MINUTES} minutos o el análisis se cancelará.", d["idexperimento"])
     conn.commit()
+    cerrar_archivo(d["idanalisis"])     # en pausa el worker ya no trabaja en él: el cronómetro se detiene
     enviar_correos(pendientes)
     log.info("Análisis %s en pausa (cilindro %s); el worker sigue con la cola", d["idanalisis"], cilindro)
 
@@ -306,7 +313,7 @@ def inventar_segundos(rng, n):
     return segundos
 
 
-def completar(conn, d, especimenes, progreso):
+def completar(conn, d, especimenes, progreso, tiempos):
     """Sección 4.4: por espécimen, una OBSERVACION, hasta 300 SEGUNDO (los últimos 300 s, ya
     renumerados de 1 a 300). Los totales por minuto no se guardan (D-52). Los archivos se escriben antes y la base se actualiza en una sola transacción."""
     id_analisis = d["idanalisis"]
@@ -349,6 +356,7 @@ def completar(conn, d, especimenes, progreso):
                   f"Ya puedes ver los resultados.", d["idexperimento"])
     conn.commit()
     progreso.terminar()
+    tiempos.cerrar()
 
     # Ya no está en pausa: la carpeta de pausa, si la hubo, sobra.
     borrar_archivo(carpeta / "pausa.json")
