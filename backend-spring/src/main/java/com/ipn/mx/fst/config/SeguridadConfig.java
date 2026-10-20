@@ -102,6 +102,10 @@ public class SeguridadConfig {
 				.authorizeHttpRequests(rutas -> rutas
 						.requestMatchers(HttpMethod.POST, "/auth/login", "/auth/recover", "/auth/reset").permitAll()
 						.requestMatchers(HttpMethod.GET, "/health").permitAll()
+						// El video de la revisión: la etiqueta <video> no puede mandar Authorization, así que la
+						// ruta no pide sesión y el propio endpoint exige un token de VIDEO en ?vt= (RevisionService).
+						// Solo ese GET y esa ruta exacta; todo lo demás de /experiments sigue pidiendo sesión.
+						.requestMatchers(HttpMethod.GET, "/experiments/*/analyses/*/video").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/documentacion/**", "/swagger-ui/**", "/error").permitAll()
 						.anyRequest().authenticated())
 				// El token se acepta solo en la cabecera "Authorization: Bearer" (el resolver por defecto),
