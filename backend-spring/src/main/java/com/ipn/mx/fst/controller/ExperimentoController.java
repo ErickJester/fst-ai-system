@@ -92,6 +92,16 @@ public class ExperimentoController {
 		return Respuesta.ok(experimentoService.actualizar(id, experimento), HttpStatus.OK);
 	}
 
+	// Elimina una tanda con sus videos y resultados, para dejar libre su letra si se subió mal: solo el creador del
+	// experimento o un Administrador (403); 404 si la tanda no es de ese experimento; 409 si su análisis está procesando o
+	// en pausa. 204 sin cuerpo.
+	@DeleteMapping("/{id}/tandas/{idTanda}")
+	public ResponseEntity<Map<String, Object>> deleteTanda(@PathVariable Integer id, @PathVariable Integer idTanda,
+			Authentication authentication) {
+		experimentoService.eliminarTanda(id, idTanda, authentication);
+		return ResponseEntity.noContent().build();
+	}
+
 	// Elimina un experimento: solo su creador o un Administrador (403). Por ahora solo los que no tienen
 	// grupos (409 si los tiene, 404 si no existe).
 	@DeleteMapping("/{id}")
