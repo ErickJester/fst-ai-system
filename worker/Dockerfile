@@ -16,6 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # El código va al final para que cambiarlo no reinstale las bibliotecas
 COPY worker_fake/*.py ./
 COPY pipeline ./pipeline
-COPY worker/worker.py ./
+COPY worker/worker.py worker/vigilancia.py ./
 # -u: sin búfer, para que el log salga al momento en docker compose logs
 CMD ["python", "-u", "worker.py"]

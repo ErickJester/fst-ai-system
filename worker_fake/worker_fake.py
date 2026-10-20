@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 from psycopg2.extras import execute_values
 
 import tareas_programadas
+from progreso import RegistroProgreso
 from comun import (
     ARCHIVOS, DAILY_HOUR, PAUSE_TIMEOUT_MINUTES, POLL_SECONDS, STAGE_SECONDS,
     ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, datos_analisis,
@@ -155,9 +156,12 @@ def procesar(conn, id_analisis):
     log.info("Análisis %s (%s, '%s'): %s", id_analisis, d["tanda"], d["nombre"],
              "retoma tras el ajuste" if retoma else "empieza")
 
+    progreso = RegistroProgreso(id_analisis)
     for etapa in etapas:
         poner_etapa(conn, id_analisis, etapa)
-        time.sleep(STAGE_SECONDS)
+        # En lugar de dormir STAGE_SECONDS de golpe, la etapa avanza de 0 a 100 en ese tiempo, para que las
+        # pruebas con el simulador muestren el mismo progreso que el worker real.
+        progreso.avanzar_por_tiempo(etapa, STAGE_SECONDS)
         if etapa == "preprocesamiento":
             if not d["archivo"] or not (ARCHIVOS / d["archivo"]).exists():
                 return marcar_error(conn, d, etapa, "No se pudo abrir el video: el archivo no está en el volumen.")
@@ -171,7 +175,7 @@ def procesar(conn, id_analisis):
         elif etapa == "clasificacion" and "pausa" in texto and not retoma:
             return pausar(conn, d, especimenes)
 
-    completar(conn, d, especimenes)
+    completar(conn, d, especimenes, progreso)
 
 
 def recuadros(especimenes):
@@ -302,7 +306,7 @@ def inventar_segundos(rng, n):
     return segundos
 
 
-def completar(conn, d, especimenes):
+def completar(conn, d, especimenes, progreso):
     """Sección 4.4: por espécimen, una OBSERVACION, hasta 300 SEGUNDO (los últimos 300 s, ya
     renumerados de 1 a 300). Los totales por minuto no se guardan (D-52). Los archivos se escriben antes y la base se actualiza en una sola transacción."""
     id_analisis = d["idanalisis"]
@@ -344,6 +348,7 @@ def completar(conn, d, especimenes):
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' terminó. "
                   f"Ya puedes ver los resultados.", d["idexperimento"])
     conn.commit()
+    progreso.terminar()
 
     # Ya no está en pausa: la carpeta de pausa, si la hubo, sobra.
     borrar_archivo(carpeta / "pausa.json")

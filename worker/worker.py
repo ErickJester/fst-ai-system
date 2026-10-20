@@ -24,16 +24,19 @@ import os
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 import pandas as pd
 from PIL import Image, ImageDraw
 from psycopg2.extras import execute_values
 
+import vigilancia
 import worker_fake
 from comun import (
     ARCHIVOS, ahora, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
 )
+from progreso import RegistroProgreso
 from worker_fake import fuente, marcar_error, poner_etapa
 
 MODELO = Path(os.environ.get("MODELO_CNN", "/data/modelos/fst_cnn_seg.pt"))
@@ -79,18 +82,34 @@ def sondear(ruta):
     return ancho, alto, float(info["format"]["duration"])
 
 
-def correr(comando, registro):
+def correr(comando, registro, al_vigilar=None, limite=LIMITE_PASO_S):
     """Corre un paso del pipeline desde pipeline/ (sus archivos se importan entre sí) y manda toda su
-    salida a registro. Devuelve el código de salida, o None si pasó del límite de tiempo."""
+    salida a registro. Devuelve el código de salida, o None si pasó del límite de tiempo.
+    Cada vigilancia.PERIODO_S llama a al_vigilar(pid) para medir el avance del paso desde afuera; si el
+    vigilante falla, se avisa una vez y el análisis sigue sin barra fina: nunca se rompe por medirlo."""
     entorno = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
     with open(registro, "ab") as f:
         f.write(f"\n$ {' '.join(comando)}\n".encode("utf-8"))
         f.flush()
-        try:
-            return subprocess.run(comando, cwd=PIPELINE, env=entorno, stdout=f,
-                                  stderr=subprocess.STDOUT, timeout=LIMITE_PASO_S).returncode
-        except subprocess.TimeoutExpired:
-            return None
+        proceso = subprocess.Popen(comando, cwd=PIPELINE, env=entorno, stdout=f, stderr=subprocess.STDOUT)
+        inicio = time.monotonic()
+        avisado = False
+        while True:
+            try:
+                return proceso.wait(timeout=vigilancia.PERIODO_S)
+            except subprocess.TimeoutExpired:
+                pass
+            if time.monotonic() - inicio > limite:
+                proceso.kill()
+                proceso.wait()
+                return None
+            if al_vigilar is not None:
+                try:
+                    al_vigilar(proceso.pid)
+                except Exception as e:  # noqa: BLE001  (medir el avance no puede romper el análisis)
+                    if not avisado:
+                        avisado = True
+                        log.warning("No se pudo medir el avance de %s: %s", Path(comando[1]).name, e)
 
 
 def ultimas_lineas(registro, cuantas=4):
@@ -155,6 +174,9 @@ def procesar_real(conn, id_analisis):
     conn.commit()
     log.info("Análisis %s (%s, '%s'): empieza (modelo real)", id_analisis, d["tanda"], d["nombre"])
 
+    # Avance para la pantalla de progreso (analisis/{id}/progreso.json); un análisis reiniciado empieza en 0.
+    progreso = RegistroProgreso(id_analisis)
+
     # a. preprocesamiento: el video existe y se puede leer
     poner_etapa(conn, id_analisis, "preprocesamiento")
     video = ARCHIVOS / d["archivo"] if d["archivo"] else None
@@ -175,6 +197,7 @@ def procesar_real(conn, id_analisis):
                             f"No se pudo leer el video con ffprobe: el archivo está dañado o no es un video "
                             f"({type(e).__name__}).")
     log.info("Análisis %s: video de %sx%s, %.1f s", id_analisis, ancho, alto, duracion)
+    progreso.etapa_hecha("preprocesamiento")
 
     trabajo = carpeta_analisis(id_analisis) / "trabajo"
     trabajo.mkdir(parents=True, exist_ok=True)
@@ -186,7 +209,9 @@ def procesar_real(conn, id_analisis):
     poner_etapa(conn, id_analisis, "cilindros")
     tubos = len(especimenes)
     codigo = correr([sys.executable, "etiquetar.py", str(video), "--tubos", str(tubos),
-                     "--salida", str(trabajo)], registro)
+                     "--salida", str(trabajo)], registro,
+                    vigilancia.VigilanteCilindros(lambda pct: progreso.avance("cilindros", pct),
+                                                  video, registro, duracion))
     if codigo != 0:
         return fallo_del_pipeline(conn, d, "cilindros", "No se pudieron encontrar los cilindros", codigo, registro)
     rasgos = trabajo / f"{nombre}_rasgos.csv"
@@ -203,20 +228,30 @@ def procesar_real(conn, id_analisis):
                             f"la tanda tiene {tubos} especímenes. Revisa {nombre}_control.jpg en la carpeta "
                             "de trabajo del análisis.")
 
-    # c. clasificacion: probar_seg.py clasifica cada segundo con la red
+    progreso.etapa_hecha("cilindros")
+
+    # c. clasificacion: probar_seg.py clasifica cada segundo con la red. Su ritmo se mide en cada corrida y se
+    # guarda para que la barra de la siguiente se ajuste a esta computadora.
     poner_etapa(conn, id_analisis, "clasificacion")
+    archivo_ritmo = ARCHIVOS / "worker" / "ritmo_prediccion.json"
+    ritmo = vigilancia.leer_ritmo(archivo_ritmo)
+    vigilante = vigilancia.VigilanteClasificacion(lambda pct: progreso.avance("clasificacion", pct),
+                                                  video, registro, duracion, ritmo)
     codigo = correr([sys.executable, "cnn/probar_seg.py", str(rasgos), "--red", str(MODELO),
-                     "--video", str(video)], registro)
+                     "--video", str(video)], registro, vigilante)
     if codigo != 0:
         return fallo_del_pipeline(conn, d, "clasificacion", "No se pudo clasificar el video", codigo, registro)
+    medido = vigilante.ritmo_medido()
+    if medido is not None:
+        vigilancia.guardar_ritmo(archivo_ritmo, medido, ritmo)
     clasificados = trabajo / f"{nombre}_cnnseg.csv"
     if not clasificados.exists():
         return marcar_error(conn, d, "clasificacion",
                             "No se pudo clasificar el video: el pipeline terminó sin generar "
                             f"{clasificados.name}. Últimas líneas del registro: {ultimas_lineas(registro)}")
 
-    # d. completar
-    completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto)
+    # d. completar (la copia web.mp4 es la última fase de la etapa clasificacion)
+    completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, progreso, registro)
 
 
 def traducir(valor, id_analisis, cilindro):
@@ -228,7 +263,7 @@ def traducir(valor, id_analisis, cilindro):
     return conducta
 
 
-def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto):
+def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, progreso, registro):
     """El equivalente real de worker_fake.completar (sección 4.4): por espécimen, una OBSERVACION con sus
     últimos 300 SEGUNDO renumerados de 1 a n. Los archivos se escriben antes y la base se actualiza en una
     sola transacción, con la misma notificación."""
@@ -251,21 +286,33 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto):
 
     # web.mp4: la copia para revisar en el navegador, recodificada a H.264 y sin audio (guía 11.16),
     # con los mismos últimos 300 s que se guardan en SEGUNDO (o todo el video si dura menos).
-    comando = ["ffmpeg", "-y", "-v", "error"]
+    # -progress escribe en un archivo cuántos segundos de video lleva convertidos (out_time_us): con eso y la
+    # duración de la copia se mide esta fase, que pesa el 12 % de la etapa (ver vigilancia.py).
+    archivo_progreso = carpeta / "web_progreso.txt"
+    archivo_progreso.write_bytes(b"")
+    duracion_copia = max(1, min(MAX_SEGUNDOS, n_total))
+    comando = ["ffmpeg", "-y", "-v", "error", "-progress", str(archivo_progreso)]
     if inicio > 0:
         comando += ["-ss", str(inicio)]
     comando += ["-i", str(video), "-t", str(MAX_SEGUNDOS), "-an", "-c:v", "libx264", "-preset", "veryfast",
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(carpeta / "web.mp4")]
-    try:
-        subprocess.run(comando, capture_output=True, text=True, timeout=LIMITE_FFMPEG_S, check=True)
-    except subprocess.CalledProcessError as e:
-        return marcar_error(conn, d, "clasificacion",
-                            f"No se pudo preparar la copia del video para revisión (ffmpeg): "
-                            f"{(e.stderr or '').strip()[-300:]}")
-    except subprocess.TimeoutExpired:
+    fase_web = vigilancia.PESO_FASE_CLASIFICACION
+    antes_web = 100 - fase_web["web"]
+
+    def vigilar_ffmpeg(_pid):
+        hecho = vigilancia.segundos_de_ffmpeg(vigilancia.leer_texto(archivo_progreso)) / duracion_copia
+        progreso.avance("clasificacion", antes_web + fase_web["web"] * min(hecho, 0.99))
+
+    codigo = correr(comando, registro, vigilar_ffmpeg, LIMITE_FFMPEG_S)
+    borrar_archivo(archivo_progreso)
+    if codigo is None:
         return marcar_error(conn, d, "clasificacion",
                             f"No se pudo preparar la copia del video para revisión: ffmpeg pasó de "
                             f"{LIMITE_FFMPEG_S // 60} minutos.")
+    if codigo != 0:
+        return marcar_error(conn, d, "clasificacion",
+                            f"No se pudo preparar la copia del video para revisión (ffmpeg): "
+                            f"{ultimas_lineas(registro)}")
 
     # cajas.json: el recuadro de cada tubo es la mediana de sus recuadros por bloque, en píxeles del
     # video original (el mismo formato que worker_fake).
@@ -306,6 +353,7 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto):
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' terminó. "
                   f"Ya puedes ver los resultados.", d["idexperimento"])
     conn.commit()
+    progreso.terminar()      # hasta aquí el general no llega a 100: el análisis ya quedó completado
 
     borrar_archivo(carpeta / "pausa.json")
     borrar_archivo(carpeta / "pausa.jpg")

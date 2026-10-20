@@ -24,7 +24,8 @@ function trabajo(exp, g, t, a) {
     subido_por: t.subido_por,
     status: ESTADO.aFront[a.estado],
     stage: a.etapa ? ETAPA.aFront[a.etapa] : null,
-    progress_pct: a.porcentaje ?? 0,
+    progress_pct: a.porcentaje ?? 0, // el avance GENERAL, de 0 a 100
+    stage_pct: a.porcentajeEtapa ?? null, // el de la etapa actual; null si el backend no lo tiene
     analisis_fecha: a.fechaAnalisis ?? null,
     motivo: a.motivoCancelacion ?? null,
     ...(a.pausa && { pausa: { cilindro: a.pausa.cilindro, desde_segundo: a.pausa.desdeSegundo }, segundos_restantes: a.pausa.segundosRestantes }),

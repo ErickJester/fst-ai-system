@@ -1,5 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA } from './fst'
+
+describe('porcentaje de cada etapa en Progreso', () => {
+  const ETAPAS = ['PREPROCESSING', 'ROI_DETECTION', 'CLASSIFICATION']
+
+  it('hecha 100, en curso el del backend, pendiente 0', () => {
+    const j = { stage: 'ROI_DETECTION', stage_pct: 41 }
+    expect(ETAPAS.map((e) => pctDeEtapa(j, e, ETAPAS))).toEqual([100, 41, 0])
+  })
+
+  it('en curso sin porcentaje de etapa (backend viejo) usa el de la etapa', () => {
+    expect(pctDeEtapa({ stage: 'ROI_DETECTION', stage_pct: null }, 'ROI_DETECTION', ETAPAS)).toBe(67)
+  })
+
+  it('los pesos de la barra general suman 100', () => {
+    expect(Object.values(PESO_ETAPA).reduce((a, b) => a + b, 0)).toBe(100)
+  })
+})
 
 describe('estadísticos y formato', () => {
   it('media y varianza muestral (n − 1), como en Resultados', () => {
