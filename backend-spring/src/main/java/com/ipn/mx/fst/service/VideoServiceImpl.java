@@ -120,12 +120,14 @@ public class VideoServiceImpl implements VideoService {
 			// si algo falla, no se confirma nada y el catch borra el archivo, esté donde esté.
 			String tipoFinal = tipo;
 			String tratamientoFinal = tratamiento;
+			// Solo para mostrarlo en Resultados y en los reportes; el archivo se guarda como videos/{id}.{ext}.
+			String nombreOriginal = nombreParaMostrar(archivo.getOriginalFilename());
 			return new TransactionTemplate(transactionManager).execute(estado -> {
 				Integer idTanda = resolverDestino(idExperimento, etiqueta, sesion, tipoFinal, tratamientoFinal,
 						nCilindros, ordinal, true);
 				Integer idVideo = jdbc.queryForObject(
-						"INSERT INTO video (idtanda, sesion, duracion) VALUES (?, ?, ?) RETURNING idvideo",
-						Integer.class, idTanda, sesion, duracion);
+						"INSERT INTO video (idtanda, sesion, duracion, nombreoriginal) VALUES (?, ?, ?, ?) RETURNING idvideo",
+						Integer.class, idTanda, sesion, duracion, nombreOriginal);
 				// La ruta es relativa a la raíz del volumen, como la guarda y la lee todo el sistema.
 				String relativa = "videos/" + idVideo + "." + extension;
 				jdbc.update("UPDATE video SET archivo = ? WHERE idvideo = ?", relativa, idVideo);
@@ -241,6 +243,24 @@ public class VideoServiceImpl implements VideoService {
 			return "mov";
 		}
 		return null;
+	}
+
+	// El nombre del archivo como lo subió el usuario, para mostrarlo: respeta mayúsculas y acentos ("AcuBN1.MOV" queda
+	// tal cual). Algunos navegadores mandan la ruta completa (C:\carpeta\archivo.mp4): solo vale lo que sigue al
+	// último / o \. Sin espacios de los lados, sin caracteres de control y de a lo más 255 caracteres (el largo de
+	// la columna). Vacío es null. NUNCA se usa para armar rutas: el archivo se guarda como videos/{id}.{ext}.
+	static String nombreParaMostrar(String original) {
+		if (original == null) {
+			return null;
+		}
+		String nombre = original.substring(Math.max(original.lastIndexOf('/'), original.lastIndexOf('\\')) + 1);
+		StringBuilder sinControl = new StringBuilder();
+		nombre.codePoints().filter(c -> !Character.isISOControl(c)).forEach(sinControl::appendCodePoint);
+		String texto = sinControl.toString().trim();
+		if (texto.codePointCount(0, texto.length()) > 255) {
+			texto = texto.substring(0, texto.offsetByCodePoints(0, 255));
+		}
+		return texto.isEmpty() ? null : texto;
 	}
 
 	// Texto sin espacios de los lados; vacío o ausente es null.

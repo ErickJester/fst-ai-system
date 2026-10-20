@@ -91,6 +91,10 @@ export const segundosDesde = (iso, ahoraMs) => Math.max(0, Math.floor((ahoraMs -
 // El equipo de un análisis, como se muestra: su nombre o, si no tiene, el modelo del procesador.
 export const nombreEquipo = (equipo) => equipo?.nombre || equipo?.cpu || null
 
+// El video de un análisis, con el nombre del archivo como lo subió el usuario («Video: acu-yintang2.mp4»). Los videos
+// anteriores al 20-oct-2026 no lo tienen: «Video: nombre no registrado». Siempre visible: no depende del modo desarrollador.
+export const textoVideo = (nombre) => 'Video: ' + (nombre || 'nombre no registrado')
+
 // Segundos de una etapa de un análisis en curso (j.tiempos, de services/progreso.js): hecha → los que midió el worker;
 // en curso → los que lleva, contados desde su inicio; sin empezar (o sin registro) → null, que se muestra «—».
 export function tiempoDeEtapa(j, etapa, ahoraMs) {

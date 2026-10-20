@@ -104,6 +104,9 @@ CREATE TABLE video (
     REFERENCES tanda (idtanda) ON UPDATE NO ACTION ON DELETE NO ACTION,
   sesion      sesion_video NOT NULL,
   archivo     text,                         -- ruta dentro del volumen; nula cuando el video ya se borro
+  -- nombre del archivo como lo subio el usuario, solo para mostrarlo (nunca arma rutas); NULL en videos
+  -- anteriores al 20-oct-2026. Las bases que ya existian lo reciben con db/migraciones.sql (la corre el backend).
+  nombreoriginal varchar(255),
   duracion    numeric(8,2) NOT NULL CHECK (duracion > 0),    -- segundos
   fechacarga  timestamptz  NOT NULL DEFAULT now(),
   CONSTRAINT uq_video_sesion UNIQUE (idtanda, sesion)

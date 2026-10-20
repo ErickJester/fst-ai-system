@@ -24,6 +24,11 @@ public interface ResultadosService {
 	// grupo, tanda (letra), duracionVideo (segundos) y tiempos (lo de tiempos.json, o null si no hay archivo).
 	List<Map<String, Object>> tiemposDelExperimento(Integer idExperimento);
 
+	// Una fila por tanda con análisis completado, para la tabla "Videos analizados" del PDF de resultados (siempre
+	// visible, no depende del modo desarrollador): grupo, tanda (letra), nombreVideo (como lo subió el usuario, o
+	// null en los videos anteriores al 20-oct-2026), duracionVideo (segundos) e idAnalisis.
+	List<Map<String, Object>> videosAnalizados(Integer idExperimento);
+
 	// Ruta del PDF de diagnóstico de un análisis en error. 404 si el análisis no es de ese experimento, no
 	// está en error o el archivo no existe.
 	Path diagnostico(Integer idExperimento, Integer idAnalisis);

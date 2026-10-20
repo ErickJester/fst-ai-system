@@ -23,6 +23,7 @@ public interface TandaRepository extends JpaRepository<Tanda, Integer> {
 			       v.idvideo                             AS "idVideo",
 			       v.sesion                              AS "sesion",
 			       v.duracion                            AS "duracion",
+			       v.nombreoriginal                      AS "nombreOriginal",
 			       to_char(v.fechacarga AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD') AS "fecha",
 			       (v.archivo IS NOT NULL)               AS "videoDisponible",
 			       a.idanalisis                          AS "idAnalisis",

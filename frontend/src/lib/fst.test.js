@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo } from './fst'
 
 describe('tiempos del análisis', () => {
   it('mmss: m:ss y, pasada la hora, h:mm:ss', () => {
@@ -10,6 +10,14 @@ describe('tiempos del análisis', () => {
     expect(mmss(3599)).toBe('59:59')
     expect(mmss(3600)).toBe('1:00:00')
     expect(mmss(3725)).toBe('1:02:05')
+  })
+
+  it('el video: su nombre como lo subió el usuario o «nombre no registrado»', () => {
+    expect(textoVideo('acu-yintang2.mp4')).toBe('Video: acu-yintang2.mp4')
+    expect(textoVideo('Prueba ñandú 25s.MP4')).toBe('Video: Prueba ñandú 25s.MP4')
+    expect(textoVideo(null)).toBe('Video: nombre no registrado')
+    expect(textoVideo(undefined)).toBe('Video: nombre no registrado')
+    expect(textoVideo('')).toBe('Video: nombre no registrado')
   })
 
   it('segundosDesde nunca es negativo (relojes distintos)', () => {

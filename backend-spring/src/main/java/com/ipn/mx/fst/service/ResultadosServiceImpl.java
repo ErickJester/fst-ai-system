@@ -71,7 +71,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 
 	// Una fila de la consulta de resultados: las veces que un espécimen tuvo una conducta en un minuto.
 	private record FilaConteo(int idGrupo, String etiqueta, int ordinal, int cilindro, String nivel, int idAnalisis,
-			int minuto, String conducta, long segundos, boolean revisado) {
+			String nombreVideo, int minuto, String conducta, long segundos, boolean revisado) {
 	}
 
 	// Un espécimen con sus conteos ya sumados. filas incluye los segundos sin conducta (NULL): cuentan en el
@@ -83,6 +83,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		int cilindro;
 		String nivel;
 		int idAnalisis;
+		String nombreVideo;      // el del video de la tanda; null en los videos anteriores al 20-oct-2026
 		boolean revisado;
 		long filas;
 		final Map<String, Long> total = new HashMap<>();
@@ -260,12 +261,24 @@ public class ResultadosServiceImpl implements ResultadosService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<Map<String, Object>> tiemposDelExperimento(Integer idExperimento) {
-		existe(idExperimento);
 		if (!modoDesarrollador) {
 			return List.of();      // sin modo desarrollador el PDF no lleva la sección de tiempos
 		}
+		List<Map<String, Object>> filas = videosAnalizados(idExperimento);
+		for (Map<String, Object> fila : filas) {
+			fila.put("tiempos", tiempos((Integer) fila.get("idAnalisis")));
+		}
+		return filas;
+	}
+
+	// Una fila por tanda con análisis completado: grupo, tanda (letra), nombre del video como lo subió el usuario
+	// (null en los videos anteriores al 20-oct-2026), duración del video e idAnalisis. Es para el PDF de resultados.
+	@Override
+	@Transactional(readOnly = true)
+	public List<Map<String, Object>> videosAnalizados(Integer idExperimento) {
+		existe(idExperimento);
 		return jdbc.query("""
-				SELECT a.idanalisis, g.etiqueta, t.ordinal, v.duracion
+				SELECT a.idanalisis, g.etiqueta, t.ordinal, v.duracion, v.nombreoriginal
 				FROM analisis a
 				JOIN video v ON v.idvideo = a.idvideo
 				JOIN tanda t ON t.idtanda = v.idtanda
@@ -277,7 +290,8 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("grupo", rs.getString("etiqueta"));
 			item.put("tanda", letra(rs.getInt("ordinal")));
 			item.put("duracionVideo", rs.getDouble("duracion"));
-			item.put("tiempos", tiempos(rs.getInt("idanalisis")));
+			item.put("nombreVideo", rs.getString("nombreoriginal"));
+			item.put("idAnalisis", rs.getInt("idanalisis"));
 			return item;
 		}, idExperimento);
 	}
@@ -365,6 +379,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("numeroCilindro", e.cilindro);
 			item.put("nivelClasif", e.nivel);
 			item.put("revisado", e.revisado);
+			item.put("nombreVideo", e.nombreVideo);     // el del video de su tanda; null en los videos anteriores
 			item.put("totales", totales(e));
 			item.put("tiempoAnalisis", modoDesarrollador ? tiempoDe.computeIfAbsent(e.idAnalisis, this::tiempoAnalisis) : null);
 			if (conMinutos) {
@@ -414,7 +429,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	// tanda y cilindro.
 	private List<Espec> leerEspecimenes(Integer idExperimento) {
 		List<FilaConteo> filas = jdbc.query("""
-				SELECT g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis,
+				SELECT g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis, v.nombreoriginal,
 				       ((s.segundo - 1) / 60) + 1 AS minuto,
 				       s.conducta,
 				       COUNT(*) AS segundos,
@@ -427,12 +442,12 @@ public class ResultadosServiceImpl implements ResultadosService {
 				JOIN observacion o ON o.idespecimen = e.idespecimen AND o.idvideo = v.idvideo
 				JOIN segundo s     ON s.idobservacion = o.idobservacion
 				WHERE g.idexperimento = ? AND a.estado = 'completado'
-				GROUP BY g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis,
+				GROUP BY g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, a.nivelclasif, a.idanalisis, v.nombreoriginal,
 				         ((s.segundo - 1) / 60) + 1, s.conducta
 				ORDER BY g.idgrupo, t.ordinal, e.numerocilindro, minuto
 				""", (rs, fila) -> new FilaConteo(rs.getInt("idgrupo"), rs.getString("etiqueta"),
 				rs.getInt("ordinal"), rs.getInt("numerocilindro"), rs.getString("nivelclasif"), rs.getInt("idanalisis"),
-				rs.getInt("minuto"), rs.getString("conducta"), rs.getLong("segundos"), rs.getBoolean("revisado")),
+				rs.getString("nombreoriginal"), rs.getInt("minuto"), rs.getString("conducta"), rs.getLong("segundos"), rs.getBoolean("revisado")),
 				idExperimento);
 
 		Map<String, Espec> porEspecimen = new LinkedHashMap<>();
@@ -445,6 +460,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 				nuevo.cilindro = f.cilindro();
 				nuevo.nivel = f.nivel();
 				nuevo.idAnalisis = f.idAnalisis();
+				nuevo.nombreVideo = f.nombreVideo();
 				return nuevo;
 			});
 			e.filas += f.segundos();

@@ -76,8 +76,10 @@ def encolar(conn, args):
 
         # Igual que el backend (sección 4.1): primero el archivo en videos/{idVideo}.mp4, luego la fila.
         cur.execute(
-            "INSERT INTO video (idtanda, sesion, duracion) VALUES (%s, %s, %s) RETURNING idvideo",
-            (id_tanda, args.sesion, duracion),
+            "INSERT INTO video (idtanda, sesion, duracion, nombreoriginal) VALUES (%s, %s, %s, %s) RETURNING idvideo",
+            # Con --video, el nombre del archivo como lo tiene (solo para mostrarlo, como hace el backend); el video
+            # simulado no tiene nombre.
+            (id_tanda, args.sesion, duracion, origen.name if origen else None),
         )
         id_video = cur.fetchone()[0]
         # Un video real conserva su extensión (.mp4 o .mov); el simulado es siempre .mp4.

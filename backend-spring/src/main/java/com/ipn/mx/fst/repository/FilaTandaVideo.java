@@ -25,6 +25,9 @@ public interface FilaTandaVideo {
 
 	BigDecimal getDuracion();
 
+	// Nombre del archivo como lo subió el usuario; null en los videos anteriores al 20-oct-2026
+	String getNombreOriginal();
+
 	// Fecha de carga, AAAA-MM-DD en la zona America/Mexico_City
 	String getFecha();
 
