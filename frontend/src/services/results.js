@@ -109,8 +109,9 @@ export async function getBatchResults(clave, gid, letra) {
     grupo: { id: g.id, nombre: g.nombre, tipo: g.tipo, tratamiento: g.tratamiento },
     letra,
     dia: 'DAY2',
-    duracion_s: DURACION_S,
-    duracion_analizada_s: DURACION_S,
+    // Duración del video del Día 2 según el detalle (300 s en un video normal de 5 min).
+    duracion_s: t.duracion_s || DURACION_S,
+    duracion_analizada_s: t.duracion_s || DURACION_S,
     analizado_en: t.analisis_fecha || exp.fecha_inicio,
     nivel: mios.some((e) => e.nivelClasif === 'agrupado') ? 'AGRUPADO' : 'PRECISO',
     revisado: mios.some((e) => e.revisado),
@@ -185,7 +186,13 @@ export async function getGroupComparison(clave) {
 // backend no hay bloques: responde null y la pantalla explica.
 export async function getBlocks(clave, gid, letra) {
   if (USE_MOCKS) return reply(null)
-  const [exp, d] = await Promise.all([getExperiment(clave), pedir(clave, 'results/blocks')])
+  let exp, d
+  try {
+    [exp, d] = await Promise.all([getExperiment(clave), pedir(clave, 'results/blocks')])
+  } catch (e) {
+    if (e?.response?.status === 404) return null // el backend aún no los calcula
+    throw e
+  }
   const g = exp.grupos.find((x) => x.id === gid)
   if (!g) return null
   const aFront = (c) => (c ? CONDUCTA.aFront[c] : null)
