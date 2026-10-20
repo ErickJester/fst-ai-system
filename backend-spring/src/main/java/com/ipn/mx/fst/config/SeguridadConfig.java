@@ -86,6 +86,9 @@ public class SeguridadConfig {
 		cors.setAllowedOrigins(origenes);
 		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		// Para que la web lea el nombre de los archivos que descarga (Content-Disposition) cuando la API está en otro
+		// origen (desarrollo); por nginx es el mismo origen y no hace falta.
+		cors.setExposedHeaders(List.of("Content-Disposition"));
 
 		UrlBasedCorsConfigurationSource fuente = new UrlBasedCorsConfigurationSource();
 		fuente.registerCorsConfiguration("/**", cors);

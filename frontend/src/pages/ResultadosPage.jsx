@@ -3,7 +3,8 @@ import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { getBatchResults, getGroupComparison, getBlocks, getReporte } from '../services/results'
+import { getBatchResults, getGroupComparison, getBlocks, getReporte, getSegundosModelo } from '../services/results'
+import BotonSegundos from '../components/BotonSegundos'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
@@ -245,6 +246,19 @@ function ResultadosTanda({ clave, gid, letra }) {
     }
   }
 
+  // «Segundos» (solo modo desarrollador): la salida por segundo del modelo, tal cual. Con una tanda pide grupo y tanda;
+  // con el grupo completo, solo grupo.
+  async function pedirSegundos() {
+    setReporte({ formato: 'segundos', pidiendo: true })
+    try {
+      const salida = await getSegundosModelo(exp.clave, grupoCompleto ? { grupo: gid } : { grupo: gid, tanda: r.letra })
+      if (salida) download(salida.nombre, salida.archivo, salida.tipo)
+      setReporte(null)
+    } catch (e) {
+      setReporte({ formato: 'segundos', error: mensajeError(e, 'No se pudo descargar la salida por segundo del modelo. Inténtalo de nuevo.') })
+    }
+  }
+
   // Las pestañas llevan a su sección de la vista.
   function irA(id) {
     setTab(id)
@@ -318,6 +332,7 @@ function ResultadosTanda({ clave, gid, letra }) {
               <button key={formato} type="button" className={'btn ' + (formato === 'pdf' ? 'btn-primary' : 'btn-secondary')} style={btnLeft}
                 disabled={reporte?.pidiendo} onClick={() => pedirReporte(formato)}>{x.boton}</button>
             ))}
+            <BotonSegundos grupoCompleto={grupoCompleto} ocupado={reporte?.pidiendo} onClick={pedirSegundos} />
           </div>
         </div>
 

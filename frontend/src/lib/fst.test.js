@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition } from './fst'
 
 describe('tiempos del análisis', () => {
   it('mmss: m:ss y, pasada la hora, h:mm:ss', () => {
@@ -10,6 +10,13 @@ describe('tiempos del análisis', () => {
     expect(mmss(3599)).toBe('59:59')
     expect(mmss(3600)).toBe('1:00:00')
     expect(mmss(3725)).toBe('1:02:05')
+  })
+
+  it('el nombre de una descarga sale de Content-Disposition', () => {
+    expect(nombreDeContentDisposition('attachment; filename="acu-yintang2_cnnseg.csv"')).toBe('acu-yintang2_cnnseg.csv')
+    expect(nombreDeContentDisposition("attachment; filename*=UTF-8''Prueba%20%C3%B1and%C3%BA_cnnseg.csv")).toBe('Prueba ñandú_cnnseg.csv')
+    expect(nombreDeContentDisposition('attachment')).toBeNull()
+    expect(nombreDeContentDisposition(undefined)).toBeNull()
   })
 
   it('el video: su nombre como lo subió el usuario o «nombre no registrado»', () => {

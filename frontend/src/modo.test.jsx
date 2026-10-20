@@ -6,6 +6,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { version as versionDelPaquete } from '../package.json'
 import { ModoContext } from './contexts/ModoContext'
 import BannerBeta from './components/BannerBeta'
+import BotonSegundos from './components/BotonSegundos'
 import { TrabajoActual } from './pages/ProgresoPage'
 
 afterEach(cleanup)
@@ -33,6 +34,32 @@ describe('banner BETA', () => {
     cleanup()
     render(conModo({ modoDesarrollador: true, version: null }, <BannerBeta />))
     expect(screen.getByText('BETA v' + versionDelPaquete)).toBeTruthy()
+  })
+})
+
+describe('botón «Segundos» de Resultados', () => {
+  it('con modo desarrollador: una tanda descarga un CSV y el grupo completo, un ZIP', () => {
+    const { rerender } = render(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} onClick={() => {}} />))
+    expect(screen.getByRole('button', { name: 'Segundos (CSV)' })).toBeTruthy()
+    rerender(conModo(PRENDIDO, <BotonSegundos grupoCompleto onClick={() => {}} />))
+    expect(screen.getByRole('button', { name: 'Segundos (ZIP)' })).toBeTruthy()
+  })
+
+  it('sin modo desarrollador no hay botón, ni siquiera sin proveedor', () => {
+    const { container } = render(conModo(APAGADO, <BotonSegundos grupoCompleto={false} onClick={() => {}} />))
+    expect(container.querySelector('button')).toBeNull()
+    cleanup()
+    const solo = render(<BotonSegundos grupoCompleto={false} onClick={() => {}} />)
+    expect(solo.container.querySelector('button')).toBeNull()
+  })
+
+  it('el clic avisa, y ocupado lo deshabilita', () => {
+    const onClick = vi.fn()
+    const { rerender } = render(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} onClick={onClick} />))
+    screen.getByRole('button').click()
+    expect(onClick).toHaveBeenCalledTimes(1)
+    rerender(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} ocupado onClick={onClick} />))
+    expect(screen.getByRole('button').disabled).toBe(true)
   })
 })
 

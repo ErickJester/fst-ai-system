@@ -5,7 +5,7 @@ import * as db from './mocks/data'
 import { segundosDe, totalesDe, minutosDe, CONDUCTAS, DURACION_S } from './mocks/segundos'
 import { getExperiment } from './experiments'
 import { CONDUCTA, ESTADO, NIVEL, TIPO_GRUPO, ordinalDeLetra } from '../lib/contrato'
-import { mean, variance } from '../lib/fst'
+import { mean, variance, nombreDeContentDisposition } from '../lib/fst'
 
 // Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
 const USE_MOCKS = usaEjemplo('resultados')
@@ -212,6 +212,21 @@ export async function getBlocks(clave, gid, letra) {
 // sigue vigente devuelve el guardado. CSV y XLSX reciben el alcance de lo que se ve (D-93):
 // ?grupo= (grupo completo) o además &tanda= (una tanda). El frontend solo lo descarga. Sin
 // backend no hay archivo: responde null y la pantalla explica qué hará el botón.
+// GET /experiments/:clave/report/segundos?grupo=&tanda= (solo modo desarrollador): la salida por segundo del modelo TAL CUAL
+// (un CSV por tanda, o un ZIP con el de cada tanda si solo va el grupo). Es la salida CRUDA del modelo: no trae las
+// correcciones de la revisión. Se descarga como blob con el nombre que manda el servidor (Content-Disposition).
+// Sin backend no hay archivo: responde null.
+export async function getSegundosModelo(clave, alcance) {
+  if (USE_MOCKS) return reply(null)
+  const res = await api.get(`/experiments/${clave}/report/segundos`, { params: alcance, responseType: 'blob' })
+  const zip = !alcance.tanda
+  return {
+    archivo: res.data,
+    nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) || (zip ? 'segundos.zip' : 'segundos.csv'),
+    tipo: zip ? 'application/zip' : 'text/csv',
+  }
+}
+
 export async function getReporte(clave, formato, alcance = null) {
   if (USE_MOCKS) return reply(null)
   return (await api.get(`/experiments/${clave}/report/${formato}`, { params: alcance || undefined, responseType: 'blob' })).data
