@@ -96,7 +96,7 @@ public class RevisionServiceImpl implements RevisionService {
 
 	// Un análisis con la tanda y el creador del experimento (que por ahora es quien subió los videos).
 	private record Datos(String estado, String archivo, String etiqueta, int ordinal, int idVideo, int idTanda,
-			String creador) {
+			String creador, String nombreVideo) {
 	}
 
 	// ---------------------------------------------------------------------------
@@ -170,6 +170,7 @@ public class RevisionServiceImpl implements RevisionService {
 		datos.put("puedeCorregir", hayVideo && puedeCorregir(a, authentication));
 		datos.put("videoUrl", hayVideo ? "/experiments/" + idExperimento + "/analyses/" + idAnalisis + "/video" : null);
 		datos.put("videoDisponible", hayVideo);
+		datos.put("nombreVideo", a.nombreVideo());      // como lo subió el usuario; null en los videos anteriores
 		datos.put("duracion", duracion);
 		datos.put("ancho", ancho);
 		datos.put("alto", alto);
@@ -342,7 +343,7 @@ public class RevisionServiceImpl implements RevisionService {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + idExperimento + " no existe");
 		}
 		List<Datos> filas = jdbc.query("""
-				SELECT a.estado, v.archivo, g.etiqueta, t.ordinal, v.idvideo, t.idtanda, x.idinstitucional
+				SELECT a.estado, v.archivo, g.etiqueta, t.ordinal, v.idvideo, t.idtanda, x.idinstitucional, v.nombreoriginal
 				FROM analisis a
 				JOIN video v       ON v.idvideo = a.idvideo
 				JOIN tanda t       ON t.idtanda = v.idtanda
@@ -350,7 +351,8 @@ public class RevisionServiceImpl implements RevisionService {
 				JOIN experimento x ON x.idexperimento = g.idexperimento
 				WHERE a.idanalisis = ? AND g.idexperimento = ?
 				""", (rs, fila) -> new Datos(rs.getString("estado"), rs.getString("archivo"), rs.getString("etiqueta"),
-				rs.getInt("ordinal"), rs.getInt("idvideo"), rs.getInt("idtanda"), rs.getString("idinstitucional")),
+				rs.getInt("ordinal"), rs.getInt("idvideo"), rs.getInt("idtanda"), rs.getString("idinstitucional"),
+				rs.getString("nombreoriginal")),
 				idAnalisis, idExperimento);
 		if (filas.isEmpty()) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND,

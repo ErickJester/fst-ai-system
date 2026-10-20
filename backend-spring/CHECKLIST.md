@@ -93,6 +93,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] Solo el Día 2 crea `ANALISIS` con `estado='en cola'`, `etapa='preprocesamiento'`, `nivelClasif='preciso'` y `fechaAnalisis=ahora` (D-79), y el worker real lo toma solo
 - [x] El Día 1 se guarda sin análisis
 - [x] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
+- [x] Nombre original del video (D-114, 20-oct): columna `VIDEO.nombreOriginal` (migración idempotente al arrancar), guardado sin la ruta del cliente; se ve en Resultados, en la Revisión y en el PDF (tabla "Videos analizados"); los videos anteriores dicen "nombre no registrado"
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)

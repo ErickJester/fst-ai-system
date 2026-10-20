@@ -122,6 +122,7 @@ export async function getBatchResults(clave, gid, letra) {
     nivel: mios.some((e) => e.nivelClasif === 'agrupado') ? 'AGRUPADO' : 'PRECISO',
     revisado: mios.some((e) => e.revisado),
     tiempo_analisis: tiempoAnalisisFront(mios[0]),
+    nombre_video: mios[0]?.nombreVideo ?? null,    // como lo subió el usuario; null en los videos anteriores
     especimenes: mios.map((e) => ({ numeroCilindro: e.numeroCilindro, ...segundosPorConducta(e.totales) })),
     linea_tiempo: lineas_tiempo[0],
     lineas_tiempo,

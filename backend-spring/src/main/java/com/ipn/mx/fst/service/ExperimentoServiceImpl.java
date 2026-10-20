@@ -257,6 +257,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				video.put("idVideo", f.getIdVideo());
 				video.put("sesion", f.getSesion());
 				video.put("duracion", f.getDuracion());
+				video.put("nombreOriginal", f.getNombreOriginal());   // null en los videos anteriores al 20-oct-2026
 				video.put("fecha", f.getFecha());
 				video.put("videoDisponible", f.getVideoDisponible());
 				video.put("idAnalisis", f.getIdAnalisis());
@@ -454,6 +455,14 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió).",
 						letraNota));
 
+				// Los videos analizados: cada tanda con el nombre del archivo como lo subió el usuario. Siempre
+				// visible (no depende del modo desarrollador); los videos anteriores al 20-oct-2026 no tienen nombre.
+				documento.add(Chunk.NEWLINE);
+				Paragraph tituloVideos = new Paragraph("Videos analizados", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+				tituloVideos.setSpacingAfter(6);
+				documento.add(tituloVideos);
+				documento.add(armarTablaVideos(resultadosService.videosAnalizados(idExperimento)));
+
 				// Cuánto tardó cada tanda analizada y en qué equipo, para comparar entre computadoras. Solo en modo
 				// desarrollador: sin él, tiemposDelExperimento devuelve una lista vacía y la sección no sale.
 				List<Map<String, Object>> tiempos = resultadosService.tiemposDelExperimento(idExperimento);
@@ -525,6 +534,36 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		return tabla;
 	}
 
+	// "Videos analizados": una fila por tanda con su grupo, el nombre del video como lo subió el usuario (o "nombre no
+	// registrado" en los videos anteriores al 20-oct-2026) y su duración.
+	private PdfPTable armarTablaVideos(List<Map<String, Object>> videos) throws DocumentException {
+		PdfPTable tabla = new PdfPTable(3);
+		tabla.setWidthPercentage(100);
+		tabla.setWidths(new float[] {3.2f, 5f, 1.6f});
+
+		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+		Stream.of("Grupo · Tanda", "Video", "Duración (mm:ss)").forEach(textoEncabezado -> {
+			PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
+			encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+			encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
+			encabezado.setPadding(4);
+			tabla.addCell(encabezado);
+		});
+
+		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
+		for (Map<String, Object> video : videos) {
+			tabla.addCell(new PdfPCell(new Phrase(video.get("grupo") + " · Tanda " + video.get("tanda"), letraTexto)));
+			tabla.addCell(new PdfPCell(new Phrase(nombreDelVideo(video), letraTexto)));
+			tabla.addCell(celdaCentrada(mmss((Number) video.get("duracionVideo")), letraTexto));
+		}
+		return tabla;
+	}
+
+	private static String nombreDelVideo(Map<String, Object> video) {
+		Object nombre = video.get("nombreVideo");
+		return nombre != null ? nombre.toString() : "nombre no registrado";
+	}
+
 	// Una fila por tanda analizada: grupo y tanda, duración del video, tiempo total, tiempo de cada etapa y equipo.
 	private PdfPTable armarTablaTiempos(List<Map<String, Object>> tandas) throws DocumentException {
 		PdfPTable tabla = new PdfPTable(7);
@@ -544,7 +583,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 8);
 		for (Map<String, Object> tanda : tandas) {
-			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda"), letraTexto)));
+			// Además del grupo y la tanda, el nombre del video, para saber a qué archivo corresponde cada tiempo.
+			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
+					+ nombreDelVideo(tanda), letraTexto)));
 			tabla.addCell(celdaCentrada(mmss((Number) tanda.get("duracionVideo")), letraTexto));
 
 			@SuppressWarnings("unchecked")

@@ -48,6 +48,11 @@ public class Video implements Serializable {
 	@Column(name = "archivo")
 	private String archivo;
 
+	// Nombre del archivo como lo subió el usuario (por ejemplo "acu-yintang2.mp4"), solo para mostrarlo: NUNCA arma
+	// rutas. Nulo en los videos anteriores al 20-oct-2026.
+	@Column(name = "nombreoriginal", length = 255)
+	private String nombreOriginal;
+
 	// Duración en segundos.
 	@Column(name = "duracion", precision = 8, scale = 2, nullable = false)
 	private BigDecimal duracion;

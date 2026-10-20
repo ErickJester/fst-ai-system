@@ -7,7 +7,7 @@ import { getBatchResults, getGroupComparison, getBlocks, getReporte } from '../s
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, fechaCorta, mmss, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -268,6 +268,10 @@ function ResultadosTanda({ clave, gid, letra }) {
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}{analizado.length > 10 && ', ' + hora(analizado)}</div>
+            {/* El nombre del archivo del video, como lo subió el usuario; en el grupo completo, uno por tanda. */}
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>
+              {grupoCompleto ? rs.map((x) => 'Tanda ' + x.letra + ' · ' + textoVideo(x.nombre_video)).join('; ') : textoVideo(r.nombre_video)}
+            </div>
             {tiempos.length > 0 && (
               <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>
                 Tiempo de análisis: {tiempos.map((x) => (grupoCompleto ? 'Tanda ' + x.letra + ' ' : '') + mmss(x.tiempo_analisis.total_s) + (x.tiempo_analisis.equipo ? ' · ' + x.tiempo_analisis.equipo : '')).join('; ')}
