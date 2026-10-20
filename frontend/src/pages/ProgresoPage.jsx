@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Topbar, { Brand } from '../components/Topbar'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { getDiagnostico } from '../services/queue'
+import { getControl, getDiagnostico } from '../services/queue'
 import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
@@ -186,6 +186,42 @@ export function TrabajoActual({ j }) {
   )
 }
 
+const PIE_CONTROL = 'Imagen de control: amarillo = zona medida de cada tubo encontrado, azul = línea de agua, verde = fondo.'
+
+// La imagen de control del pipeline de un análisis con error: así se ve desde la página qué tubos se encontraron y cuáles
+// no, sin descargar el PDF. Se pide UNA vez, solo si el backend dice que existe, como blob (la etiqueta <img> no manda
+// el Authorization), y la URL de objeto se revoca al salir. Clic: se abre grande en una pestaña nueva. No depende del
+// modo desarrollador.
+export function ImagenControl({ j }) {
+  const { clave, job_id: id, control_disponible: disponible } = j
+  const [url, setUrl] = useState(null)
+  useEffect(() => {
+    if (!disponible) return undefined
+    let vivo = true
+    let creada = null
+    getControl({ clave, job_id: id })
+      .then((blob) => {
+        if (!vivo || !blob) return
+        creada = URL.createObjectURL(blob)
+        setUrl(creada)
+      })
+      .catch(() => { /* sin imagen: el error se entiende igual con su mensaje y el PDF */ })
+    return () => {
+      vivo = false
+      if (creada) URL.revokeObjectURL(creada)
+    }
+  }, [clave, id, disponible])
+  if (!url) return null
+  return (
+    <figure style={{ margin: 0 }}>
+      <a href={url} target="_blank" rel="noreferrer" title="Abrir en grande">
+        <img src={url} alt="Imagen de control con los tubos que se encontraron" style={{ display: 'block', maxWidth: '100%', height: 'auto', border: '1px solid var(--color-divider)' }} />
+      </a>
+      <figcaption className="hint" style={{ marginTop: 6 }}>{PIE_CONTROL}</figcaption>
+    </figure>
+  )
+}
+
 function TrabajoFallido({ j }) {
   const { modoDesarrollador } = useModo()
   const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)' + (tardo(j, modoDesarrollador) ? ' · ' + tardo(j, modoDesarrollador) : '')
@@ -227,6 +263,7 @@ function TrabajoFallido({ j }) {
       </div>
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="nd" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{mensajeErrorAnalisis(j.stage)}</div>
+        <ImagenControl j={j} />
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
           <button type="button" className="btn btn-primary" style={btnLeft} disabled={diag === 'pidiendo' || diag === 'preparando'} onClick={descargar}>
             {diag === 'preparando' ? 'Preparando…' : 'Descargar reporte de diagnóstico (PDF)'}

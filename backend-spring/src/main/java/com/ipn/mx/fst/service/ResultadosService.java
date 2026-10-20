@@ -29,6 +29,10 @@ public interface ResultadosService {
 	// null en los videos anteriores al 20-oct-2026), duracionVideo (segundos) e idAnalisis.
 	List<Map<String, Object>> videosAnalizados(Integer idExperimento);
 
+	// Ruta de la imagen de control que dejó el pipeline (trabajo/{idVideo}_control.jpg): los tubos que encontró. 404 si
+	// el análisis no es de ese experimento o la imagen no existe.
+	Path control(Integer idExperimento, Integer idAnalisis);
+
 	// Ruta del PDF de diagnóstico de un análisis en error. 404 si el análisis no es de ese experimento, no
 	// está en error o el archivo no existe.
 	Path diagnostico(Integer idExperimento, Integer idAnalisis);

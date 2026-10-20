@@ -105,7 +105,8 @@ public class ResultadosServiceImpl implements ResultadosService {
 		existe(idExperimento);
 
 		List<Map<String, Object>> analisis = jdbc.query("""
-				SELECT a.idanalisis, g.etiqueta, t.ordinal, v.sesion, a.estado, a.etapa, a.fechaanalisis, a.rutadiagnostico
+				SELECT a.idanalisis, g.etiqueta, t.ordinal, v.sesion, a.estado, a.etapa, a.fechaanalisis, a.rutadiagnostico,
+				       a.idvideo
 				FROM analisis a
 				JOIN video v ON v.idvideo = a.idvideo
 				JOIN tanda t ON t.idtanda = v.idtanda
@@ -128,6 +129,8 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("porcentajeEtapa", avance.etapa());
 			item.put("pausa", "en pausa".equals(estado) ? pausa(idAnalisis) : null);
 			item.put("diagnosticoDisponible", diagnosticoDisponible(estado, rs.getString("rutadiagnostico")));
+			// La imagen de control (los tubos que encontró el pipeline) que la pantalla de error muestra.
+			item.put("controlDisponible", Files.isRegularFile(rutaControl(idAnalisis, rs.getInt("idvideo"))));
 			// Mientras el análisis no termina es la hora en que se encoló (D-79); el worker la reemplaza al
 			// terminar. En la zona de México, con su desfase, para que se lea como hora local.
 			item.put("fechaAnalisis", rs.getObject("fechaanalisis", OffsetDateTime.class)
@@ -614,6 +617,41 @@ public class ResultadosServiceImpl implements ResultadosService {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "El archivo de diagnóstico del análisis " + idAnalisis + " ya no existe");
 		}
 		return pdf;
+	}
+
+	// ---------------------------------------------------------------------------
+	//  Imagen de control
+	// ---------------------------------------------------------------------------
+
+	// etiquetar.py la deja en analisis/{id}/trabajo/ y nombra el archivo con el idVideo (no con datos del usuario).
+	// Normalizada, para que siga DENTRO de la raíz.
+	private Path rutaControl(int idAnalisis, int idVideo) {
+		return raiz.resolve("analisis").resolve(String.valueOf(idAnalisis)).resolve("trabajo")
+				.resolve(idVideo + "_control.jpg").normalize();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Path control(Integer idExperimento, Integer idAnalisis) {
+		existe(idExperimento);
+
+		List<Integer> videos = jdbc.queryForList("""
+				SELECT a.idvideo
+				FROM analisis a
+				JOIN video v ON v.idvideo = a.idvideo
+				JOIN tanda t ON t.idtanda = v.idtanda
+				JOIN grupo g ON g.idgrupo = t.idgrupo
+				WHERE a.idanalisis = ? AND g.idexperimento = ?
+				""", Integer.class, idAnalisis, idExperimento);
+		if (videos.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND,
+					"El análisis " + idAnalisis + " no existe en el experimento " + idExperimento);
+		}
+		Path imagen = rutaControl(idAnalisis, videos.get(0));
+		if (!imagen.startsWith(raiz) || !Files.isRegularFile(imagen)) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El análisis " + idAnalisis + " no tiene imagen de control");
+		}
+		return imagen;
 	}
 
 	// ---------------------------------------------------------------------------
