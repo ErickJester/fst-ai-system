@@ -52,6 +52,10 @@ try {
     New-Item -ItemType Directory -Force (Join-Path $tmp 'modelos') | Out-Null
     Copy-Item $modelo (Join-Path $tmp 'modelos\fst_cnn_seg.pt')
 
+    # La version sale de frontend\package.json, que escribe tools\version.py (la misma que ve el backend en /health).
+    $version = (Get-Content (Join-Path $tmp 'frontend\package.json') -Raw | ConvertFrom-Json).version
+    Write-Host "Version que se empaqueta: $version"
+
     Write-Host "Comprimiendo..."
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -72,7 +76,7 @@ try {
 
     $mb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
     Write-Host ""
-    Write-Host "Listo: $zip"
+    Write-Host "Listo: $zip (version $version)"
     Write-Host "Tamano: $mb MB"
     Write-Host "Carpetas que contiene:"
     $archivo = [System.IO.Compression.ZipFile]::OpenRead($zip)
