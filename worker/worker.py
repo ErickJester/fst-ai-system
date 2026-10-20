@@ -21,6 +21,7 @@ Supuestos:
 
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -134,8 +135,38 @@ def fallo_del_pipeline(conn, d, etapa, que, codigo, registro):
 
 def generar_diagnostico_real(ruta, d, etapa, mensaje):
     """El PDF de diagnóstico de worker_fake, pero con el mensaje partido en renglones (el de aquí trae
-    la cola del registro del pipeline, que es larga) y sin la leyenda de "simulación"."""
-    pagina = Image.new("RGB", (1275, 1650), "white")
+    la cola del registro del pipeline, que es larga) y sin la leyenda de "simulación". Si el error ocurre después de que
+    etiquetar.py dejó su imagen de control (<idVideo>_control.jpg), va en el PDF: así se ve desde la página qué tubos
+    se encontraron y cuáles no."""
+    paginas = paginas_de_diagnostico(d, etapa, mensaje)
+    paginas[0].save(ruta, "PDF", resolution=150, save_all=len(paginas) > 1, append_images=paginas[1:])
+
+
+ANCHO_PAGINA, ALTO_PAGINA, MARGEN = 1275, 1650, 100
+
+PIE_DE_CONTROL = ("Imagen de control: amarillo = zona medida de cada tubo encontrado, azul = línea de agua, "
+                  "verde = fondo.")
+
+
+def imagen_de_control(d):
+    """La imagen de control de este análisis (la deja etiquetar.py en trabajo/, con el idVideo por nombre), o None."""
+    if not d.get("archivo"):
+        return None
+    ruta = carpeta_analisis(d["idanalisis"]) / "trabajo" / f"{Path(d['archivo']).stem}_control.jpg"
+    if not ruta.is_file():
+        return None
+    try:
+        with Image.open(ruta) as imagen:
+            return imagen.convert("RGB")
+    except OSError as e:
+        log.warning("No se pudo abrir la imagen de control %s: %s (el diagnóstico sale sin ella)", ruta, e)
+        return None
+
+
+def paginas_de_diagnostico(d, etapa, mensaje):
+    """Las páginas del PDF de diagnóstico, como imágenes de Pillow: la primera con el texto y, debajo, la imagen de
+    control si cabe; si no cabe, la imagen va sola en una segunda página. Se escala al ancho útil, sin deformarla."""
+    pagina = Image.new("RGB", (ANCHO_PAGINA, ALTO_PAGINA), "white")
     dibujo = ImageDraw.Draw(pagina)
     dibujo.text((100, 100), "Reporte de diagnóstico", font=fuente(40), fill="black")
     renglones = [
@@ -152,7 +183,45 @@ def generar_diagnostico_real(ruta, d, etapa, mensaje):
     texto = fuente(26)
     for i, renglon in enumerate(renglones):
         dibujo.text((100, 200 + i * 45), renglon, font=texto, fill="black")
-    pagina.save(ruta, "PDF", resolution=150)
+    paginas = [pagina]
+
+    control = imagen_de_control(d)
+    if control is None:
+        return paginas
+    ancho_util = ANCHO_PAGINA - 2 * MARGEN
+    ancho, alto = ancho_util, round(control.height * ancho_util / control.width)
+    pie = PIE_DE_CONTROL
+    if d.get("cilindros_esperados") is not None and d.get("cilindros_encontrados") is not None:
+        pie += (f" Se esperaban {d['cilindros_esperados']} cilindros con animal y se encontraron "
+                f"{d['cilindros_encontrados']}.")
+    renglones_pie = textwrap.wrap(pie, 80)
+    alto_pie = len(renglones_pie) * 34 + 20
+    y = 200 + len(renglones) * 45 + 20
+    destino = pagina
+    if y + alto + alto_pie > ALTO_PAGINA - MARGEN:
+        # No cabe debajo del texto: segunda página, y si aun sola no cabe por alto, se achica sin deformarla.
+        destino = Image.new("RGB", (ANCHO_PAGINA, ALTO_PAGINA), "white")
+        paginas.append(destino)
+        y = MARGEN
+        tope = ALTO_PAGINA - 2 * MARGEN - alto_pie
+        if alto > tope:
+            ancho, alto = round(control.width * tope / control.height), tope
+    destino.paste(control.resize((ancho, alto), Image.LANCZOS), (MARGEN, y))
+    dibujo_destino = ImageDraw.Draw(destino)
+    for i, renglon in enumerate(renglones_pie):
+        dibujo_destino.text((MARGEN, y + alto + 15 + i * 34), renglon, font=fuente(22), fill="black")
+    return paginas
+
+
+def rangos_de_tubos(registro):
+    """Los tubos que encontró etiquetar.py, con su rango de columnas en píxeles («1:217-580 2:580-939 …»), del último
+    renglón «tubos:» del registro del pipeline; vacío si no lo imprimió."""
+    try:
+        texto = Path(registro).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    encontrados = re.findall(r"^\s*tubos:\s*(.+)$", texto, re.M)
+    return " ".join(encontrados[-1].split()) if encontrados else ""
 
 
 # marcar_error (de worker_fake) llama a generar_diagnostico por su nombre global: se cambia por la nuestra
@@ -232,10 +301,14 @@ def procesar_real(conn, id_analisis):
     encontrados = {int(e) for e in tabla["especimen"].unique()}
     cilindros = {cilindro for _, cilindro in especimenes}
     if encontrados != cilindros:
+        # Estos números van al pie de la imagen de control del PDF de diagnóstico.
+        d["cilindros_esperados"], d["cilindros_encontrados"] = tubos, len(encontrados)
+        rangos = rangos_de_tubos(registro)
         return marcar_error(conn, d, "cilindros",
                             f"No se encontraron los cilindros esperados: el video tiene {len(encontrados)} y "
-                            f"la tanda tiene {tubos} especímenes. Revisa {nombre}_control.jpg en la carpeta "
-                            "de trabajo del análisis.")
+                            f"la tanda tiene {tubos} especímenes. En el reporte de diagnóstico está la imagen de "
+                            "control con los tubos que se encontraron."
+                            + (f" Tubos encontrados (columnas en píxeles): {rangos}." if rangos else ""))
 
     progreso.etapa_hecha("cilindros")
 

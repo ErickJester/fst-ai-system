@@ -40,6 +40,7 @@ function trabajo(exp, g, t, a) {
     progress_pct: a.porcentaje ?? 0, // el avance GENERAL, de 0 a 100
     stage_pct: a.porcentajeEtapa ?? null, // el de la etapa actual; null si el backend no lo tiene
     tiempos: tiemposFront(a.tiempos),
+    control_disponible: !!a.controlDisponible, // hay imagen de control (los tubos que encontró el pipeline)
     analisis_fecha: a.fechaAnalisis ?? null,
     motivo: a.motivoCancelacion ?? null,
     ...(a.pausa && { pausa: { cilindro: a.pausa.cilindro, desde_segundo: a.pausa.desdeSegundo }, segundos_restantes: a.pausa.segundosRestantes }),

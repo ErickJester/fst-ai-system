@@ -46,6 +46,16 @@ public class ResultadosController {
 		return Respuesta.ok(resultadosService.resultadosPorGrupo(id), HttpStatus.OK);
 	}
 
+	// La imagen de control (los tubos que encontró el pipeline) tal cual, sin envoltorio: la pantalla de un análisis
+	// con error la muestra. Pide sesión como el resto; si no existe, el servicio lanza el 404 con envoltorio.
+	@GetMapping("/{id}/analyses/{idAnalisis}/control")
+	public ResponseEntity<Resource> control(@PathVariable Integer id, @PathVariable Integer idAnalisis) {
+		return ResponseEntity
+				.ok()
+				.contentType(MediaType.IMAGE_JPEG)
+				.body(new FileSystemResource(resultadosService.control(id, idAnalisis)));
+	}
+
 	// El PDF de diagnóstico tal cual, sin envoltorio, como el reporte de resultados: Content-Disposition
 	// "inline" para que el navegador lo muestre. Si no existe, el servicio lanza el 404 con envoltorio.
 	@GetMapping("/{id}/analyses/{idAnalisis}/diagnostic")
