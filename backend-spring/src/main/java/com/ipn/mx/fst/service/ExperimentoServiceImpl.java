@@ -29,7 +29,14 @@ import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,11 +55,15 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ExperimentoServiceImpl implements ExperimentoService {
@@ -90,6 +101,14 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	@Autowired
 	private TandaRepository tandaRepository;
+
+	// Para eliminarTanda: consultas con candado (FOR UPDATE) y los borrados de las hojas hacia arriba, explícitos.
+	@Autowired
+	private JdbcTemplate jdbc;
+
+	// Raíz del volumen videos_reportes: de ahí se borran los videos y la carpeta del análisis de una tanda eliminada.
+	@Value("${app.archivos.raiz}")
+	private String raizConfigurada;
 
 	// Los tiempos de cada análisis (tiempos.json) para la sección "Tiempos de análisis" del PDF.
 	@Autowired
@@ -406,6 +425,103 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		reporteRepository.deleteByExperimentoIdExperimento(id);
 		notificacionRepository.deleteByExperimentoIdExperimento(id);
 		experimentoRepository.deleteById(id);
+	}
+
+	// Elimina una tanda (regla nueva, parecida a R-08): su letra queda libre para volver a subirla. Todo en UNA
+	// transacción, de las hojas hacia arriba; los archivos se borran DESPUÉS del commit (si fallara el borrado de uno, la
+	// base ya quedó bien: solo se avisa en el log).
+	@Override
+	@Transactional
+	public void eliminarTanda(Integer idExperimento, Integer idTanda, Authentication authentication) {
+		Experimento experimento = buscar(idExperimento);
+		List<Integer> delExperimento = jdbc.queryForList("""
+				SELECT t.idtanda FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo
+				WHERE t.idtanda = ? AND g.idexperimento = ?
+				""", Integer.class, idTanda, idExperimento);
+		if (delExperimento.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "La tanda " + idTanda + " no existe en el experimento " + idExperimento);
+		}
+
+		// Igual que el experimento: solo quien lo creó o un Administrador.
+		boolean esCreador = experimento.getIdInstitucional().equals(authentication.getName());
+		boolean esAdministrador = authentication.getAuthorities().stream()
+				.anyMatch(permiso -> permiso.getAuthority().equals("ROLE_ADMINISTRADOR"));
+		if (!esCreador && !esAdministrador) {
+			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento o un Administrador puede eliminar una tanda");
+		}
+
+		// FOR UPDATE: el análisis queda bloqueado hasta el commit. El worker toma el siguiente con FOR UPDATE SKIP LOCKED,
+		// así que no lo agarra a la mitad; si ya lo tomó (procesando) o está en pausa, no se borra. En cola sí: sale de la cola.
+		List<Map<String, Object>> analisis = jdbc.queryForList("""
+				SELECT idanalisis, estado FROM analisis
+				WHERE idvideo IN (SELECT idvideo FROM video WHERE idtanda = ?)
+				FOR UPDATE
+				""", idTanda);
+		List<Integer> idsAnalisis = new ArrayList<>();
+		for (Map<String, Object> a : analisis) {
+			String estado = (String) a.get("estado");
+			if ("procesando".equals(estado) || "en pausa".equals(estado)) {
+				throw new ErrorApi(HttpStatus.CONFLICT, "No se puede eliminar mientras su análisis está procesando o en pausa");
+			}
+			idsAnalisis.add(((Number) a.get("idanalisis")).intValue());
+		}
+		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda = ?", Integer.class, idTanda);
+
+		String videosDeLaTanda = "(SELECT idvideo FROM video WHERE idtanda = ?)";
+		jdbc.update("DELETE FROM segundo WHERE idobservacion IN (SELECT idobservacion FROM observacion WHERE idvideo IN "
+				+ videosDeLaTanda + ")", idTanda);
+		jdbc.update("DELETE FROM observacion WHERE idvideo IN " + videosDeLaTanda, idTanda);
+		jdbc.update("DELETE FROM analisis WHERE idvideo IN " + videosDeLaTanda, idTanda);
+		jdbc.update("DELETE FROM video WHERE idtanda = ?", idTanda);
+		jdbc.update("DELETE FROM especimen WHERE idtanda = ?", idTanda);
+		jdbc.update("DELETE FROM tanda WHERE idtanda = ?", idTanda);
+		// Sus resultados cambian: un reporte guardado ya no los refleja.
+		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
+
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				borrarArchivosDeTanda(idsVideo, idsAnalisis);
+			}
+		});
+	}
+
+	// Ya con la base en orden: los videos (videos/{idVideo}.mp4 o .mov) y la carpeta analisis/{idAnalisis}/. Los nombres
+	// salen de ids de la base, nunca de la petición, y la carpeta se revisa DENTRO de la raíz. Un fallo es solo un aviso.
+	private void borrarArchivosDeTanda(List<Integer> idsVideo, List<Integer> idsAnalisis) {
+		Path raiz = Path.of(raizConfigurada).toAbsolutePath().normalize();
+		for (Integer idVideo : idsVideo) {
+			try (DirectoryStream<Path> archivos = Files.newDirectoryStream(raiz.resolve("videos"), idVideo + ".*")) {
+				for (Path archivo : archivos) {
+					Files.deleteIfExists(archivo);
+				}
+			} catch (IOException e) {
+				log.warn("No se pudo borrar el video {} de una tanda eliminada: {}", idVideo, e.getMessage());
+			}
+		}
+		for (Integer idAnalisis : idsAnalisis) {
+			Path carpeta = raiz.resolve("analisis").resolve(String.valueOf(idAnalisis)).normalize();
+			if (!carpeta.startsWith(raiz) || !Files.isDirectory(carpeta)) {
+				continue;
+			}
+			try {
+				Files.walkFileTree(carpeta, new SimpleFileVisitor<Path>() {
+					@Override
+					public FileVisitResult visitFile(Path archivo, BasicFileAttributes atributos) throws IOException {
+						Files.delete(archivo);
+						return FileVisitResult.CONTINUE;
+					}
+
+					@Override
+					public FileVisitResult postVisitDirectory(Path directorio, IOException e) throws IOException {
+						Files.delete(directorio);
+						return FileVisitResult.CONTINUE;
+					}
+				});
+			} catch (IOException e) {
+				log.warn("No se pudo borrar la carpeta {} de una tanda eliminada: {}", carpeta, e.getMessage());
+			}
+		}
 	}
 
 	// Reporte de resultados con iText 5, igual que generarReporte de la práctica: se arma en memoria y se

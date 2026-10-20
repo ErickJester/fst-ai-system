@@ -37,6 +37,11 @@ public interface ExperimentoService {
 	// Borra también sus reportes y notificaciones.
 	void eliminar(Integer id, Authentication authentication);
 
+	// Elimina una tanda con sus videos (Día 1 y Día 2), su análisis y sus resultados, para dejar libre su letra si se subió
+	// mal. 404 si la tanda no es de ese experimento; 403 si quien pide no es el creador ni Administrador; 409 si su análisis
+	// está procesando o en pausa (en cola sí se borra). El grupo se queda aunque se quede sin tandas.
+	void eliminarTanda(Integer idExperimento, Integer idTanda, Authentication authentication);
+
 	// Reporte de resultados en PDF, generado en memoria.
 	ByteArrayInputStream generarReporte(Integer idExperimento);
 
