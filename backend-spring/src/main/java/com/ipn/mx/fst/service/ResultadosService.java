@@ -20,6 +20,10 @@ public interface ResultadosService {
 	// Un renglón por grupo con el promedio y la desviación estándar de cada conducta (guía 7).
 	List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento);
 
+	// Una fila por tanda con análisis completado, para la sección "Tiempos de análisis" del PDF de resultados:
+	// grupo, tanda (letra), duracionVideo (segundos) y tiempos (lo de tiempos.json, o null si no hay archivo).
+	List<Map<String, Object>> tiemposDelExperimento(Integer idExperimento);
+
 	// Ruta del PDF de diagnóstico de un análisis en error. 404 si el análisis no es de ese experimento, no
 	// está en error o el archivo no existe.
 	Path diagnostico(Integer idExperimento, Integer idAnalisis);

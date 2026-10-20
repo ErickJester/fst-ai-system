@@ -38,6 +38,8 @@ services:
       DB_PORT: "5432"
       ARCHIVOS_DIR: /data/archivos
       SMTP_HOST: ${SMTP_HOST:-mailhog}
+      # true: herramientas de desarrollo (cronómetro y tiempos, banner BETA). false (lo normal) las apaga.
+      MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -64,6 +66,10 @@ services:
       ARCHIVOS_DIR: /data/archivos
       MODELO_CNN: /data/modelos/fst_cnn_seg.pt
       SMTP_HOST: ${SMTP_HOST:-mailhog}
+      # Nombre de esta computadora para los reportes de tiempos (opcional; vacío = el modelo del procesador).
+      EQUIPO_NOMBRE: ${EQUIPO_NOMBRE:-}
+      # Con false el worker no escribe tiempos.json (el avance de 0 a 100 % sí se escribe siempre).
+      MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     depends_on:
       db:
         condition: service_healthy

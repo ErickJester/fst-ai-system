@@ -59,6 +59,11 @@ RITMO_PREDICCION = 1.88
 RITMO_WEB = 1.1
 
 
+# Nombres de los pasos de etiquetar.py, como los imprime su log, para tiempos.json.
+NOMBRE_PASO = {1: "1/5 alineando la camara", 2: "2/5 modelando el fondo", 3: "3/5 buscando los tubos",
+               4: "4/5 midiendo al animal", 5: "5/5 agregando en bloques"}
+
+
 def leer_texto(ruta):
     try:
         return Path(ruta).read_text(encoding="utf-8", errors="replace")
@@ -180,10 +185,22 @@ class VigilanteCilindros:
         self._lectura = lectura or PosicionLectura(video, reloj=reloj)
         self._paso = None
         self._inicio_paso = reloj()
+        self._arranque = self._inicio_paso
+        self._inicios = {}               # paso -> cuándo lo vio empezar este vigilante
+
+    def duraciones(self, fin=None):
+        """Segundos que tardó cada paso de etiquetar.py, para tiempos.json (comparar entre computadoras). Se miden con
+        el mismo vigilante, así que tienen la precisión de PERIODO_S (~2 s); un paso tan corto que el vigilante no lo
+        vio empezar (el 5/5 dura menos de 1 s) se suma al anterior. El arranque de Python cuenta en el paso 1."""
+        fin = self._reloj() if fin is None else fin
+        pasos = sorted(self._inicios)
+        return {NOMBRE_PASO[p]: round((self._inicios[pasos[i + 1]] if i + 1 < len(pasos) else fin) - self._inicios[p], 1)
+                for i, p in enumerate(pasos)}
 
     def __call__(self, pid):
         paso = ultimo_paso(leer_texto(self._registro)) or 1    # antes del primer marcador, Python arranca
         if paso != self._paso:
+            self._inicios[paso] = self._arranque if self._paso is None else self._reloj()
             self._paso = paso
             self._inicio_paso = self._reloj()
             self._lectura.reiniciar()
@@ -229,6 +246,15 @@ class VigilanteClasificacion:
         if leida is None and not self._lectura.disponible:
             leida = fraccion_por_tiempo(self._reloj() - self._inicio, self._duracion * RITMO_RECORTANDO)
         self._avance(recortando * (leida or 0.0))
+
+    def duraciones(self, fin=None):
+        """Segundos de "recortando" (con el arranque de Python y la carga de la red) y de "prediciendo", para
+        tiempos.json. Vacío si no llegó a "prediciendo". Precisión de PERIODO_S (~2 s)."""
+        if self.inicio_prediccion is None:
+            return {}
+        fin = self._reloj() if fin is None else fin
+        return {"recortando": round(self.inicio_prediccion - self._inicio, 1),
+                "prediciendo": round(fin - self.inicio_prediccion, 1)}
 
     def ritmo_medido(self):
         """Segundos reales por segundo-tubo de "prediciendo" (hasta ahora), o None si no llegó a esa fase."""

@@ -6,8 +6,9 @@ import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, PESO_ETAPA, pctDeEtapa, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PESO_ETAPA, pctDeEtapa, segundosDesde, tiempoDeEtapa, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
 import { useAuth } from '../contexts/AuthContext'
+import { useModo } from '../contexts/ModoContext'
 import { Cargando, FieldError } from '../components/ui'
 import { MUT60, btnLeft } from '../lib/estilos'
 
@@ -22,6 +23,22 @@ const DETALLE = {
 }
 
 const nombreTrabajo = (j) => j.experimento + ' · ' + j.grupo + ' · Tanda ' + j.tanda
+
+// «Tardó 20:05 · Laptop Erick» de un análisis que ya terminó (completado, con error o cancelado); vacío si el
+// worker no dejó registro de su tiempo (análisis de antes de que se midiera).
+// Solo en modo desarrollador (los tiempos son para quien desarrolla): sin él, vacío.
+const tardo = (j, modo) => (modo && j.tiempos?.total_s != null ? 'Tardó ' + mmss(j.tiempos.total_s) + (j.tiempos.equipo ? ' · ' + j.tiempos.equipo : '') : '')
+
+// La hora de ahora, que se actualiza cada segundo: la mueve el navegador, no la consulta de la cola (que es cada
+// 5 s y solo corrige el inicio).
+function useAhora() {
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return ahora
+}
 
 // Solo se analiza el Día 2 (D-54): sus últimos 5 min.
 const duracion = (j) => DIA[j.dia] + ' · 5 min'
@@ -104,8 +121,12 @@ export default function ProgresoPage() {
   )
 }
 
-function TrabajoActual({ j }) {
+export function TrabajoActual({ j }) {
   const iActual = ETAPAS.indexOf(j.stage)
+  const { modoDesarrollador } = useModo()
+  const ahora = useAhora()
+  // Cronómetro del análisis: desde que el worker lo tomó (la espera en la cola no cuenta). Sin registro, «—».
+  const transcurrido = j.tiempos ? j.tiempos.total_s ?? segundosDesde(j.tiempos.inicio, ahora) : null
 
   return (
     <div style={{ border: '2px solid var(--color-text)' }}>
@@ -116,6 +137,13 @@ function TrabajoActual({ j }) {
           <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Procesando</span>
         </div>
         <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{duracion(j)} · {j.n_especimenes} especímenes</div>
+        {modoDesarrollador && (
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+            <span className="k">Tiempo transcurrido</span>
+            <span className="num nd" role="timer" aria-label="Tiempo transcurrido" style={{ fontSize: 30, lineHeight: 1 }}>{transcurrido == null ? '—' : mmss(transcurrido)}</span>
+            {j.tiempos?.equipo && <span className="hint">· {j.tiempos.equipo}</span>}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
           {/* Una sola barra, de 0 a 100: el ancho es el avance GENERAL. Las marcas finas dicen dónde empieza cada etapa */}
           <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={j.progress_pct} aria-label="Avance general del análisis" style={{ flex: 1, position: 'relative', height: 10, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)' }}>
@@ -134,6 +162,7 @@ function TrabajoActual({ j }) {
         const enCurso = i === iActual
         const color = hecha || enCurso ? INK : 'var(--muted)'
         const pct = pctDeEtapa(j, s, ETAPAS)
+        const segundos = tiempoDeEtapa(j, s, ahora)
         return (
           <div key={s} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid var(--color-divider)' }}>
             <span className="num nd" style={{ width: 26, height: 26, flex: 'none', background: hecha ? INK : enCurso ? 'var(--color-accent)' : 'transparent', color: hecha || enCurso ? 'var(--color-bg)' : 'var(--muted)', border: '1px solid var(--color-divider)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{hecha ? '✓' : i + 1}</span>
@@ -143,6 +172,7 @@ function TrabajoActual({ j }) {
             </div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, whiteSpace: 'nowrap', color }}>{hecha ? 'hecha' : enCurso ? 'en curso' : 'pendiente'}</span>
+            {modoDesarrollador && <span className="num" aria-label="Tiempo de la etapa" style={{ width: 62, textAlign: 'right', fontSize: 12.5, color }}>{segundos == null ? '—' : mmss(segundos)}</span>}
             <span className="num nd" style={{ width: 56, textAlign: 'right', fontSize: 13, color }}>{pct} %</span>
             {/* barra fina de la propia etapa, pegada al borde de abajo de la fila */}
             <div style={{ position: 'absolute', left: 20, right: 20, bottom: 4, height: 3, background: 'color-mix(in srgb,var(--color-text) 12%,transparent)' }}>
@@ -157,7 +187,8 @@ function TrabajoActual({ j }) {
 }
 
 function TrabajoFallido({ j }) {
-  const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)'
+  const { modoDesarrollador } = useModo()
+  const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)' + (tardo(j, modoDesarrollador) ? ' · ' + tardo(j, modoDesarrollador) : '')
   // null | 'pidiendo' | 'preparando' (el PDF aún no existe: se reintenta solo) | 'demo' (sin backend) | 'error'
   const [diag, setDiag] = useState(null)
   const [errDiag, setErrDiag] = useState('')
@@ -248,12 +279,14 @@ function TrabajoEnPausa({ j }) {
 
 // Análisis cancelado: por quien lo atendía o porque nadie respondió a la pausa.
 function TrabajoCancelado({ j }) {
+  const { modoDesarrollador } = useModo()
   return (
     <div style={{ border: '1px solid var(--color-divider)', marginTop: 18, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{ flex: 1 }}>
         <div className="nd" style={{ fontSize: 14 }}>{nombreTrabajo(j)}</div>
         <div style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>
           {j.motivo === 'plazo' ? 'Pasaron 5 minutos en pausa sin respuesta y el sistema canceló el análisis.' : 'Se canceló desde la pantalla de pausa.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
+          {tardo(j, modoDesarrollador) && <> {tardo(j, modoDesarrollador)}.</>}
         </div>
       </div>
       <span className="tag tag-accent" style={{ whiteSpace: 'nowrap', background: 'var(--color-accent-800)', color: 'var(--color-bg)' }}>Cancelado</span>
@@ -265,6 +298,7 @@ function TrabajoCancelado({ j }) {
 // «Revisar segundo a segundo» (este, solo para quien subió el video o un Administrador).
 function Terminados({ lista }) {
   const { user } = useAuth()
+  const { modoDesarrollador } = useModo()
   return (
     <>
       <div className="k" style={{ margin: '26px 0 12px' }}>Completados recientemente</div>
@@ -275,6 +309,7 @@ function Terminados({ lista }) {
               <td>{nombreTrabajo(j)}</td>
               <td className="num" style={{ width: 70 }}>{DIA[j.dia]}</td>
               <td className="num" style={{ width: 110, fontSize: 12, color: MUT60 }}>{j.analisis_fecha ? fechaCorta(j.analisis_fecha) : ''}</td>
+              {modoDesarrollador && <td className="num" style={{ width: 190, fontSize: 12, color: MUT60 }}>{tardo(j, modoDesarrollador)}</td>}
               <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 <span style={{ display: 'inline-flex', gap: 14, fontSize: 12.5 }}>
                   {(user.admin || j.subido_por === user.id) && <Link to={enlaceRevision(j.clave, j.job_id)}>Revisar segundo a segundo</Link>}
