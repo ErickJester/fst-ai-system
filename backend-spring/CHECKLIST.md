@@ -118,13 +118,13 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] `GET .../results/groups`, con promedio (no suma), datos faltantes y aviso si mezcla `preciso` y `agrupado`
 - [ ] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12)
 - [x] Los totales se calculan desde `SEGUNDO`, nunca se guardan (D-52)
-- [ ] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos
+- [ ] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos. Hecho (encargo 15): implementado; sin probar con sesión, lo prueba el usuario en el navegador
 - [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct)
-  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]
-  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas
-  - [ ] Sin query string en los logs de nginx ni de Spring
+  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]. Hecho (encargo 15): implementado; sin probar con sesión, lo prueba el usuario en el navegador
+  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas. Hecho: sin `vt` o con uno inválido da `401` (probado sin sesión); el resto sin probar con sesión
+  - [ ] Sin query string en los logs de nginx ni de Spring. Hecho: el `access_log` de nginx ya no guarda `?vt=` y Spring no la registra. Falta: el `error_log` de nginx sí escribe la petición completa, con `?vt=`, cuando falla el backend (hallazgo del 19-oct, pendiente)
   - [ ] Si el video ya se borró, responde que ya no existe (`404`)
-- [ ] `PUT .../segundos`:
+- [ ] `PUT .../segundos`: Hecho (encargo 15): implementado con todas las reglas de abajo; sin probar con sesión
   - [ ] Solo los segundos que cambiaron
   - [ ] `origen` en `confirmada`, `corregida` o `dudosa`
   - [ ] Solo el que subió el video o un Administrador
@@ -158,6 +158,11 @@ Probado con `AcuBN1.MOV`: completado, 4 × 300 segundos en `SEGUNDO`, `web.mp4`,
 y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo (100 %),
 pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
 nace al medir los fotogramas, antes de la red). No hace la pausa de R-15.
+Agregado el 19-oct (versión 0.22.0): **progreso real** (encargo 14: `progreso.json`, `/status` con `porcentajeEtapa`
+y el porcentaje general, pesos medidos 1/9/90); **tiempos del análisis** (encargo 16: `tiempos.json` con segundos
+por etapa y el equipo, en Progreso, Resultados y el PDF); **`MODO_DESARROLLADOR`** (encargo 17: con `false` se
+apagan los tiempos y el banner rojo "BETA vX.Y.Z"). Probado con pruebas automáticas y sin sesión; falta una corrida
+real con sesión (la hará el usuario en otra PC).
 - [ ] Toma un análisis a la vez, el más antiguo primero
 - [ ] Caso exitoso: pasa por las etapas, escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación
 - [ ] Caso de error con la palabra `falla`: PDF de diagnóstico, estado `error` y notificación
@@ -197,6 +202,6 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `/results`: cada espécimen trae además `idGrupo`
 - [x] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
 - [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
-- [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080)
+- [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080). Hecho: los trae (`duracion` = segundos guardados; `ancho` y `alto` de `cajas.json`); sin probar con sesión
 - [x] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
 - [ ] `POST .../video-token` responde `{token}`; probar `Range` con un `web.mp4` real
