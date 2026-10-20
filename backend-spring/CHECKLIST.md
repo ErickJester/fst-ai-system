@@ -94,6 +94,7 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [x] El Día 1 se guarda sin análisis
 - [x] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
 - [x] Nombre original del video (D-114, 20-oct): columna `VIDEO.nombreOriginal` (migración idempotente al arrancar), guardado sin la ruta del cliente; se ve en Resultados, en la Revisión y en el PDF (tabla "Videos analizados"); los videos anteriores dicen "nombre no registrado"
+- [x] Eliminar una tanda (D-115, 20-oct): `DELETE /experiments/{id}/tandas/{idTanda}` → `204`; solo el creador o un Administrador (`403`), `409` si su análisis está procesando o en pausa (en cola sí se borra). Una transacción borra segundos, observaciones, análisis, videos, especímenes, la tanda y los reportes del experimento; los archivos se borran después del commit. El grupo se conserva y la letra queda libre. Botón "Eliminar tanda" con confirmación en el grupo
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
