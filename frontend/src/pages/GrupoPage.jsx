@@ -62,7 +62,7 @@ export default function GrupoPage() {
             <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--muted-2)' }}>
               <span>{g.tratamiento}</span>
               <span className="num">{g.n_especimenes} especímenes</span>
-              <span className="num">{g.tandas.length} tandas · {g.tandas.map((t) => t.n_cilindros).join(' + ')} especímenes</span>
+              <span className="num">{g.tandas.length} {g.tandas.length === 1 ? 'tanda' : 'tandas'} · {g.tandas.map((t) => t.n_cilindros).join(' + ')} especímenes</span>
             </div>
           </div>
           {/* Resultados del grupo completo (RF-19, D-93): reúne las tandas con análisis completado. */}

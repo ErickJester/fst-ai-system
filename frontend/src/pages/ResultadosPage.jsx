@@ -491,7 +491,7 @@ function Bloques({ clave, gid, letras }) {
   if (!data) {
     return (
       <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
-        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Todavía no está disponible en el modo demo.
+        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Todavía no está disponible.
       </div>
     )
   }
