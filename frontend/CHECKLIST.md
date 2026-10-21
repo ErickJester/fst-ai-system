@@ -121,7 +121,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
 - [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
-- [ ] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje
+- [x] Descargar el PDF de diagnóstico real: con el backend `9f8b614` y `worker_fake` (grupo «Falla»), el análisis termina en error en la etapa de cilindros, Progreso lo muestra con su mensaje y `.../diagnostic` responde el PDF (200, `application/pdf`)
 - [ ] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso
 
 ## 7. Resultados (§9.5, R-12, R-13)
