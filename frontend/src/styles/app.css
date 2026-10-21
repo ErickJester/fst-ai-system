@@ -2,13 +2,17 @@
    El sistema de diseño vive en modernist.css y fst.css (copias de mockup/v2/assets). */
 
 /* — franja de modo demo, fija arriba de todas las pantallas — */
-:root{--demo-h:0px}
+:root{--demo-h:0px;--beta-h:0px}
 :root:has(.demo-banner){--demo-h:30px}
-.demo-banner{position:sticky;top:0;z-index:100;height:var(--demo-h);display:flex;align-items:center;justify-content:center;gap:.6em;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+:root:has(.beta-banner){--beta-h:30px}
+/* franja BETA (modo desarrollador): arriba de todo; si también está la de demo, esa va justo debajo */
+.beta-banner{position:sticky;top:0;z-index:101;height:var(--beta-h);display:flex;align-items:center;justify-content:center;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:13px;letter-spacing:.12em}
+@media print{.beta-banner{display:none}}
+.demo-banner{position:sticky;top:var(--beta-h);z-index:100;height:var(--demo-h);display:flex;align-items:center;justify-content:center;gap:.6em;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
 @media print{.demo-banner{display:none}}
 
 /* — login, recuperar contraseña y primer acceso (2h, 2i) — */
-.acc-page{min-height:calc(100vh - var(--demo-h));display:flex;align-items:center;justify-content:center;padding:32px 16px;background:#d8d8da}
+.acc-page{min-height:calc(100vh - var(--demo-h) - var(--beta-h));display:flex;align-items:center;justify-content:center;padding:32px 16px;background:#d8d8da}
 .acc-card{width:480px;max-width:100%;background:var(--color-bg);border:2px solid var(--color-text)}
 
 /* — segmentados como botones — */

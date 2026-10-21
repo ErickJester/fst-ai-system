@@ -17,7 +17,7 @@ export async function getGroup(clave, gid) {
   const exp = await getExperiment(clave)
   const grupo = exp.grupos.find((g) => g.id === gid)
   if (!grupo) return fail(404, 'No existe ese grupo.')
-  return { experimento: { clave: exp.clave, titulo: exp.titulo }, ...grupo }
+  return { experimento: { clave: exp.clave, titulo: exp.titulo, creador_id: exp.creador_id }, ...grupo }
 }
 
 // GET /experiments/:clave/groups?q= → grupos del experimento con nombre parecido y la tanda
