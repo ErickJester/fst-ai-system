@@ -25,7 +25,7 @@ posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo 
 - [x] `VITE_USE_MOCKS`, `VITE_API_BASE` y `VITE_MAX_UPLOAD_MB` documentadas en `frontend/.env.example`
 - [x] Franja «Modo demo» solo con datos de ejemplo; con el backend real no hay franja y la versión se ve en el menú de usuario
 - [ ] Chrome, Firefox y Edge en sus versiones actuales probados (§2)
-- [ ] Abrir el dashboard, filtrar y abrir resultados en 3 s o menos en el 95 % de los casos, con el backend real (§2)
+- [x] Abrir el dashboard, filtrar y abrir resultados en 3 s o menos en el 95 % de los casos, con el backend real (§2). Medido el 20-oct en local: la pantalla completa tarda 0.25 s (lista) y 0.25–0.31 s (resultados) con el servidor de desarrollo; las peticiones, p95 de 0.05 s en 40 aperturas. Con pocos datos (3 experimentos): conviene repetirlo con el volumen real
 
 ## 1. Capa de servicios y conexión con el backend real (§6, §6.1)
 Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa responde con datos de ejemplo.
@@ -52,7 +52,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [ ] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
-- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring o contra `worker_fake`, y corregir lo que falle
+- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con `worker_fake`): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: lo que el backend aún no tiene (administración, recuperar contraseña, pausa, bloques, CSV y XLSX) y probar error y pausa (el `worker_fake` aún no lee el nombre original del video)
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
 - [x] Inicio de sesión con correo y contraseña, y error de credenciales (R-01)
@@ -63,7 +63,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] La sesión sobrevive a cerrar la pestaña y «Cerrar sesión» la borra
 - [x] Sin sesión se va al login; con sesión, el login no se vuelve a mostrar
 - [x] Validación de formularios en el cliente: correo con forma válida y contraseña nueva de 8 caracteres o más
-- [ ] Mensaje genérico en el login con el backend real. Hecho: con datos de ejemplo es «Correo o contraseña incorrectos». Falta: depende de que el backend responda un 401 genérico (R-01)
+- [x] Mensaje genérico en el login con el backend real: un correo que existe con contraseña mala y uno que no existe dan el mismo 401 «Correo o contraseña incorrectos» (R-01)
 - [ ] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo
 
 ## 3. Dashboard de experimentos (§9.2)
@@ -135,7 +135,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Aviso «Todavía no hay resultados» cuando no hay tandas completadas
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
-- [ ] Descargas reales de PDF, CSV y XLSX. Hecho: los botones piden el archivo y lo guardan. Falta: sin backend solo muestran un mensaje
+- [ ] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). Falta: CSV y XLSX, que el backend aún no tiene (404)
 - [ ] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará
 
 ## 8. Administración (§9.6, R-16)
@@ -162,11 +162,11 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Visto» a 2× o menos, y solo lo visto se guarda como `confirmada`, `corregida` o `dudosa` (D-80)
 - [x] Borrador en el navegador, resumen antes de guardar y «Guardar correcciones»
 - [x] «Reiniciar el análisis» con confirmación, solo en esta pantalla (R-04, D-60)
-- [ ] Reproducir el video real con un token de video (decidido: la URL lleva `?vt=`, nunca el JWT de sesión). Hecho: la pantalla lee `videoUrl`. Falta lo siguiente
+- [x] Reproducir el video real con un token de video (la URL lleva `?vt=`, nunca el JWT de sesión). Probado el 20-oct con el backend `e66ce40`
   - [x] Pedir `POST .../video-token` con el JWT por header antes de abrir la revisión y poner `?vt=` en el `<video>` [PROPUESTA]
   - [x] Si el video responde 401 o 403 por token vencido, pedir otro y seguir en el mismo segundo
   - [x] No escribir la URL del video con su token en consola ni en pantalla
-  - [ ] Probar `Range` (adelantar y retroceder) con un `web.mp4` real
+  - [x] Probar `Range` (adelantar y retroceder): el video con `?vt=` responde `206 Partial Content`
 - [x] Borrador guardado por cuenta, y «Cerrar sesión» borra los de la revisión
 - [x] Sin video (ya se borró) la revisión es de solo lectura: explica el motivo y quita «Guardar correcciones» y «Reiniciar el análisis»
 - [x] Con `puedeCorregir: false` la revisión es de solo lectura
@@ -198,13 +198,13 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 ## 13. Criterios de aceptación finales (§12)
 En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta verlo de punta a punta.
 - [ ] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas
-- [ ] Subir un `.mp4` o `.mov` en horizontal crea un análisis `en cola`, el `worker_fake` lo lleva a `completado` y Progreso lo refleja sin recargar. Hecho: la subida y el refresco
-- [ ] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor. Hecho: ambos mensajes
+- [x] Subir un `.mp4` o `.mov` en horizontal crea un análisis `en cola`, el `worker_fake` lo lleva a `completado` y Progreso lo refleja sin recargar (probado con el backend real)
+- [x] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor con 422 y su mensaje (probado con el backend real)
 - [ ] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo
 - [ ] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
-- [ ] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2». Hecho: ambos
+- [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
 - [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
 - [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
-- [ ] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos
+- [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)

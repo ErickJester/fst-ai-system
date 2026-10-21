@@ -12,8 +12,19 @@ export const r1 = (n) => (Math.round(n * 10) / 10).toFixed(1)
 // '2026-02-18' → '18 feb 2026' (sin pasar por Date, para no depender de la zona horaria).
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 export const fechaCorta = (iso) => {
-  const [y, m, d] = iso.split('-').map(Number)
+  const [y, m, d] = enHoraLocal(iso).slice(0, 10).split('-').map(Number)
   return d + ' ' + MESES[m - 1] + ' ' + y
+}
+
+// Fecha con hora y zona, como la manda el backend ('2026-10-19T19:22:13.85Z' o '…-06:00') →
+// 'AAAA-MM-DDTHH:MM' en la hora de esta computadora. Una fecha sola ('2026-02-18') o sin zona
+// queda igual: no se pasa por Date, para no correr el día por la zona horaria.
+export function enHoraLocal(iso) {
+  if (!/\d[T ]\d{2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/.test(iso)) return iso.replace(' ', 'T')
+  const f = new Date(iso.replace(' ', 'T'))
+  if (Number.isNaN(f.getTime())) return iso
+  const p = (n) => String(n).padStart(2, '0')
+  return f.getFullYear() + '-' + p(f.getMonth() + 1) + '-' + p(f.getDate()) + 'T' + p(f.getHours()) + ':' + p(f.getMinutes())
 }
 
 // Dos fechas del mismo mes → '18–19 feb 2026'.

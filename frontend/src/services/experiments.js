@@ -20,7 +20,14 @@ function enDias(n) {
 const avisoDe = (e) => (!e.videosBorrados && e.diasRetencion != null && e.diasRetencion <= 7 ? { fechaBorrado: enDias(e.diasRetencion) } : null)
 
 // «M. Rivera»: inicial del nombre y primer apellido de quien creó el experimento.
-const responsableDe = (c) => (c ? c.nombre[0] + '. ' + (c.apellidos || '').split(' ')[0] : '')
+const PARTICULAS = ['de', 'del', 'la', 'las', 'los', 'y']
+function primerApellido(apellidos = '') {
+  const p = apellidos.split(' ').filter(Boolean)
+  let i = 0
+  while (i < p.length - 1 && PARTICULAS.includes(p[i].toLowerCase())) i++
+  return p.slice(0, i + 1).join(' ')
+}
+const responsableDe = (c) => (c ? c.nombre[0] + '. ' + primerApellido(c.apellidos) : '')
 
 // Fila de la lista (§6.1, más los campos de más de data.js) → forma de las pantallas. La
 // clave de las rutas es idExperimento.
@@ -135,6 +142,7 @@ export function deDetalle(d, analisis = []) {
           id_tanda: t.idTanda ?? null, // sin backend (datos de ejemplo) no hay id: no se puede eliminar la tanda
           desde,
           n_cilindros: t.nCilindros,
+          duracion_s: v2?.duracion ? Math.round(v2.duracion) : null,
           fecha_dia1: v1?.fecha ?? v2?.fecha ?? d.fecha,
           fecha_dia2: v2?.fecha ?? v1?.fecha ?? d.fecha,
           estado,
