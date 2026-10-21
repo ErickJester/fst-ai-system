@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, pctDeEtapa, PESO_ETAPA, mmss, plazoRestante, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition } from './fst'
+
+describe('plazoRestante: lo que queda de las 72 h de la pausa', () => {
+  it('en horas y minutos; con menos de una hora solo minutos', () => {
+    expect(plazoRestante(72 * 3600)).toBe('72 h 0 min')
+    expect(plazoRestante(72 * 3600 - 90)).toBe('71 h 58 min') // los segundos sueltos no se muestran
+    expect(plazoRestante(3600)).toBe('1 h 0 min')
+    expect(plazoRestante(59 * 60 + 30)).toBe('59 min')
+    expect(plazoRestante(60)).toBe('1 min')
+  })
+
+  it('con menos de un minuto, vencido o negativo: «menos de 1 min»', () => {
+    expect(plazoRestante(59)).toBe('menos de 1 min')
+    expect(plazoRestante(0)).toBe('menos de 1 min')
+    expect(plazoRestante(-5)).toBe('menos de 1 min')
+  })
+})
 
 describe('tiempos del análisis', () => {
   it('mmss: m:ss y, pasada la hora, h:mm:ss', () => {

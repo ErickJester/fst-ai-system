@@ -37,7 +37,7 @@ docker compose exec -e DISK_SIMULATED_PERCENT=95 worker python tareas_programada
 ```
 
 `ajustar` y `cancelar` responden 409 si el análisis ya no está en pausa. Sin respuesta, la pausa se
-cancela sola a los `PAUSE_TIMEOUT_MINUTES`. La alerta de disco va a los administradores activos; el
+cancela sola a los `PAUSE_TIMEOUT_HOURS` (72 por defecto). La alerta de disco va a los administradores activos; el
 usuario de desarrollo no es administrador, así que sin uno solo queda un aviso en el log.
 
 ## Diferencias con el worker real

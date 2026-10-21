@@ -24,7 +24,7 @@ import tareas_programadas
 from progreso import RegistroProgreso
 from tiempos import RegistroTiempos, cerrar_archivo
 from comun import (
-    ARCHIVOS, DAILY_HOUR, PAUSE_TIMEOUT_MINUTES, POLL_SECONDS, STAGE_SECONDS,
+    ARCHIVOS, DAILY_HOUR, PAUSE_TIMEOUT_HOURS, POLL_SECONDS, STAGE_SECONDS,
     ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, datos_analisis,
     enviar_correos, log, notificar, relativa,
 )
@@ -84,7 +84,7 @@ def revisar_pausas(conn):
                 continue
             if pausa.get("ajuste"):
                 continue
-            vence = datetime.fromisoformat(pausa["hora_pausa"]) + timedelta(minutes=PAUSE_TIMEOUT_MINUTES)
+            vence = datetime.fromisoformat(pausa["hora_pausa"]) + timedelta(hours=PAUSE_TIMEOUT_HOURS)
             if ahora() < vence:
                 continue
             cur.execute(
@@ -93,11 +93,11 @@ def revisar_pausas(conn):
             )
             if cur.rowcount == 1:
                 d = datos_analisis(cur, id_analisis)
-                log.info("Análisis %s cancelado: pasaron %s min sin ajuste", id_analisis, PAUSE_TIMEOUT_MINUTES)
+                log.info("Análisis %s cancelado: pasaron %s horas sin ajuste", id_analisis, PAUSE_TIMEOUT_HOURS)
                 # Solo la cancelación por falta de respuesta crea notificación (sección 4.3).
                 notificar(cur, pendientes, d["idinstitucional"], d["correo"], "analisis cancelado",
                           f"El análisis de {d['tanda']} del experimento '{d['nombre']}' se canceló: "
-                          f"pasaron {PAUSE_TIMEOUT_MINUTES} minutos sin que se ajustara el recuadro.",
+                          f"pasaron {PAUSE_TIMEOUT_HOURS} horas sin que se ajustara el recuadro.",
                           d["idexperimento"])
     conn.commit()
     enviar_correos(pendientes)
@@ -279,7 +279,7 @@ def pausar(conn, d, especimenes):
         notificar(cur, pendientes, d["idinstitucional"], d["correo"], "analisis en pausa",
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' está en pausa: no se ve "
                   f"al espécimen del cilindro {cilindro}. Ajusta el recuadro en los próximos "
-                  f"{PAUSE_TIMEOUT_MINUTES} minutos o el análisis se cancelará.", d["idexperimento"])
+                  f"{PAUSE_TIMEOUT_HOURS} horas o el análisis se cancelará.", d["idexperimento"])
     conn.commit()
     cerrar_archivo(d["idanalisis"])     # en pausa el worker ya no trabaja en él: el cronómetro se detiene
     enviar_correos(pendientes)
@@ -402,8 +402,8 @@ def main(procesar_analisis=procesar):
     """procesar_analisis es lo único que cambia entre el simulador y el worker real (worker/worker.py):
     la cola, las pausas, las tareas diarias y la reconexión son las mismas, así que no se duplican."""
     configurar_log()
-    log.info("worker_fake: cola cada %s s, etapas de %s s, tareas diarias a las %s h, pausa de %s min",
-             POLL_SECONDS, STAGE_SECONDS, DAILY_HOUR, PAUSE_TIMEOUT_MINUTES)
+    log.info("worker_fake: cola cada %s s, etapas de %s s, tareas diarias a las %s h, pausa de %s h",
+             POLL_SECONDS, STAGE_SECONDS, DAILY_HOUR, PAUSE_TIMEOUT_HOURS)
     conn = None
     arrancando = True
     while True:

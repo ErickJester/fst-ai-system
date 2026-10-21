@@ -7,7 +7,7 @@ import { getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from '../
 import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { useAsync, useAsyncVivo, CADA_ACTIVO_MS } from '../hooks/useAsync'
-import { DIA, mmss } from '../lib/fst'
+import { DIA, plazoRestante } from '../lib/fst'
 import { MUT60, btnLeft } from '../lib/estilos'
 
 const CAMPOS = [['x0', 'Izquierda'], ['y0', 'Arriba'], ['x1', 'Derecha'], ['y1', 'Abajo']]
@@ -66,7 +66,7 @@ export default function PausaPage() {
       await ajustarRecuadro(clave, id, { cilindro, x0, y0, x1, y1 })
       navigate('/analisis?experimento=' + clave, { state: { aviso: 'Recuadro del cilindro ' + cilindro + ' ajustado. El análisis volvió a la cola, por delante de los que llegaron después, y sigue desde el segundo ' + p.desdeSegundo + '.' } })
     } catch (e) {
-      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron los 5 minutos y se canceló.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
+      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron las 72 horas y se canceló.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
       setEnviando(false)
     }
   }
@@ -104,7 +104,7 @@ export default function PausaPage() {
         </p>
 
         <div role="timer" aria-live="off" className="num nd" style={{ fontSize: 15, marginBottom: 14, color: vencido || quedan <= 60 ? 'var(--color-accent-700)' : 'inherit' }}>
-          {vencido ? 'Pasaron los 5 minutos: el análisis se cancela.' : 'Tiempo para responder: ' + mmss(quedan)}
+          {vencido ? 'Pasaron las 72 horas: el análisis se cancela.' : 'Tiempo para responder: ' + plazoRestante(quedan)}
         </div>
 
         <RecuadroEditable src={img} ancho={p.ancho} alto={p.alto} recuadro={recuadro} onChange={setRecuadro}
@@ -130,8 +130,8 @@ export default function PausaPage() {
         <FieldError msg={errAccion} style={{ marginTop: 10 }} />
         <p className="hint" style={{ marginTop: 10 }}>
           {vencido
-            ? 'El análisis ya se canceló: pasaron los 5 minutos sin respuesta y el sistema lo cerró. No se guardó ningún resultado de esta tanda; para analizarlo otra vez, sube el video de nuevo.'
-            : 'Si pasan 5 minutos sin respuesta, el sistema cancela el análisis. Solo quien subió el video o un Administrador puede ajustar o cancelar.'}
+            ? 'El análisis ya se canceló: pasaron las 72 horas sin respuesta y el sistema lo cerró. No se guardó ningún resultado de esta tanda; para analizarlo otra vez, sube el video de nuevo.'
+            : 'Si pasan 72 horas sin respuesta, el sistema cancela el análisis. Solo quien subió el video o un Administrador puede ajustar o cancelar.'}
         </p>
       </div>
     </div>
@@ -149,7 +149,7 @@ function NoEnPausa({ error }) {
         <p className="lead" style={{ marginBottom: 16, maxWidth: 560 }}>
           {sinPermiso
             ? 'Solo quien subió el video o un Administrador puede ajustar el recuadro o cancelar el análisis.'
-            : 'Ya se ajustó el recuadro, se canceló o pasaron los 5 minutos sin respuesta. Su estado está en Análisis en curso.'}
+            : 'Ya se ajustó el recuadro, se canceló o pasaron las 72 horas sin respuesta. Su estado está en Análisis en curso.'}
         </p>
         <Link className="btn btn-primary" to="/analisis">Ver análisis en curso</Link>
       </div>

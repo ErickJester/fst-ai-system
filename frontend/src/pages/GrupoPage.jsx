@@ -21,7 +21,7 @@ function notaDia2(t) {
     case 'QUEUED': return 'En espera de turno en la cola: un trabajo a la vez.'
     case 'RUNNING': return ETAPA[t.progreso.etapa] + ' · en curso · ' + t.progreso.pct + ' %'
     case 'FAILED': return mensajeErrorAnalisis(t.error.etapa)
-    case 'PAUSED': return 'En pausa: el sistema dejó de ver a un espécimen. Hay 5 minutos para ajustar el recuadro.'
+    case 'PAUSED': return 'En pausa: el sistema dejó de ver a un espécimen. Hay 72 horas para ajustar el recuadro.'
     case 'CANCELED': return 'Análisis cancelado.'
     case 'ESPERA_DIA2': return 'Aún no se sube el video del Día 2. El Día 1 ya está guardado; el análisis empieza cuando se cargue el del Día 2.'
     case 'SIN_VIDEO': return 'Todavía no se sube el video de Día 2.'

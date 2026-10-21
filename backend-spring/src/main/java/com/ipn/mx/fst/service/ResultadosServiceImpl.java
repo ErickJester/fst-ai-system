@@ -52,9 +52,9 @@ public class ResultadosServiceImpl implements ResultadosService {
 	@Value("${app.modo-desarrollador:false}")
 	private boolean modoDesarrollador;
 
-	// Minutos que espera un análisis en pausa antes de cancelarse (la misma variable que usa el worker).
-	@Value("${PAUSE_TIMEOUT_MINUTES:5}")
-	private int minutosDePausa;
+	// Horas que espera un análisis en pausa antes de cancelarse (la misma variable que usa el worker).
+	@Value("${PAUSE_TIMEOUT_HOURS:72}")
+	private int horasDePausa;
 
 	@Autowired
 	private ExperimentoRepository experimentoRepository;
@@ -324,7 +324,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		try {
 			JsonNode pausa = JSON.readTree(Files.readString(archivo));
 			OffsetDateTime horaPausa = OffsetDateTime.parse(pausa.path("hora_pausa").asText());
-			long restantes = Duration.between(OffsetDateTime.now(), horaPausa.plusMinutes(minutosDePausa)).getSeconds();
+			long restantes = Duration.between(OffsetDateTime.now(), horaPausa.plusHours(horasDePausa)).getSeconds();
 
 			Map<String, Object> datos = new LinkedHashMap<>();
 			datos.put("cilindro", pausa.path("cilindro").asInt());

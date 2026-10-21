@@ -6,7 +6,7 @@ import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { usePolling } from '../hooks/usePolling'
 import { CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { DIA, ETAPA, PESO_ETAPA, pctDeEtapa, segundosDesde, tiempoDeEtapa, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, download, norm } from '../lib/fst'
+import { DIA, ETAPA, PESO_ETAPA, pctDeEtapa, segundosDesde, tiempoDeEtapa, enlacePausa, enlaceResultados, enlaceRevision, fechaCorta, mensajeErrorAnalisis, mmss, plazoRestante, download, norm } from '../lib/fst'
 import { useAuth } from '../contexts/AuthContext'
 import { useModo } from '../contexts/ModoContext'
 import { Cargando, FieldError } from '../components/ui'
@@ -302,7 +302,7 @@ function TrabajoEnPausa({ j }) {
           <div className="num" style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>{duracion(j)} · pausa en el segundo {j.pausa.desde_segundo}</div>
           <div style={{ fontSize: 13, marginTop: 6 }}>No se ve al espécimen del cilindro {j.pausa.cilindro} (segundo {j.pausa.desde_segundo}).</div>
           <div className="num" style={{ fontSize: 12, marginTop: 4, color: 'var(--color-accent-700)' }}>
-            {quedan > 0 ? 'Tiempo para responder: ' + mmss(quedan) : 'Pasaron los 5 minutos: se cancela.'}
+            {quedan > 0 ? 'Tiempo para responder: ' + plazoRestante(quedan) : 'Pasaron las 72 horas: se cancela.'}
           </div>
         </div>
         <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>En pausa</span>
@@ -322,7 +322,7 @@ function TrabajoCancelado({ j }) {
       <div style={{ flex: 1 }}>
         <div className="nd" style={{ fontSize: 14 }}>{nombreTrabajo(j)}</div>
         <div style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>
-          {j.motivo === 'plazo' ? 'Pasaron 5 minutos en pausa sin respuesta y el sistema canceló el análisis.' : 'Se canceló desde la pantalla de pausa.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
+          {j.motivo === 'plazo' ? 'Pasaron 72 horas en pausa sin respuesta y el sistema canceló el análisis.' : 'Se canceló desde la pantalla de pausa.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
           {tardo(j, modoDesarrollador) && <> {tardo(j, modoDesarrollador)}.</>}
         </div>
       </div>
