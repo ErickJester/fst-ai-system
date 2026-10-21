@@ -25,7 +25,7 @@ posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo 
 - [x] `VITE_USE_MOCKS`, `VITE_API_BASE` y `VITE_MAX_UPLOAD_MB` documentadas en `frontend/.env.example`
 - [x] Franja «Modo demo» solo con datos de ejemplo; con el backend real no hay franja y la versión se ve en el menú de usuario
 - [ ] Chrome, Firefox y Edge en sus versiones actuales probados (§2)
-- [ ] Abrir el dashboard, filtrar y abrir resultados en 3 s o menos en el 95 % de los casos, con el backend real (§2)
+- [x] Abrir el dashboard, filtrar y abrir resultados en 3 s o menos en el 95 % de los casos, con el backend real (§2). Medido el 20-oct en local: la pantalla completa tarda 0.25 s (lista) y 0.25–0.31 s (resultados) con el servidor de desarrollo; las peticiones, p95 de 0.05 s en 40 aperturas. Con pocos datos (3 experimentos): conviene repetirlo con el volumen real
 
 ## 1. Capa de servicios y conexión con el backend real (§6, §6.1)
 Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa responde con datos de ejemplo.
@@ -206,5 +206,5 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
 - [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a los 5 minutos, y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
 - [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
-- [ ] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos
+- [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
