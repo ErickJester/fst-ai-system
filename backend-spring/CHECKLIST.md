@@ -15,7 +15,7 @@ de prueba **se ejecutaron** en un PostgreSQL 16 temporal: el esquema se aplica s
 `tipo_conducta`, sin `conducta`, `intervalo` ni `presenta`), las restricciones rechazan lo que deben (8 casos
 probados), `ddl-auto=validate` acepta las 12 entidades, y `/health`, `/experiments` y el PDF responden con los
 números esperados. **Sin probar:** `docker compose --profile dev up --build` completo, con el backend y el
-`worker_fake` en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker sigue con el esquema viejo de
+worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker sigue con el esquema viejo de
 15 tablas y 14 experimentos de prueba; para aplicar el nuevo hay que correr `docker compose down -v` en
 `backend-spring/` (borra esos datos) y volver a levantar.
 
@@ -151,11 +151,12 @@ números esperados. **Sin probar:** `docker compose --profile dev up --build` co
 - [ ] Cada notificación se envía también por correo
 - [x] Quitar el correo de demostración al crear un experimento, que no está en la guía
 
-## 10. `worker_fake` y tareas programadas
-El `worker_fake` está en `../worker_fake` y es Python, no Spring. Ya escribe `OBSERVACION` y `SEGUNDO` con el
-modelo de 12 tablas. No lo he revisado punto por punto contra esta lista.
-Desde el 18-oct hay además un **worker real** (`../worker`, servicio `worker` del compose; `worker_fake` quedó en el
-perfil `fake`). Usa el modelo `fst_cnn_seg.pt` con el código de `fst_auto` copiado sin cambios en `../pipeline`.
+## 10. `worker` y tareas programadas
+El worker está en `../worker` y es Python, no Spring. Escribe `OBSERVACION` y `SEGUNDO` con el modelo de 12 tablas.
+No lo he revisado punto por punto contra esta lista. Hasta el 20-oct hubo además un simulador (`worker_fake`, con
+conductas inventadas y `simular_carga.py` para encolar videos de prueba); se retiró ese día y su cola, pausas y
+tareas diarias pasaron a `../worker` (`cola.py`, `tareas_programadas.py`). Desde el 18-oct el worker (`../worker`,
+servicio `worker` del compose) usa el modelo `fst_cnn_seg.pt` con el código de `fst_auto` copiado sin cambios en `../pipeline`.
 Probado con `AcuBN1.MOV`: completado, 4 × 300 segundos en `SEGUNDO`, `web.mp4`, `cajas.json`, PDF y notificación,
 y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo (100 %),
 pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia

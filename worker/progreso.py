@@ -71,17 +71,6 @@ class RegistroProgreso:
         self._etapa = ETAPAS[-1]
         self._escribir()
 
-    def avanzar_por_tiempo(self, etapa, segundos, paso_s=0.5):
-        """Para el simulador: la etapa avanza de 0 a 100 durante `segundos`, sin hacer nada más."""
-        inicio = time.monotonic()
-        while True:
-            transcurrido = time.monotonic() - inicio
-            if transcurrido >= segundos:
-                break
-            self.avance(etapa, 100.0 * transcurrido / segundos)
-            time.sleep(min(paso_s, segundos - transcurrido))
-        self.etapa_hecha(etapa)
-
     def _escribir(self):
         datos = {
             "etapa": self._etapa,

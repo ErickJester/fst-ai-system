@@ -22,7 +22,7 @@ import re
 import time
 from pathlib import Path
 
-log = logging.getLogger("worker_fake")   # el mismo logger que comun.log
+log = logging.getLogger("worker")   # el mismo logger que comun.log
 
 PERIODO_S = 2.0
 
