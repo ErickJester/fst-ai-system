@@ -52,7 +52,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [ ] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
-- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `9e3a874` con `worker_fake`): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF y notificaciones. Falta: lo que el backend aún no tiene (administración, recuperar contraseña, pausa, revisión y video, bloques, CSV y XLSX)
+- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con `worker_fake`): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: lo que el backend aún no tiene (administración, recuperar contraseña, pausa, bloques, CSV y XLSX) y probar error y pausa (el `worker_fake` aún no lee el nombre original del video)
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
 - [x] Inicio de sesión con correo y contraseña, y error de credenciales (R-01)
@@ -162,11 +162,11 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Visto» a 2× o menos, y solo lo visto se guarda como `confirmada`, `corregida` o `dudosa` (D-80)
 - [x] Borrador en el navegador, resumen antes de guardar y «Guardar correcciones»
 - [x] «Reiniciar el análisis» con confirmación, solo en esta pantalla (R-04, D-60)
-- [ ] Reproducir el video real con un token de video (decidido: la URL lleva `?vt=`, nunca el JWT de sesión). Hecho: la pantalla lee `videoUrl`. Falta lo siguiente
+- [x] Reproducir el video real con un token de video (la URL lleva `?vt=`, nunca el JWT de sesión). Probado el 20-oct con el backend `e66ce40`
   - [x] Pedir `POST .../video-token` con el JWT por header antes de abrir la revisión y poner `?vt=` en el `<video>` [PROPUESTA]
   - [x] Si el video responde 401 o 403 por token vencido, pedir otro y seguir en el mismo segundo
   - [x] No escribir la URL del video con su token en consola ni en pantalla
-  - [ ] Probar `Range` (adelantar y retroceder) con un `web.mp4` real
+  - [x] Probar `Range` (adelantar y retroceder): el video con `?vt=` responde `206 Partial Content`
 - [x] Borrador guardado por cuenta, y «Cerrar sesión» borra los de la revisión
 - [x] Sin video (ya se borró) la revisión es de solo lectura: explica el motivo y quita «Guardar correcciones» y «Reiniciar el análisis»
 - [x] Con `puedeCorregir: false` la revisión es de solo lectura

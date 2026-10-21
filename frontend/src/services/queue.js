@@ -61,6 +61,15 @@ export async function getDiagnostico(job) {
   return (await api.get(`/experiments/${job.clave}/analyses/${job.job_id}/diagnostic`, { responseType: 'blob' })).data
 }
 
+// GET /experiments/:clave/analyses/:id/control → la imagen de control del pipeline (JPG): los tubos que encontró, con
+// su zona medida, la línea de agua y el fondo. La pantalla de un análisis con error la muestra. La etiqueta <img> no
+// puede mandar el Authorization, por eso se pide como blob (igual que el PDF de diagnóstico) y la pantalla la muestra
+// con una URL de objeto. Sin backend no hay imagen: responde null.
+export async function getControl(job) {
+  if (USE_MOCKS) return reply(null)
+  return (await api.get(`/experiments/${job.clave}/analyses/${job.job_id}/control`, { responseType: 'blob' })).data
+}
+
 // ── Pausa (R-15, D-89) ──────────────────────────────────────────────────────
 // Plazo para responder (PAUSE_TIMEOUT_MINUTES). Al vencer, el worker cancela el análisis.
 const PLAZO_PAUSA_MS = 5 * 60 * 1000

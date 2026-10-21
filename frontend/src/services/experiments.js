@@ -139,6 +139,7 @@ export function deDetalle(d, analisis = []) {
         const etapa = a?.etapa ? ETAPA.aFront[a.etapa] : null
         const x = {
           letra: t.letra || letraDeOrdinal(t.ordinal),
+          id_tanda: t.idTanda ?? null, // sin backend (datos de ejemplo) no hay id: no se puede eliminar la tanda
           desde,
           n_cilindros: t.nCilindros,
           duracion_s: v2?.duracion ? Math.round(v2.duracion) : null,
@@ -205,6 +206,14 @@ export async function deleteExperiment(clave) {
     return reply({ ok: true })
   }
   return (await api.delete(`/experiments/${clave}`)).data
+}
+
+// DELETE /experiments/:clave/tandas/:idTanda → elimina una tanda con sus videos (Día 1 y Día 2) y resultados, para
+// dejar libre su letra si se subió mal. 403 si no es quien creó el experimento ni Administrador; 409 si su análisis
+// está procesando o en pausa; 204 sin cuerpo. Sin backend no hay id de tanda y el botón no sale.
+export async function deleteTanda(clave, idTanda) {
+  if (USE_MOCKS) return reply({ ok: true })
+  await api.delete(`/experiments/${clave}/tandas/${idTanda}`)
 }
 
 // Quita de la lista, sin reemplazarla, los elementos que cumplen la condición.

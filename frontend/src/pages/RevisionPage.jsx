@@ -7,7 +7,7 @@ import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { useAsync } from '../hooks/useAsync'
 import { getRevision, guardarSegundos, reiniciarAnalisis, urlDeVideo } from '../services/revision'
 import { mensajeError } from '../services/api'
-import { CONDUCTA_BD, DE_BD, fmt, enlaceResultados, especimen } from '../lib/fst'
+import { CONDUCTA_BD, DE_BD, fmt, enlaceResultados, especimen, textoVideo } from '../lib/fst'
 
 const REACCION = 0.4 // lo que tarda una persona en reaccionar (s)
 const LUPA_S = 40 // segundos visibles en la lupa
@@ -402,6 +402,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 9px' }}>Revisión segundo a segundo · {datos.grupo.nombre}, Tanda {datos.tanda}</h2>
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{datos.grupo.tratamiento} · Día 2, {N} s</div>
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>{textoVideo(datos.nombreVideo)}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Link className="btn btn-secondary" to={enlaceResultados(clave, datos.grupo.id, datos.tanda)}>Volver a resultados</Link>
