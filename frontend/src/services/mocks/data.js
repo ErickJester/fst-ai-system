@@ -89,7 +89,7 @@ export const pausedJobs = [
         { cilindro: 3, x0: 690, y0: 130, x1: 910, y1: 640 }, { cilindro: 4, x0: 1010, y0: 130, x1: 1230, y1: 640 }] } },
 ]
 
-// Análisis cancelados: por el usuario o porque pasaron 5 minutos sin respuesta (motivo).
+// Análisis cancelados: por el usuario o porque pasaron 72 horas sin respuesta (motivo).
 export const canceledJobs = []
 
 // Correcciones guardadas en la revisión segundo a segundo (la tabla SEGUNDO revisada), por
@@ -212,7 +212,7 @@ export const notifications = [
   { idNotificacion: 2, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Referencia · Tanda A · Día 2.', idExperimento: 7, fechaCreacion: hace(0, '15:02'), leido: false },
   { idNotificacion: 4, tipo: 'alerta de disco', mensaje: 'El disco está al 82 %, por encima del 80 %. Al pasar del 90 % se borran primero los videos más antiguos.', idExperimento: null, fechaCreacion: hace(0, '09:12'), leido: false, soloAdmin: true },
   { idNotificacion: 5, tipo: 'video borrado', mensaje: 'Réplica interanalista · control metodológico: los videos se borraron al cumplir 30 días. Resultados y reportes se conservan.', idExperimento: 4, fechaCreacion: hace(1, '03:00'), leido: true },
-  { idNotificacion: 6, tipo: 'analisis en pausa', mensaje: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 5 minutos o se cancela.', idExperimento: 7, fechaCreacion: hace(0, '15:50'), leido: false },
+  { idNotificacion: 6, tipo: 'analisis en pausa', mensaje: 'Compuesto CSR-14 · Control · Tanda B · Día 2. No se ve al espécimen del cilindro 2 (segundo 142). Ajusta el recuadro en 72 horas o se cancela.', idExperimento: 7, fechaCreacion: hace(0, '15:50'), leido: false },
   { idNotificacion: 3, tipo: 'analisis completado', mensaje: 'Compuesto CSR-14 · Control · Tanda A · Día 2.', idExperimento: 7, fechaCreacion: hace(1, '18:20'), leido: true },
 ]
 

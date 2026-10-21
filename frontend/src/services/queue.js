@@ -71,10 +71,10 @@ export async function getControl(job) {
 }
 
 // ── Pausa (R-15, D-89) ──────────────────────────────────────────────────────
-// Plazo para responder (PAUSE_TIMEOUT_MINUTES). Al vencer, el worker cancela el análisis.
-const PLAZO_PAUSA_MS = 5 * 60 * 1000
+// Plazo para responder (PAUSE_TIMEOUT_HOURS). Al vencer, el worker cancela el análisis.
+const PLAZO_PAUSA_MS = 72 * 60 * 60 * 1000
 
-// Segundos que quedan para responder (hora de la pausa + 5 minutos). Sin backend, la pausa
+// Segundos que quedan para responder (hora de la pausa + 72 horas). Sin backend, la pausa
 // de ejemplo empieza la primera vez que se consulta, para poder ver el plazo corriendo.
 function restante(job, ahora = Date.now()) {
   if (job.pausa.hora_ms == null) job.pausa.hora_ms = ahora
@@ -139,7 +139,7 @@ export async function ajustarRecuadro(clave, id, recuadro) {
 }
 
 // POST /experiments/:clave/analyses/:id/cancel → el análisis queda cancelado; 409 si ya no
-// está en pausa (por ejemplo, porque pasaron los 5 minutos).
+// está en pausa (por ejemplo, porque pasaron las 72 horas).
 export async function cancelarAnalisis(clave, id) {
   if (USE_MOCKS) {
     const { job, i, error } = pausaPropia(clave, id)

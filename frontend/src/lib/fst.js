@@ -84,6 +84,14 @@ export function mmss(s) {
   return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + seg : m + ':' + seg
 }
 
+// Lo que queda del plazo de la pausa (72 h), en horas y minutos: «71 h 58 min»; con menos de una hora, «59 min»;
+// con menos de un minuto (o vencido), «menos de 1 min». Los segundos no se muestran: el plazo es de días, no de segundos.
+export function plazoRestante(s) {
+  const min = Math.floor(Math.max(0, s) / 60)
+  if (min < 1) return 'menos de 1 min'
+  return min >= 60 ? Math.floor(min / 60) + ' h ' + (min % 60) + ' min' : min + ' min'
+}
+
 // Segundos que pasaron desde una hora ISO hasta ahoraMs (nunca negativos: el reloj del navegador y el del
 // worker pueden diferir unos segundos).
 export const segundosDesde = (iso, ahoraMs) => Math.max(0, Math.floor((ahoraMs - Date.parse(iso)) / 1000))

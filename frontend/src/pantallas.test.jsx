@@ -380,7 +380,7 @@ describe('pausa del análisis (R-15)', () => {
   it('muestra la imagen con el recuadro, el tiempo que queda y ajusta', async () => {
     const user = await conSesion('/experimentos/7/analisis/502/pausa')
     expect(await screen.findByRole('heading', { name: 'No se ve al espécimen del cilindro 2 (segundo 142)' })).toBeTruthy()
-    expect(screen.getByRole('timer').textContent).toMatch(/Tiempo para responder: [45]:\d\d/)
+    expect(screen.getByRole('timer').textContent).toMatch(/Tiempo para responder: (72 h 0|71 h 59) min/)
     const izquierda = screen.getByLabelText('Izquierda (px)')
     await user.clear(izquierda)
     await user.type(izquierda, '370')

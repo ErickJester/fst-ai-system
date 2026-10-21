@@ -168,7 +168,7 @@ real con sesión (la hará el usuario en otra PC).
 - [ ] Toma un análisis a la vez, el más antiguo primero
 - [ ] Caso exitoso: pasa por las etapas, escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación
 - [ ] Caso de error con la palabra `falla`: PDF de diagnóstico, estado `error` y notificación
-- [ ] Caso de pausa con la palabra `pausa`, con sus tres salidas: ajuste, cancelación y vencimiento a los 5 minutos
+- [ ] Caso de pausa con la palabra `pausa`, con sus tres salidas: ajuste, cancelación y vencimiento a las 72 horas (D-112)
 - [ ] Al arrancar, reencola los `procesando` huérfanos
 - [ ] Reemplaza `fechaAnalisis` por `ahora` al terminar
 - [ ] Tareas diarias en un módulo aparte, disparables a mano:

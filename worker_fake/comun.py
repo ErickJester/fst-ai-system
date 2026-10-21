@@ -22,7 +22,7 @@ def _entero(nombre, defecto):
 # Variables de la guía (sección 2) con sus valores por defecto.
 POLL_SECONDS = _entero("WORKER_POLL_SECONDS", 5)
 DAILY_HOUR = _entero("WORKER_DAILY_HOUR", 3)
-PAUSE_TIMEOUT_MINUTES = _entero("PAUSE_TIMEOUT_MINUTES", 5)
+PAUSE_TIMEOUT_HOURS = _entero("PAUSE_TIMEOUT_HOURS", 72)
 DISK_ALERT_PERCENT = _entero("DISK_ALERT_PERCENT", 80)
 DISK_CLEANUP_PERCENT = _entero("DISK_CLEANUP_PERCENT", 90)
 # Propias del simulador: segundos que tarda cada etapa y, solo para pruebas, un porcentaje de disco
