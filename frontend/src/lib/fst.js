@@ -46,6 +46,19 @@ export const ETAPA = {
 }
 // Porcentaje que informa el backend en cada etapa (33, 67 y 100; 0 en cola).
 export const PCT_ETAPA = { PREPROCESSING: 33, ROI_DETECTION: 67, CLASSIFICATION: 100 }
+// Cuánto pesa cada etapa en la barra general (suman 100): son los pesos que MIDIÓ el worker con un video real
+// (worker_fake/progreso.py). Solo sirven para dibujar dónde empieza cada etapa en la barra.
+export const PESO_ETAPA = { PREPROCESSING: 1, ROI_DETECTION: 9, CLASSIFICATION: 90 }
+
+// Porcentaje propio de una etapa de un análisis en curso: hecha 100; en curso, el que informa el backend
+// (stage_pct) o, si no lo trae, el de la etapa; pendiente 0.
+export function pctDeEtapa(j, etapa, etapas) {
+  const i = etapas.indexOf(etapa)
+  const iActual = etapas.indexOf(j.stage)
+  if (i < iActual) return 100
+  if (i > iActual) return 0
+  return j.stage_pct ?? PCT_ETAPA[etapa]
+}
 
 // Estado de un experimento: no se guarda, se calcula con sus tandas (§4.8 del documento).
 export const ESTADO_EXPERIMENTO = {
@@ -73,7 +86,50 @@ export const estadoDeTanda = (t) => (t.estado === 'SIN_VIDEO' && t.dia1 ? 'ESPER
 export const enlacePausa = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/pausa`
 
 // «3:41» a partir de segundos.
-export const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0')
+// m:ss, o h:mm:ss si pasa de una hora.
+export function mmss(s) {
+  const t = Math.floor(s)
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const seg = String(t % 60).padStart(2, '0')
+  return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + seg : m + ':' + seg
+}
+
+// Segundos que pasaron desde una hora ISO hasta ahoraMs (nunca negativos: el reloj del navegador y el del
+// worker pueden diferir unos segundos).
+export const segundosDesde = (iso, ahoraMs) => Math.max(0, Math.floor((ahoraMs - Date.parse(iso)) / 1000))
+
+// El equipo de un análisis, como se muestra: su nombre o, si no tiene, el modelo del procesador.
+export const nombreEquipo = (equipo) => equipo?.nombre || equipo?.cpu || null
+
+// El nombre de archivo de una descarga, según la cabecera Content-Disposition del servidor (filename*=UTF-8''… o
+// filename="…"), o null si no la trae.
+export function nombreDeContentDisposition(cabecera) {
+  if (!cabecera) return null
+  const utf8 = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(cabecera)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1].trim())
+    } catch {
+      /* mal codificado: se prueba con el nombre simple */
+    }
+  }
+  const simple = /filename\s*=\s*"?([^";]+)"?/i.exec(cabecera)
+  return simple ? simple[1].trim() : null
+}
+
+// El video de un análisis, con el nombre del archivo como lo subió el usuario («Video: acu-yintang2.mp4»). Los videos
+// anteriores al 20-oct-2026 no lo tienen: «Video: nombre no registrado». Siempre visible: no depende del modo desarrollador.
+export const textoVideo = (nombre) => 'Video: ' + (nombre || 'nombre no registrado')
+
+// Segundos de una etapa de un análisis en curso (j.tiempos, de services/progreso.js): hecha → los que midió el worker;
+// en curso → los que lleva, contados desde su inicio; sin empezar (o sin registro) → null, que se muestra «—».
+export function tiempoDeEtapa(j, etapa, ahoraMs) {
+  const e = j.tiempos?.etapas?.[etapa]
+  if (!e) return null
+  if (e.segundos != null) return e.segundos
+  return e.fin ? Math.max(0, Math.round((Date.parse(e.fin) - Date.parse(e.inicio)) / 1000)) : segundosDesde(e.inicio, ahoraMs)
+}
 
 // Un espécimen se distingue por su posición en el cuadro; como el número se repite en cada
 // tanda del grupo, donde se juntan tandas va con la tanda: «Tanda A · Espécimen 2» (D-55).

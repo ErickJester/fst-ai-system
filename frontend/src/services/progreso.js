@@ -1,5 +1,6 @@
 import { listExperiments, detalleConStatus } from './experiments'
 import { ESTADO, ETAPA, SESION } from '../lib/contrato'
+import { nombreEquipo } from '../lib/fst'
 
 // «Análisis en curso» (2e) sin una cola global: la guía solo da el progreso por experimento,
 // GET /experiments/{id}/status (§6.1; PARA_VANESA_API.md §3, decisión 6). Con un experimento,
@@ -9,6 +10,18 @@ import { ESTADO, ETAPA, SESION } from '../lib/contrato'
 // Experimentos de la lista que pueden tener análisis que mostrar.
 const CON_ANALISIS = ['QUEUED', 'RUNNING', 'PAUSED', 'FAILED', 'CANCELED']
 const TERMINADOS = 5
+
+// «tiempos» de un análisis de /status (lo que midió el worker; null si no hay registro) → la forma de las pantallas:
+// las etapas con las claves del frontend, el total y el equipo como texto (su nombre o, si no tiene, el CPU).
+export function tiemposFront(t) {
+  if (!t) return null
+  const etapas = {}
+  for (const e of t.etapas || []) {
+    const clave = ETAPA.aFront[e.etapa]
+    if (clave) etapas[clave] = { inicio: e.inicio, fin: e.fin ?? null, segundos: e.segundos ?? null }
+  }
+  return { inicio: t.inicio, fin: t.fin ?? null, total_s: t.totalSegundos ?? null, etapas, equipo: nombreEquipo(t.equipo) }
+}
 
 // Un análisis de /status, con su tanda del detalle → la forma que usan las pantallas.
 function trabajo(exp, g, t, a) {
@@ -24,7 +37,10 @@ function trabajo(exp, g, t, a) {
     subido_por: t.subido_por,
     status: ESTADO.aFront[a.estado],
     stage: a.etapa ? ETAPA.aFront[a.etapa] : null,
-    progress_pct: a.porcentaje ?? 0,
+    progress_pct: a.porcentaje ?? 0, // el avance GENERAL, de 0 a 100
+    stage_pct: a.porcentajeEtapa ?? null, // el de la etapa actual; null si el backend no lo tiene
+    tiempos: tiemposFront(a.tiempos),
+    control_disponible: !!a.controlDisponible, // hay imagen de control (los tubos que encontró el pipeline)
     analisis_fecha: a.fechaAnalisis ?? null,
     motivo: a.motivoCancelacion ?? null,
     ...(a.pausa && { pausa: { cilindro: a.pausa.cilindro, desde_segundo: a.pausa.desdeSegundo }, segundos_restantes: a.pausa.segundosRestantes }),

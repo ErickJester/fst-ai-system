@@ -1,12 +1,14 @@
 import React, { useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { getBatchResults, getGroupComparison, getBlocks, getReporte } from '../services/results'
+import { getBatchResults, getGroupComparison, getBlocks, getReporte, getSegundosModelo } from '../services/results'
+import BotonSegundos from '../components/BotonSegundos'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, fechaCorta, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -182,6 +184,7 @@ function SinResultados({ clave }) {
 
 function ResultadosTanda({ clave, gid, letra }) {
   const { user } = useAuth()
+  const { modoDesarrollador } = useModo()
   const [tab, setTab] = useState('especimen')
   const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
@@ -218,6 +221,8 @@ function ResultadosTanda({ clave, gid, letra }) {
   const agrupado = rs.some((x) => x.nivel === 'AGRUPADO')
   const revisado = rs.some((x) => x.revisado)
   const analizado = rs.map((x) => x.analizado_en).sort().at(-1)
+  // Cuánto tardó el análisis de cada tanda que se ve y en qué computadora (los análisis de antes no lo tienen).
+  const tiempos = modoDesarrollador ? rs.filter((x) => x.tiempo_analisis) : []   // solo en modo desarrollador
   const vistaTexto = grupoCompleto ? 'del grupo completo' : 'de la Tanda ' + r.letra
   const enlaceGrupo = `/experimentos/${clave}/resultados?grupo=${gid}`
   // Desglose por minuto de cada espécimen que se ve; se elige uno.
@@ -238,6 +243,19 @@ function ResultadosTanda({ clave, gid, letra }) {
       setReporte(null)
     } catch (e) {
       setReporte({ formato, error: mensajeError(e, 'No se pudo descargar el reporte. Inténtalo de nuevo.') })
+    }
+  }
+
+  // «Segundos» (solo modo desarrollador): la salida por segundo del modelo, tal cual. Con una tanda pide grupo y tanda;
+  // con el grupo completo, solo grupo.
+  async function pedirSegundos() {
+    setReporte({ formato: 'segundos', pidiendo: true })
+    try {
+      const salida = await getSegundosModelo(exp.clave, grupoCompleto ? { grupo: gid } : { grupo: gid, tanda: r.letra })
+      if (salida) download(salida.nombre, salida.archivo, salida.tipo)
+      setReporte(null)
+    } catch (e) {
+      setReporte({ formato: 'segundos', error: mensajeError(e, 'No se pudo descargar la salida por segundo del modelo. Inténtalo de nuevo.') })
     }
   }
 
@@ -264,6 +282,15 @@ function ResultadosTanda({ clave, gid, letra }) {
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}{analizado.length > 10 && ', ' + hora(analizado)}</div>
+            {/* El nombre del archivo del video, como lo subió el usuario; en el grupo completo, uno por tanda. */}
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>
+              {grupoCompleto ? rs.map((x) => 'Tanda ' + x.letra + ' · ' + textoVideo(x.nombre_video)).join('; ') : textoVideo(r.nombre_video)}
+            </div>
+            {tiempos.length > 0 && (
+              <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>
+                Tiempo de análisis: {tiempos.map((x) => (grupoCompleto ? 'Tanda ' + x.letra + ' ' : '') + mmss(x.tiempo_analisis.total_s) + (x.tiempo_analisis.equipo ? ' · ' + x.tiempo_analisis.equipo : '')).join('; ')}
+              </div>
+            )}
             {/* Ver una tanda o el grupo completo (RF-19, D-93). */}
             <nav aria-label="Ver" className="no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               <span className="k" style={{ marginRight: 4 }}>Ver</span>
@@ -305,6 +332,7 @@ function ResultadosTanda({ clave, gid, letra }) {
               <button key={formato} type="button" className={'btn ' + (formato === 'pdf' ? 'btn-primary' : 'btn-secondary')} style={btnLeft}
                 disabled={reporte?.pidiendo} onClick={() => pedirReporte(formato)}>{x.boton}</button>
             ))}
+            <BotonSegundos grupoCompleto={grupoCompleto} ocupado={reporte?.pidiendo} onClick={pedirSegundos} />
           </div>
         </div>
 
