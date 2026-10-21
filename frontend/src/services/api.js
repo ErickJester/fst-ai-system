@@ -2,7 +2,7 @@ import axios from 'axios'
 import { TOKEN_KEY, AVISO_KEY } from './config'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:8084',
 })
 
 api.interceptors.request.use((config) => {

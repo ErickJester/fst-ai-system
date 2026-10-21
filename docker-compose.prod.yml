@@ -1,0 +1,18 @@
+# Frontend de producción (compilado y servido con nginx) en lugar del servidor de desarrollo.
+# Se usa junto con docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+#
+# La app queda en http://localhost:8080. Con el backend listo, cambiar VITE_USE_MOCKS a "false".
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_USE_MOCKS: "true"
+        VITE_API_BASE: /api
+    # En producción la dirección del backend va compilada; esta variable ya no aplica.
+    environment: !reset {}
+    ports: !override
+      - "8080:80"

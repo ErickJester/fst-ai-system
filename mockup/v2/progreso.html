@@ -17,7 +17,7 @@
 
   <div class="page" style="padding-bottom:34px">
     <h3 style="margin:0 0 8px">Análisis en curso</h3>
-    <p class="lead" style="margin:0 0 22px;max-width:600px">El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: no hay iniciar, pausar, cancelar ni reiniciar desde aquí.</p>
+    <p class="lead" style="margin:0 0 22px;max-width:600px">El <em>pipeline</em> (cadena de procesamiento) atiende un trabajo a la vez. El orden lo fija el sistema al momento de la carga: no hay iniciar, pausar ni reiniciar desde aquí. Solo cuando el sistema deja un análisis en pausa se puede ajustar el recuadro o cancelarlo.</p>
 
     <div style="border:2px solid var(--color-text)">
       <div style="padding:18px 20px;border-bottom:2px solid var(--color-divider)">
@@ -28,18 +28,32 @@
         </div>
         <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · 4 especímenes</div>
         <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
-          <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:2px" id="barra"></div>
+          <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:2px" id="barra"></div>
           <span class="num nd" style="font-size:15px;white-space:nowrap" id="pctTotal"></span>
         </div>
       </div>
       <div id="etapas"></div>
-      <div style="padding:14px 20px;background:var(--color-surface);font-size:12px">
-        <div style="display:flex;align-items:baseline;gap:8px">
-          <span>Confianza de detección:</span>
-          <span class="num nd" style="font-size:15px">0.86</span>
-          <span class="num" style="color:color-mix(in srgb,var(--color-text) 60%,transparent)">(mínimo 0.70)</span>
+    </div>
+
+    <div style="border:2px solid var(--color-text);margin-top:18px">
+      <div style="padding:16px 20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:15px">Compuesto CSR-14 · Referencia · Tanda A</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-neutral" style="white-space:nowrap">Completado</span>
         </div>
-        <div class="hint" style="margin-top:4px">Es la confianza de la detección de cilindros. Por debajo de 0.70, el análisis se detiene completo.</div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · 4 especímenes · terminado hoy, 15:02</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+          <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:2px">
+            <div style="height:10px;background:var(--color-text)"></div><div style="height:10px;background:var(--color-text)"></div><div style="height:10px;background:var(--color-text)"></div>
+          </div>
+          <span class="num nd" style="font-size:15px;white-space:nowrap">100 %</span>
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px">
+          <a class="btn btn-primary" href="resultados.html">Ver resultados</a>
+          <a class="btn btn-secondary" href="revision.html">Revisar segundo a segundo</a>
+          <span class="hint">Las tres etapas terminaron; los resultados ya están disponibles.</span>
+        </div>
       </div>
     </div>
 
@@ -50,17 +64,62 @@
           <div style="flex:1"></div>
           <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-800);color:var(--color-bg)">Error</span>
         </div>
-        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · detenido en Detección de cilindros (50 %)</div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · detenido en Localización de los cilindros (67 %)</div>
       </div>
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;gap:14px;align-items:baseline">
-          <span class="num nd" style="font-size:13px;color:var(--color-accent-700);white-space:nowrap">E-DET-070</span>
-          <span style="font-size:13px;line-height:1.55">Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.</span>
-        </div>
+        <div style="font-size:13px;line-height:1.55">No se encontraron los cilindros en el video: el análisis se detuvo en la localización de los cilindros y no llegó a la clasificación.</div>
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px">
           <button type="button" class="btn btn-primary" id="btnDiag" style="justify-content:flex-start">Descargar reporte de diagnóstico (PDF)</button>
           <span class="hint">El investigador no puede reiniciar el análisis.</span>
         </div>
+      </div>
+    </div>
+
+    <div style="border:2px solid var(--color-accent);margin-top:18px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--color-divider)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:15px">Compuesto CSR-14 · Control · Tanda A</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-800);color:var(--color-bg)">Error</span>
+        </div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 1 · referencia basal · detenido en Preprocesamiento (0 %)</div>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:13px;line-height:1.55">No se pudo abrir el video: el archivo está dañado o no se puede leer. Ninguna etapa del análisis llegó a correr.</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px">
+          <button type="button" class="btn btn-primary" id="btnDiag2" style="justify-content:flex-start">Descargar reporte de diagnóstico (PDF)</button>
+          <span class="hint">El investigador no puede reiniciar el análisis.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border:2px solid var(--color-accent);margin-top:18px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--color-divider)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:15px">Compuesto CSR-14 · Experimental B · Tanda A</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-100);color:var(--color-accent-700)">En pausa</span>
+        </div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · pausa en el segundo 142 · queda 3:41</div>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:13px;line-height:1.55">El sistema no vio al espécimen del cilindro 2 durante tres segundos seguidos y espera tu respuesta. Si pasan 5 minutos sin respuesta, el análisis se cancela.</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px">
+          <a class="btn btn-primary" href="pausa.html">Ajustar o cancelar</a>
+          <span class="hint">Se avisó con una notificación en el sistema.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border:2px solid var(--color-accent);margin-top:18px">
+      <div style="padding:16px 20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nd" style="font-size:15px">Compuesto CSR-14 · Referencia · Tanda B</div>
+          <div style="flex:1"></div>
+          <span class="tag tag-accent" style="white-space:nowrap;background:var(--color-accent-800);color:var(--color-bg)">Cancelado</span>
+        </div>
+        <div class="num" style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Día 2 · 5 min · cancelado en el segundo 87</div>
+        <div style="font-size:13px;line-height:1.55;margin-top:12px">Pasaron 5 minutos en pausa sin respuesta y el sistema canceló el análisis. No se guardó ningún resultado de esta tanda.</div>
       </div>
     </div>
 
@@ -74,15 +133,13 @@
   const $ = id => document.getElementById(id);
   const INK = 'var(--color-text)', ACC = 'var(--color-accent)', MUT = 'var(--muted)';
   const etapas = [
-    { nombre: 'Preprocesamiento', detalle: 'CLAHE (realce local de contraste)', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '25 %' },
-    { nombre: 'Detección de cilindros', detalle: '4 cilindros detectados', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '50 %' },
-    { nombre: 'Seguimiento de especímenes', detalle: 'tracking (seguimiento) de 4 especímenes', icono: '3', dotBg: ACC, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'en curso', pct: '75 %' },
-    { nombre: 'Clasificación de conducta', detalle: 'nado activo, inmovilidad, escalamiento', icono: '4', dotBg: 'transparent', dotFg: MUT, titleFg: MUT, estado: 'pendiente', pct: '100 %' }
+    { nombre: 'Preprocesamiento', detalle: 'alineación de la cámara y modelo de fondo', icono: '✓', dotBg: INK, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'hecha', pct: '33 %' },
+    { nombre: 'Localización de los cilindros', detalle: 'cilindros y línea de agua', icono: '2', dotBg: ACC, dotFg: 'var(--color-bg)', titleFg: INK, estado: 'en curso', pct: '67 %' },
+    { nombre: 'Clasificación de conducta', detalle: 'nado activo, inmovilidad, escalamiento', icono: '3', dotBg: 'transparent', dotFg: MUT, titleFg: MUT, estado: 'pendiente', pct: '100 %' }
   ];
   const cola = [
     { n: '1', nombre: 'Compuesto CSR-14 · Experimental A · Tanda B', dia: 'Día 2', estado: 'Procesando', tagClass: 'tag-accent' },
-    { n: '2', nombre: 'Compuesto CSR-14 · Control · Tanda B', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' },
-    { n: '3', nombre: 'Compuesto CSR-14 · Experimental B · Tanda A', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' }
+    { n: '2', nombre: 'Compuesto CSR-14 · Control · Tanda B', dia: 'Día 2', estado: 'En cola', tagClass: 'tag-outline' }
   ];
 
   $('barra').innerHTML = etapas.map(s => {
@@ -115,19 +172,23 @@
     '</tr>').join('');
 
   // Reporte de diagnóstico: se imprime/guarda como PDF desde el navegador.
-  $('btnDiag').onclick = () => {
+  function diagnostico(titulo, nombre, detalle, motivo) {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(
-      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte de diagnóstico · E-DET-070</title>' +
+      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte de diagnóstico · ' + titulo + '</title>' +
       '<link rel="stylesheet" href="' + new URL('assets/modernist.css', location.href) + '">' +
       '<link rel="stylesheet" href="' + new URL('assets/fst.css', location.href) + '"></head>' +
       '<body style="padding:32px;background:#fff"><h3>Reporte de diagnóstico</h3>' +
-      '<p><strong>Compuesto CSR-14 · Experimental B · Tanda B</strong><br>Día 2 · 5 min · detenido en Detección de cilindros (50 %)</p>' +
-      '<p><strong>E-DET-070</strong> · Confianza de detección 0.54, menor a 0.70: no se detectaron los cuatro cilindros.</p>' +
+      '<p><strong>' + nombre + '</strong><br>' + detalle + '</p>' +
+      '<p>' + motivo + '</p>' +
       '<script>onload=()=>print()<\/script></body></html>');
     w.document.close();
-  };
+  }
+  $('btnDiag').onclick = () => diagnostico('cilindros no encontrados', 'Compuesto CSR-14 · Experimental B · Tanda B', 'Día 2 · 5 min · detenido en Localización de los cilindros (67 %)',
+    'No se encontraron los cilindros en el video.');
+  $('btnDiag2').onclick = () => diagnostico('video no legible', 'Compuesto CSR-14 · Control · Tanda A', 'Día 1 · referencia basal · detenido en Preprocesamiento (0 %)',
+    'No se pudo abrir el video: el archivo está dañado o no se puede leer.');
 </script>
 </body>
 </html>
