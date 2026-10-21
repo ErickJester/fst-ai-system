@@ -363,8 +363,8 @@ describe('pausa del análisis (R-15, D-89)', () => {
     const p = await getPausa('7', 502)
     expect(p).toMatchObject({ cilindro: 2, desdeSegundo: 142, ancho: 1280, alto: 720 })
     expect(p.recuadros).toHaveLength(4)
-    expect(p.segundosRestantes).toBeGreaterThan(290) // empieza al consultarla: quedan casi 5 min
-    expect(p.segundosRestantes).toBeLessThanOrEqual(300)
+    expect(p.segundosRestantes).toBeGreaterThan(72 * 3600 - 10) // empieza al consultarla: quedan casi 72 h
+    expect(p.segundosRestantes).toBeLessThanOrEqual(72 * 3600)
     expect(await getImagenPausa('7', 502)).toBeNull() // la imagen la entrega el servidor
     sesion(2)
     expect(await status(getPausa('7', 502))).toBe('ok')
