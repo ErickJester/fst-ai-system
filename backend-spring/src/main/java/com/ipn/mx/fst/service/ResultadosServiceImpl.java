@@ -316,7 +316,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		};
 	}
 
-	// Lo que dice analisis/{id}/pausa.json (lo escribe worker_fake; el worker real no pausa): en qué cilindro
+	// Lo que dice analisis/{id}/pausa.json (lo escribe el worker; hoy ningún análisis pausa, pero el plazo de 72 h se revisa igual): en qué cilindro
 	// y desde qué segundo, y cuántos segundos quedan antes de que se cancele. Si el archivo no existe o está
 	// roto, null y un aviso en el log.
 	private Map<String, Object> pausa(int idAnalisis) {

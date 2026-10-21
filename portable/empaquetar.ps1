@@ -1,5 +1,5 @@
 # Arma dist\fst-portable-AAAAMMDD.zip con SOLO lo necesario para llevar el sistema a otra PC:
-# backend-spring, worker, worker_fake, pipeline, frontend y portable, mas modelos\fst_cnn_seg.pt (el modelo no
+# backend-spring, worker, pipeline, frontend y portable, mas modelos\fst_cnn_seg.pt (el modelo no
 # esta en git). Nunca incluye .env, target, node_modules ni dist.
 #
 #   .\portable\empaquetar.ps1                  toma lo que esta COMMITEADO (git archive HEAD): es el paquete oficial.
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $raiz = Split-Path -Parent $PSScriptRoot
-$carpetas = @('backend-spring', 'worker', 'worker_fake', 'pipeline', 'frontend', 'portable')
+$carpetas = @('backend-spring', 'worker', 'pipeline', 'frontend', 'portable')
 $modelo = Join-Path $raiz 'modelos\fst_cnn_seg.pt'
 if (-not (Test-Path $modelo)) {
     throw "Falta el modelo: $modelo"

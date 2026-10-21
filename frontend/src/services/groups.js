@@ -51,7 +51,7 @@ async function subirDeEjemplo(clave, grupo, { archivo, sesion, tipo, tratamiento
     onProgress?.(p)
   }
   // El servidor valida el video al recibirlo (D-64). Sin backend, el nombre del archivo
-  // simula los rechazos, como hará worker_fake con «falla» y «pausa».
+  // simula los rechazos del servidor.
   const nombre = archivo?.name || ''
   if (/vertical/i.test(nombre)) return fail(422, 'El video es vertical: se necesita un video horizontal, con los cilindros de lado a lado.')
   if (/da[ñn]ado/i.test(nombre)) return fail(422, 'El video no se puede reproducir: el archivo está dañado o incompleto.')

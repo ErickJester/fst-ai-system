@@ -1,20 +1,17 @@
-"""worker: el worker REAL. Hace lo mismo que worker_fake (la misma cola, las mismas etapas, las mismas
-pausas y los mismos avisos: reutiliza su código) pero en lugar de inventar las conductas analiza el
-video con el modelo de fst_auto, que vive tal cual en pipeline/ (ver pipeline/README.md):
+"""worker: el worker. La cola, las pausas y las tareas diarias viven en cola.py; aquí está lo que hace cada
+análisis: analizar el video con el modelo de fst_auto, que vive tal cual en pipeline/ (ver pipeline/README.md):
 
   1. preprocesamiento  ffprobe abre el video y lo mide.
   2. cilindros         pipeline/etiquetar.py encuentra los tubos y mide al animal en cada uno.
   3. clasificacion     pipeline/cnn/probar_seg.py clasifica cada segundo con la red fst_cnn_seg.pt.
 
-Al final guarda en SEGUNDO los últimos 300 s de cada espécimen, la copia web.mp4 y cajas.json, y avisa,
-igual que worker_fake.completar.
+Al final guarda en SEGUNDO los últimos 300 s de cada espécimen, la copia web.mp4 y cajas.json, y avisa.
 
 Supuestos:
   - El pipeline numera los tubos de izquierda a derecha, de 1 a N. El espécimen k del pipeline es el
     ESPECIMEN de la tanda con numerocilindro k.
   - Este modelo no detecta "no se ve al espécimen", así que la pausa de la sección 4.3 (R-15) no se
-    implementa aquí: ningún análisis real pasa a 'en pausa'. Tampoco se usan las palabras de prueba
-    "falla" y "pausa" de worker_fake.
+    implementa aquí: ningún análisis pasa a 'en pausa'. (cola.revisar_pausas sí atiende las que ya existan.)
   - La carpeta analisis/{id}/trabajo/ (CSV del pipeline, _control.jpg y pipeline.log) se conserva para
     poder revisar a mano un análisis.
 """
@@ -24,22 +21,21 @@ import os
 import re
 import subprocess
 import sys
-import textwrap
 import time
 from pathlib import Path
 
 import pandas as pd
-from PIL import Image, ImageDraw
 from psycopg2.extras import execute_values
 
+import cola
 import vigilancia
-import worker_fake
+from cola import marcar_error, poner_etapa
 from comun import (
-    ARCHIVOS, ahora, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
+    ARCHIVOS, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
 )
+from diagnostico import rangos_de_tubos
 from progreso import RegistroProgreso
 from tiempos import RegistroTiempos
-from worker_fake import fuente, marcar_error, poner_etapa
 
 MODELO = Path(os.environ.get("MODELO_CNN", "/data/modelos/fst_cnn_seg.pt"))
 PIPELINE = Path(__file__).resolve().parent / "pipeline"
@@ -132,101 +128,6 @@ def fallo_del_pipeline(conn, d, etapa, que, codigo, registro):
         causa = f"{que}: el pipeline terminó con error (código {codigo})."
     marcar_error(conn, d, etapa, f"{causa} Últimas líneas del registro: {ultimas_lineas(registro)}")
 
-
-def generar_diagnostico_real(ruta, d, etapa, mensaje):
-    """El PDF de diagnóstico de worker_fake, pero con el mensaje partido en renglones (el de aquí trae
-    la cola del registro del pipeline, que es larga) y sin la leyenda de "simulación". Si el error ocurre después de que
-    etiquetar.py dejó su imagen de control (<idVideo>_control.jpg), va en el PDF: así se ve desde la página qué tubos
-    se encontraron y cuáles no."""
-    paginas = paginas_de_diagnostico(d, etapa, mensaje)
-    paginas[0].save(ruta, "PDF", resolution=150, save_all=len(paginas) > 1, append_images=paginas[1:])
-
-
-ANCHO_PAGINA, ALTO_PAGINA, MARGEN = 1275, 1650, 100
-
-PIE_DE_CONTROL = ("Imagen de control: amarillo = zona medida de cada tubo encontrado, azul = línea de agua, "
-                  "verde = fondo.")
-
-
-def imagen_de_control(d):
-    """La imagen de control de este análisis (la deja etiquetar.py en trabajo/, con el idVideo por nombre), o None."""
-    if not d.get("archivo"):
-        return None
-    ruta = carpeta_analisis(d["idanalisis"]) / "trabajo" / f"{Path(d['archivo']).stem}_control.jpg"
-    if not ruta.is_file():
-        return None
-    try:
-        with Image.open(ruta) as imagen:
-            return imagen.convert("RGB")
-    except OSError as e:
-        log.warning("No se pudo abrir la imagen de control %s: %s (el diagnóstico sale sin ella)", ruta, e)
-        return None
-
-
-def paginas_de_diagnostico(d, etapa, mensaje):
-    """Las páginas del PDF de diagnóstico, como imágenes de Pillow: la primera con el texto y, debajo, la imagen de
-    control si cabe; si no cabe, la imagen va sola en una segunda página. Se escala al ancho útil, sin deformarla."""
-    pagina = Image.new("RGB", (ANCHO_PAGINA, ALTO_PAGINA), "white")
-    dibujo = ImageDraw.Draw(pagina)
-    dibujo.text((100, 100), "Reporte de diagnóstico", font=fuente(40), fill="black")
-    renglones = [
-        f"Experimento: {d['nombre']}",
-        f"Tanda: {d['tanda']}",
-        f"Análisis: {d['idanalisis']}",
-        f"Etapa: {etapa}",
-        f"Fecha: {ahora().strftime('%Y-%m-%d %H:%M')}",
-        "",
-        "Mensaje técnico:",
-    ]
-    renglones += textwrap.wrap(mensaje, 68)[:22]
-    renglones += ["", "Generado por el worker (pipeline fst_auto, modelo fst_cnn_seg)."]
-    texto = fuente(26)
-    for i, renglon in enumerate(renglones):
-        dibujo.text((100, 200 + i * 45), renglon, font=texto, fill="black")
-    paginas = [pagina]
-
-    control = imagen_de_control(d)
-    if control is None:
-        return paginas
-    ancho_util = ANCHO_PAGINA - 2 * MARGEN
-    ancho, alto = ancho_util, round(control.height * ancho_util / control.width)
-    pie = PIE_DE_CONTROL
-    if d.get("cilindros_esperados") is not None and d.get("cilindros_encontrados") is not None:
-        pie += (f" Se esperaban {d['cilindros_esperados']} cilindros con animal y se encontraron "
-                f"{d['cilindros_encontrados']}.")
-    renglones_pie = textwrap.wrap(pie, 80)
-    alto_pie = len(renglones_pie) * 34 + 20
-    y = 200 + len(renglones) * 45 + 20
-    destino = pagina
-    if y + alto + alto_pie > ALTO_PAGINA - MARGEN:
-        # No cabe debajo del texto: segunda página, y si aun sola no cabe por alto, se achica sin deformarla.
-        destino = Image.new("RGB", (ANCHO_PAGINA, ALTO_PAGINA), "white")
-        paginas.append(destino)
-        y = MARGEN
-        tope = ALTO_PAGINA - 2 * MARGEN - alto_pie
-        if alto > tope:
-            ancho, alto = round(control.width * tope / control.height), tope
-    destino.paste(control.resize((ancho, alto), Image.LANCZOS), (MARGEN, y))
-    dibujo_destino = ImageDraw.Draw(destino)
-    for i, renglon in enumerate(renglones_pie):
-        dibujo_destino.text((MARGEN, y + alto + 15 + i * 34), renglon, font=fuente(22), fill="black")
-    return paginas
-
-
-def rangos_de_tubos(registro):
-    """Los tubos que encontró etiquetar.py, con su rango de columnas en píxeles («1:217-580 2:580-939 …»), del último
-    renglón «tubos:» del registro del pipeline; vacío si no lo imprimió."""
-    try:
-        texto = Path(registro).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-    encontrados = re.findall(r"^\s*tubos:\s*(.+)$", texto, re.M)
-    return " ".join(encontrados[-1].split()) if encontrados else ""
-
-
-# marcar_error (de worker_fake) llama a generar_diagnostico por su nombre global: se cambia por la nuestra
-# para que el PDF de un análisis real no diga que es una simulación.
-worker_fake.generar_diagnostico = generar_diagnostico_real
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +250,7 @@ def traducir(valor, id_analisis, cilindro):
 
 
 def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, progreso, registro, tiempos):
-    """El equivalente real de worker_fake.completar (sección 4.4): por espécimen, una OBSERVACION con sus
+    """Cierra el análisis (sección 4.4): por espécimen, una OBSERVACION con sus
     últimos 300 SEGUNDO renumerados de 1 a n. Los archivos se escriben antes y la base se actualiza en una
     sola transacción, con la misma notificación."""
     id_analisis = d["idanalisis"]
@@ -402,7 +303,7 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
                             f"{ultimas_lineas(registro)}")
 
     # cajas.json: el recuadro de cada tubo es la mediana de sus recuadros por bloque, en píxeles del
-    # video original (el mismo formato que worker_fake).
+    # video original.
     recuadros = []
     for _, cilindro in especimenes:
         del_tubo = rasgos[rasgos["especimen"] == cilindro]
@@ -451,4 +352,4 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
 
 
 if __name__ == "__main__":
-    worker_fake.main(procesar_real)
+    cola.main(procesar_real)

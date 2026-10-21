@@ -6,7 +6,7 @@ numpy>=2.0
 pandas>=2.0
 # fst_cnn.py la importa al cargar (GroupKFold), aunque aquí solo se predice
 scikit-learn>=1.9,<1.10
-# worker_fake: conexión a la base y PDF de diagnóstico
+# La cola: conexión a la base y PDF de diagnóstico
 psycopg2-binary
 pillow
 tzdata

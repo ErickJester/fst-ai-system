@@ -1,4 +1,4 @@
-"""Piezas que comparten worker_fake.py, tareas_programadas.py y simular_carga.py:
+"""Piezas que comparten cola.py, worker.py, tareas_programadas.py y los registros de avance y tiempos:
 configuración (variables de entorno), conexión a la base, rutas del volumen y avisos."""
 
 import logging
@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 import psycopg2
 
-log = logging.getLogger("worker_fake")
+log = logging.getLogger("worker")
 
 
 def _entero(nombre, defecto):
@@ -25,9 +25,7 @@ DAILY_HOUR = _entero("WORKER_DAILY_HOUR", 3)
 PAUSE_TIMEOUT_HOURS = _entero("PAUSE_TIMEOUT_HOURS", 72)
 DISK_ALERT_PERCENT = _entero("DISK_ALERT_PERCENT", 80)
 DISK_CLEANUP_PERCENT = _entero("DISK_CLEANUP_PERCENT", 90)
-# Propias del simulador: segundos que tarda cada etapa y, solo para pruebas, un porcentaje de disco
-# fingido para disparar la alerta y el borrado sin llenar el disco de verdad.
-STAGE_SECONDS = _entero("WORKER_STAGE_SECONDS", 3)
+# Solo para pruebas: un porcentaje de disco fingido para disparar la alerta y el borrado sin llenar el disco de verdad.
 DISK_SIMULATED_PERCENT = os.environ.get("DISK_SIMULATED_PERCENT", "").strip()
 
 ZONA = ZoneInfo(os.environ.get("WORKER_TZ", "America/Mexico_City"))
