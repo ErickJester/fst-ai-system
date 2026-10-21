@@ -13,12 +13,12 @@ const REACCION = 0.4 // lo que tarda una persona en reaccionar (s)
 const LUPA_S = 40 // segundos visibles en la lupa
 const FILA = 22 // alto de cada renglón de la línea de tiempo
 const VELOCIDADES = [0.5, 0.75, 1, 1.5, 2]
-// Botones y teclas (§9.7). «Dudosa» deja el segundo sin conducta (origen dudosa).
-const BOTONES = [['1', 'nado', 'Nado'], ['2', 'inmovilidad', 'Inmovilidad'], ['3', 'escalamiento', 'Escalamiento'], ['4', 'activa', 'Activa'], ['0', null, 'Dudosa']]
+// Botones y teclas (§9.7). «No se ve» deja el segundo sin conducta (el origen interno sigue siendo 'dudosa').
+const BOTONES = [['1', 'nado', 'Nado'], ['2', 'inmovilidad', 'Inmovilidad'], ['3', 'escalamiento', 'Escalamiento'], ['4', 'activa', 'Activa'], ['0', null, 'No se ve']]
 const TECLA = Object.fromEntries(BOTONES.map(([k, c]) => [k, c]))
 const NOMBRE = { nado: 'Nado activo', inmovilidad: 'Inmovilidad', escalamiento: 'Escalamiento', activa: 'Conducta activa' }
 const nombre = (c) => (c ? NOMBRE[c] : 'Sin conducta')
-const ORIGEN = { confirmada: 'Confirmado antes', corregida: 'Corregido antes', dudosa: 'Marcado como dudoso antes' }
+const ORIGEN = { confirmada: 'Confirmado antes', corregida: 'Corregido antes', dudosa: 'Marcado como no se ve antes' }
 
 // Muestra de color de una conducta, igual que en las líneas de tiempo.
 function Muestra({ c }) {

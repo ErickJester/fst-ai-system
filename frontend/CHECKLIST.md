@@ -112,12 +112,12 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Cola con el orden de llegada, un trabajo a la vez
 - [x] Se actualiza sola: cada 5 s con análisis activos y cada 30 s sin ninguno
 - [x] Error: el mensaje se arma con la etapa, y el botón del PDF de diagnóstico muestra «Preparando…» y reintenta cada 4 s
-- [x] Cancelado: dice si fue por el usuario o por pasar 5 minutos sin respuesta
+- [x] Cancelado: dice si fue por el usuario o por pasar 72 horas sin respuesta (D-112)
 - [x] Sin botón de cancelar ni de reiniciar en la pantalla de progreso (R-04)
 - [x] «Completados recientemente» con «Ver resultados» y, para quien subió el video o un Administrador, «Revisar segundo a segundo»
 - [x] Sin log de ejecución (§11.10)
 - [x] Pantalla de pausa: imagen fija, recuadro que se arrastra, se redimensiona o se mueve con el teclado, y campos en píxeles de la imagen
-- [x] Cuenta regresiva de 5 minutos, que se vuelve a pedir al servidor cada 5 s
+- [x] Cuenta regresiva de 72 horas (en horas y minutos, D-112), que se vuelve a pedir al servidor cada 5 s
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
 - [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
@@ -204,7 +204,7 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [ ] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
-- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a los 5 minutos, y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
+- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
 - [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
