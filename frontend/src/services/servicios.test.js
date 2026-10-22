@@ -247,6 +247,13 @@ describe('experimentos', () => {
     expect(await status(conArchivo('tanda_A.mp4'))).toBe('ok')
   })
 
+  it('solo quien creó el experimento sube videos; un Administrador no (D-107)', async () => {
+    sesion(2) // Administrador; el experimento 7 lo creó M. Rivera
+    expect(await status(subir('7', { grupo: 'Referencia', nuevo: false, letra: 'C' }))).toBe(403)
+    sesion(1)
+    expect(await status(subir('7', { grupo: 'Referencia', nuevo: false, letra: 'C' }))).toBe('ok')
+  })
+
   it('un grupo nuevo necesita tipo y tratamiento; uno existente sigue con su siguiente tanda', async () => {
     expect(await status(subir('7', { grupo: 'Nuevo', tipo: undefined }))).toBe(422)
     expect(await sugerirGrupos('7', 'fluox')).toEqual([{ id: '2', nombre: 'Referencia', tratamiento: 'Fluoxetina 10 mg/kg', tipo: 'REFERENCIA', siguiente: 'C' }])

@@ -7,7 +7,8 @@ import { sugerirGrupos, subirVideo } from '../services/groups'
 import { mensajeError, esCancelacion } from '../services/api'
 import { MAX_UPLOAD_MB } from '../services/config'
 import { useAsync } from '../hooks/useAsync'
-import { norm } from '../lib/fst'
+import { useAuth } from '../contexts/AuthContext'
+import { norm, puedeSubirVideo, SOLO_CREADOR_SUBE } from '../lib/fst'
 import { MUT60, btnLeft, mutedSub } from '../lib/estilos'
 
 // Texto de una sugerencia del autocompletado: grupo y tratamiento.
@@ -31,6 +32,7 @@ function Hi({ label, q }) {
 export default function CargarVideoPage() {
   const { clave } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
   const [q, setQ] = useState('')
   const [elegido, setElegido] = useState(null) // sugerencia elegida (grupo existente)
@@ -73,6 +75,18 @@ export default function CargarVideoPage() {
 
   if (error) return <NoEncontrado />
   if (!exp) return <Cargando />
+  if (!puedeSubirVideo(user, exp)) {
+    return (
+      <div className="app narrow">
+        <Topbar><Brand sub={exp.titulo} /></Topbar>
+        <div className="page">
+          <h3 style={{ margin: '0 0 10px' }}>Cargar video por tanda</h3>
+          <p className="lead" style={{ margin: '0 0 18px', maxWidth: 560 }}>{SOLO_CREADOR_SUBE} Este lo creó {exp.responsable || 'otra cuenta'}.</p>
+          <Link className="btn btn-secondary" style={btnLeft} to={`/experimentos/${exp.clave}`}>Volver al experimento</Link>
+        </div>
+      </div>
+    )
+  }
 
   const grupo = elegido
   const respondido = !!qt && sug.q === qt

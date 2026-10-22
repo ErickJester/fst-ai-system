@@ -6,7 +6,7 @@ import { getGroup } from '../services/groups'
 import { useAuth } from '../contexts/AuthContext'
 import EliminarTanda, { puedeEliminarTanda } from '../components/EliminarTanda'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, enlaceRevision, mensajeErrorAnalisis, especimen, estadoDeTanda } from '../lib/fst'
+import { fechaCorta, fechaRango, ETAPA, enlaceResultados, enlacePausa, enlaceRevision, mensajeErrorAnalisis, especimen, estadoDeTanda, puedeSubirVideo } from '../lib/fst'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 const sub = { fontSize: 12, lineHeight: 1.55, marginTop: 3, color: MUT70 }
@@ -143,7 +143,9 @@ export default function GrupoPage() {
                         : t.estado === 'PAUSED'
                           ? <Link to={enlacePausa(exp.clave, t.id_analisis)}>Ajustar o cancelar →</Link>
                           : t.estado === 'SIN_VIDEO'
-                            ? <Link to={`/experimentos/${exp.clave}/cargar`}>Cargar el video del Día 2 →</Link>
+                            ? (puedeSubirVideo(user, exp)
+                              ? <Link to={`/experimentos/${exp.clave}/cargar`}>Cargar el video del Día 2 →</Link>
+                              : <span>Falta el video del Día 2</span>)
                             : <Link to={'/analisis?experimento=' + exp.clave}>Ver progreso del análisis →</Link>}
                     </div>
                   </div>
