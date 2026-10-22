@@ -1,5 +1,43 @@
 # Para Erick (y su Claude): rama `feat/frontend-v2-servicios`
 
+## ⚑ Lee esto primero (22-oct-2026)
+
+El frontend está terminado de nuestro lado: la checklist del front va en **146 de 164** y lo que falta depende de tu backend o de una decisión tuya. Abajo, cada pendiente con **nuestra propuesta**. Para contestar basta con poner **«Sí»** o tu alternativa junto al número (aquí mismo, en un commit, o por mensaje). **Mientras no digas otra cosa, el front sigue con la propuesta**, que ya está programada y probada.
+
+### A. Decisiones que necesitamos
+
+| # | Tema | Propuesta (lo que el front ya hace) | Tu respuesta |
+|---|---|---|---|
+| A1 | Contraseña temporal nueva desde Administración | `POST /admin/users/{idInstitucional}/reset-temporal` → `{passwordTemporal}`; invalida la anterior y la cuenta vuelve a pedir el cambio. La guía no la trae; la alternativa sería `PATCH /admin/users/{id}` con `{regenerarTemporal: true}` | |
+| A2 | Enlace del correo de recuperación | `{URL del front}/restablecer?token=<token>`. La pantalla ya existe; el token se manda tal cual a `POST /auth/reset` con `{token, contrasenaNueva}`. Propongo la variable `FRONT_URL` en el `.env` del backend | |
+| A3 | Filtros y páginas de la lista | Dejarlo como está: el front pide todas las páginas de `GET /experiments` y filtra en el navegador (mismo resultado, y con unos pocos cientos de experimentos sobra). Tus filtros en el servidor quedan opcionales. Con «Sí» cierro la casilla | |
+| A4 | Forma de `GET /admin/system` | `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, la cola en orden de llegada con el que se procesa primero | |
+| A5 | Forma de `GET /results/blocks` | Cada espécimen (`idGrupo`, `tanda`, `ordinal`, `numeroCilindro`) con `bloques: [{inicio, conducta, matiz, segundos: [5 conductas o null]}]`, conductas con el nombre de la base. Si la ruta da 404, el front explica que aún no está | |
+| A6 | Flujo de ramas | Los cambios del front se hacen en `feat/frontend-v2-servicios`; tú la juntas en `poc/backend-spring` cuando armes versión. Si tocas el front en tu rama, avísanos y lo traemos. `main` no se toca | |
+
+### B. Cosas que ya están y puedes marcar en tu checklist (sección 12)
+
+- **`motivoCancelacion`**: cerrado por D-112 (no se guarda). El front ya dice «El análisis se canceló.» cuando no viene.
+- **`POST .../video-token` → `{token}` y `Range`**: probado el 20-oct con tu backend `e66ce40`: el token da 200 y el video con `?vt=` responde **206**.
+- **`GET .../review` con `duracion`, `ancho` y `alto`**: el front los usa si vienen.
+
+### C. Lo que falta de tu lado, en el orden que más destraba
+
+| Orden | Qué | Por qué primero |
+|---|---|---|
+| 1 | **`/admin/users`** (GET, POST, PATCH) y **`/admin/system`** | Cierra 5 casillas del front: crear cuentas, último administrador, 403 en `/admin/*` y dos criterios de aceptación |
+| 2 | **`/auth/recover` y `/auth/reset`** | Sin ellos nadie recupera su contraseña |
+| 3 | **D-107 en el servidor:** `POST .../groups/{grupo}/videos` responde **403** si quien sube no creó el experimento | Hoy acepta a cualquiera; el front solo esconde el botón |
+| 4 | **D-87 al eliminar:** borrar en cascada y rechazar con 409 solo si hay un análisis `procesando` o `en pausa` | Hoy responde 409 a cualquier experimento con grupos |
+| 5 | **Pausa:** `/pause`, `/pause/image`, `/pause/adjust`, `/cancel` | Sin ellas no se prueba la pantalla de pausa |
+| 6 | **`/results/blocks`** y reportes **CSV** y **XLSX** | El PDF ya funciona |
+| 7 | **Traer a tu rama** `feat/frontend-v2-servicios` (hasta `6067e4c`: D-112 y D-107 en el front) | Para que tu portable lleve el front al día |
+
+Detalle de cada cosa: puntos 41 a 56 al final de este documento.
+
+---
+
+
 Documento de traspaso para que trabajemos organizados sobre el frontend. Está escrito para que lo lea una persona y también para dárselo como contexto a Claude Code («lee `PARA_ERICK.md` antes de empezar»).
 
 Autora de la rama: Vanesa · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `PARA_VANESA.md`) · Base: `main` en `a57356b` (tu merge del frontend v2) · Versión: **0.3.0**.
@@ -11,7 +49,7 @@ Autora de la rama: Vanesa · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `P
 1. **No se toca `main`.** Nada de commits, merges, rebases ni push directo. Todo el trabajo va en ramas y entra por PR cuando el equipo lo decida.
 2. **Todo en español**: interfaz, comentarios, mensajes de commit y respuestas de Claude.
 3. **Terminología en la interfaz** (y en lo que se exporta, como el CSV):
-   - A cada sujeto se le nombra **por su cilindro: «Cilindro P1»**. Donde se junten varias tandas (vista por grupo, CSV combinado), **«Tanda A · Cilindro P1»**, porque cada tanda tiene su propio P1. Para conteos se dice «especímenes» (p. ej. «32 especímenes»). «Rata» en singular se permite solo como especie («Rata Wistar»); **nunca «ratas»**.
+   - A cada sujeto se le nombra **«Espécimen 1»** y, donde se juntan tandas, **«Tanda A · Espécimen 1»** (D-55, desde el 12-oct; antes era «Cilindro P1»).
    - Prohibido en la interfaz: «animal», «IA», «inteligencia artificial».
 4. **Los mockups v2 (`mockup/v2/`) mandan en lo visual.** Las pantallas deben verse como el mockup; si algo se aparta, se documenta por qué.
 5. Antes de hacer push o abrir un PR, avisar a la otra persona.
@@ -43,7 +81,7 @@ npm --prefix frontend run dev
 Abre http://localhost:5173. Por defecto usa **datos de ejemplo** (`VITE_USE_MOCKS` distinto de `'false'`). Para llamar al backend real:
 
 ```bash
-VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8000 npm --prefix frontend run dev
+VITE_USE_MOCKS=false VITE_API_BASE=http://localhost:8084 npm --prefix frontend run dev
 ```
 
 ### Cuentas para probar (solo con datos de ejemplo)
