@@ -150,6 +150,16 @@ describe('administración', () => {
 })
 
 describe('cargar video', () => {
+  it('solo quien creó el experimento sube sus videos; un Administrador no (D-107)', async () => {
+    await conSesion('/experimentos/7/cargar', 'creyesl@ipn.mx')
+    expect(await screen.findByText(/Solo quien creó el experimento sube sus videos/)).toBeTruthy()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    cleanup()
+    abrir('/experimentos/7')
+    const boton = await screen.findByRole('button', { name: 'Cargar videos pendientes' })
+    expect(boton.getAttribute('aria-disabled')).toBe('true')
+  })
+
   // Elige Referencia con el teclado, confirma la tanda C y adjunta el archivo.
   async function prepararTandaC(user, nombre) {
     await user.type(await screen.findByRole('combobox'), 'fluox')

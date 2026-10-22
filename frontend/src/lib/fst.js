@@ -163,6 +163,10 @@ export function primeraTandaLista(exp) {
 // Código del grupo como en la maqueta: «G-01» (el id de la base es un número).
 export const codigoGrupo = (id) => (/^\d+$/.test(String(id)) ? 'G-' + String(id).padStart(2, '0') : String(id))
 
+// D-107: los videos de un experimento los sube solo quien lo creó; un Administrador no.
+export const puedeSubirVideo = (user, exp) => !!user && exp?.creador_id != null && String(exp.creador_id) === String(user.id)
+export const SOLO_CREADOR_SUBE = 'Solo quien creó el experimento sube sus videos.'
+
 // Enlace a los resultados de una tanda.
 export const enlaceResultados = (clave, gid, letra) => `/experimentos/${clave}/resultados?grupo=${gid}&tanda=${letra}`
 
