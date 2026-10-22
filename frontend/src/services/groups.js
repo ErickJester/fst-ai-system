@@ -43,6 +43,9 @@ export async function sugerirGrupos(clave, q) {
 async function subirDeEjemplo(clave, grupo, { archivo, sesion, tipo, tratamiento, nCilindros, ordinal, signal }, onProgress) {
   const exp = db.experimentDetail[clave]
   if (!exp) return fail(404, 'No existe ese experimento.')
+  // D-107: solo quien creó el experimento sube videos (un Administrador tampoco).
+  const u = usuarioDeLaSesion()
+  if (u && exp.creador_id && String(exp.creador_id) !== String(u.idInstitucional)) return fail(403, 'Solo quien creó el experimento sube sus videos.')
   const cancelada = () => Object.assign(new Error('Subida cancelada.'), { code: 'ERR_CANCELED' })
   for (let p = 25; p <= 100; p += 25) {
     if (signal?.aborted) throw cancelada()

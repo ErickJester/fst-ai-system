@@ -6,7 +6,7 @@ import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperi
 import { useAuth } from '../contexts/AuthContext'
 import { getExperiment } from '../services/experiments'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados, codigoGrupo } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados, codigoGrupo, puedeSubirVideo, SOLO_CREADOR_SUBE } from '../lib/fst'
 
 // Hay análisis en cola, en curso o en pausa en alguna tanda (solo se analiza el Día 2).
 const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
@@ -62,7 +62,9 @@ export default function ExperimentoPage() {
             {exp.notas && <p style={{ margin: '10px 0 0', maxWidth: 720, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-line', color: 'var(--muted-2)' }}>{exp.notas}</p>}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link className="btn btn-secondary" to={`/experimentos/${exp.clave}/cargar`}>Cargar videos pendientes</Link>
+            {puedeSubirVideo(user, exp)
+              ? <Link className="btn btn-secondary" to={`/experimentos/${exp.clave}/cargar`}>Cargar videos pendientes</Link>
+              : <button type="button" className="btn btn-secondary" aria-disabled="true" title={SOLO_CREADOR_SUBE}>Cargar videos pendientes</button>}
             {lista
               ? <Link className="btn btn-primary" to={enlaceResultados(exp.clave, lista.gid, lista.letra)}>Ver resultados</Link>
               : <button type="button" className="btn btn-primary" disabled title="Todavía no hay tandas con el Día 2 analizado">Ver resultados</button>}
@@ -87,7 +89,9 @@ export default function ExperimentoPage() {
 
         {groups.length === 0 && (
           <div className="note-bar" style={{ marginBottom: 22 }}>
-            Todavía no hay grupos. Se crean al cargar el primer video de cada tanda: <Link to={`/experimentos/${exp.clave}/cargar`}>cargar videos</Link>.
+            {puedeSubirVideo(user, exp)
+              ? <>Todavía no hay grupos. Se crean al cargar el primer video de cada tanda: <Link to={`/experimentos/${exp.clave}/cargar`}>cargar videos</Link>.</>
+              : <>Todavía no hay grupos. Se crean cuando {exp.responsable || 'quien creó el experimento'} carga el primer video de cada tanda.</>}
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: 'var(--color-divider)', border: '1px solid var(--color-divider)' }}>
