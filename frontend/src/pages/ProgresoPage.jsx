@@ -322,7 +322,8 @@ function TrabajoCancelado({ j }) {
       <div style={{ flex: 1 }}>
         <div className="nd" style={{ fontSize: 14 }}>{nombreTrabajo(j)}</div>
         <div style={{ fontSize: 12, marginTop: 4, color: MUT60 }}>
-          {j.motivo === 'plazo' ? 'Pasaron 72 horas en pausa sin respuesta y el sistema canceló el análisis.' : 'Se canceló desde la pantalla de pausa.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
+          {/* D-112: el motivo no se guarda; solo se dice si el backend lo manda. */}
+          {j.motivo === 'plazo' ? 'Pasaron 72 horas en pausa sin respuesta y el sistema canceló el análisis.' : j.motivo === 'usuario' ? 'Se canceló desde la pantalla de pausa.' : 'El análisis se canceló.'} No se guardó ningún resultado de esta tanda. Para analizarlo otra vez, sube el video de nuevo.
           {tardo(j, modoDesarrollador) && <> {tardo(j, modoDesarrollador)}.</>}
         </div>
       </div>
