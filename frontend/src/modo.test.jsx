@@ -6,7 +6,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { version as versionDelPaquete } from '../package.json'
 import { ModoContext } from './contexts/ModoContext'
 import BannerBeta from './components/BannerBeta'
-import BotonSegundos from './components/BotonSegundos'
+import BotonSalidaModelo from './components/BotonSalidaModelo'
 import { TrabajoActual } from './pages/ProgresoPage'
 
 afterEach(cleanup)
@@ -37,28 +37,28 @@ describe('banner BETA', () => {
   })
 })
 
-describe('botón «Segundos» de Resultados', () => {
+describe('botón «Salida del modelo» de Resultados', () => {
   it('con modo desarrollador: una tanda descarga un CSV y el grupo completo, un ZIP', () => {
-    const { rerender } = render(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} onClick={() => {}} />))
-    expect(screen.getByRole('button', { name: 'Segundos (CSV)' })).toBeTruthy()
-    rerender(conModo(PRENDIDO, <BotonSegundos grupoCompleto onClick={() => {}} />))
-    expect(screen.getByRole('button', { name: 'Segundos (ZIP)' })).toBeTruthy()
+    const { rerender } = render(conModo(PRENDIDO, <BotonSalidaModelo grupoCompleto={false} onClick={() => {}} />))
+    expect(screen.getByRole('button', { name: 'Salida del modelo (CSV)' })).toBeTruthy()
+    rerender(conModo(PRENDIDO, <BotonSalidaModelo grupoCompleto onClick={() => {}} />))
+    expect(screen.getByRole('button', { name: 'Salida del modelo (ZIP)' })).toBeTruthy()
   })
 
   it('sin modo desarrollador no hay botón, ni siquiera sin proveedor', () => {
-    const { container } = render(conModo(APAGADO, <BotonSegundos grupoCompleto={false} onClick={() => {}} />))
+    const { container } = render(conModo(APAGADO, <BotonSalidaModelo grupoCompleto={false} onClick={() => {}} />))
     expect(container.querySelector('button')).toBeNull()
     cleanup()
-    const solo = render(<BotonSegundos grupoCompleto={false} onClick={() => {}} />)
+    const solo = render(<BotonSalidaModelo grupoCompleto={false} onClick={() => {}} />)
     expect(solo.container.querySelector('button')).toBeNull()
   })
 
   it('el clic avisa, y ocupado lo deshabilita', () => {
     const onClick = vi.fn()
-    const { rerender } = render(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} onClick={onClick} />))
+    const { rerender } = render(conModo(PRENDIDO, <BotonSalidaModelo grupoCompleto={false} onClick={onClick} />))
     screen.getByRole('button').click()
     expect(onClick).toHaveBeenCalledTimes(1)
-    rerender(conModo(PRENDIDO, <BotonSegundos grupoCompleto={false} ocupado onClick={onClick} />))
+    rerender(conModo(PRENDIDO, <BotonSalidaModelo grupoCompleto={false} ocupado onClick={onClick} />))
     expect(screen.getByRole('button').disabled).toBe(true)
   })
 })

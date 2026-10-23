@@ -55,14 +55,16 @@ public class ResultadosController {
 		return Respuesta.ok(resultadosService.resultadosPorGrupo(id), HttpStatus.OK);
 	}
 
-	// "Segundos" (solo modo desarrollador): la salida por segundo del modelo TAL CUAL la deja fst_auto, byte por byte, sin
-	// reescribirla. Con grupo y tanda, el CSV de esa tanda; con solo grupo, un ZIP con el de cada tanda completada y su
-	// resumen. OJO: es la salida CRUDA del modelo (el video completo, con probabilidades) y NO trae las correcciones de
-	// la revisión. Sin MODO_DESARROLLADOR el servicio responde 404; sin sesión, 401 (lo pone la seguridad).
-	@GetMapping("/{id}/report/segundos")
-	public ResponseEntity<Resource> segundos(@PathVariable Integer id, @RequestParam(required = false) Integer grupo,
+	// "Salida del modelo" (solo modo desarrollador, sin documentar): lo que decidió el modelo en cada segundo, TAL CUAL lo
+	// deja fst_auto, byte por byte, sin reescribirlo; sirve para reentrenar. Con grupo y tanda, el CSV de esa tanda; con
+	// solo grupo, un ZIP con el de cada tanda completada y su resumen. OJO: es la salida CRUDA del modelo (el video
+	// completo, con probabilidades) y NO trae las correcciones de la revisión. No es "segundos" del producto (la
+	// revisión y los resultados por segundo): por eso vive bajo /dev y con otro nombre. Sin MODO_DESARROLLADOR el
+	// servicio responde 404; sin sesión, 401 (lo pone la seguridad).
+	@GetMapping("/{id}/dev/salida-modelo")
+	public ResponseEntity<Resource> salidaModelo(@PathVariable Integer id, @RequestParam(required = false) Integer grupo,
 			@RequestParam(required = false) String tanda) throws IOException {
-		ResultadosService.SalidaSegundos salida = resultadosService.segundosDelModelo(id, grupo, tanda);
+		ResultadosService.SalidaModelo salida = resultadosService.salidaDelModelo(id, grupo, tanda);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentDisposition(ContentDisposition.attachment().filename(salida.nombre(), StandardCharsets.UTF_8).build());
