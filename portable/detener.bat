@@ -16,7 +16,7 @@ if errorlevel 1 (
   exit /b 0
 )
 
-docker compose stop
+docker compose -f ..\docker-compose.yml --env-file .env stop
 if errorlevel 1 (
   echo.
   echo [ERROR] No se pudo apagar el sistema. Revisa el mensaje de arriba.

@@ -15,8 +15,10 @@ queda funcionando: entras, creas un experimento, subes un video y ves el anális
 
 ## Instalación (una sola vez)
 
-1. Copia la carpeta completa a la computadora. Debe verse así, con `modelos` junto a `portable`:
-   `fst-portable\portable`, `fst-portable\modelos`, `fst-portable\backend-spring`, etc.
+1. Copia la carpeta completa a la computadora. Debe verse así, con `modelos` y `docker-compose.yml` junto a `portable`:
+   `fst-portable\portable`, `fst-portable\modelos`, `fst-portable\docker-compose.yml`, `fst-portable\backend-spring`, etc.
+   El `docker-compose.yml` de esa carpeta es el compose definitivo del sistema: **no lo ejecutes a mano**, se usa
+   con `portable\iniciar.bat` (que lo llama con tu `.env` de `portable`).
 2. Abre Docker Desktop y espera a que diga que está corriendo.
 3. Entra a la carpeta `portable` y dale doble clic a **iniciar.bat**.
 4. La primera vez se abre un archivo de texto (`.env`). Llena SOLO la parte de la cuenta de administrador
@@ -67,7 +69,8 @@ No uses "Delete" sobre los volúmenes de `fst-portable` en Docker Desktop salvo 
   darle a iniciar.bat. La dirección será `http://localhost:` con ese número.
 - Un análisis terminó en "error": en la pantalla del experimento puedes ver su reporte de diagnóstico.
 - Para ver qué pasó por dentro, abre una ventana de comandos en la carpeta `portable` y escribe
-  `docker compose logs worker` (el que analiza) o `docker compose logs api` (el servidor).
+  `docker compose -f ..\docker-compose.yml --env-file .env logs worker` (el que analiza) o
+  `docker compose -f ..\docker-compose.yml --env-file .env logs api` (el servidor).
 
 ## Qué NO hace todavía
 

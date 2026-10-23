@@ -1,5 +1,6 @@
-# Backend FST en Spring Boot con su propia base. Nombre de proyecto aparte (fst-spring) y puerto 5433 para
-# no chocar con el docker-compose.yml de la raíz (Flask y su base en el 5432).
+# Backend FST en Spring Boot con su propia base: el compose de DESARROLLO. Nombre de proyecto aparte (fst-spring)
+# y puerto 5433 para no mezclarse con el definitivo, el docker-compose.yml de la raíz (proyecto fst-portable, que
+# se levanta con portable\iniciar.bat).
 #
 #   cp .env.example .env
 #   docker compose --profile dev up --build      (con MailHog: correos en http://localhost:8025)

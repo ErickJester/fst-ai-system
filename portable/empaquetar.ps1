@@ -1,6 +1,7 @@
 # Arma dist\fst-portable-AAAAMMDD.zip con SOLO lo necesario para llevar el sistema a otra PC:
-# backend-spring, worker, pipeline, frontend y portable, mas modelos\fst_cnn_seg.pt (el modelo no
-# esta en git). Nunca incluye .env, target, node_modules ni dist.
+# backend-spring, worker, pipeline, frontend y portable, mas el docker-compose.yml de la raiz (el compose
+# definitivo, que portable\iniciar.bat busca en ..\docker-compose.yml) y modelos\fst_cnn_seg.pt (el modelo
+# no esta en git). Nunca incluye .env, target, node_modules ni dist.
 #
 #   .\portable\empaquetar.ps1                  toma lo que esta COMMITEADO (git archive HEAD): es el paquete oficial.
 #   .\portable\empaquetar.ps1 -DesdeCarpeta    toma lo que hay en la carpeta de trabajo, con las mismas
@@ -12,6 +13,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $raiz = Split-Path -Parent $PSScriptRoot
 $carpetas = @('backend-spring', 'worker', 'pipeline', 'frontend', 'portable')
+# Archivos sueltos de la raiz que tambien van en el zip.
+$archivos = @('docker-compose.yml')
 $modelo = Join-Path $raiz 'modelos\fst_cnn_seg.pt'
 if (-not (Test-Path $modelo)) {
     throw "Falta el modelo: $modelo"
@@ -34,12 +37,15 @@ try {
             robocopy (Join-Path $raiz $c) (Join-Path $tmp $c) /E /XD node_modules dist target __pycache__ .git /XF .env *.pyc /NFL /NDL /NJH /NJS /NP | Out-Null
             if ($LASTEXITCODE -ge 8) { throw "robocopy fallo con $c (codigo $LASTEXITCODE)" }
         }
+        foreach ($a in $archivos) {
+            Copy-Item (Join-Path $raiz $a) (Join-Path $tmp $a)
+        }
     }
     else {
         Write-Host "Extrayendo de git (HEAD)..."
         $tar = Join-Path $tmp 'git.tar'
-        git -C $raiz archive --format=tar -o $tar HEAD @carpetas
-        if ($LASTEXITCODE -ne 0) { throw "git archive fallo (codigo $LASTEXITCODE). Si portable/ aun no esta commiteado, usa -DesdeCarpeta." }
+        git -C $raiz archive --format=tar -o $tar HEAD @carpetas @archivos
+        if ($LASTEXITCODE -ne 0) { throw "git archive fallo (codigo $LASTEXITCODE). Si portable/ o docker-compose.yml aun no estan commiteados, usa -DesdeCarpeta." }
         tar -xf $tar -C $tmp
         if ($LASTEXITCODE -ne 0) { throw "tar fallo (codigo $LASTEXITCODE)" }
         Remove-Item $tar -Force
