@@ -219,17 +219,17 @@ export async function getBlocks(clave, gid, letra) {
 // sigue vigente devuelve el guardado. CSV y XLSX reciben el alcance de lo que se ve (D-93):
 // ?grupo= (grupo completo) o además &tanda= (una tanda). El frontend solo lo descarga. Sin
 // backend no hay archivo: responde null y la pantalla explica qué hará el botón.
-// GET /experiments/:clave/report/segundos?grupo=&tanda= (solo modo desarrollador): la salida por segundo del modelo TAL CUAL
-// (un CSV por tanda, o un ZIP con el de cada tanda si solo va el grupo). Es la salida CRUDA del modelo: no trae las
-// correcciones de la revisión. Se descarga como blob con el nombre que manda el servidor (Content-Disposition).
-// Sin backend no hay archivo: responde null.
-export async function getSegundosModelo(clave, alcance) {
+// GET /experiments/:clave/dev/salida-modelo?grupo=&tanda= (solo modo desarrollador, sin documentar): lo que decidió el
+// modelo en cada segundo, TAL CUAL (un CSV por tanda, o un ZIP con el de cada tanda si solo va el grupo). Es la salida
+// CRUDA del modelo: no trae las correcciones de la revisión. Se descarga como blob con el nombre que manda el servidor
+// (Content-Disposition). Sin backend no hay archivo: responde null.
+export async function getSalidaModelo(clave, alcance) {
   if (USE_MOCKS) return reply(null)
-  const res = await api.get(`/experiments/${clave}/report/segundos`, { params: alcance, responseType: 'blob' })
+  const res = await api.get(`/experiments/${clave}/dev/salida-modelo`, { params: alcance, responseType: 'blob' })
   const zip = !alcance.tanda
   return {
     archivo: res.data,
-    nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) || (zip ? 'segundos.zip' : 'segundos.csv'),
+    nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) || (zip ? 'salida_modelo.zip' : 'salida_modelo.csv'),
     tipo: zip ? 'application/zip' : 'text/csv',
   }
 }

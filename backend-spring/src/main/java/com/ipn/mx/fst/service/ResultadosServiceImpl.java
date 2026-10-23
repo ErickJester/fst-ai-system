@@ -625,7 +625,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public SalidaSegundos segundosDelModelo(Integer idExperimento, Integer idGrupo, String letra) {
+	public SalidaModelo salidaDelModelo(Integer idExperimento, Integer idGrupo, String letra) {
 		// Las probabilidades del modelo solo salen en modo desarrollador: sin él, la ruta "no existe".
 		if (!modoDesarrollador) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "No encontrado");
@@ -684,9 +684,9 @@ public class ResultadosServiceImpl implements ResultadosService {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "Esta tanda no tiene la salida por segundo del modelo");
 		}
 		if (deUnaTanda) {
-			return new SalidaSegundos(archivos.keySet().iterator().next(), false, archivos);
+			return new SalidaModelo(archivos.keySet().iterator().next(), false, archivos);
 		}
-		return new SalidaSegundos(paraNombreDeArchivo(etiquetas.get(0)) + "_segundos.zip", true, archivos);
+		return new SalidaModelo(paraNombreDeArchivo(etiquetas.get(0)) + "_salida_modelo.zip", true, archivos);
 	}
 
 	// analisis/{id}/trabajo/{nombre}, normalizada: tiene que seguir DENTRO de la raíz (si no, una ruta que no existe).
