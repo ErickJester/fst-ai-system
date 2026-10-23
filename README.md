@@ -6,18 +6,17 @@ resultados por animal.
 
 | Servicio | Tecnología | Puerto |
 |---|---|---|
-| `frontend` | React + Vite | 5173 |
-| `api` | Flask + SQLAlchemy | 8000 |
-| `db` | PostgreSQL 16 | 5432 |
-| `worker` | Python (placeholder del pipeline) | — |
+| `web` | React (Vite) servido por nginx | 8088 (el único que se publica) |
+| `api` | Spring Boot (`backend-spring/`) | solo dentro de Docker |
+| `db` | PostgreSQL 16 | solo dentro de Docker |
+| `worker` | Python, analiza los videos con el modelo (`worker/`) | — |
 
-```bash
-docker-compose up --build
-```
+El `docker-compose.yml` de esta carpeta es el compose **definitivo** del sistema. Se usa con
+`portable\iniciar.bat` (doble clic; ver [portable/LEEME.md](portable/LEEME.md)), que llama a
+`docker compose -f ..\docker-compose.yml --env-file .env up -d --build` desde la carpeta `portable` para
+que tome `portable\.env`. El compose de desarrollo es otro: `backend-spring/docker-compose.yml`.
 
-**El pipeline de análisis de video todavía no está implementado.** El
-`worker` solo muestra en su log que ahí irá; los videos subidos quedan en cola.
-Lo que el pipeline debe escribir está descrito en `backend/worker/worker.py`,
-y el esquema de la base de datos en `db_schema.puml`.
+El análisis de video lo hace el `worker` (`worker/`) con el pipeline de `pipeline/`; el esquema de la base de
+datos está en `backend-spring/db/init/001_esquema.sql` y su diagrama en `db_schema.puml`.
 
 Manual completo: [MANUAL.md](MANUAL.md).

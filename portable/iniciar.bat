@@ -100,7 +100,9 @@ echo [6/7] Preparando el sistema. La PRIMERA vez tarda de 20 a 40 minutos y nece
 echo       internet ^(descarga e instala todo^). Las siguientes veces tarda menos de un minuto.
 echo       No cierres esta ventana.
 echo.
-docker compose up -d --build
+rem El compose es el de la raiz (..\docker-compose.yml). Con --env-file se usa portable\.env tambien para las
+rem variables del compose, y no el .env de la raiz.
+docker compose -f ..\docker-compose.yml --env-file .env up -d --build
 if errorlevel 1 (
   echo.
   echo [ERROR] No se pudo preparar el sistema. Revisa el mensaje de arriba.
@@ -132,8 +134,8 @@ goto espera
 echo.
 echo [ERROR] El sistema no respondio en 5 minutos.
 echo   Para ver que paso, abre una ventana de comandos en esta carpeta y escribe:
-echo       docker compose logs api
-echo       docker compose logs web
+echo       docker compose -f ..\docker-compose.yml --env-file .env logs api
+echo       docker compose -f ..\docker-compose.yml --env-file .env logs web
 echo.
 pause
 exit /b 7

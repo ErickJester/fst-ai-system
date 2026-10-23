@@ -1,5 +1,8 @@
 # Sistema FST — Manual de Usuario
 
+> **Obsoleto (sistema Flask). Para instalar: portable/LEEME.md.** Este manual describe el sistema Flask anterior, que
+> ya no está en el repositorio. Sus comandos (por ejemplo `down -v`, que BORRA los datos) no aplican al sistema actual.
+
 ---
 
 ## PARTE 1: MANUAL TÉCNICO (DevOps/SysAdmin)
