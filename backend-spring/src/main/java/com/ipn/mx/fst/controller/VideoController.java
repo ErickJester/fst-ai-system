@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,8 +34,10 @@ public class VideoController {
 			@RequestParam(required = false) String tipo,
 			@RequestParam(required = false) String tratamiento,
 			@RequestParam(required = false) Integer nCilindros,
-			@RequestParam(required = false) Integer ordinal) {
-		return Respuesta.ok(videoService.subir(id, grupo, archivo, sesion, tipo, tratamiento, nCilindros, ordinal),
+			@RequestParam(required = false) Integer ordinal,
+			Authentication authentication) {
+		return Respuesta.ok(
+				videoService.subir(id, grupo, archivo, sesion, tipo, tratamiento, nCilindros, ordinal, authentication),
 				HttpStatus.CREATED);
 	}
 

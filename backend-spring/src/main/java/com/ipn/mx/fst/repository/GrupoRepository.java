@@ -9,10 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface GrupoRepository extends JpaRepository<Grupo, Integer> {
 
-	// ¿El experimento ya tiene grupos? Mientras el CRUD no sepa borrar grupos, tandas y videos, un
-	// experimento con grupos no se puede eliminar.
-	boolean existsByExperimentoIdExperimento(Integer idExperimento);
-
 	// Los grupos de varios experimentos, en una sola consulta, cada uno con el ordinal de su siguiente tanda
 	// (max(ordinal) + 1, o 1 si no tiene tandas). Sirve a la lista (nGrupos y tratamientos), al detalle y a
 	// la búsqueda de grupos. Ordenados por id.

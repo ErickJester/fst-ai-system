@@ -102,11 +102,11 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Autowired
 	private TandaRepository tandaRepository;
 
-	// Para eliminarTanda: consultas con candado (FOR UPDATE) y los borrados de las hojas hacia arriba, explícitos.
+	// Para eliminar y eliminarTanda: consultas con candado (FOR UPDATE) y los borrados de las hojas hacia arriba, explícitos.
 	@Autowired
 	private JdbcTemplate jdbc;
 
-	// Raíz del volumen videos_reportes: de ahí se borran los videos y la carpeta del análisis de una tanda eliminada.
+	// Raíz del volumen videos_reportes: de ahí se borran los videos y la carpeta del análisis de una tanda o un experimento eliminado.
 	@Value("${app.archivos.raiz}")
 	private String raizConfigurada;
 
@@ -397,11 +397,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		}
 	}
 
-	// Por ahora solo se borran los experimentos sin grupos: borrar grupos, tandas, videos y resultados (de las
-	// hojas hacia arriba) llega con la carga de video.
-	// Todas las llaves foráneas son ON DELETE NO ACTION: la base no borra en cascada. Por eso primero se
-	// borra lo que cuelga del experimento (reportes y notificaciones) y al final el experimento, todo en
-	// una sola transacción: si algo falla, no se borra nada.
+	// Elimina un experimento COMPLETO (D-87): sus grupos, tandas, especímenes, videos, análisis y resultados, más sus
+	// reportes y notificaciones. Todas las llaves foráneas son ON DELETE NO ACTION: la base no borra en cascada. Por eso
+	// se borra de las hojas hacia arriba y el experimento al final, todo en una sola transacción: si algo falla, no se
+	// borra nada. Los archivos se borran DESPUÉS del commit, igual que al eliminar una tanda.
 	@Override
 	@Transactional
 	public void eliminar(Integer id, Authentication authentication) {
@@ -417,14 +416,22 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 					"Solo quien creó el experimento o un Administrador puede eliminarlo");
 		}
 
-		if (grupoRepository.existsByExperimentoIdExperimento(id)) {
-			throw new ErrorApi(HttpStatus.CONFLICT,
-					"El experimento " + id + " tiene grupos y todavía no se puede eliminar");
-		}
+		// Candado sobre la fila del experimento: una subida en curso (su grupo, tanda o video apuntan a él) espera a que
+		// esta transacción termine, y no queda un video a medias dentro de un experimento que ya no existe.
+		jdbc.queryForList("SELECT idexperimento FROM experimento WHERE idexperimento = ? FOR UPDATE", Integer.class, id);
 
+		List<Integer> idsAnalisis = bloquearAnalisis(TANDAS_DEL_EXPERIMENTO, id,
+				"No se puede eliminar mientras un análisis está procesando o en pausa");
+		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda IN " + TANDAS_DEL_EXPERIMENTO,
+				Integer.class, id);
+
+		borrarDesdeLosVideos(TANDAS_DEL_EXPERIMENTO, id);
+		jdbc.update("DELETE FROM grupo WHERE idexperimento = ?", id);
 		reporteRepository.deleteByExperimentoIdExperimento(id);
 		notificacionRepository.deleteByExperimentoIdExperimento(id);
 		experimentoRepository.deleteById(id);
+
+		borrarArchivosDespuesDelCommit(idsVideo, idsAnalisis);
 	}
 
 	// Elimina una tanda (regla nueva, parecida a R-08): su letra queda libre para volver a subirla. Todo en UNA
@@ -450,45 +457,69 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento o un Administrador puede eliminar una tanda");
 		}
 
-		// FOR UPDATE: el análisis queda bloqueado hasta el commit. El worker toma el siguiente con FOR UPDATE SKIP LOCKED,
-		// así que no lo agarra a la mitad; si ya lo tomó (procesando) o está en pausa, no se borra. En cola sí: sale de la cola.
-		List<Map<String, Object>> analisis = jdbc.queryForList("""
-				SELECT idanalisis, estado FROM analisis
-				WHERE idvideo IN (SELECT idvideo FROM video WHERE idtanda = ?)
-				FOR UPDATE
-				""", idTanda);
+		List<Integer> idsAnalisis = bloquearAnalisis(TANDA_UNICA, idTanda,
+				"No se puede eliminar mientras su análisis está procesando o en pausa");
+		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda IN " + TANDA_UNICA,
+				Integer.class, idTanda);
+
+		borrarDesdeLosVideos(TANDA_UNICA, idTanda);
+		// Sus resultados cambian: un reporte guardado ya no los refleja.
+		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
+
+		borrarArchivosDespuesDelCommit(idsVideo, idsAnalisis);
+	}
+
+	// Lo que comparten eliminar y eliminarTanda. "tandas" es una subconsulta con UN parámetro (?) que da las tandas a
+	// borrar, y "parametro" es su valor (el idTanda o el idExperimento).
+	private static final String TANDA_UNICA = "(SELECT idtanda FROM tanda WHERE idtanda = ?)";
+	private static final String TANDAS_DEL_EXPERIMENTO =
+			"(SELECT t.idtanda FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo WHERE g.idexperimento = ?)";
+
+	// FOR UPDATE: el análisis queda bloqueado hasta el commit. El worker toma el siguiente con FOR UPDATE SKIP LOCKED,
+	// así que no lo agarra a la mitad; si ya lo tomó (procesando) o está en pausa, no se borra. En cola sí: sale de la cola.
+	// Devuelve los ids de los análisis a borrar.
+	private List<Integer> bloquearAnalisis(String tandas, Integer parametro, String mensajeSiOcupado) {
+		List<Map<String, Object>> analisis = jdbc.queryForList(
+				"SELECT idanalisis, estado FROM analisis WHERE idvideo IN (SELECT idvideo FROM video WHERE idtanda IN "
+						+ tandas + ") FOR UPDATE",
+				parametro);
 		List<Integer> idsAnalisis = new ArrayList<>();
 		for (Map<String, Object> a : analisis) {
 			String estado = (String) a.get("estado");
 			if ("procesando".equals(estado) || "en pausa".equals(estado)) {
-				throw new ErrorApi(HttpStatus.CONFLICT, "No se puede eliminar mientras su análisis está procesando o en pausa");
+				throw new ErrorApi(HttpStatus.CONFLICT, mensajeSiOcupado);
 			}
 			idsAnalisis.add(((Number) a.get("idanalisis")).intValue());
 		}
-		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda = ?", Integer.class, idTanda);
+		return idsAnalisis;
+	}
 
-		String videosDeLaTanda = "(SELECT idvideo FROM video WHERE idtanda = ?)";
+	// Los borrados de las hojas hacia arriba, hasta las tandas inclusive (el grupo y lo de más arriba lo decide cada
+	// método). Observacion cuelga de especimen y también de video: se borra antes que los dos.
+	private void borrarDesdeLosVideos(String tandas, Integer parametro) {
+		String videos = "(SELECT idvideo FROM video WHERE idtanda IN " + tandas + ")";
 		jdbc.update("DELETE FROM segundo WHERE idobservacion IN (SELECT idobservacion FROM observacion WHERE idvideo IN "
-				+ videosDeLaTanda + ")", idTanda);
-		jdbc.update("DELETE FROM observacion WHERE idvideo IN " + videosDeLaTanda, idTanda);
-		jdbc.update("DELETE FROM analisis WHERE idvideo IN " + videosDeLaTanda, idTanda);
-		jdbc.update("DELETE FROM video WHERE idtanda = ?", idTanda);
-		jdbc.update("DELETE FROM especimen WHERE idtanda = ?", idTanda);
-		jdbc.update("DELETE FROM tanda WHERE idtanda = ?", idTanda);
-		// Sus resultados cambian: un reporte guardado ya no los refleja.
-		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
+				+ videos + ")", parametro);
+		jdbc.update("DELETE FROM observacion WHERE idvideo IN " + videos, parametro);
+		jdbc.update("DELETE FROM analisis WHERE idvideo IN " + videos, parametro);
+		jdbc.update("DELETE FROM video WHERE idtanda IN " + tandas, parametro);
+		jdbc.update("DELETE FROM especimen WHERE idtanda IN " + tandas, parametro);
+		jdbc.update("DELETE FROM tanda WHERE idtanda IN " + tandas, parametro);
+	}
 
+	// Los archivos se borran DESPUÉS del commit: si fallara el borrado de uno, la base ya quedó bien (solo se avisa en el log).
+	private void borrarArchivosDespuesDelCommit(List<Integer> idsVideo, List<Integer> idsAnalisis) {
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 			@Override
 			public void afterCommit() {
-				borrarArchivosDeTanda(idsVideo, idsAnalisis);
+				borrarArchivos(idsVideo, idsAnalisis);
 			}
 		});
 	}
 
 	// Ya con la base en orden: los videos (videos/{idVideo}.mp4 o .mov) y la carpeta analisis/{idAnalisis}/. Los nombres
 	// salen de ids de la base, nunca de la petición, y la carpeta se revisa DENTRO de la raíz. Un fallo es solo un aviso.
-	private void borrarArchivosDeTanda(List<Integer> idsVideo, List<Integer> idsAnalisis) {
+	private void borrarArchivos(List<Integer> idsVideo, List<Integer> idsAnalisis) {
 		Path raiz = Path.of(raizConfigurada).toAbsolutePath().normalize();
 		for (Integer idVideo : idsVideo) {
 			try (DirectoryStream<Path> archivos = Files.newDirectoryStream(raiz.resolve("videos"), idVideo + ".*")) {
@@ -496,7 +527,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 					Files.deleteIfExists(archivo);
 				}
 			} catch (IOException e) {
-				log.warn("No se pudo borrar el video {} de una tanda eliminada: {}", idVideo, e.getMessage());
+				log.warn("No se pudo borrar el video {} de lo eliminado: {}", idVideo, e.getMessage());
 			}
 		}
 		for (Integer idAnalisis : idsAnalisis) {
@@ -519,7 +550,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 					}
 				});
 			} catch (IOException e) {
-				log.warn("No se pudo borrar la carpeta {} de una tanda eliminada: {}", carpeta, e.getMessage());
+				log.warn("No se pudo borrar la carpeta {} de lo eliminado: {}", carpeta, e.getMessage());
 			}
 		}
 	}

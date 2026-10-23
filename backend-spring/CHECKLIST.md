@@ -72,13 +72,13 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] `PUT /experiments/{id}` con `404` y `409` por nombre repetido
   - [x] Nombre, fecha y notas; el creador no cambia
   - [x] `404` si no existe y `409` si el nombre ya es de otro
-- [ ] `DELETE /experiments/{id}`: solo el creador o un Administrador (R-08)
+- [x] `DELETE /experiments/{id}`: solo el creador o un Administrador (R-08); borra el experimento completo (D-87, 23-oct) y responde `204`
   - [x] `404` si no existe
-  - [ ] `403` si es otro usuario. Hecho: implementado; se prueba en la sección 3, con una segunda cuenta
-  - [ ] `409` si hay un análisis `procesando` o `en pausa`. Hecho: `409` si tiene grupos (temporal, hasta tener el borrado completo)
-  - [ ] Los `en cola` salen de la cola
-  - [ ] Borra de las hojas hacia arriba, en una transacción: `SEGUNDO`, `OBSERVACION`, `ANALISIS`, `VIDEO`, `ESPECIMEN`, `TANDA`, `GRUPO`, `REPORTE`, `NOTIFICACION`, `EXPERIMENTO`. Hecho: `REPORTE` y `NOTIFICACION`, en una transacción
-  - [ ] Borra también la carpeta `analisis/{id}/` y los archivos
+  - [x] `403` si es otro usuario (probado con una segunda cuenta Investigador en desarrollo, 23-oct)
+  - [x] `409` si hay un análisis `procesando` o `en pausa` (probado con los dos estados: no se borró ninguna fila ni archivo). Bloquea antes la fila del experimento (`FOR UPDATE`) para que no entre una subida a medias
+  - [x] Los `en cola` salen de la cola
+  - [x] Borra de las hojas hacia arriba, en una transacción: `SEGUNDO`, `OBSERVACION`, `ANALISIS`, `VIDEO`, `ESPECIMEN`, `TANDA`, `GRUPO`, `REPORTE`, `NOTIFICACION`, `EXPERIMENTO`. Probado con 2 grupos, 3 tandas y 3 análisis en cola: los conteos de las 10 tablas quedaron iguales a los de antes de crearlo. Comparte los borrados con "Eliminar una tanda"
+  - [x] Borra también la carpeta `analisis/{id}/` y los archivos `videos/{id}.*` (después del commit)
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
 
 ## 5. Carga de video (§4.1, R-02, R-03, R-09)
@@ -95,6 +95,7 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
 - [x] Nombre original del video (D-114, 20-oct): columna `VIDEO.nombreOriginal` (migración idempotente al arrancar), guardado sin la ruta del cliente; se ve en Resultados, en la Revisión y en el PDF (tabla "Videos analizados"); los videos anteriores dicen "nombre no registrado"
 - [x] Eliminar una tanda (D-115, 20-oct): `DELETE /experiments/{id}/tandas/{idTanda}` → `204`; solo el creador o un Administrador (`403`), `409` si su análisis está procesando o en pausa (en cola sí se borra). Una transacción borra segundos, observaciones, análisis, videos, especímenes, la tanda y los reportes del experimento; los archivos se borran después del commit. El grupo se conserva y la letra queda libre. Botón "Eliminar tanda" con confirmación en el grupo
+- [x] D-107 (23-oct): solo el creador sube videos; `403` ("Solo quien creó el experimento sube sus videos.") a cualquier otra cuenta, también a un Administrador. El `404` va primero. Probado con otro Investigador y con otro Administrador: sin filas ni archivos nuevos. Motivo: `VIDEO` no guarda quién lo subió y `subidoPor` es el creador del experimento
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
