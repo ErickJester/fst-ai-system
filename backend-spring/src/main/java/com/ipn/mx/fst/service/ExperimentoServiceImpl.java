@@ -416,11 +416,16 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 					"Solo quien creó el experimento o un Administrador puede eliminarlo");
 		}
 
-		// Candado sobre la fila del experimento: una subida en curso (su grupo, tanda o video apuntan a él) espera a que
-		// esta transacción termine, y no queda un video a medias dentro de un experimento que ya no existe.
+		// Candados de arriba hacia abajo, con FOR UPDATE: el experimento, sus grupos y (en bloquear) sus tandas y análisis.
+		// Una subida a un grupo, tanda o experimento que ya existen solo toma FOR KEY SHARE sobre esa fila (lo que pide la
+		// llave foránea); FOR UPDATE choca con él, así que la subida espera al commit y su INSERT falla después porque la
+		// fila ya no existe. Sin esto, un video podía entrar entre el SELECT de idsVideo y el DELETE (archivo huérfano)
+		// o crearse una tanda nueva en un grupo que se está borrando. Siempre en este orden (experimento, grupos, tandas,
+		// análisis): es el mismo que sigue la subida, y el worker solo bloquea análisis, así que no hay deadlock.
 		jdbc.queryForList("SELECT idexperimento FROM experimento WHERE idexperimento = ? FOR UPDATE", Integer.class, id);
+		jdbc.queryForList("SELECT idgrupo FROM grupo WHERE idexperimento = ? FOR UPDATE", Integer.class, id);
 
-		List<Integer> idsAnalisis = bloquearAnalisis(TANDAS_DEL_EXPERIMENTO, id,
+		List<Integer> idsAnalisis = bloquear(TANDAS_DEL_EXPERIMENTO, id,
 				"No se puede eliminar mientras un análisis está procesando o en pausa");
 		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda IN " + TANDAS_DEL_EXPERIMENTO,
 				Integer.class, id);
@@ -457,7 +462,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento o un Administrador puede eliminar una tanda");
 		}
 
-		List<Integer> idsAnalisis = bloquearAnalisis(TANDA_UNICA, idTanda,
+		List<Integer> idsAnalisis = bloquear(TANDA_UNICA, idTanda,
 				"No se puede eliminar mientras su análisis está procesando o en pausa");
 		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda IN " + TANDA_UNICA,
 				Integer.class, idTanda);
@@ -475,10 +480,12 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private static final String TANDAS_DEL_EXPERIMENTO =
 			"(SELECT t.idtanda FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo WHERE g.idexperimento = ?)";
 
-	// FOR UPDATE: el análisis queda bloqueado hasta el commit. El worker toma el siguiente con FOR UPDATE SKIP LOCKED,
-	// así que no lo agarra a la mitad; si ya lo tomó (procesando) o está en pausa, no se borra. En cola sí: sale de la cola.
-	// Devuelve los ids de los análisis a borrar.
-	private List<Integer> bloquearAnalisis(String tandas, Integer parametro, String mensajeSiOcupado) {
+	// FOR UPDATE, de arriba hacia abajo: primero las tandas (una subida a una tanda que ya existe solo toma FOR KEY SHARE
+	// sobre ella y así espera al commit; ver eliminar) y después los análisis, que quedan bloqueados hasta el commit.
+	// El worker toma el siguiente con FOR UPDATE SKIP LOCKED, así que no lo agarra a la mitad; si ya lo tomó (procesando)
+	// o está en pausa, no se borra. En cola sí: sale de la cola. Devuelve los ids de los análisis a borrar.
+	private List<Integer> bloquear(String tandas, Integer parametro, String mensajeSiOcupado) {
+		jdbc.queryForList("SELECT idtanda FROM tanda WHERE idtanda IN " + tandas + " FOR UPDATE", Integer.class, parametro);
 		List<Map<String, Object>> analisis = jdbc.queryForList(
 				"SELECT idanalisis, estado FROM analisis WHERE idvideo IN (SELECT idvideo FROM video WHERE idtanda IN "
 						+ tandas + ") FOR UPDATE",
