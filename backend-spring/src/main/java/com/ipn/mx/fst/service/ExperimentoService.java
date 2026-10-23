@@ -33,8 +33,9 @@ public interface ExperimentoService {
 	// 404 si no existe, 409 si el nombre ya lo tiene otro experimento. El creador no cambia.
 	Experimento actualizar(Integer id, Experimento datos);
 
-	// 404 si no existe, 403 si quien pide no es el creador ni Administrador (R-08), 409 si tiene grupos.
-	// Borra también sus reportes y notificaciones.
+	// Elimina el experimento completo (D-87): grupos, tandas, videos, análisis, resultados, reportes y notificaciones.
+	// 404 si no existe, 403 si quien pide no es el creador ni Administrador (R-08), 409 si algún análisis está
+	// procesando o en pausa (los que están en cola sí se borran).
 	void eliminar(Integer id, Authentication authentication);
 
 	// Elimina una tanda con sus videos (Día 1 y Día 2), su análisis y sus resultados, para dejar libre su letra si se subió

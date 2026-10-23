@@ -1,5 +1,6 @@
 package com.ipn.mx.fst.service;
 
+import com.ipn.mx.fst.domain.Experimento;
 import com.ipn.mx.fst.repository.ExperimentoRepository;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.ipn.mx.fst.utilerias.Ffprobe;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -75,10 +77,16 @@ public class VideoServiceImpl implements VideoService {
 
 	@Override
 	public Map<String, Object> subir(Integer idExperimento, String etiquetaGrupo, MultipartFile archivo,
-			String sesion, String tipo, String tratamiento, Integer nCilindros, Integer ordinal) {
+			String sesion, String tipo, String tratamiento, Integer nCilindros, Integer ordinal,
+			Authentication authentication) {
 		// 1. Todo lo que se puede rechazar sin tocar el disco.
-		if (!experimentoRepository.existsById(idExperimento)) {
-			throw new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + idExperimento + " no existe");
+		Experimento experimento = experimentoRepository.findById(idExperimento).orElseThrow(
+				() -> new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + idExperimento + " no existe"));
+		// D-107: solo quien creó el experimento sube sus videos, sea Investigador o Administrador. VIDEO no guarda
+		// quién lo subió y el backend reporta al creador del experimento como "subidoPor"; si subiera otra cuenta,
+		// ese dato sería falso.
+		if (!experimento.getIdInstitucional().equals(authentication.getName())) {
+			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento sube sus videos.");
 		}
 		String etiqueta = etiquetaGrupo == null ? "" : etiquetaGrupo.trim();
 		if (etiqueta.isEmpty()) {
