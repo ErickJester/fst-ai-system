@@ -2,18 +2,25 @@
 // Eliminar una tanda: quién puede, la confirmación y los errores del servidor.
 import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 vi.mock('./services/experiments', () => ({ deleteTanda: vi.fn() }))
+// Para probar la pantalla del grupo: sus datos, la sesión y el encabezado se simulan.
+vi.mock('./services/groups', () => ({ getGroup: vi.fn() }))
+vi.mock('./contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: '2019630177', admin: false } }) }))
+vi.mock('./components/Topbar', () => ({ default: ({ children }) => <div>{children}</div>, Brand: () => null }))
 
 import { deleteTanda } from './services/experiments'
+import { getGroup } from './services/groups'
 import EliminarTanda, { puedeEliminarTanda } from './components/EliminarTanda'
+import GrupoPage from './pages/GrupoPage'
 
 const tanda = { letra: 'A', id_tanda: 21 }
 
 // Con llaves: un beforeEach que devuelve algo lo toma vitest como su limpieza y lo ejecutaría (aquí, el mock) al terminar.
-beforeEach(() => { deleteTanda.mockReset() })
+beforeEach(() => { deleteTanda.mockReset(); getGroup.mockReset() })
 afterEach(cleanup)
 
 describe('quién puede eliminar una tanda', () => {
@@ -73,5 +80,59 @@ describe('diálogo para eliminar una tanda', () => {
     abrir()
     await userEvent.click(screen.getByRole('button', { name: 'Eliminar tanda' }))
     expect(await screen.findByText(/Solo quien creó el experimento o un Administrador puede eliminar una tanda/)).toBeTruthy()
+  })
+
+  it('si es la última tanda del grupo, avisa que el grupo también se elimina; si no, no', () => {
+    abrir({ ultima: true })
+    expect(screen.getByText('Es la única tanda de este grupo: el grupo también se eliminará.')).toBeTruthy()
+    cleanup()
+    abrir()
+    expect(screen.queryByText(/el grupo también se eliminará/)).toBeNull()
+  })
+})
+
+// La pantalla del grupo: con una sola tanda, al eliminarla el grupo ya no existe y se vuelve al experimento; con más, se
+// recarga el mismo grupo.
+describe('eliminar desde el detalle del grupo', () => {
+  const tandaDe = (letra, id) => ({
+    letra, id_tanda: id, n_cilindros: 4, estado: 'SIN_VIDEO', dia1: true, fecha_dia1: '2026-10-20', fecha_dia2: '2026-10-21',
+  })
+  const grupo = (tandas) => ({
+    id: 3, nombre: 'Control', tipo: 'CONTROL', tratamiento: 'Salina', n_especimenes: 4 * tandas.length,
+    experimento: { clave: '7', titulo: 'Experimento de prueba', creador_id: '2019630177' }, tandas,
+  })
+  const abrirGrupo = (tandas) => {
+    getGroup.mockResolvedValue(grupo(tandas))
+    render(
+      <MemoryRouter initialEntries={['/experimentos/7/grupos/3']}>
+        <Routes>
+          <Route path="/experimentos/:clave/grupos/:gid" element={<GrupoPage />} />
+          <Route path="/experimentos/:clave" element={<div>Detalle del experimento</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+  }
+
+  it('con una sola tanda: el diálogo avisa que el grupo se elimina y, al eliminar, navega al experimento sin recargar el grupo', async () => {
+    deleteTanda.mockResolvedValue(undefined)
+    abrirGrupo([tandaDe('A', 21)])
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar tanda' }))
+    const dialogo = screen.getByRole('dialog')
+    expect(within(dialogo).getByText('Es la única tanda de este grupo: el grupo también se eliminará.')).toBeTruthy()
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar tanda' }))
+    expect(await screen.findByText('Detalle del experimento')).toBeTruthy()
+    expect(deleteTanda).toHaveBeenCalledWith('7', 21)
+    expect(getGroup).toHaveBeenCalledTimes(1)
+  })
+
+  it('con más tandas: sin aviso del grupo y, al eliminar, se recarga el mismo grupo', async () => {
+    deleteTanda.mockResolvedValue(undefined)
+    abrirGrupo([tandaDe('A', 21), tandaDe('B', 22)])
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Eliminar tanda' }))[0])
+    const dialogo = screen.getByRole('dialog')
+    expect(within(dialogo).queryByText(/el grupo también se eliminará/)).toBeNull()
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar tanda' }))
+    await waitFor(() => expect(getGroup).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Detalle del experimento')).toBeNull()
   })
 })

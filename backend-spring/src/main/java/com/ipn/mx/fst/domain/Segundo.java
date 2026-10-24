@@ -1,7 +1,11 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.OrigenSegundo;
+import com.ipn.mx.fst.domain.valores.TipoConducta;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -38,11 +42,14 @@ public class Segundo implements Serializable {
 
 	// Dominio tipo_conducta: 'nado activo', 'inmovilidad', 'escalamiento' o 'conducta activa' (D-102, no es
 	// tabla). Nula si el worker no decidió el segundo, si no se ve al espécimen o si el usuario lo marcó dudoso.
+	// En Java es el enum TipoConducta; el conversor deja pasar el null.
+	@Convert(converter = Convertidores.TipoConductaConvertidor.class)
 	@Column(name = "conducta", columnDefinition = "tipo_conducta")
-	private String conducta;
+	private TipoConducta conducta;
 
-	// Dominio origen_segundo: 'maquina', 'confirmada', 'corregida' o 'dudosa'.
+	// Dominio origen_segundo: 'maquina', 'confirmada', 'corregida' o 'dudosa' (enum OrigenSegundo).
+	@Convert(converter = Convertidores.OrigenSegundoConvertidor.class)
 	@Column(name = "origen", columnDefinition = "origen_segundo", nullable = false)
-	private String origen;
+	private OrigenSegundo origen;
 
 }

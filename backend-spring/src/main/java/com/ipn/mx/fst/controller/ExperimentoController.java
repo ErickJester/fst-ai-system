@@ -94,7 +94,7 @@ public class ExperimentoController {
 
 	// Elimina una tanda con sus videos y resultados, para dejar libre su letra si se subió mal: solo el creador del
 	// experimento o un Administrador (403); 404 si la tanda no es de ese experimento; 409 si su análisis está procesando o
-	// en pausa. 204 sin cuerpo.
+	// en pausa. Si era la última tanda de su grupo, el grupo también se borra. 204 sin cuerpo.
 	@DeleteMapping("/{id}/tandas/{idTanda}")
 	public ResponseEntity<Map<String, Object>> deleteTanda(@PathVariable Integer id, @PathVariable Integer idTanda,
 			Authentication authentication) {

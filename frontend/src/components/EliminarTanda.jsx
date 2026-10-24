@@ -12,7 +12,9 @@ export const puedeEliminarTanda = (user, exp, tanda) => tanda.id_tanda != null &
 // Diálogo para eliminar una tanda, desde el detalle del grupo: pide confirmación explícita. El foco empieza en
 // «Cancelar», la opción segura. Muestra tal cual el 403 y el 409 del servidor (por ejemplo, si el análisis está
 // procesando o en pausa). Regla nueva (no está en la guía): sirve para dejar libre la letra si la tanda se subió mal.
-export default function EliminarTanda({ clave, grupo, tanda, onCerrar, onEliminada }) {
+// ultima: es la única tanda del grupo; el servidor borra entonces también el grupo (un grupo nunca queda sin tandas), y
+// el diálogo lo avisa.
+export default function EliminarTanda({ clave, grupo, tanda, ultima = false, onCerrar, onEliminada }) {
   const [borrando, setBorrando] = useState(false)
   const [error, setError] = useState('')
   const cancelarRef = useRef(null)
@@ -49,6 +51,7 @@ export default function EliminarTanda({ clave, grupo, tanda, onCerrar, onElimina
         <div className="dialog-title" id="dlgTanda">Eliminar tanda</div>
         <div className="dialog-body" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
           ¿Eliminar la Tanda {tanda.letra} de «{grupo}»? Se borrarán el video del Día 1, el del Día 2 y sus resultados. No se puede deshacer.
+          {ultima && <div style={{ marginTop: 8, fontWeight: 600 }}>Es la única tanda de este grupo: el grupo también se eliminará.</div>}
         </div>
         <FieldError msg={error} style={{ marginBottom: 12 }} />
         <div className="dialog-actions" style={btnLeft}>

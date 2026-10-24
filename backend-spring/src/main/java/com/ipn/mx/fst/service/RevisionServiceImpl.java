@@ -1,5 +1,8 @@
 package com.ipn.mx.fst.service;
 
+import com.ipn.mx.fst.domain.valores.EstadoAnalisis;
+import com.ipn.mx.fst.domain.valores.OrigenSegundo;
+import com.ipn.mx.fst.domain.valores.TipoConducta;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -8,6 +11,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,11 +51,12 @@ public class RevisionServiceImpl implements RevisionService {
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
-	// Dominio tipo_conducta de la base. La conducta nula también es válida (no se ve o no se decidió).
-	private static final List<String> CONDUCTAS = List.of("nado activo", "inmovilidad", "escalamiento", "conducta activa");
+	// Dominio tipo_conducta de la base, tomado del enum. La conducta nula también es válida (no se ve o no se decidió).
+	private static final List<String> CONDUCTAS = Arrays.stream(TipoConducta.values()).map(TipoConducta::valor).toList();
 
 	// Dominio origen_segundo menos 'maquina': lo que escribe una persona al revisar.
-	private static final List<String> ORIGENES = List.of("confirmada", "corregida", "dudosa");
+	private static final List<String> ORIGENES = Arrays.stream(OrigenSegundo.values())
+			.filter(origen -> origen != OrigenSegundo.MAQUINA).map(OrigenSegundo::valor).toList();
 
 	// Tamaño del video si falta cajas.json: el de la pausa de ejemplo de la guía.
 	private static final int ANCHO_POR_OMISION = 1920;
@@ -362,7 +367,7 @@ public class RevisionServiceImpl implements RevisionService {
 	}
 
 	private static void exigirCompletado(Datos a) {
-		if (!"completado".equals(a.estado())) {
+		if (!EstadoAnalisis.COMPLETADO.es(a.estado())) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Solo se puede revisar un análisis completado.");
 		}
 	}

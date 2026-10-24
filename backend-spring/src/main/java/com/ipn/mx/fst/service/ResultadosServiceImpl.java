@@ -1,5 +1,8 @@
 package com.ipn.mx.fst.service;
 
+import com.ipn.mx.fst.domain.valores.EstadoAnalisis;
+import com.ipn.mx.fst.domain.valores.EtapaAnalisis;
+import com.ipn.mx.fst.domain.valores.TipoConducta;
 import com.ipn.mx.fst.repository.ExperimentoRepository;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import jakarta.annotation.PostConstruct;
@@ -11,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,7 +44,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	// Las cuatro conductas, con su nombre de la base y en este orden en todas las respuestas.
-	private static final List<String> CONDUCTAS = List.of("nado activo", "inmovilidad", "escalamiento", "conducta activa");
+	private static final List<String> CONDUCTAS = Arrays.stream(TipoConducta.values()).map(TipoConducta::valor).toList();
 
 	// Raíz del volumen videos_reportes: de ahí salen pausa.json y los PDF de diagnóstico.
 	@Value("${app.archivos.raiz}")
@@ -127,7 +131,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			Avance avance = avance(idAnalisis, estado, etapa);
 			item.put("porcentaje", avance.general());
 			item.put("porcentajeEtapa", avance.etapa());
-			item.put("pausa", "en pausa".equals(estado) ? pausa(idAnalisis) : null);
+			item.put("pausa", EstadoAnalisis.EN_PAUSA.es(estado) ? pausa(idAnalisis) : null);
 			item.put("diagnosticoDisponible", diagnosticoDisponible(estado, rs.getString("rutadiagnostico")));
 			// La imagen de control (los tubos que encontró el pipeline) que la pantalla de error muestra.
 			item.put("controlDisponible", Files.isRegularFile(rutaControl(idAnalisis, rs.getInt("idvideo"))));
@@ -139,7 +143,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			item.put("motivoCancelacion", null);
 			// Un análisis en cola puede traer el archivo de una corrida anterior (se reencoló): no es de esta
 			// espera, así que no se muestra. Los demás estados leen tiempos.json, o null si no existe.
-			item.put("tiempos", modoDesarrollador && !"en cola".equals(estado) ? tiempos(idAnalisis) : null);
+			item.put("tiempos", modoDesarrollador && !EstadoAnalisis.EN_COLA.es(estado) ? tiempos(idAnalisis) : null);
 			return item;
 		}, idExperimento);
 
@@ -157,10 +161,10 @@ public class ResultadosServiceImpl implements ResultadosService {
 	// si no (un análisis de antes de que existiera el archivo, o uno que acaba de empezar), el mapeo viejo por
 	// etapa (33, 67, 100) y el avance de la etapa en null, para que nada se rompa.
 	private Avance avance(int idAnalisis, String estado, String etapa) {
-		if ("en cola".equals(estado)) {
+		if (EstadoAnalisis.EN_COLA.es(estado)) {
 			return new Avance(0, 0);
 		}
-		if ("completado".equals(estado)) {
+		if (EstadoAnalisis.COMPLETADO.es(estado)) {
 			return new Avance(100, 100);
 		}
 		Avance leido = leerProgreso(idAnalisis, etapa);
@@ -302,18 +306,19 @@ public class ResultadosServiceImpl implements ResultadosService {
 	// Avance en porcentaje por etapa (el de antes de progreso.json, y el respaldo): en cola 0, completado 100 y,
 	// en cualquier otro estado, el de su etapa.
 	private static int porcentaje(String estado, String etapa) {
-		if ("en cola".equals(estado)) {
+		if (EstadoAnalisis.EN_COLA.es(estado)) {
 			return 0;
 		}
-		if ("completado".equals(estado)) {
+		if (EstadoAnalisis.COMPLETADO.es(estado)) {
 			return 100;
 		}
-		return switch (etapa) {
-			case "preprocesamiento" -> 33;
-			case "cilindros" -> 67;
-			case "clasificacion" -> 100;
-			default -> 0;
-		};
+		if (EtapaAnalisis.PREPROCESAMIENTO.es(etapa)) {
+			return 33;
+		}
+		if (EtapaAnalisis.CILINDROS.es(etapa)) {
+			return 67;
+		}
+		return EtapaAnalisis.CLASIFICACION.es(etapa) ? 100 : 0;
 	}
 
 	// Lo que dice analisis/{id}/pausa.json (lo escribe el worker; hoy ningún análisis pausa, pero el plazo de 72 h se revisa igual): en qué cilindro
@@ -338,7 +343,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	}
 
 	private boolean diagnosticoDisponible(String estado, String rutaDiagnostico) {
-		if (!"error".equals(estado) || rutaDiagnostico == null) {
+		if (!EstadoAnalisis.ERROR.es(estado) || rutaDiagnostico == null) {
 			return false;
 		}
 		Path pdf = rutaSegura(rutaDiagnostico);
@@ -514,7 +519,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 					continue;
 				}
 				nTotal += t.cilindros();
-				if (!"completado".equals(t.estado())) {
+				if (!EstadoAnalisis.COMPLETADO.es(t.estado())) {
 					Map<String, Object> falta = new LinkedHashMap<>();
 					falta.put("letra", letra(t.ordinal()));
 					falta.put("nCilindros", t.cilindros());
@@ -609,7 +614,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		}
 		String estado = (String) filas.get(0).get("estado");
 		String ruta = (String) filas.get(0).get("rutadiagnostico");
-		if (!"error".equals(estado) || ruta == null) {
+		if (!EstadoAnalisis.ERROR.es(estado) || ruta == null) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "El análisis " + idAnalisis + " no tiene reporte de diagnóstico");
 		}
 		Path pdf = rutaSegura(ruta);

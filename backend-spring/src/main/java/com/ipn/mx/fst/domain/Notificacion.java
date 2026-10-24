@@ -1,7 +1,10 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.TipoNotificacion;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -47,9 +50,10 @@ public class Notificacion implements Serializable {
 	@JoinColumn(name = "idexperimento")
 	private Experimento experimento;
 
-	// Dominio tipo_notificacion: las seis de la guía.
+	// Dominio tipo_notificacion: las seis de la guía (enum TipoNotificacion).
+	@Convert(converter = Convertidores.TipoNotificacionConvertidor.class)
 	@Column(name = "tipo", columnDefinition = "tipo_notificacion", nullable = false)
-	private String tipo;
+	private TipoNotificacion tipo;
 
 	@Column(name = "mensaje", nullable = false)
 	private String mensaje;
