@@ -1,7 +1,12 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.EstadoAnalisis;
+import com.ipn.mx.fst.domain.valores.EtapaAnalisis;
+import com.ipn.mx.fst.domain.valores.NivelClasifAnalisis;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -42,17 +47,21 @@ public class Analisis implements Serializable {
 
 	// Dominio estado_analisis: 'en cola', 'procesando', 'en pausa', 'completado', 'error' o 'cancelado'.
 	// columnDefinition con el nombre del dominio: PostgreSQL reporta la columna con ese tipo y no como
-	// varchar, y sin esto "validate" no deja arrancar. Igual en las demás columnas con dominio.
+	// varchar, y sin esto "validate" no deja arrancar. Igual en las demás columnas con dominio. En Java es el enum
+	// EstadoAnalisis (y EtapaAnalisis, NivelClasifAnalisis abajo); su conversor guarda el texto exacto del dominio.
+	@Convert(converter = Convertidores.EstadoAnalisisConvertidor.class)
 	@Column(name = "estado", columnDefinition = "estado_analisis", nullable = false)
-	private String estado;
+	private EstadoAnalisis estado;
 
 	// Dominio etapa_analisis: 'preprocesamiento', 'cilindros' o 'clasificacion'.
+	@Convert(converter = Convertidores.EtapaAnalisisConvertidor.class)
 	@Column(name = "etapa", columnDefinition = "etapa_analisis", nullable = false)
-	private String etapa;
+	private EtapaAnalisis etapa;
 
 	// Dominio nivel_clasif_analisis: 'preciso' o 'agrupado'.
+	@Convert(converter = Convertidores.NivelClasifAnalisisConvertidor.class)
 	@Column(name = "nivelclasif", columnDefinition = "nivel_clasif_analisis", nullable = false)
-	private String nivelClasif;
+	private NivelClasifAnalisis nivelClasif;
 
 	// Al encolar, la fecha de encolado; al terminar, la reemplaza el worker (D-79).
 	@Column(name = "fechaanalisis", nullable = false)

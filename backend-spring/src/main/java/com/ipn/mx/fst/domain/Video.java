@@ -1,7 +1,10 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.SesionVideo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -40,9 +43,10 @@ public class Video implements Serializable {
 	@JoinColumn(name = "idtanda", nullable = false)
 	private Tanda tanda;
 
-	// Dominio sesion_video: 'Dia 1' o 'Dia 2'.
+	// Dominio sesion_video: 'Dia 1' o 'Dia 2' (enum SesionVideo).
+	@Convert(converter = Convertidores.SesionVideoConvertidor.class)
 	@Column(name = "sesion", columnDefinition = "sesion_video", nullable = false)
-	private String sesion;
+	private SesionVideo sesion;
 
 	// Ruta relativa al volumen. Nula cuando el video ya se borró (a los 30 días o por falta de disco).
 	@Column(name = "archivo")

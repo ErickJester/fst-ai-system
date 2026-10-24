@@ -1,7 +1,10 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.TipoGrupo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -41,9 +44,11 @@ public class Grupo implements Serializable {
 	@Column(name = "etiqueta", length = 100, nullable = false)
 	private String etiqueta;
 
-	// Dominio tipo_grupo: 'control', 'referencia' o 'tratamiento experimental'. Lo valida PostgreSQL.
+	// Dominio tipo_grupo: 'control', 'referencia' o 'tratamiento experimental'. Lo valida PostgreSQL; en Java es el enum
+	// TipoGrupo y el conversor guarda su texto exacto.
+	@Convert(converter = Convertidores.TipoGrupoConvertidor.class)
 	@Column(name = "tipo", columnDefinition = "tipo_grupo", nullable = false)
-	private String tipo;
+	private TipoGrupo tipo;
 
 	@Column(name = "tratamiento", nullable = false)
 	private String tratamiento;

@@ -10,14 +10,11 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (15-oct-2026):** el backend compila y arranca. El SQL, la consulta del PDF y los datos
-de prueba **se ejecutaron** en un PostgreSQL 16 temporal: el esquema se aplica sin errores (12 tablas, dominio
-`tipo_conducta`, sin `conducta`, `intervalo` ni `presenta`), las restricciones rechazan lo que deben (8 casos
-probados), `ddl-auto=validate` acepta las 12 entidades, y `/health`, `/experiments` y el PDF responden con los
-números esperados. **Sin probar:** `docker compose --profile dev up --build` completo, con el backend y el
-worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker sigue con el esquema viejo de
-15 tablas y 14 experimentos de prueba; para aplicar el nuevo hay que correr `docker compose down -v` en
-`backend-spring/` (borra esos datos) y volver a levantar.
+**Última revisión del estado (23-oct-2026, versión 0.79.1):** el backend compila y corre en Docker junto con la base,
+el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
+`fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
+en el navegador contra nuestro backend (20-oct, `e66ce40`). **Sin hacer:** administración y recuperación de
+contraseña (§3), pausa y reinicio (§6), bloques de 5 s, CSV y XLSX (§8) y el respaldo con `pg_dump` (§10).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -29,7 +26,8 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] Rutas guardadas en la BD relativas a la raíz del volumen, que en el contenedor es `/data/archivos` (§2): `videos/{idVideo}.{ext}`
 - [x] Límite de subida configurable, y `413` si se excede (§11.5): `ManejadorErrores` responde `{data: null, error, status: 413}`; probado con `MAX_UPLOAD_MB=1` y un archivo de 3 MB
 - [x] ffmpeg en el Dockerfile del backend (hace falta para §5); `ffprobe -version` corre en el contenedor
-- [x] Puerto del backend `8084`, dentro y fuera de Docker: el `8080` lo ocupa Traefik de CVAT en esta máquina. Falta avisarle a Vanesa (`VITE_API_BASE=http://localhost:8084`)
+- [x] Puerto del backend `8084`, dentro y fuera de Docker: el `8080` lo ocupa Traefik de CVAT en esta máquina. Vanesa ya lo usa (`VITE_API_BASE=http://localhost:8084` en `PARA_ERICK.md`)
+- [ ] `docker-compose.yml` definitivo en la raíz (commit `99a016d`, 23-oct): proyecto `fst-portable`, servicios `db`, `api`, `worker` y `web`, que se levanta con `portable\iniciar.bat`; el de desarrollo sigue en `backend-spring/`. Hecho: verificado solo con `docker compose config` (rutas, volúmenes y variables); falta probarlo en la otra PC
 
 ## 1. Base de datos
 - [x] SQL del Anexo B con los dominios cerrados, `UNIQUE` y llaves foráneas `NO ACTION` (§5), incluido `tipo_conducta`
@@ -37,9 +35,9 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] 12 entidades, sin `Conducta`, `Intervalo` ni `Presenta` (§4.9, D-102)
 - [x] `ANALISIS.idVideo` único
 - [x] `rutaDiagnostico` solo se llena si `estado = 'error'` (`CHECK` en el SQL)
-- [ ] Cardinalidades validadas en el servicio, sin `CHECK` de conteo: tanda de 2 a 4 especímenes, grupo con 1 o más tandas, mínimo 2 especímenes por grupo (§5)
+- [x] Cardinalidades validadas en el servicio, sin `CHECK` de conteo: tanda de 2 a 4 especímenes, grupo con 1 o más tandas, mínimo 2 especímenes por grupo (§5). Tanda de 2 a 4: `VideoServiceImpl` rechaza `nCilindros` fuera de ese rango y crea exactamente esos especímenes. Grupo con 1 o más tandas: un grupo solo nace dentro de la misma transacción que su primera tanda (`resolverDestino`; si algo falla se deshace todo, revisado en el código) y, desde el 23-oct, al eliminar su última tanda el grupo se borra en la misma transacción (probado en desarrollo: la única tanda de un grupo → `204` y el grupo desaparece; una de dos → el grupo se conserva). Mínimo 2 especímenes por grupo: sale de las dos anteriores
 - [x] Contraseñas con bcrypt, nunca en texto plano: `BCryptPasswordEncoder` en el login y en `AdminInicial`, y el hash con `@JsonIgnore`
-- [ ] Valores de dominio como enums de Java en lugar de `String` (opcional)
+- [x] Valores de dominio como enums de Java en lugar de `String` (23-oct): los 9 dominios de la base tienen su enum en `domain.valores` (`TipoGrupo`, `SesionVideo`, `FormatoReporte`, `TipoNotificacion`, `EstadoAnalisis`, `EtapaAnalisis`, `NivelClasifAnalisis`, `OrigenSegundo`, `TipoConducta`), con el texto exacto de la base (`valor()`, `desdeValor`, `@JsonValue`) y un conversor JPA por enum en las entidades, que conservan su `columnDefinition`. Las listas que se validaban a mano salen de los enums. Probado en desarrollo: el backend arranca con `ddl-auto=validate`; `GET /experiments/{id}`, `/status`, `/results` y `/results/byminute` devuelven los mismos textos que la base; y borrar un experimento con reporte y notificaciones (lectura de entidades por los conversores) da `204`. No se probó la lectura de `Segundo.conducta` nula ni de `Analisis` por los conversores: ningún servicio lee esas entidades hoy (todo va por SQL directo)
 
 ## 2. Autenticación
 - [x] Spring Security con JWT de larga duración, configurable con `JWT_EXPIRES_HOURS` (§11.1): Nimbus HS256 con `tipo = sesion`, token solo en la cabecera (en la URL o alterado da `401`), y `ConvertidorJwt` revisa en la base en cada petición si la cuenta sigue activa (desactivada da `401` aunque el token no haya vencido) y si es Administrador. No arranca con un `JWT_SECRET` de menos de 32 caracteres
@@ -75,7 +73,7 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] `DELETE /experiments/{id}`: solo el creador o un Administrador (R-08); borra el experimento completo (D-87, 23-oct) y responde `204`
   - [x] `404` si no existe
   - [x] `403` si es otro usuario (probado con una segunda cuenta Investigador en desarrollo, 23-oct)
-  - [x] `409` si hay un análisis `procesando` o `en pausa` (probado con los dos estados: no se borró ninguna fila ni archivo). Bloquea antes la fila del experimento (`FOR UPDATE`) para que no entre una subida a medias
+  - [x] `409` si hay un análisis `procesando` o `en pausa` (probado con los dos estados: no se borró ninguna fila ni archivo). Antes bloquea con `FOR UPDATE`, de arriba hacia abajo, el experimento, sus grupos y sus tandas, para que una subida simultánea espere y falle con `409` (commit `5de79cf`, 23-oct); la concurrencia se probó con dos sesiones de `psql`, no con la API
   - [x] Los `en cola` salen de la cola
   - [x] Borra de las hojas hacia arriba, en una transacción: `SEGUNDO`, `OBSERVACION`, `ANALISIS`, `VIDEO`, `ESPECIMEN`, `TANDA`, `GRUPO`, `REPORTE`, `NOTIFICACION`, `EXPERIMENTO`. Probado con 2 grupos, 3 tandas y 3 análisis en cola: los conteos de las 10 tablas quedaron iguales a los de antes de crearlo. Comparte los borrados con "Eliminar una tanda"
   - [x] Borra también la carpeta `analisis/{id}/` y los archivos `videos/{id}.*` (después del commit)
@@ -94,7 +92,7 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] El Día 1 se guarda sin análisis
 - [x] Respuesta `201` con `{idVideo, idAnalisis, estadoAnalisis}`
 - [x] Nombre original del video (D-114, 20-oct): columna `VIDEO.nombreOriginal` (migración idempotente al arrancar), guardado sin la ruta del cliente; se ve en Resultados, en la Revisión y en el PDF (tabla "Videos analizados"); los videos anteriores dicen "nombre no registrado"
-- [x] Eliminar una tanda (D-115, 20-oct): `DELETE /experiments/{id}/tandas/{idTanda}` → `204`; solo el creador o un Administrador (`403`), `409` si su análisis está procesando o en pausa (en cola sí se borra). Una transacción borra segundos, observaciones, análisis, videos, especímenes, la tanda y los reportes del experimento; los archivos se borran después del commit. El grupo se conserva y la letra queda libre. Botón "Eliminar tanda" con confirmación en el grupo
+- [x] Eliminar una tanda (D-115, 20-oct): `DELETE /experiments/{id}/tandas/{idTanda}` → `204`; solo el creador o un Administrador (`403`), `409` si su análisis está procesando o en pausa (en cola sí se borra). Una transacción borra segundos, observaciones, análisis, videos, especímenes, la tanda y los reportes del experimento; los archivos se borran después del commit. La letra queda libre. El grupo se conserva si le quedan tandas; si era la última, se borra también (23-oct, decisión de Erick: un grupo nunca queda sin tandas; el grupo se bloquea con `FOR UPDATE` antes que la tanda). Botón "Eliminar tanda" con confirmación en el grupo; si es la única tanda, el diálogo avisa que el grupo también se elimina y la pantalla vuelve al experimento
 - [x] D-107 (23-oct): solo el creador sube videos; `403` ("Solo quien creó el experimento sube sus videos.") a cualquier otra cuenta, también a un Administrador. El `404` va primero. Probado con otro Investigador y con otro Administrador: sin filas ni archivos nuevos. Motivo: `VIDEO` no guarda quién lo subió y `subidoPor` es el creador del experimento
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
@@ -121,18 +119,18 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] `GET .../results/groups`, con promedio (no suma), datos faltantes y aviso si mezcla `preciso` y `agrupado`
 - [ ] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12)
 - [x] Los totales se calculan desde `SEGUNDO`, nunca se guardan (D-52)
-- [ ] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos. Hecho (encargo 15): implementado; sin probar con sesión, lo prueba el usuario en el navegador
-- [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct)
-  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]. Hecho (encargo 15): implementado; sin probar con sesión, lo prueba el usuario en el navegador
-  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas. Hecho: sin `vt` o con uno inválido da `401` (probado sin sesión); el resto sin probar con sesión
+- [x] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos: la revisión carga con el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`; `PARA_ERICK.md`, punto 54). Sin probar: `puedeCorregir` en falso con otra cuenta
+- [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct). Hecho: el video con `?vt=` responde `206` con `Range` y un `web.mp4` real (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`); las reglas de abajo siguen sin probar
+  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]. Hecho: responde `200` con `{token}` cuando lo pide el front (Vanesa, 20-oct, backend `e66ce40`); sin probar las reglas de quién lo pide y de qué análisis
+  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas. Hecho: con un `vt` válido responde `206` (Vanesa, 20-oct, `e66ce40`); sin `vt` o con uno inválido da `401` (probado sin sesión); sin probar que el token de otro análisis o el JWT de sesión en la URL se rechacen
   - [ ] Sin query string en los logs de nginx ni de Spring. Hecho: el `access_log` de nginx ya no guarda `?vt=` y Spring no la registra. Falta: el `error_log` de nginx sí escribe la petición completa, con `?vt=`, cuando falla el backend (hallazgo del 19-oct, pendiente)
-  - [ ] Si el video ya se borró, responde que ya no existe (`404`)
-- [ ] `PUT .../segundos`: Hecho (encargo 15): implementado con todas las reglas de abajo; sin probar con sesión
-  - [ ] Solo los segundos que cambiaron
-  - [ ] `origen` en `confirmada`, `corregida` o `dudosa`
-  - [ ] Solo el que subió el video o un Administrador
-  - [ ] Solo sobre un análisis `completado`
-  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige
+  - [ ] Si el video ya se borró, responde que ya no existe (`404`). Sin probar
+- [ ] `PUT .../segundos`: Hecho: responde `200` al guardar desde el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`); las reglas de abajo están implementadas (encargo 15) y ninguna se ha probado
+  - [ ] Solo los segundos que cambiaron. Sin probar
+  - [ ] `origen` en `confirmada`, `corregida` o `dudosa`. Sin probar
+  - [ ] Solo el que subió el video o un Administrador (`403` a otra cuenta). Sin probar
+  - [ ] Solo sobre un análisis `completado`. Sin probar
+  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige. Sin probar
 
 ## 8. Reportes (§7, R-06)
 - [ ] CSV con las columnas `Grupo, Tanda, Espécimen, Tiempo, Nado, Escalamiento, Inmovilidad, Conducta activa`
@@ -153,35 +151,47 @@ worker en contenedores. **Aviso:** el volumen `fst-spring_pgdata` de tu Docker s
 - [x] Quitar el correo de demostración al crear un experimento, que no está en la guía
 
 ## 10. `worker` y tareas programadas
-El worker está en `../worker` y es Python, no Spring. Escribe `OBSERVACION` y `SEGUNDO` con el modelo de 12 tablas.
-No lo he revisado punto por punto contra esta lista. Hasta el 20-oct hubo además un simulador (`worker_fake`, con
-conductas inventadas y `simular_carga.py` para encolar videos de prueba); se retiró ese día y su cola, pausas y
-tareas diarias pasaron a `../worker` (`cola.py`, `tareas_programadas.py`). Desde el 18-oct el worker (`../worker`,
-servicio `worker` del compose) usa el modelo `fst_cnn_seg.pt` con el código de `fst_auto` copiado sin cambios en `../pipeline`.
-Probado con `AcuBN1.MOV`: completado, 4 × 300 segundos en `SEGUNDO`, `web.mp4`, `cajas.json`, PDF y notificación,
-y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo (100 %),
-pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
-nace al medir los fotogramas, antes de la red). No hace la pausa de R-15.
+El worker está en `../worker` y es Python, no Spring (servicio `worker` del compose). Revisado punto por punto contra el
+código el 23-oct: `cola.py` (la cola, las pausas vencidas y la reconexión), `worker.py` (el análisis con el modelo),
+`diagnostico.py` (el PDF de error), `tareas_programadas.py`, `progreso.py`, `tiempos.py` y `vigilancia.py`. Usa el modelo
+`fst_cnn_seg.pt` con el código de `fst_auto` copiado sin cambios en `../pipeline`; escribe `OBSERVACION` y `SEGUNDO` (los
+últimos 300 s de cada espécimen) con el modelo de 12 tablas, más `web.mp4`, `cajas.json` y la notificación.
+Probado con `AcuBN1.MOV` (18-oct): completado, 4 × 300 segundos en `SEGUNDO`, `web.mp4`, `cajas.json`, PDF y
+notificación, y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo
+(100 %), pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
+nace al medir los fotogramas, antes de la red). Pruebas automáticas de `worker/` (`test_tiempos`, `test_vigilancia` y
+`test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct).
+**Lo que NO hace:** (1) la pausa de R-15: el modelo no detecta «no se ve al espécimen», así que ningún análisis pasa a
+`en pausa`, no escribe `pausa.json` ni `pausa.jpg`, no crea la notificación `analisis en pausa` y no lee ningún `ajuste`;
+solo atiende las pausas que ya existan. (2) El respaldo de la base con `pg_dump` (D-18): no está en el código ni en la
+imagen. (3) El aviso a 7 días solo se escribe en el log; no crea notificación (la guía no la define, D-45).
+Hasta el 20-oct hubo además un simulador (`worker_fake`, con conductas inventadas); se retiró ese día y su cola, pausas
+y tareas diarias pasaron a `../worker`.
 Agregado el 19-oct (versión 0.22.0): **progreso real** (encargo 14: `progreso.json`, `/status` con `porcentajeEtapa`
 y el porcentaje general, pesos medidos 1/9/90); **tiempos del análisis** (encargo 16: `tiempos.json` con segundos
 por etapa y el equipo, en Progreso, Resultados y el PDF); **`MODO_DESARROLLADOR`** (encargo 17: con `false` se
 apagan los tiempos y el banner rojo "BETA vX.Y.Z"). Probado con pruebas automáticas y sin sesión; falta una corrida
 real con sesión (la hará el usuario en otra PC).
-- [ ] Toma un análisis a la vez, el más antiguo primero
-- [ ] Caso exitoso: pasa por las etapas, escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación
-- [ ] Caso de error con la palabra `falla`: PDF de diagnóstico, estado `error` y notificación
-- [ ] Caso de pausa con la palabra `pausa`, con sus tres salidas: ajuste, cancelación y vencimiento a las 72 horas (D-112)
-- [ ] Al arrancar, reencola los `procesando` huérfanos
-- [ ] Reemplaza `fechaAnalisis` por `ahora` al terminar
-- [ ] Tareas diarias en un módulo aparte, disparables a mano:
-  - [ ] Borrar videos vencidos a los 30 días
-  - [ ] Aviso a 7 días
-  - [ ] Vigilar el disco: alerta al 80 %, borrado al 90 %
-  - [ ] Respaldar la base con `pg_dump` cada día, conservar los últimos 7 y borrar los más viejos (§8, D-18, agregado a la guía el 20-oct). Respalda la base, no los videos
-- [ ] `ultima_corrida_tareas.txt`
+- [ ] Toma un análisis a la vez, el más antiguo primero. Hecho: en código (`cola.py`: `tomar_siguiente`, `ORDER BY fechaanalisis, idanalisis` con `FOR UPDATE SKIP LOCKED`, y un solo proceso); sin probar con dos análisis en cola
+- [x] Caso exitoso: pasa por las etapas (`preprocesamiento`, `cilindros`, `clasificacion`), escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación `analisis completado`. Probado con `AcuBN1.MOV` (18-oct); en el portable hay dos análisis completados (19-oct) con su notificación
+- [ ] Caso de error (el video no se abre, un paso del pipeline falla o pasa de una hora, no coinciden los cilindros, o un fallo imprevisto, D-88): PDF de diagnóstico, estado `error` y notificación
+  - [x] PDF de diagnóstico y estado `error`: probado con un archivo que no es video (18-oct) y con `worker/test_diagnostico.py` (6 pruebas, 23-oct)
+  - [ ] Notificación `error del pipeline`. Hecho: en código (`cola.py`: `marcar_error`); sin constancia de prueba con la base real
+- [ ] Pausa (R-15): el worker real no la crea (ver arriba). Hecho: solo atiende las pausas que ya existan
+  - [ ] Vencimiento a las 72 horas (D-112): cancela y crea la notificación `analisis cancelado`; sin archivo de pausa, cancela. Hecho: en código (`cola.py`: `revisar_pausas`, `PAUSE_TIMEOUT_HOURS`); sin probar con un análisis en pausa
+  - [ ] Ajuste y cancelación del usuario: no existen. El backend no tiene `/pause/adjust` ni `/cancel` y el worker no lee `ajuste`
+- [ ] Al arrancar, reencola los `procesando` huérfanos (D-84). Hecho: en código (`cola.py`: `reencolar_huerfanos`, conserva `fechaAnalisis`); sin probar con un análisis cortado a la mitad
+- [x] Reemplaza `fechaAnalisis` por `ahora` al terminar (`completar_real` y `marcar_error`). Probado en el portable (19-oct): los análisis 1 y 3, completados, tienen `fechaAnalisis` 4 min 57 s y 4 h 21 min después de subir el video; el análisis cancelado (el 2) conserva la hora de entrada
+- [ ] Tareas diarias en un módulo aparte, disparables a mano. Hecho: `tareas_programadas.py` (`python tareas_programadas.py`, o `--disco` para solo el disco); corrió completo en el portable el 23-oct (existe `ultima_corrida_tareas.txt` con esa fecha, que se escribe al final), sin videos vencidos que borrar
+  - [ ] Borrar videos vencidos a los 30 días (R-05). Hecho: en código (`borrar_videos_vencidos`: `fechaAnalisis` + 30 días en análisis completados; borra el video y `web.mp4` y deja `VIDEO.archivo` en nulo); sin probar el borrado
+  - [ ] Borrar `pausa.json` y `pausa.jpg` huérfanos (D-89, regla c). Hecho: en código (`borrar_pausas_huerfanas`); sin probar
+  - [ ] Aviso a 7 días. Hecho: en código (`avisar_vencimientos`), pero solo escribe en el log: no crea notificación (la guía no la define, D-45)
+  - [ ] Vigilar el disco: alerta al 80 %, borrado al 90 %. Hecho: en código (`vigilar_disco`: a más de 80 % avisa a los administradores, una alerta al día; a más de 90 % `liberar_disco` borra videos del más antiguo al más nuevo sin tocar análisis pendientes y avisa al creador; también corre antes de cada análisis, D-86). Se prueba con `DISK_SIMULATED_PERCENT`; sin probar
+  - [ ] Respaldar la base con `pg_dump` cada día, conservar los últimos 7 y borrar los más viejos (§8, D-18, agregado a la guía el 20-oct). Respalda la base, no los videos. No existe: ni `tareas_programadas.py` ni la imagen del worker lo hacen (no trae el cliente de PostgreSQL)
+- [x] `ultima_corrida_tareas.txt`: se escribe al terminar las tareas diarias y evita repetirlas el mismo día. Probado en el portable (23-oct): `worker/ultima_corrida_tareas.txt` en el volumen, con la fecha de ese día
 
 ## 11. Criterios de aceptación finales (§12)
-- [ ] `docker compose up` arranca en una máquina limpia, y en una segunda máquina
+- [ ] `docker compose up` arranca en una máquina limpia, y en una segunda máquina. Hecho: el portable se probó desde el zip el 18-oct y Erick lo usa en otra PC; falta probar el compose definitivo de la raíz
 - [ ] Un investigador recibe `403` en `/admin/*`
 - [ ] No se puede quitar al último Administrador
 - [x] Un Día 1 se guarda sin análisis
@@ -199,7 +209,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
 - [x] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [x] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
-- [ ] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion` (`usuario` o `plazo`). Hecho: `pausa.desdeSegundo`. Falta `motivoCancelacion`, que no se guarda en ningún lado (sale `null`)
+- [x] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion`. Decidido (D-112): `motivoCancelacion` no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa). `pausa.desdeSegundo` sale de `pausa.json`; el worker real no crea pausas, así que no se ha visto con un análisis real
 - [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
@@ -207,6 +217,6 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `/results`: cada espécimen trae además `idGrupo`
 - [x] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
 - [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
-- [ ] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080). Hecho: los trae (`duracion` = segundos guardados; `ancho` y `alto` de `cajas.json`); sin probar con sesión
+- [x] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080): los trae (`duracion` = segundos guardados; `ancho` y `alto` de `cajas.json`) y la revisión carga con el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`)
 - [x] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
-- [ ] `POST .../video-token` responde `{token}`; probar `Range` con un `web.mp4` real
+- [x] `POST .../video-token` responde `{token}` y el video con `?vt=` admite `Range` con un `web.mp4` real: `200` con el token y `206` con `Range` (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`)

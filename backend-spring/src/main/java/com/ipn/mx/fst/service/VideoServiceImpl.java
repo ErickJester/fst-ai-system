@@ -1,6 +1,8 @@
 package com.ipn.mx.fst.service;
 
 import com.ipn.mx.fst.domain.Experimento;
+import com.ipn.mx.fst.domain.valores.SesionVideo;
+import com.ipn.mx.fst.domain.valores.TipoGrupo;
 import com.ipn.mx.fst.repository.ExperimentoRepository;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.ipn.mx.fst.utilerias.Ffprobe;
@@ -12,12 +14,14 @@ import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +45,9 @@ public class VideoServiceImpl implements VideoService {
 
 	private static final Logger log = LoggerFactory.getLogger(VideoServiceImpl.class);
 
-	private static final Set<String> TIPOS = Set.of("control", "referencia", "tratamiento experimental");
+	// Los valores del dominio tipo_grupo de la base, tomados del enum.
+	private static final Set<String> TIPOS = Arrays.stream(TipoGrupo.values()).map(TipoGrupo::valor)
+			.collect(Collectors.toUnmodifiableSet());
 	private static final String DANADO = "El video no se puede reproducir: el archivo está dañado o incompleto.";
 
 	// Raíz del volumen videos_reportes. Las rutas que se guardan en la base son RELATIVAS a ella.
@@ -95,7 +101,7 @@ public class VideoServiceImpl implements VideoService {
 		if (archivo == null || archivo.isEmpty()) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "Falta el archivo del video.");
 		}
-		if (!"Dia 1".equals(sesion) && !"Dia 2".equals(sesion)) {
+		if (!SesionVideo.DIA_1.es(sesion) && !SesionVideo.DIA_2.es(sesion)) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "La sesión debe ser 'Dia 1' o 'Dia 2'.");
 		}
 		String extension = extensionDe(archivo.getOriginalFilename());
@@ -149,7 +155,7 @@ public class VideoServiceImpl implements VideoService {
 
 				Map<String, Object> datos = new LinkedHashMap<>();
 				datos.put("idVideo", idVideo);
-				if ("Dia 2".equals(sesion)) {
+				if (SesionVideo.DIA_2.es(sesion)) {
 					// Solo el Día 2 se analiza (D-71). Los valores de arranque salen de los DEFAULT de la tabla.
 					Map<String, Object> analisis = jdbc.queryForMap(
 							"INSERT INTO analisis (idvideo) VALUES (?) RETURNING idanalisis, estado", idVideo);
@@ -180,6 +186,11 @@ public class VideoServiceImpl implements VideoService {
 	// nuevo, entre 2 y 4 cilindros si la tanda es nueva y que la tanda no tenga ya el video de esa sesión.
 	// Con crear = false solo revisa; con crear = true además crea lo que falta. Devuelve el idTanda (null si
 	// no se creó). Si el grupo ya existe, tipo y tratamiento se ignoran; si la tanda ya existe, nCilindros también.
+	// Cardinalidades de la guía (§5), que se cumplen aquí y no con CHECK: una tanda tiene de 2 a 4 especímenes (se rechaza
+	// nCilindros fuera de ese rango y se crean exactamente nCilindros); un grupo tiene 1 o más tandas (un grupo solo nace
+	// aquí, en la misma transacción que su primera tanda: si algo falla después, el grupo también se deshace; y al
+	// eliminar su última tanda el grupo se borra, ver ExperimentoServiceImpl.eliminarTanda); y de las dos sale el mínimo de
+	// 2 especímenes por grupo.
 	private Integer resolverDestino(Integer idExperimento, String etiqueta, String sesion, String tipo,
 			String tratamiento, Integer nCilindros, Integer ordinalPedido, boolean crear) {
 		Integer idGrupo = primero(jdbc.queryForList(
@@ -230,7 +241,7 @@ public class VideoServiceImpl implements VideoService {
 		} else if (!jdbc.queryForList("SELECT 1 FROM video WHERE idtanda = ? AND sesion = ?", Integer.class,
 				idTanda, sesion).isEmpty()) {
 			String letra = String.valueOf((char) ('A' + ordinal - 1));
-			String dia = "Dia 1".equals(sesion) ? "Día 1" : "Día 2";
+			String dia = SesionVideo.DIA_1.es(sesion) ? "Día 1" : "Día 2";
 			throw new ErrorApi(HttpStatus.CONFLICT, "La Tanda " + letra + " ya tiene su video de " + dia
 					+ ". Cada tanda lleva un solo video por sesión.");
 		}

@@ -2,6 +2,10 @@ package com.ipn.mx.fst.service;
 
 import com.ipn.mx.fst.domain.Experimento;
 import com.ipn.mx.fst.domain.Usuario;
+import com.ipn.mx.fst.domain.valores.EstadoAnalisis;
+import com.ipn.mx.fst.domain.valores.EtapaAnalisis;
+import com.ipn.mx.fst.domain.valores.SesionVideo;
+import com.ipn.mx.fst.domain.valores.TipoConducta;
 import com.ipn.mx.fst.repository.ExperimentoRepository;
 import com.ipn.mx.fst.repository.FilaExperimento;
 import com.ipn.mx.fst.repository.FilaGrupo;
@@ -71,7 +75,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private static final Logger log = LoggerFactory.getLogger(ExperimentoServiceImpl.class);
 
 	// Las cuatro conductas en el orden de las columnas del reporte (sección 7 de la guía).
-	private static final String[] CONDUCTAS = {"nado activo", "escalamiento", "inmovilidad", "conducta activa"};
+	private static final String[] CONDUCTAS = {TipoConducta.NADO_ACTIVO.valor(), TipoConducta.ESCALAMIENTO.valor(),
+			TipoConducta.INMOVILIDAD.valor(), TipoConducta.CONDUCTA_ACTIVA.valor()};
 
 	private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
 	private static final int POR_PAGINA = 20;
@@ -79,7 +84,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private static final int DIAS_RETENCION = 30;
 	private static final int DIAS_AVISO = 7;
 	// Estados de un análisis de mayor a menor precedencia, para el estado del experimento (guía 4.8).
-	private static final List<String> PRECEDENCIA = List.of("error", "cancelado", "en pausa", "procesando", "en cola", "completado");
+	private static final List<String> PRECEDENCIA = List.of(EstadoAnalisis.ERROR.valor(), EstadoAnalisis.CANCELADO.valor(),
+			EstadoAnalisis.EN_PAUSA.valor(), EstadoAnalisis.PROCESANDO.valor(), EstadoAnalisis.EN_COLA.valor(),
+			EstadoAnalisis.COMPLETADO.valor());
 
 	@Autowired
 	private ExperimentoRepository experimentoRepository;
@@ -164,8 +171,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			if (!f.getVideoDisponible()) {
 				videosBorrados = true;
 			}
-			boolean dia2 = "Dia 2".equals(f.getSesion());
-			boolean completado = "completado".equals(f.getEstadoAnalisis());
+			boolean dia2 = SesionVideo.DIA_2.es(f.getSesion());
+			boolean completado = EstadoAnalisis.COMPLETADO.es(f.getEstadoAnalisis());
 			if (dia2) {
 				tandasConDia2.add(f.getIdTanda());
 				if (completado) {
@@ -441,18 +448,21 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// Elimina una tanda (regla nueva, parecida a R-08): su letra queda libre para volver a subirla. Todo en UNA
 	// transacción, de las hojas hacia arriba; los archivos se borran DESPUÉS del commit (si fallara el borrado de uno, la
-	// base ya quedó bien: solo se avisa en el log).
+	// base ya quedó bien: solo se avisa en el log). Un grupo nunca queda sin tandas (§5 de la guía: grupo con 1 o más
+	// tandas, y de ahí mínimo 2 especímenes): si era la última de su grupo, el grupo se borra en la misma transacción
+	// (23-oct, decisión de Erick; antes, D-115, el grupo se conservaba vacío).
 	@Override
 	@Transactional
 	public void eliminarTanda(Integer idExperimento, Integer idTanda, Authentication authentication) {
 		Experimento experimento = buscar(idExperimento);
-		List<Integer> delExperimento = jdbc.queryForList("""
-				SELECT t.idtanda FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo
+		List<Integer> gruposDeLaTanda = jdbc.queryForList("""
+				SELECT t.idgrupo FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo
 				WHERE t.idtanda = ? AND g.idexperimento = ?
 				""", Integer.class, idTanda, idExperimento);
-		if (delExperimento.isEmpty()) {
+		if (gruposDeLaTanda.isEmpty()) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "La tanda " + idTanda + " no existe en el experimento " + idExperimento);
 		}
+		Integer idGrupo = gruposDeLaTanda.get(0);
 
 		// Igual que el experimento: solo quien lo creó o un Administrador.
 		boolean esCreador = experimento.getIdInstitucional().equals(authentication.getName());
@@ -462,12 +472,22 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento o un Administrador puede eliminar una tanda");
 		}
 
+		// Mismo orden de candados que eliminar (grupo, tandas, análisis; ver los comentarios de ahí): el grupo también se
+		// bloquea porque quizá se borre con su última tanda, y una subida a ese grupo debe esperar al commit.
+		jdbc.queryForList("SELECT idgrupo FROM grupo WHERE idgrupo = ? FOR UPDATE", Integer.class, idGrupo);
 		List<Integer> idsAnalisis = bloquear(TANDA_UNICA, idTanda,
 				"No se puede eliminar mientras su análisis está procesando o en pausa");
 		List<Integer> idsVideo = jdbc.queryForList("SELECT idvideo FROM video WHERE idtanda IN " + TANDA_UNICA,
 				Integer.class, idTanda);
 
 		borrarDesdeLosVideos(TANDA_UNICA, idTanda);
+		// Si ya no quedan tandas en el grupo, el grupo se va con ella (no tiene nada más que lo cuelgue: especímenes y
+		// tandas ya se borraron).
+		Boolean sinTandas = jdbc.queryForObject("SELECT NOT EXISTS (SELECT 1 FROM tanda WHERE idgrupo = ?)",
+				Boolean.class, idGrupo);
+		if (Boolean.TRUE.equals(sinTandas)) {
+			jdbc.update("DELETE FROM grupo WHERE idgrupo = ?", idGrupo);
+		}
 		// Sus resultados cambian: un reporte guardado ya no los refleja.
 		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
 
@@ -493,7 +513,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		List<Integer> idsAnalisis = new ArrayList<>();
 		for (Map<String, Object> a : analisis) {
 			String estado = (String) a.get("estado");
-			if ("procesando".equals(estado) || "en pausa".equals(estado)) {
+			if (EstadoAnalisis.PROCESANDO.es(estado) || EstadoAnalisis.EN_PAUSA.es(estado)) {
 				throw new ErrorApi(HttpStatus.CONFLICT, mensajeSiOcupado);
 			}
 			idsAnalisis.add(((Number) a.get("idanalisis")).intValue());
@@ -758,8 +778,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				Map<?, ?> e = (Map<?, ?>) etapa;
 				porEtapa.put((String) e.get("etapa"), (Number) e.get("segundos"));
 			}
-			for (String etapa : List.of("preprocesamiento", "cilindros", "clasificacion")) {
-				tabla.addCell(celdaCentrada(mmss(porEtapa.get(etapa)), letraTexto));
+			for (EtapaAnalisis etapa : EtapaAnalisis.values()) {
+				tabla.addCell(celdaCentrada(mmss(porEtapa.get(etapa.valor())), letraTexto));
 			}
 			tabla.addCell(new PdfPCell(new Phrase(textoDelEquipo((Map<?, ?>) tiempos.get("equipo")), letraTexto)));
 		}

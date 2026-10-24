@@ -1,7 +1,10 @@
 package com.ipn.mx.fst.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ipn.mx.fst.domain.valores.Convertidores;
+import com.ipn.mx.fst.domain.valores.FormatoReporte;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -39,9 +42,10 @@ public class Reporte implements Serializable {
 	@JoinColumn(name = "idexperimento", nullable = false)
 	private Experimento experimento;
 
-	// Dominio formato_reporte: 'CSV', 'XLSX' o 'PDF'.
+	// Dominio formato_reporte: 'CSV', 'XLSX' o 'PDF' (enum FormatoReporte).
+	@Convert(converter = Convertidores.FormatoReporteConvertidor.class)
 	@Column(name = "formato", columnDefinition = "formato_reporte", nullable = false)
-	private String formato;
+	private FormatoReporte formato;
 
 	@Column(name = "ruta", nullable = false, unique = true)
 	private String ruta;
