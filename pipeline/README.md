@@ -1,8 +1,10 @@
 # pipeline/: el modelo de fst_auto, tal cual
 
 Este código **no es de este repositorio**: es una copia, sin cambios, del proyecto `fst_auto`
-(carpeta hermana `../fst_auto`), commit **`9844e57`** (2026-10-18, "Versiones del codigo de Colab y hojas
-ciegas de AcuBN2 y Acu-YBN-2"). Lo usa el worker real (`worker/worker.py`) para analizar los videos.
+(carpeta hermana `../fst_auto`), rama **`wip/correccion-recuadro`**, commit **`6b27226`** (23-oct-2026): es `9844e57`
+(2026-10-18, "Versiones del codigo de Colab y hojas ciegas de AcuBN2 y Acu-YBN-2") más la opción `--correccion` de
+`etiquetar.py` (cambian `lib.py` y `etiquetar.py`). Sin `--correccion` da exactamente lo mismo que `9844e57`. Esa rama
+todavía no está en `main` de fst_auto. Lo usa el worker real (`worker/worker.py`) para analizar los videos.
 
 Archivos copiados:
 
