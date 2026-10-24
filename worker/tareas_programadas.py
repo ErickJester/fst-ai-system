@@ -5,19 +5,25 @@ arrancar; para no repetirlas el mismo día se guarda la fecha en worker/ultima_c
 Como el worker atiende un análisis a la vez, si hay uno en curso esperan solas a que termine.
 
 Este módulo es el que el worker real puede traer tal cual. Para probarlo a mano:
-  python tareas_programadas.py           corre todas ahora (aunque ya hayan corrido hoy)
-  python tareas_programadas.py --disco   solo la vigilancia del disco
+  python tareas_programadas.py             corre todas ahora (aunque ya hayan corrido hoy)
+  python tareas_programadas.py --disco     solo la vigilancia del disco
+  python tareas_programadas.py --respaldo  solo el respaldo de la base (pg_dump, D-18)
 """
 
+import os
 import shutil
+import subprocess
 import sys
 
 from comun import (
-    ARCHIVOS, DAILY_HOUR, DISK_ALERT_PERCENT, DISK_CLEANUP_PERCENT, DISK_SIMULATED_PERCENT,
-    ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, enviar_correos, log, notificar,
+    ARCHIVOS, DAILY_HOUR, DISK_ALERT_PERCENT, DISK_CLEANUP_PERCENT, DISK_SIMULATED_PERCENT, RESPALDOS,
+    ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, datos_conexion, enviar_correos, log, notificar,
 )
 
 ULTIMA_CORRIDA = ARCHIVOS / "worker" / "ultima_corrida_tareas.txt"
+
+CONSERVAR_RESPALDOS = 7          # D-18: los 7 más nuevos
+LIMITE_RESPALDO_S = 30 * 60      # un pg_dump que pasa de media hora se da por perdido
 
 
 def leer_ultima_corrida():
@@ -35,6 +41,8 @@ def correr_si_toca(conn):
 
 def correr_todas(conn):
     log.info("Tareas programadas: inicio")
+    # El respaldo va primero, antes de cualquier borrado. Si falla, lo registra y las demás tareas siguen (D-88).
+    respaldar_base()
     borrar_videos_vencidos(conn)
     borrar_pausas_huerfanas(conn)
     avisar_vencimientos(conn)
@@ -118,6 +126,44 @@ def avisar_vencimientos(conn):
     conn.commit()
     for nombre, id_video, fecha in por_vencer:
         log.info("Aviso: el video %s del experimento '%s' se borrará el %s", id_video, nombre, fecha)
+
+
+def respaldar_base():
+    """D-18 (sección 8): un respaldo de la BASE por día (no de los videos) con pg_dump, en RESPALDOS, que en Docker es una
+    carpeta del equipo fuera de los volúmenes. Se llama fst-AAAAMMDD.dump; si ya hay uno de hoy, se reemplaza. Se
+    conservan los CONSERVAR_RESPALDOS más nuevos y se borra el resto. Se escribe primero a un temporal y se renombra al
+    final: un respaldo cortado nunca queda como válido. Si algo falla solo se registra (D-88) y las demás tareas siguen.
+    Devuelve True si el respaldo de hoy quedó listo."""
+    datos = datos_conexion()
+    hoy = ahora().strftime("%Y%m%d")
+    destino = RESPALDOS / f"fst-{hoy}.dump"
+    temporal = RESPALDOS / f"fst-{hoy}.dump.tmp"
+    try:
+        RESPALDOS.mkdir(parents=True, exist_ok=True)
+        for resto in RESPALDOS.glob("fst-*.dump.tmp"):     # lo que dejó un respaldo cortado
+            borrar_archivo(resto)
+        comando = ["pg_dump", "-Fc", "-h", datos["host"], "-p", str(datos["port"]),
+                   "-U", datos["user"], "-d", datos["dbname"], "-f", str(temporal)]
+        # La contraseña va solo en el entorno del subproceso: ni en la línea de comandos ni en el log.
+        entorno = {**os.environ, "PGPASSWORD": datos["password"]}
+        subprocess.run(comando, env=entorno, check=True, capture_output=True, text=True, timeout=LIMITE_RESPALDO_S)
+        temporal.replace(destino)
+    except subprocess.CalledProcessError as e:
+        log.error("Respaldo de la base: pg_dump terminó con error (código %s): %s",
+                  e.returncode, (e.stderr or "").strip()[:400])
+        borrar_archivo(temporal)
+        return False
+    except (OSError, subprocess.SubprocessError) as e:      # sin pg_dump, carpeta sin permiso, tiempo agotado...
+        log.error("Respaldo de la base: no se pudo hacer: %s", e)
+        borrar_archivo(temporal)
+        return False
+
+    # El nombre lleva la fecha, así que ordenar por nombre es ordenar por antigüedad.
+    for viejo in sorted(RESPALDOS.glob("fst-*.dump"), reverse=True)[CONSERVAR_RESPALDOS:]:
+        borrar_archivo(viejo)
+    log.info("Respaldo de la base: %s (%.1f MB); se conservan los %s más nuevos",
+             destino.name, destino.stat().st_size / (1024 * 1024), CONSERVAR_RESPALDOS)
+    return True
 
 
 def uso_disco():
@@ -206,6 +252,8 @@ def liberar_disco(conn):
 
 if __name__ == "__main__":
     configurar_log()
+    if "--respaldo" in sys.argv:       # no necesita conexión de psycopg2: pg_dump se conecta solo
+        sys.exit(0 if respaldar_base() else 1)
     conexion = conectar()
     if "--disco" in sys.argv:
         vigilar_disco(conexion)

@@ -77,6 +77,8 @@ services:
     volumes:
       - videos_reportes:/data/archivos
       - ../modelos:/data/modelos:ro
+      # Respaldos diarios de la base (pg_dump, D-18): una carpeta del equipo (backend-spring/respaldos), fuera de los volúmenes.
+      - ./respaldos:/data/respaldos
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
