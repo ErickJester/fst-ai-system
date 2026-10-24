@@ -10,11 +10,12 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (23-oct-2026, versión 0.79.1):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (23-oct-2026, versión 0.80.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
-en el navegador contra nuestro backend (20-oct, `e66ce40`). **Sin hacer:** administración y recuperación de
-contraseña (§3), pausa y reinicio (§6), bloques de 5 s y CSV y XLSX (§8).
+en el navegador contra nuestro backend (20-oct, `e66ce40`). **En curso:** la pausa de R-15 (§6 y §10), detenida a pedido
+de Erick el 23-oct con la parte de fst_auto a medias. **Sin hacer:** administración y recuperación de contraseña (§3),
+reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -98,7 +99,7 @@ contraseña (§3), pausa y reinicio (§6), bloques de 5 s y CSV y XLSX (§8).
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
 - [x] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
-- [ ] Pausa:
+- [ ] Pausa. Hecho: diseño aprobado por Erick el 23-oct, siguiendo §4.3 de la guía, en dos encargos. El 31 (fst_auto acepta `--correccion` para medir un cilindro con el recuadro que ajusta el usuario desde el segundo de la pausa) quedó a medias, detenido a pedido de Erick, en la rama `wip/correccion-recuadro` de fst-etiquetador (commit `958eeea`, que explica lo hecho y lo que falta; `main` de fst_auto sigue en `9844e57`, igual que `pipeline/`). El 32 (el worker detecta 3 s seguidos sin ver al espécimen y pausa, estas rutas y la pantalla) no se empezó. Medido el 23-oct en los 15 videos de `fst_auto/etiquetas`: ningún espécimen dejó de verse 3 s seguidos (máximo 1 s, dos veces), así que hace falta un video fabricado para probarlo
   - [ ] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`
   - [ ] `GET .../pause/image`
   - [ ] `POST .../pause/adjust` escribe `ajuste` en el JSON y cambia `en pausa` a `en cola`, solo si sigue `en pausa` (`409` si no)
@@ -161,9 +162,11 @@ notificación, y el camino de error con un archivo que no es video. Guarda en la
 (100 %), pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
 nace al medir los fotogramas, antes de la red). Pruebas automáticas de `worker/` (`test_tiempos`, `test_vigilancia` y
 `test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct).
-**Lo que NO hace:** (1) la pausa de R-15: el modelo no detecta «no se ve al espécimen», así que ningún análisis pasa a
-`en pausa`, no escribe `pausa.json` ni `pausa.jpg`, no crea la notificación `analisis en pausa` y no lee ningún `ajuste`;
-solo atiende las pausas que ya existan. (2) El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
+**Lo que NO hace:** (1) la pausa de R-15: el worker no revisa los segundos en que la segmentación de fst_auto no
+encontró al espécimen (`cx` vacío en `_cuadros.csv`), así que ningún análisis pasa a `en pausa`, no escribe `pausa.json`
+ni `pausa.jpg`, no crea la notificación `analisis en pausa`, no lee ningún `ajuste` y guarda la conducta de la red
+también en los segundos «no se ve» (§4.3 pide conducta nula); solo atiende las pausas que ya existan. Está en curso:
+ver la casilla «Pausa» de la sección 6. (2) El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
 nada y que el backend lo calcula (`avisoVencimiento` de `GET /experiments`); el worker solo lo deja en el log. El respaldo
 de la base con `pg_dump` (D-18) ya está hecho desde el 23-oct (casilla de abajo).
 Hasta el 20-oct hubo además un simulador (`worker_fake`, con conductas inventadas); se retiró ese día y su cola, pausas
@@ -178,7 +181,7 @@ real con sesión (la hará el usuario en otra PC).
 - [x] Caso de error (el video no se abre, un paso del pipeline falla o pasa de una hora, no coinciden los cilindros, o un fallo imprevisto, D-88): PDF de diagnóstico, estado `error` y notificación. Probado con el video que no se puede abrir; los demás motivos comparten `marcar_error` y no se provocaron a mano
   - [x] PDF de diagnóstico y estado `error`: probado con un archivo que no es video (18-oct), con `worker/test_diagnostico.py` (6 pruebas, 23-oct) y en desarrollo el 23-oct (video sustituido por basura: `error` en `preprocesamiento`, `diagnostico.pdf` de 80 KB válido, `rutaDiagnostico` guardada, `/status` en `error` y `GET .../diagnostic` con `200` `application/pdf`)
   - [x] Notificación `error del pipeline`: probado en desarrollo (23-oct), una fila para el creador con la etapa y el motivo («No se pudo leer el video con ffprobe…»). El correo no salió porque MailHog no estaba levantado; el aviso queda en la campanita
-- [ ] Pausa (R-15): el worker real no la crea (ver arriba). Hecho: solo atiende las pausas que ya existan
+- [ ] Pausa (R-15): el worker real no la crea (ver arriba). Hecho: solo atiende las pausas que ya existan. En curso desde el 23-oct (encargos 31 y 32, ver la sección 6)
   - [x] Vencimiento a las 72 horas (D-112), `cola.py`: `revisar_pausas`. Probado en desarrollo (23-oct) con `pausa.json` escritos a mano: el de 96 h pasa a `cancelado` con la notificación `analisis cancelado`; el que no tiene `pausa.json` también se cancela (solo un aviso en el log, sin notificación); el de 96 h con `ajuste` y el de 1 h siguen `en pausa`
   - [ ] Ajuste y cancelación del usuario: no existen. El backend no tiene `/pause/adjust` ni `/cancel` y el worker no lee `ajuste`
 - [x] Al arrancar, reencola los `procesando` huérfanos (D-84), `cola.py`: `reencolar_huerfanos`. Probado en desarrollo (23-oct), llamándola como lo hace `main()` al conectarse: los análisis `procesando` vuelven a `en cola` en la etapa `preprocesamiento` y conservan su `fechaAnalisis`
@@ -210,7 +213,8 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `GET /experiments`: campos extra `nEspecimenes`, `tratamientos`, `videosDia2: {analizados, cargados, total}`, `diasRetencion` (`null` sin videos o ya borrados) y `videosBorrados`
 - [x] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [x] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
-- [x] `/status`: campos extra `pausa.desdeSegundo` y `motivoCancelacion`. Decidido (D-112): `motivoCancelacion` no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa). `pausa.desdeSegundo` sale de `pausa.json`; el worker real no crea pausas, así que no se ha visto con un análisis real
+- [x] `/status`: campo extra `motivoCancelacion` (`usuario` o `plazo`). Decidido (D-112): no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa)
+- [ ] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); no se ha visto con un análisis real porque el worker todavía no crea pausas (ver la casilla «Pausa» de la sección 6)
 - [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
