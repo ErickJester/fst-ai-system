@@ -29,9 +29,9 @@ from psycopg2.extras import execute_values
 
 import cola
 import vigilancia
-from cola import marcar_error, poner_etapa
+from cola import leer_pausa, marcar_error, poner_etapa
 from comun import (
-    ARCHIVOS, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
+    ARCHIVOS, ahora, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
 )
 from diagnostico import rangos_de_tubos
 from progreso import RegistroProgreso
@@ -187,8 +187,12 @@ def procesar_real(conn, id_analisis):
     tubos = len(especimenes)
     vigilante_cilindros = vigilancia.VigilanteCilindros(lambda pct: progreso.avance("cilindros", pct),
                                                         video, registro, duracion)
+    # §4.3: si el usuario ajustó una pausa, su corrección se acumula en correcciones.json y se pasa a etiquetar.py.
+    # Las correcciones acumuladas son todas las del análisis (una por cada pausa atendida).
+    correcciones = acumular_correccion(id_analisis)
+    argumentos_correccion = ["--correccion", str(correcciones)] if correcciones else []
     codigo = correr([sys.executable, "etiquetar.py", str(video), "--tubos", str(tubos),
-                     "--salida", str(trabajo)], registro, vigilante_cilindros)
+                     "--salida", str(trabajo), *argumentos_correccion], registro, vigilante_cilindros)
     for paso, segundos in vigilante_cilindros.duraciones().items():
         tiempos.subpaso("cilindros", paso, segundos)
     if codigo != 0:
@@ -212,6 +216,20 @@ def procesar_real(conn, id_analisis):
                             + (f" Tubos encontrados (columnas en píxeles): {rangos}." if rangos else ""))
 
     progreso.etapa_hecha("cilindros")
+
+    # §4.3 (R-15): tres segundos seguidos sin animal en un cilindro pausan el análisis antes de clasificar. Solo se
+    # mira el tramo que se guarda (los últimos 300 s, D-54). Si ya se pausó, se suelta el análisis.
+    cuadros_cil = pd.read_csv(trabajo / f"{nombre}_cuadros.csv", encoding="utf-8-sig")
+    ultimo = int(float(cuadros_cil["t"].max())) + 1
+    inicio_guardado = max(1, ultimo - MAX_SEGUNDOS + 1)
+    racha = racha_de_pausa(segundos_sin_animal(cuadros_cil, ultimo), inicio_guardado, ultimo)
+    if racha is not None:
+        cilindro, desde = racha
+        pausado = pausar_analisis(conn, d, id_analisis, cilindro, desde, video, tabla, carpeta_analisis(id_analisis),
+                                  ancho, alto)
+        if pausado:
+            tiempos.cerrar()
+            return
 
     # c. clasificacion: probar_seg.py clasifica cada segundo con la red. Su ritmo se mide en cada corrida y se
     # guarda para que la barra de la siguiente se ajuste a esta computadora.
@@ -240,6 +258,138 @@ def procesar_real(conn, id_analisis):
     completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, progreso, registro, tiempos)
 
 
+RACHA_PAUSA_S = 3   # §4.3: tres segundos seguidos sin animal en un cilindro pausan el análisis
+
+
+def segundos_sin_animal(cuadros, ultimo_segundo):
+    """{cilindro: set de segundos} en los que, para ese cilindro, NINGÚN fotograma medido tiene al animal (cx NaN en
+    _cuadros.csv). Los segundos van de 1 en adelante, como en SEGUNDO. Un segundo sin fotogramas no cuenta."""
+    cuadros = cuadros.assign(segundo=cuadros["t"].astype(float).apply(lambda t: int(t) + 1))
+    sin = {}
+    for (cilindro, segundo), grupo in cuadros.groupby(["s", "segundo"]):
+        if segundo <= ultimo_segundo and grupo["cx"].isna().all():
+            sin.setdefault(int(cilindro), set()).add(int(segundo))
+    return sin
+
+
+def racha_de_pausa(sin_animal, inicio, fin):
+    """La racha de RACHA_PAUSA_S segundos seguidos sin animal MÁS TEMPRANA en el tiempo, dentro de [inicio, fin], en
+    cualquier cilindro. En empate de segundo gana el cilindro de número menor. Devuelve (cilindro, desde_segundo) o None.
+    Solo mira el tramo que se guarda (los últimos 300 s, D-54)."""
+    mejor = None
+    for cilindro in sorted(sin_animal):
+        for s in range(inicio, fin - RACHA_PAUSA_S + 2):
+            if all(k in sin_animal[cilindro] for k in range(s, s + RACHA_PAUSA_S)):
+                if mejor is None or s < mejor[1]:      # sorted() por cilindro: en empate se queda el de número menor
+                    mejor = (cilindro, s)
+                break                                 # la primera racha de este cilindro es la suya más temprana
+    return mejor
+
+
+def acumular_correccion(id_analisis):
+    """§4.3, al retomar: si pausa.json trae un ajuste, se agrega a correcciones.json (que acumula las del análisis), se
+    borran pausa.json y pausa.jpg, y se devuelve la ruta de correcciones.json. Sin ajuste, devuelve la de las que ya
+    hay (o None). Así etiquetar.py las aplica todas en orden de desde_segundo."""
+    carpeta = carpeta_analisis(id_analisis)
+    archivo_corr = carpeta / "correcciones.json"
+    lista = []
+    if archivo_corr.exists():
+        lista = json.loads(archivo_corr.read_text(encoding="utf-8"))
+    pausa = leer_pausa(id_analisis)
+    if pausa and pausa.get("ajuste"):
+        a = pausa["ajuste"]
+        lista.append({"cilindro": int(a["cilindro"]), "desde_segundo": float(pausa["desde_segundo"]),
+                      "x0": a["x0"], "y0": a["y0"], "x1": a["x1"], "y1": a["y1"]})
+        escribir_atomico(archivo_corr, lista)
+        borrar_archivo(carpeta / "pausa.json")
+        borrar_archivo(carpeta / "pausa.jpg")
+    return archivo_corr if lista else None
+
+
+def recuadros_en_instante(rasgos, instante):
+    """Por cilindro, el recuadro bx0..by1 del bloque de 5 s que contiene el instante (t0 <= instante < t1). Si para ese
+    cilindro no hay bloque en el instante, el del bloque más cercano. Devuelve la lista para pausa.json."""
+    recuadros = []
+    for cil in sorted(rasgos["especimen"].unique()):
+        del_tubo = rasgos[rasgos["especimen"] == cil]
+        dentro = del_tubo[(del_tubo["t0"] <= instante) & (instante < del_tubo["t1"])]
+        if dentro.empty:
+            # el bloque cuyo centro esté más cerca del instante
+            centros = (del_tubo["t0"] + del_tubo["t1"]) / 2
+            fila = del_tubo.loc[(centros - instante).abs().idxmin()]
+        else:
+            fila = dentro.iloc[0]
+        recuadros.append({"cilindro": int(cil), "x0": int(fila["bx0"]), "y0": int(fila["by0"]),
+                          "x1": int(fila["bx1"]), "y1": int(fila["by1"])})
+    return recuadros
+
+
+def escribir_atomico(ruta, datos_o_bytes):
+    """Escribe a un temporal y lo renombra: un corte a media escritura nunca deja el archivo a medias (§4.3)."""
+    temporal = ruta.with_name(ruta.name + ".tmp")
+    if isinstance(datos_o_bytes, bytes):
+        temporal.write_bytes(datos_o_bytes)
+    else:
+        temporal.write_text(json.dumps(datos_o_bytes, indent=2, ensure_ascii=False), encoding="utf-8")
+    temporal.replace(ruta)
+
+
+def pausar_analisis(conn, d, id_analisis, cilindro, desde_segundo, video, rasgos, carpeta, ancho, alto):
+    """§4.3: fotograma del video ORIGINAL en el segundo central de la racha, pausa.json con los recuadros de todos los
+    cilindros en ese instante, y el análisis a 'en pausa'. Regla (a): primero el archivo y después el estado; si el
+    estado ya no es 'procesando' (lo cancelaron o lo borraron a medias), se borran los archivos y no se crea nada."""
+    import cv2
+    instante = desde_segundo + RACHA_PAUSA_S / 2 - 0.5     # el segundo central de la racha (el 2 de 3)
+    cap = cv2.VideoCapture(str(video))
+    cap.set(cv2.CAP_PROP_POS_MSEC, instante * 1000)
+    ok, fotograma = cap.read()
+    cap.release()
+    if not ok:
+        raise RuntimeError(f"no se pudo leer el fotograma de la pausa en {instante:.1f} s")
+
+    # Los recuadros de TODOS los cilindros en ESE instante (no la mediana del análisis: la cámara se mueve y el
+    # usuario ajusta sobre la imagen de ese instante). Se toma el bloque de 5 s que lo contiene.
+    recuadros = recuadros_en_instante(rasgos, instante)
+
+    ahora_zona = ahora().isoformat(timespec="seconds")
+    pausa = {
+        "version": 1,
+        "cilindro": int(cilindro),
+        "desde_segundo": int(desde_segundo),
+        "instante_imagen_s": float(instante),
+        "imagen": "pausa.jpg",
+        "hora_pausa": ahora_zona,
+        "ancho": int(ancho),     # tamaño de la imagen (lo lee el backend para acotar el recuadro que ajusta el usuario)
+        "alto": int(alto),
+        "recuadros": recuadros,
+        "ajuste": None,
+    }
+    ok, jpg = cv2.imencode(".jpg", fotograma, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    escribir_atomico(carpeta / "pausa.jpg", jpg.tobytes())
+    escribir_atomico(carpeta / "pausa.json", pausa)
+
+    pendientes = []
+    with conn.cursor() as cur:
+        cur.execute("UPDATE analisis SET estado = 'en pausa' WHERE idanalisis = %s AND estado = 'procesando'",
+                    (id_analisis,))
+        cambio = cur.rowcount
+        if cambio == 1:
+            notificar(cur, pendientes, d["idinstitucional"], d["correo"], "analisis en pausa",
+                      f"El análisis de {d['tanda']} del experimento '{d['nombre']}' se pausó: el cilindro {cilindro} "
+                      f"no se ve desde el segundo {desde_segundo}. Ajusta el recuadro para continuar.",
+                      d["idexperimento"])
+    conn.commit()
+    if cambio != 1:
+        # Alguien lo canceló o lo borró a la mitad: no queda pausa ni notificación.
+        borrar_archivo(carpeta / "pausa.json")
+        borrar_archivo(carpeta / "pausa.jpg")
+        log.warning("Análisis %s: no se pausó (ya no estaba procesando); se borraron los archivos de la pausa", id_analisis)
+        return False
+    enviar_correos(pendientes)
+    log.info("Análisis %s en pausa: cilindro %s desde el segundo %s", id_analisis, cilindro, desde_segundo)
+    return True
+
+
 def traducir(valor, id_analisis, cilindro):
     """Conducta del pipeline -> conducta de la base; cualquier otro valor queda sin conducta (NULL)."""
     conducta = CONDUCTAS.get(valor)
@@ -261,12 +411,17 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
     # Los últimos 300 s de cada espécimen, ordenados por segundo. Todos miden lo mismo; n_total es el
     # largo que vio el pipeline y de él depende dónde empieza web.mp4 para coincidir con SEGUNDO.
     segundos_de = {}
+    numeros_de = {}
+    # §4.3: los segundos sin animal de cada cilindro (cx NaN en todos sus fotogramas), para dejarlos con conducta nula.
+    cuadros_cil = pd.read_csv(trabajo / f"{nombre}_cuadros.csv", encoding="utf-8-sig")
+    sin_animal = segundos_sin_animal(cuadros_cil, int(float(cuadros_cil["t"].max())) + 1)
     for _, cilindro in especimenes:
         propios = clasificados[clasificados["especimen"] == cilindro].sort_values("segundo")
         if propios.empty:
             return marcar_error(conn, d, "clasificacion",
                                 f"El modelo no clasificó ningún segundo del cilindro {cilindro}.")
         segundos_de[cilindro] = propios.tail(MAX_SEGUNDOS)["conducta"].tolist()
+        numeros_de[cilindro] = propios.tail(MAX_SEGUNDOS)["segundo"].astype(int).tolist()
     n_total = int(clasificados["segundo"].max())
     inicio = max(0, n_total - MAX_SEGUNDOS)
 
@@ -322,7 +477,13 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
             )
             id_observacion = cur.fetchone()[0]
 
-            conductas = [traducir(c, id_analisis, cilindro) for c in segundos_de[cilindro]]
+            # §4.3: un segundo en que el cilindro no tiene animal en ningún fotograma queda con conducta NULA, aunque
+            # la red diga otra cosa. Los segundos van con la misma numeración que SEGUNDO (1 a n, los últimos 300).
+            vacios = sin_animal.get(cilindro, set())
+            conductas = [
+                None if numero in vacios else traducir(c, id_analisis, cilindro)
+                for numero, c in zip(numeros_de[cilindro], segundos_de[cilindro])
+            ]
             hay_conducta_activa |= "conducta activa" in conductas
             # Los totales por minuto no se guardan: el backend los calcula desde SEGUNDO (D-52).
             execute_values(
