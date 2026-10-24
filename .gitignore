@@ -22,6 +22,9 @@ CLAUDE.md
 /dist/
 /portable/.env
 
+# respaldos diarios de la base (pg_dump, D-18): datos de quien usa el sistema, no van en git (ni en el paquete)
+respaldos/
+
 # frontend: dependencias (se reinstalan con npm install) y salida del build
 node_modules/
 /frontend/dist/

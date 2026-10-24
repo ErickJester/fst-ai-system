@@ -31,6 +31,9 @@ DISK_SIMULATED_PERCENT = os.environ.get("DISK_SIMULATED_PERCENT", "").strip()
 ZONA = ZoneInfo(os.environ.get("WORKER_TZ", "America/Mexico_City"))
 # Raíz del volumen videos_reportes. Las rutas que se guardan en la base son relativas a ella.
 ARCHIVOS = Path(os.environ.get("ARCHIVOS_DIR", "/data/archivos"))
+# Carpeta de los respaldos de la base (D-18). En Docker es una carpeta del equipo montada aparte (./respaldos), FUERA de
+# los volúmenes, para que los respaldos sobrevivan aunque alguien borre los volúmenes.
+RESPALDOS = Path(os.environ.get("RESPALDOS_DIR", "/data/respaldos"))
 
 ASUNTOS = {
     "analisis completado": "Análisis completado",
@@ -50,14 +53,19 @@ def ahora():
     return datetime.now(ZONA)
 
 
+def datos_conexion():
+    """Los datos de la base, de las variables de entorno. Los usa conectar() y también el respaldo con pg_dump."""
+    return {
+        "host": os.environ.get("DB_HOST", "localhost"),
+        "port": _entero("DB_PORT", 5433),
+        "dbname": os.environ.get("POSTGRES_DB", "fst"),
+        "user": os.environ.get("POSTGRES_USER", "fst"),
+        "password": os.environ.get("POSTGRES_PASSWORD", "fst"),
+    }
+
+
 def conectar():
-    return psycopg2.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
-        port=_entero("DB_PORT", 5433),
-        dbname=os.environ.get("POSTGRES_DB", "fst"),
-        user=os.environ.get("POSTGRES_USER", "fst"),
-        password=os.environ.get("POSTGRES_PASSWORD", "fst"),
-    )
+    return psycopg2.connect(**datos_conexion())
 
 
 def carpeta_analisis(id_analisis):

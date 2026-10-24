@@ -79,6 +79,9 @@ services:
     volumes:
       - videos_reportes:/data/archivos
       - ./modelos:/data/modelos:ro
+      # Respaldos diarios de la base (pg_dump, D-18): una carpeta del equipo, FUERA de los volumenes de Docker, para que
+      # sobrevivan aunque alguien borre los volumenes. Quedan en respaldos\ (junto a portable\); ver portable\LEEME.md.
+      - ./respaldos:/data/respaldos
     depends_on:
       db:
         condition: service_healthy

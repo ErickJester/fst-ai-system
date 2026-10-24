@@ -62,6 +62,26 @@ turno. Puedes cerrar el navegador: el análisis sigue, y al terminar aparece un 
 En Docker Desktop (en "volúmenes"), no en esta carpeta. **No se borran al apagar**, ni al apagar la computadora.
 No uses "Delete" sobre los volúmenes de `fst-portable` en Docker Desktop salvo que quieras borrar todo.
 
+## Respaldos de la base
+
+Cada día, a las 3 de la mañana (o la próxima vez que prendas el sistema, si estaba apagado a esa hora), el sistema
+guarda una copia de la **base** (experimentos, cuentas y resultados; **no** de los videos) en la carpeta **`respaldos`**,
+junto a `portable` (`fst-portable\respaldos`), con el nombre `fst-AAAAMMDD.dump`. Se conservan los 7 más nuevos. Esa
+carpeta está fuera de los volúmenes de Docker, así que los respaldos siguen ahí aunque alguien borre los volúmenes. Copia
+la carpeta a otro lugar de vez en cuando.
+
+**Restaurar un respaldo REEMPLAZA todos los datos actuales** (experimentos, cuentas y resultados) por los del respaldo;
+los videos no se tocan. Para hacerlo, abre una ventana de comandos en la carpeta `portable`:
+
+1. Apaga la página y el servidor: `docker compose -f ..\docker-compose.yml --env-file .env stop web api worker`
+2. Restaura el respaldo que quieras (cambia el nombre del archivo; no cambies el resto):
+   ```
+   docker compose -f ..\docker-compose.yml --env-file .env run --rm worker sh -c "PGPASSWORD=$POSTGRES_PASSWORD pg_restore -h db -U $POSTGRES_USER -d $POSTGRES_DB --clean --if-exists --no-owner /data/respaldos/fst-20261023.dump"
+   ```
+   Al final puede decir `errors ignored on restore: 1` por una línea llamada `SET transaction_timeout`: es normal, los
+   datos se restauraron completos.
+3. Vuelve a prender el sistema con **iniciar.bat**.
+
 ## Si algo falla
 
 - "Docker no está respondiendo": abre Docker Desktop y espera a que diga que está corriendo.

@@ -14,7 +14,7 @@ propuso después (18-oct-2026) está en la sección 12.
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Sin hacer:** administración y recuperación de
-contraseña (§3), pausa y reinicio (§6), bloques de 5 s, CSV y XLSX (§8) y el respaldo con `pg_dump` (§10).
+contraseña (§3), pausa y reinicio (§6), bloques de 5 s y CSV y XLSX (§8).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -163,8 +163,9 @@ nace al medir los fotogramas, antes de la red). Pruebas automáticas de `worker/
 `test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct).
 **Lo que NO hace:** (1) la pausa de R-15: el modelo no detecta «no se ve al espécimen», así que ningún análisis pasa a
 `en pausa`, no escribe `pausa.json` ni `pausa.jpg`, no crea la notificación `analisis en pausa` y no lee ningún `ajuste`;
-solo atiende las pausas que ya existan. (2) El respaldo de la base con `pg_dump` (D-18): no está en el código ni en la
-imagen. (3) El aviso a 7 días solo se escribe en el log; no crea notificación (la guía no la define, D-45).
+solo atiende las pausas que ya existan. (2) El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
+nada y que el backend lo calcula (`avisoVencimiento` de `GET /experiments`); el worker solo lo deja en el log. El respaldo
+de la base con `pg_dump` (D-18) ya está hecho desde el 23-oct (casilla de abajo).
 Hasta el 20-oct hubo además un simulador (`worker_fake`, con conductas inventadas); se retiró ese día y su cola, pausas
 y tareas diarias pasaron a `../worker`.
 Agregado el 19-oct (versión 0.22.0): **progreso real** (encargo 14: `progreso.json`, `/status` con `porcentajeEtapa`
@@ -182,12 +183,12 @@ real con sesión (la hará el usuario en otra PC).
   - [ ] Ajuste y cancelación del usuario: no existen. El backend no tiene `/pause/adjust` ni `/cancel` y el worker no lee `ajuste`
 - [x] Al arrancar, reencola los `procesando` huérfanos (D-84), `cola.py`: `reencolar_huerfanos`. Probado en desarrollo (23-oct), llamándola como lo hace `main()` al conectarse: los análisis `procesando` vuelven a `en cola` en la etapa `preprocesamiento` y conservan su `fechaAnalisis`
 - [x] Reemplaza `fechaAnalisis` por `ahora` al terminar (`completar_real` y `marcar_error`). Probado en el portable (19-oct): los análisis 1 y 3, completados, tienen `fechaAnalisis` 4 min 57 s y 4 h 21 min después de subir el video; el análisis cancelado (el 2) conserva la hora de entrada
-- [ ] Tareas diarias en un módulo aparte, disparables a mano. Hecho: `tareas_programadas.py` (`python tareas_programadas.py`, o `--disco` para solo el disco); corrieron completas en desarrollo (23-oct) y en el portable. Falta el aviso a 7 días (solo log) y el respaldo con `pg_dump`
+- [x] Tareas diarias en un módulo aparte, disparables a mano: `tareas_programadas.py` (`python tareas_programadas.py`, o `--disco` / `--respaldo` para una sola). Corrieron completas en desarrollo (23-oct) y en el portable
   - [x] Borrar videos vencidos a los 30 días (R-05), `borrar_videos_vencidos`. Probado en desarrollo (23-oct) con `python tareas_programadas.py`: un análisis completado con `fechaAnalisis` de hace 31 días pierde `videos/{id}.mp4` y `web.mp4`, `VIDEO.archivo` queda en nulo y sus 5 `SEGUNDO` se conservan. No crea notificación (la de `video borrado` solo sale en la limpieza por disco)
   - [x] Borrar `pausa.json` y `pausa.jpg` huérfanos (D-89, regla c), `borrar_pausas_huerfanas`. Probado en desarrollo (23-oct): se borran los de un análisis cancelado y uno completado; se conservan los de dos análisis `en pausa`
-  - [ ] Aviso a 7 días. Hecho: en código (`avisar_vencimientos`), pero solo escribe en el log: no crea notificación (la guía no la define, D-45)
+  - [x] Aviso a 7 días: resuelto (D-45). La guía §8 dice que no se guarda nada y que el panel calcula el aviso con la misma regla, así que no hay notificación. Lo calcula el backend en `avisoVencimiento` de `GET /experiments` (`ExperimentoServiceImpl`): solo análisis `completado` con el video todavía disponible (`archivo` no nulo) y días restantes = 30 − días desde `fechaAnalisis` (con `FLOOR`) ≤ 7, que es lo mismo que `fechaAnalisis + 30 días ≤ ahora + 7 días`; trae `fechaBorrado`. Verificado en el código (23-oct), sin prueba con datos de ese rango. El worker solo lo deja en el log
   - [x] Vigilar el disco: alerta al 80 %, borrado al 90 % (`vigilar_disco`; también corre antes de cada análisis, D-86). Probado en desarrollo (23-oct) con `DISK_SIMULATED_PERCENT`: al 85 %, una sola `alerta de disco` al administrador y la segunda corrida del mismo día no la repite; al 95 %, `liberar_disco` borra un video por corrida del más antiguo al más nuevo (49 y luego 50), salta el video más antiguo de todos porque su análisis estaba `en cola` y avisa al creador con `video borrado`. Con el porcentaje real (4.1 %) no hace nada
-  - [ ] Respaldar la base con `pg_dump` cada día, conservar los últimos 7 y borrar los más viejos (§8, D-18, agregado a la guía el 20-oct). Respalda la base, no los videos. No existe: ni `tareas_programadas.py` ni la imagen del worker lo hacen (no trae el cliente de PostgreSQL)
+  - [x] Respaldar la base con `pg_dump` cada día, conservar los últimos 7 y borrar los más viejos (§8, D-18, agregado a la guía el 20-oct). Respalda la base, no los videos. Hecho el 23-oct: `respaldar_base()` en `tareas_programadas.py` (primera de las tareas diarias, o `--respaldo` sola), `pg_dump -Fc` 17.11 de la imagen del worker contra el servidor 16.15, con la contraseña solo en `PGPASSWORD` del subproceso; archivo `fst-AAAAMMDD.dump` en `respaldos/` (carpeta del equipo fuera de los volúmenes, bind mount en los dos compose; `.gitignore`), escrito a un temporal y renombrado al final. Probado en desarrollo: crea el archivo y `pg_restore --list` lo lee sin errores; con 8 respaldos falsos viejos y un `.tmp` quedan 7 y el `.tmp` se borra; el de hoy se reemplaza; con contraseña equivocada o sin `pg_dump` solo se registra el error (código 1, sin tocar los respaldos buenos) y las demás tareas siguen; ni la contraseña real ni una falsa aparecen en el log; 5 pruebas automáticas (`test_respaldo.py`). Restauración probada en una base temporal: mismos conteos, restricciones, índices y dominios, también una segunda vez encima (`--clean --if-exists`); hay que usar el `pg_restore` 17 de la imagen del worker, porque el 16 del contenedor de la base no lee archivos de `pg_dump` 17, y termina con un aviso benigno por `SET transaction_timeout`. Cómo restaurar: `portable/LEEME.md`
 - [x] `ultima_corrida_tareas.txt`: se escribe al terminar las tareas diarias y evita repetirlas el mismo día. Probado en el portable (23-oct): `worker/ultima_corrida_tareas.txt` en el volumen, con la fecha de ese día
 
 ## 11. Criterios de aceptación finales (§12)
