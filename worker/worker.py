@@ -225,8 +225,7 @@ def procesar_real(conn, id_analisis):
     racha = racha_de_pausa(segundos_sin_animal(cuadros_cil, ultimo), inicio_guardado, ultimo)
     if racha is not None:
         cilindro, desde = racha
-        pausado = pausar_analisis(conn, d, id_analisis, cilindro, desde, video, tabla, carpeta_analisis(id_analisis),
-                                  ancho, alto)
+        pausado = pausar_analisis(conn, d, id_analisis, cilindro, desde, video, tabla, carpeta_analisis(id_analisis))
         if pausado:
             tiempos.cerrar()
             return
@@ -286,6 +285,17 @@ def racha_de_pausa(sin_animal, inicio, fin):
     return mejor
 
 
+def instante_de_la_pausa(desde_segundo):
+    """Centro de la racha. El segundo k va de k-1 a k, así que la racha k, k+1, k+2 cubre de k-1 a k+2 y su centro es
+    k+0.5 (con RACHA_PAUSA_S = 3, k - 1 + 1.5)."""
+    return desde_segundo - 1 + RACHA_PAUSA_S / 2
+
+
+def desde_de_la_correccion(desde_segundo):
+    """La corrección empieza en k-1: el instante donde empieza el segundo k (que va de k-1 a k)."""
+    return desde_segundo - 1
+
+
 def acumular_correccion(id_analisis):
     """§4.3, al retomar: si pausa.json trae un ajuste, se agrega a correcciones.json (que acumula las del análisis), se
     borran pausa.json y pausa.jpg, y se devuelve la ruta de correcciones.json. Sin ajuste, devuelve la de las que ya
@@ -298,7 +308,8 @@ def acumular_correccion(id_analisis):
     pausa = leer_pausa(id_analisis)
     if pausa and pausa.get("ajuste"):
         a = pausa["ajuste"]
-        lista.append({"cilindro": int(a["cilindro"]), "desde_segundo": float(pausa["desde_segundo"]),
+        lista.append({"cilindro": int(a["cilindro"]),
+                      "desde_segundo": desde_de_la_correccion(float(pausa["desde_segundo"])),
                       "x0": a["x0"], "y0": a["y0"], "x1": a["x1"], "y1": a["y1"]})
         escribir_atomico(archivo_corr, lista)
         borrar_archivo(carpeta / "pausa.json")
@@ -334,18 +345,22 @@ def escribir_atomico(ruta, datos_o_bytes):
     temporal.replace(ruta)
 
 
-def pausar_analisis(conn, d, id_analisis, cilindro, desde_segundo, video, rasgos, carpeta, ancho, alto):
-    """§4.3: fotograma del video ORIGINAL en el segundo central de la racha, pausa.json con los recuadros de todos los
+def pausar_analisis(conn, d, id_analisis, cilindro, desde_segundo, video, rasgos, carpeta):
+    """§4.3: fotograma del video ORIGINAL en el centro de la racha (k+0.5), pausa.json con los recuadros de todos los
     cilindros en ese instante, y el análisis a 'en pausa'. Regla (a): primero el archivo y después el estado; si el
     estado ya no es 'procesando' (lo cancelaron o lo borraron a medias), se borran los archivos y no se crea nada."""
     import cv2
-    instante = desde_segundo + RACHA_PAUSA_S / 2 - 0.5     # el segundo central de la racha (el 2 de 3)
+    instante = instante_de_la_pausa(desde_segundo)
+    # Sin enderezar (ORIENTATION_AUTO = 0): el fotograma es el mismo que lee fst_auto con ROT = 0, y los recuadros salen de ahí.
+    # (con set(), no como parámetro de apertura: OpenCV 5 rechaza ese parámetro y la captura queda en None)
     cap = cv2.VideoCapture(str(video))
+    cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
     cap.set(cv2.CAP_PROP_POS_MSEC, instante * 1000)
     ok, fotograma = cap.read()
     cap.release()
     if not ok:
         raise RuntimeError(f"no se pudo leer el fotograma de la pausa en {instante:.1f} s")
+    alto, ancho = fotograma.shape[:2]     # el tamaño de la imagen que ve el usuario, no el de ffprobe
 
     # Los recuadros de TODOS los cilindros en ESE instante (no la mediana del análisis: la cámara se mueve y el
     # usuario ajusta sobre la imagen de ese instante). Se toma el bloque de 5 s que lo contiene.

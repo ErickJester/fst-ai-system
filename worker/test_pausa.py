@@ -73,8 +73,9 @@ class ReanudarConCorreccion(unittest.TestCase):
         (self.carpeta / "pausa.jpg").write_bytes(b"jpg")
         ruta = w.acumular_correccion(7)
         self.assertEqual(ruta, self.carpeta / "correcciones.json")
+        # la pausa es del segundo 142: la corrección empieza en 141 (k-1), no en 142
         self.assertEqual(json.loads(ruta.read_text(encoding="utf-8")),
-                         [{"cilindro": 2, "desde_segundo": 142.0, "x0": 250, "y0": 480, "x1": 580, "y1": 930}])
+                         [{"cilindro": 2, "desde_segundo": 141.0, "x0": 250, "y0": 480, "x1": 580, "y1": 930}])
         self.assertFalse((self.carpeta / "pausa.json").exists())
         self.assertFalse((self.carpeta / "pausa.jpg").exists())
 
@@ -83,6 +84,41 @@ class ReanudarConCorreccion(unittest.TestCase):
         (self.carpeta / "pausa.json").write_text(json.dumps({"version": 1, "ajuste": None}), encoding="utf-8")
         self.assertIsNone(w.acumular_correccion(7))
         self.assertTrue((self.carpeta / "pausa.json").exists())
+
+
+class InstanteYTamano(unittest.TestCase):
+    def setUp(self):
+        self.carpeta = Path(tempfile.mkdtemp())
+        self.parche = mock.patch.object(w, "carpeta_analisis", lambda _id: self.carpeta)
+        self.parche.start()
+        self.addCleanup(self.parche.stop)
+
+    def test_el_instante_es_el_centro_de_la_racha(self):
+        # racha k, k+1, k+2 cubre de k-1 a k+2: el centro es k+0.5
+        self.assertEqual(w.instante_de_la_pausa(142), 142.5)
+        self.assertEqual(w.RACHA_PAUSA_S, 3)
+
+    def test_la_correccion_empieza_en_k_menos_uno(self):
+        self.assertEqual(w.desde_de_la_correccion(142), 141.0)
+
+    def test_la_foto_se_lee_sin_enderezar_y_el_tamano_sale_de_ella(self):
+        import cv2
+        import numpy as np
+        foto = np.zeros((900, 500, 3), dtype=np.uint8)      # 500 de ancho y 900 de alto: sin enderezar
+        captura = mock.MagicMock()
+        captura.read.return_value = (True, foto)
+        rasgos = pd.DataFrame([{"especimen": 1, "t0": 140.0, "t1": 145.0, "bx0": 10, "by0": 20, "bx1": 30, "by1": 40}])
+        conn = mock.MagicMock()
+        conn.cursor.return_value.__enter__.return_value.rowcount = 1
+        d = {"idinstitucional": "x", "correo": None, "tanda": "T1", "nombre": "E", "idexperimento": 1}
+        with mock.patch("cv2.VideoCapture", return_value=captura) as vc, \
+                mock.patch.object(w, "notificar"), mock.patch.object(w, "enviar_correos"):
+            w.pausar_analisis(conn, d, 7, 1, 142, Path("video.mp4"), rasgos, self.carpeta)
+        captura.set.assert_any_call(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+        captura.set.assert_called_with(cv2.CAP_PROP_POS_MSEC, 142500.0)
+        pausa = json.loads((self.carpeta / "pausa.json").read_text(encoding="utf-8"))
+        self.assertEqual((pausa["ancho"], pausa["alto"]), (500, 900))
+        self.assertEqual(pausa["instante_imagen_s"], 142.5)
 
 
 class ConductaNula(unittest.TestCase):

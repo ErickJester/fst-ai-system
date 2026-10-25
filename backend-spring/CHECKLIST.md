@@ -10,11 +10,12 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (23-oct-2026, versión 0.80.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (25-oct-2026, versión 0.81.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
-en el navegador contra nuestro backend (20-oct, `e66ce40`). **En curso:** la pausa de R-15 (§6 y §10), detenida a pedido
-de Erick el 23-oct con la parte de fst_auto a medias. **Sin hacer:** administración y recuperación de contraseña (§3),
+en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
+probada en desarrollo con una pausa forzada; falta abrir la foto de la pausa igual que fst_auto, probar la pantalla y la
+regla de «recuadro casi igual» (encargo 33). **Sin hacer:** administración y recuperación de contraseña (§3),
 reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 
 ## 0. Base y Docker
@@ -99,13 +100,13 @@ reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificaci
 ## 6. Contrato con el worker (§4.2 a §4.8)
 - [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
 - [x] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
-- [ ] Pausa. Hecho: diseño aprobado por Erick el 23-oct, siguiendo §4.3 de la guía, en dos encargos. El 31 (fst_auto acepta `--correccion` para medir un cilindro con el recuadro que ajusta el usuario desde el segundo de la pausa) está TERMINADO en la rama `wip/correccion-recuadro` de fst-etiquetador (commit `6b27226`; `main` de fst_auto sigue en `9844e57`) y copiado a `pipeline/` (`b22b205`); sin la opción da lo mismo que antes. El 32 quedó A MEDIAS, detenido a pedido de Erick el 23-oct: el worker ya detecta 3 s seguidos sin ver al espécimen, pausa (primero el archivo, después el estado), guarda «no se ve» como conducta nula y al retomar acumula `correcciones.json` y llama a `etiquetar.py --correccion` (33 pruebas unitarias del worker); el backend ya tiene `GET .../pause`, `.../pause/image`, `POST .../pause/adjust` y `.../cancel` (`PausaController`), probados en desarrollo salvo un ajuste válido en la última ronda; la pantalla de pausa ya llama a esas rutas. Falta: la prueba con un video real con un cilindro tapado (no cupo en memoria), probar la pantalla contra el backend real y tres correcciones de la revisión (la corrección empieza un segundo tarde: debe pasar `k−1`; la imagen va en `k+0.5`; leer el fotograma sin enderezar y tomar ancho y alto de la imagen). Medido el 23-oct en los 15 videos de `fst_auto/etiquetas`: ningún espécimen dejó de verse 3 s seguidos (máximo 1 s, dos veces), así que hace falta un video fabricado para probarlo
-  - [ ] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`
-  - [ ] `GET .../pause/image`
-  - [ ] `POST .../pause/adjust` escribe `ajuste` en el JSON y cambia `en pausa` a `en cola`, solo si sigue `en pausa` (`409` si no)
-  - [ ] `POST .../cancel` cambia a `cancelado` con la misma condición
-  - [ ] Ambas solo para quien subió el video o un Administrador
-  - [ ] Actualización condicional atómica (`UPDATE ... WHERE estado='en pausa'`)
+- [ ] Pausa. Hecho: diseño aprobado por Erick el 23-oct, siguiendo §4.3 de la guía, en dos encargos. El 31 (fst_auto acepta `--correccion` para medir un cilindro con el recuadro que ajusta el usuario desde el segundo de la pausa) está TERMINADO en la rama `wip/correccion-recuadro` de fst-etiquetador (commit `6b27226`; `main` de fst_auto sigue en `9844e57`) y copiado a `pipeline/` (`b22b205`); sin la opción da lo mismo que antes. El 32 se cerró el 25-oct: el worker detecta 3 s seguidos sin ver al espécimen (la racha más temprana de los últimos 300 s; en empate, el cilindro menor), pausa (primero el archivo, después el estado), guarda «no se ve» como conducta nula y al retomar acumula `correcciones.json` y llama a `etiquetar.py --correccion`; el backend tiene `GET .../pause`, `.../pause/image`, `POST .../pause/adjust` y `.../cancel` (`PausaController`). Convención: el segundo k va del instante k−1 al k; con la racha k, k+1, k+2 la foto va en k+0.5 y la corrección empieza en k−1; `ancho` y `alto` de `pausa.json` salen de la foto. 36 pruebas unitarias del worker. Prueba en desarrollo (25-oct, `Acu-YBN-1.MOV` recortado a 150 s): un cilindro tapado con color plano o con el fondo del video NO provocó la racha (el detector siguió viendo manchas), así que la pausa se forzó llamando a `pausar_analisis` con k = 71: foto en 71.5 s, 1920×1080 y 4 recuadros que caen sobre los tubos; el ajuste válido dejó `correcciones.json` con `desde_segundo` 70 y, al retomar, de 600 segundos solo cambiaron 3 del cilindro corregido (75, 99 y 133) y ninguno antes del 70. Falta: (1) abrir la foto de la pausa igual que fst_auto (`cv2.VideoCapture` sin cambiar `CAP_PROP_ORIENTATION_AUTO`): hoy se abre sin enderezar y en un video con marca de giro podría no coincidir con los recuadros; (2) probar la pantalla de pausa contra el backend real (va con el encargo 33, que le agrega «El recuadro está bien, continuar»); (3) la racha y los segundos nulos disparados por un video real: solo con pruebas unitarias, porque en los 15 videos de `fst_auto/etiquetas` ningún espécimen dejó de verse 3 s seguidos (máximo 1 s, dos veces) y un video fabricado no la provoca
+  - [x] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`. Probado en desarrollo (25-oct): `200` con una pausa real del worker
+  - [x] `GET .../pause/image`. Probado (25-oct): `200` `image/jpeg`
+  - [x] `POST .../pause/adjust` escribe `ajuste` en el JSON y cambia `en pausa` a `en cola`, solo si sigue `en pausa` (`409` si no). Probado (25-oct): una caja fuera de la imagen da `400`, sin sesión `401`, la válida `200` con `fechaAnalisis` conservada; el `409` en la ronda del 23-oct
+  - [x] `POST .../cancel` cambia a `cancelado` con la misma condición. Probado (25-oct): `200` y el análisis queda `cancelado`
+  - [x] Ambas solo para el creador del experimento o un Administrador (D-107: es quien subió el video); `403` a los demás, probado el 23-oct
+  - [x] Actualización condicional atómica (`UPDATE ... WHERE estado='en pausa'`; si no cambia nada, el ajuste se deshace y responde `409`)
 - [ ] `POST .../restart` (R-04):
   - [ ] Solo desde `completado`
   - [ ] Solo para quien subió el video o un Administrador
@@ -162,9 +163,9 @@ notificación, y el camino de error con un archivo que no es video. Guarda en la
 (100 %), pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
 nace al medir los fotogramas, antes de la red). Pruebas automáticas de `worker/` (`test_tiempos`, `test_vigilancia` y
 `test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct).
-**Pendiente de probar con un video real:** (1) la pausa de R-15, ya en código desde el 23-oct (encargo 32, a medias):
-revisa los segundos en que la segmentación de fst_auto no encontró al espécimen (`cx` vacío en `_cuadros.csv`), pausa
-con 3 seguidos y guarda esos segundos con conducta nula; ver la casilla «Pausa» de la sección 6. (2) El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
+**Pausa de R-15** (encargo 32, cerrado el 25-oct): revisa los segundos en que la segmentación de fst_auto no encontró al
+espécimen (`cx` vacío en `_cuadros.csv`), pausa con 3 seguidos ANTES de correr la red y guarda esos segundos con
+conducta nula; probada con una pausa forzada, ver la casilla «Pausa» de la sección 6. El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
 nada y que el backend lo calcula (`avisoVencimiento` de `GET /experiments`); el worker solo lo deja en el log. El respaldo
 de la base con `pg_dump` (D-18) ya está hecho desde el 23-oct (casilla de abajo).
 Hasta el 20-oct hubo además un simulador (`worker_fake`, con conductas inventadas); se retiró ese día y su cola, pausas
@@ -179,9 +180,9 @@ real con sesión (la hará el usuario en otra PC).
 - [x] Caso de error (el video no se abre, un paso del pipeline falla o pasa de una hora, no coinciden los cilindros, o un fallo imprevisto, D-88): PDF de diagnóstico, estado `error` y notificación. Probado con el video que no se puede abrir; los demás motivos comparten `marcar_error` y no se provocaron a mano
   - [x] PDF de diagnóstico y estado `error`: probado con un archivo que no es video (18-oct), con `worker/test_diagnostico.py` (6 pruebas, 23-oct) y en desarrollo el 23-oct (video sustituido por basura: `error` en `preprocesamiento`, `diagnostico.pdf` de 80 KB válido, `rutaDiagnostico` guardada, `/status` en `error` y `GET .../diagnostic` con `200` `application/pdf`)
   - [x] Notificación `error del pipeline`: probado en desarrollo (23-oct), una fila para el creador con la etapa y el motivo («No se pudo leer el video con ffprobe…»). El correo no salió porque MailHog no estaba levantado; el aviso queda en la campanita
-- [ ] Pausa (R-15). Hecho: en código desde el 23-oct (encargo 32, a medias; ver la casilla «Pausa» de la sección 6): detección de 3 s seguidos sin animal, pausa y reanudación con correcciones, y conducta nula en los segundos «no se ve»; con pruebas unitarias, sin la prueba con un video real
+- [ ] Pausa (R-15). Hecho (encargo 32, 25-oct; ver la casilla «Pausa» de la sección 6): detección de 3 s seguidos sin animal, pausa y reanudación con correcciones, y conducta nula en los segundos «no se ve»; 36 pruebas unitarias y una pausa forzada en desarrollo con el pipeline real al retomar. Falta abrir la foto igual que fst_auto y la regla de «recuadro casi igual» (encargo 33)
   - [x] Vencimiento a las 72 horas (D-112), `cola.py`: `revisar_pausas`. Probado en desarrollo (23-oct) con `pausa.json` escritos a mano: el de 96 h pasa a `cancelado` con la notificación `analisis cancelado`; el que no tiene `pausa.json` también se cancela (solo un aviso en el log, sin notificación); el de 96 h con `ajuste` y el de 1 h siguen `en pausa`
-  - [ ] Ajuste y cancelación del usuario: no existen. El backend no tiene `/pause/adjust` ni `/cancel` y el worker no lee `ajuste`
+  - [x] Ajuste y cancelación del usuario: el worker lee `ajuste` al retomar, lo pasa a `correcciones.json` (desde k−1) y borra `pausa.json` y `pausa.jpg`. Probado en desarrollo (25-oct) con el ajuste y la cancelación del backend
 - [x] Al arrancar, reencola los `procesando` huérfanos (D-84), `cola.py`: `reencolar_huerfanos`. Probado en desarrollo (23-oct), llamándola como lo hace `main()` al conectarse: los análisis `procesando` vuelven a `en cola` en la etapa `preprocesamiento` y conservan su `fechaAnalisis`
 - [x] Reemplaza `fechaAnalisis` por `ahora` al terminar (`completar_real` y `marcar_error`). Probado en el portable (19-oct): los análisis 1 y 3, completados, tienen `fechaAnalisis` 4 min 57 s y 4 h 21 min después de subir el video; el análisis cancelado (el 2) conserva la hora de entrada
 - [x] Tareas diarias en un módulo aparte, disparables a mano: `tareas_programadas.py` (`python tareas_programadas.py`, o `--disco` / `--respaldo` para una sola). Corrieron completas en desarrollo (23-oct) y en el portable
@@ -212,7 +213,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [x] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
 - [x] `/status`: campo extra `motivoCancelacion` (`usuario` o `plazo`). Decidido (D-112): no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa)
-- [ ] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); no se ha visto con un análisis real porque el worker todavía no crea pausas (ver la casilla «Pausa» de la sección 6)
+- [ ] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); el worker ya crea pausas (25-oct), pero no se ha comprobado este campo en `/status` con una (ver la casilla «Pausa» de la sección 6)
 - [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
