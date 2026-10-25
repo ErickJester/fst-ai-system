@@ -9,7 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -43,6 +45,12 @@ public class AuthServiceImpl implements AuthService {
 
 	@Autowired
 	private JwtEncoder jwtEncoder;
+
+	@Autowired
+	private JdbcTemplate jdbc;
+
+	@Autowired
+	private ReporteAlmacen reportes;
 
 	@Value("${app.jwt.horas}")
 	private long horasDeSesion;
@@ -121,8 +129,15 @@ public class AuthServiceImpl implements AuthService {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe una cuenta con ese correo.");
 		}
 
-		usuario.setNombre(peticion.getNombre().trim());
-		usuario.setApellidos(peticion.getApellidos().trim());
+		// El PDF de cada experimento de la cuenta muestra el nombre y los apellidos del creador (no el correo; ver
+		// generarReporte). Si cambian, sus reportes guardados ya no los reflejan: se invalidan.
+		String nombre = peticion.getNombre().trim();
+		String apellidos = peticion.getApellidos().trim();
+		if (!nombre.equals(usuario.getNombre()) || !apellidos.equals(usuario.getApellidos())) {
+			invalidarReportesDeLaCuenta(id);
+		}
+		usuario.setNombre(nombre);
+		usuario.setApellidos(apellidos);
 		usuario.setCorreo(correo);
 		try {
 			usuarioRepository.saveAndFlush(usuario);
@@ -131,6 +146,19 @@ public class AuthServiceImpl implements AuthService {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe una cuenta con ese correo.");
 		}
 		return cuenta(usuario);
+	}
+
+	// Bloquea TODOS los experimentos de la cuenta en orden de idexperimento (un solo SELECT ... FOR UPDATE con ORDER BY:
+	// PostgreSQL bloquea en el orden del ORDER BY) y luego invalida cada reporte. Va después de los candados de cada
+	// experimento y antes del UPDATE de usuario, igual que en el resto de las transacciones que invalidan.
+	// Cuando exista PATCH /admin/users/{id} (§3), que cambie el nombre de una cuenta debe hacer lo mismo.
+	private void invalidarReportesDeLaCuenta(String idInstitucional) {
+		List<Integer> experimentos = jdbc.queryForList(
+				"SELECT idexperimento FROM experimento WHERE idinstitucional = ? ORDER BY idexperimento FOR UPDATE",
+				Integer.class, idInstitucional);
+		for (Integer idExperimento : experimentos) {
+			reportes.invalidar(idExperimento);
+		}
 	}
 
 	// Los datos de la cuenta que ven el login, el cambio de contraseña y el de perfil. LinkedHashMap para

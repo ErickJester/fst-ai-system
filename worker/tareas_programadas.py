@@ -17,7 +17,8 @@ import sys
 
 from comun import (
     ARCHIVOS, DAILY_HOUR, DISK_ALERT_PERCENT, DISK_CLEANUP_PERCENT, DISK_SIMULATED_PERCENT, RESPALDOS,
-    ahora, borrar_archivo, carpeta_analisis, configurar_log, conectar, datos_conexion, enviar_correos, log, notificar,
+    ahora, borrar_archivo, borrar_reportes_del_disco, carpeta_analisis, configurar_log, conectar, datos_conexion,
+    enviar_correos, log, notificar,
 )
 
 ULTIMA_CORRIDA = ARCHIVOS / "worker" / "ultima_corrida_tareas.txt"
@@ -45,6 +46,7 @@ def correr_todas(conn):
     respaldar_base()
     borrar_videos_vencidos(conn)
     borrar_pausas_huerfanas(conn)
+    borrar_reportes_huerfanos(conn)
     avisar_vencimientos(conn)
     vigilar_disco(conn)
     ULTIMA_CORRIDA.parent.mkdir(parents=True, exist_ok=True)
@@ -102,6 +104,25 @@ def borrar_pausas_huerfanas(conn):
         borrar_archivo(archivo.parent / "pausa.jpg")
         borradas += 1
     log.info("Pausas huérfanas borradas: %s", borradas)
+
+
+def borrar_reportes_huerfanos(conn):
+    """Las carpetas reportes/{id}/ de experimentos que ya no existen (por ejemplo, si el borrado de la carpeta falló al
+    eliminar el experimento). Solo se tocan carpetas cuyo nombre es un número. Devuelve cuántas borró."""
+    carpeta = ARCHIVOS / "reportes"
+    if not carpeta.is_dir():
+        return 0
+    with conn.cursor() as cur:
+        cur.execute("SELECT idexperimento FROM experimento")
+        vivos = {fila[0] for fila in cur.fetchall()}
+    conn.commit()
+    borradas = 0
+    for hija in carpeta.iterdir():
+        if hija.is_dir() and hija.name.isdigit() and int(hija.name) not in vivos:
+            borrar_reportes_del_disco(int(hija.name))
+            borradas += 1
+    log.info("Carpetas de reportes huérfanas borradas: %s", borradas)
+    return borradas
 
 
 def avisar_vencimientos(conn):

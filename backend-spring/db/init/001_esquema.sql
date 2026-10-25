@@ -160,8 +160,7 @@ CREATE TABLE reporte (
   formato          formato_reporte NOT NULL,
   ruta             text            NOT NULL,
   fechageneracion  timestamptz     NOT NULL DEFAULT now(),
-  CONSTRAINT uq_reporte_ruta UNIQUE (ruta),
-  CONSTRAINT uq_reporte_formato UNIQUE (idexperimento, formato)   -- [PROPUESTA] un reporte vigente por formato
+  CONSTRAINT uq_reporte_ruta UNIQUE (ruta)
 );
 
 CREATE TABLE notificacion (

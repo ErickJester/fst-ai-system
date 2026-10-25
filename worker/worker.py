@@ -31,7 +31,8 @@ import cola
 import vigilancia
 from cola import leer_pausa, marcar_error, poner_etapa
 from comun import (
-    ARCHIVOS, ahora, borrar_archivo, carpeta_analisis, datos_analisis, enviar_correos, log, notificar,
+    ARCHIVOS, ahora, bloquear_experimento, borrar_archivo, borrar_reportes_del_disco, carpeta_analisis, datos_analisis,
+    enviar_correos, invalidar_reportes, log, notificar,
 )
 from diagnostico import rangos_de_tubos
 from progreso import RegistroProgreso
@@ -528,6 +529,8 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
     hay_conducta_activa = False
     pendientes = []
     with conn.cursor() as cur:
+        # Primer paso de la transacción: el candado del experimento, antes de cualquier INSERT o UPDATE.
+        bloquear_experimento(cur, d["idexperimento"])
         for id_especimen, cilindro in especimenes:
             cur.execute(
                 "INSERT INTO observacion (idespecimen, idvideo) VALUES (%s, %s) RETURNING idobservacion",
@@ -556,10 +559,12 @@ def completar_real(conn, d, especimenes, video, trabajo, nombre, ancho, alto, pr
             "fechaanalisis = now() WHERE idanalisis = %s",
             (nivel, id_analisis),
         )
+        invalidar_reportes(cur, d["idexperimento"])     # resultados nuevos: un reporte guardado ya no los refleja
         notificar(cur, pendientes, d["idinstitucional"], d["correo"], "analisis completado",
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' terminó. "
                   f"Ya puedes ver los resultados.", d["idexperimento"])
     conn.commit()
+    borrar_reportes_del_disco(d["idexperimento"])   # después del commit
     progreso.terminar()      # hasta aquí el general no llega a 100: el análisis ya quedó completado
     tiempos.cerrar()
 

@@ -13,7 +13,6 @@ import com.ipn.mx.fst.repository.FilaResultado;
 import com.ipn.mx.fst.repository.FilaTandaVideo;
 import com.ipn.mx.fst.repository.GrupoRepository;
 import com.ipn.mx.fst.repository.NotificacionRepository;
-import com.ipn.mx.fst.repository.ReporteRepository;
 import com.ipn.mx.fst.repository.SegundoRepository;
 import com.ipn.mx.fst.repository.TandaRepository;
 import com.ipn.mx.fst.repository.UsuarioRepository;
@@ -98,7 +97,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private GrupoRepository grupoRepository;
 
 	@Autowired
-	private ReporteRepository reporteRepository;
+	private ReporteAlmacen reportes;
 
 	@Autowired
 	private NotificacionRepository notificacionRepository;
@@ -387,6 +386,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Override
 	@Transactional
 	public Experimento actualizar(Integer id, Experimento datos, Authentication authentication) {
+		reportes.bloquearExperimento(id);     // primer paso: el candado del experimento (orden de candados)
 		Experimento actual = buscar(id);
 
 		// C-03 (decidido por Erick): solo quien creó el experimento o un Administrador lo edita. Mismo criterio que eliminar.
@@ -405,6 +405,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		actual.setFecha(datos.getFecha());
 		actual.setNotas(datos.getNotas());
 
+		// El PDF muestra el nombre, la fecha y las notas: un reporte guardado ya no los refleja.
+		reportes.invalidar(id);
 		try {
 			return experimentoRepository.saveAndFlush(actual);
 		} catch (DataIntegrityViolationException e) {
@@ -447,7 +449,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 		borrarDesdeLosVideos(TANDAS_DEL_EXPERIMENTO, id);
 		jdbc.update("DELETE FROM grupo WHERE idexperimento = ?", id);
-		reporteRepository.deleteByExperimentoIdExperimento(id);
+		reportes.invalidar(id);     // las filas de REPORTE y, después del commit, la carpeta reportes/{id}/
 		notificacionRepository.deleteByExperimentoIdExperimento(id);
 		experimentoRepository.deleteById(id);
 
@@ -462,6 +464,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Override
 	@Transactional
 	public void eliminarTanda(Integer idExperimento, Integer idTanda, Authentication authentication) {
+		// Primer paso: el candado del experimento, igual que eliminar, antes que el grupo, la tanda y el análisis.
+		reportes.bloquearExperimento(idExperimento);
 		Experimento experimento = buscar(idExperimento);
 		List<Integer> gruposDeLaTanda = jdbc.queryForList("""
 				SELECT t.idgrupo FROM tanda t JOIN grupo g ON g.idgrupo = t.idgrupo
@@ -496,8 +500,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		if (Boolean.TRUE.equals(sinTandas)) {
 			jdbc.update("DELETE FROM grupo WHERE idgrupo = ?", idGrupo);
 		}
-		// Sus resultados cambian: un reporte guardado ya no los refleja.
-		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
+		// Sus resultados cambian: los reportes guardados ya no los reflejan (filas y carpeta).
+		reportes.invalidar(idExperimento);
 
 		borrarArchivosDespuesDelCommit(idsVideo, idsAnalisis);
 	}
@@ -590,8 +594,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		}
 	}
 
-	// Reporte de resultados con iText 5, igual que generarReporte de la práctica: se arma en memoria y se
-	// devuelve como bytes, sin escribir ningún archivo. Va dentro de una transacción porque lee al creador
+	// Reporte de resultados con iText 5, igual que generarReporte de la práctica: arma el PDF en memoria y lo devuelve
+	// como bytes. Quien lo guarda y lo sirve es ReporteAlmacen (GET .../report/pdf); este método no escribe nada. Va dentro de una transacción porque lee al creador
 	// del experimento, que es una relación LAZY (se carga hasta que se usa).
 	@Override
 	@Transactional(readOnly = true)

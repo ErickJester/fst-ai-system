@@ -20,8 +20,10 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-// Tabla reporte: el archivo de reporte guardado de un experimento, uno por formato. Todavía no se usa:
-// por ahora el PDF se genera en memoria en cada descarga, como en la práctica.
+// Tabla reporte: el registro de un reporte guardado (PDF, CSV o XLSX) de un experimento, con su ruta y su fecha. Un
+// experimento puede tener varios del mismo formato, uno por alcance (el experimento, cada grupo, cada tanda); la
+// unicidad es por ruta. El archivo vive en el volumen y lo escribe y borra ReporteAlmacen; esta fila se invalida
+// cuando cambia lo que el reporte muestra.
 @Data
 @NoArgsConstructor
 @Entity

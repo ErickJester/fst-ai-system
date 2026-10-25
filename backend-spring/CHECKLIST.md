@@ -10,13 +10,14 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (25-oct-2026, versión 0.82.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (25-oct-2026, versión 0.83.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
 probada en desarrollo con una pausa forzada; y el encargo 33 (foto de la pausa igual que fst_auto, «recuadro casi igual»,
 botón «El recuadro está bien, continuar» y editar experimento solo el creador o un Administrador), en código con pruebas
-unitarias y sin probar contra el stack: Erick lo prueba en su máquina. **Sin hacer:** administración y recuperación de contraseña (§3),
+unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `REPORTE` y su invalidación, §8), igual:
+Erick prueba los dos en su máquina. **Sin hacer:** administración y recuperación de contraseña (§3),
 reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 
 ## 0. Base y Docker
@@ -143,10 +144,10 @@ reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificaci
 - [ ] Estadísticas por grupo: media, desviación estándar y varianza
 - [ ] XLSX (Apache POI)
 - [x] PDF de resultados con iText (`GET /experiments/{id}/report/pdf`), con los minutos contados desde `SEGUNDO`
-- [ ] Se guardan en `REPORTE`
-- [ ] Vigencia: si no existe, se genera; si es más viejo que el último análisis, se regenera y reemplaza; si no, se devuelve el guardado
+- [ ] Se guardan en `REPORTE` (C-08, Erick, 25-oct). Hecho en código (encargo 34, compila): `ReporteAlmacen` guarda el archivo en `reportes/{idExperimento}/experimento.pdf` (después `grupo-{id}` y `tanda-{id}` en CSV y XLSX) con escritura atómica y su fila con `INSERT ... ON CONFLICT (ruta)`; si hay fila y archivo, entrega el guardado. Con `MODO_DESARROLLADOR` no guarda nada (el PDF lleva los tiempos). Se quitó `uq_reporte_formato` (C-07, cambio de esquema aprobado por Erick; migración `DROP CONSTRAINT IF EXISTS`) para guardar los de cada grupo y tanda; `uq_reporte_ruta` se queda. 5 pruebas JUnit (`ReporteAlmacenTest`) pasan; falta probarlo contra el backend
+- [ ] Vigencia. Hecho en código (encargo 34): en lugar de comparar fechas, cada cambio que altera lo que muestra el PDF borra las filas y, después del commit, la carpeta `reportes/{id}/`; la siguiente descarga lo regenera. Se invalida al corregir segundos, editar el experimento, eliminar una tanda o el experimento, cambiar el nombre o los apellidos en el perfil (todos los experimentos de la cuenta) y cuando el worker completa un análisis o lo pasa a `error`. No se invalida al subir un video, en pausas y cancelaciones ni al borrar videos, porque el PDF no los muestra. Contra una descarga simultánea, toda transacción que invalida bloquea PRIMERO la fila del experimento (`FOR UPDATE`), igual que la descarga: un solo orden de candados en el backend y el worker (`eliminarTanda` ahora también empieza por el experimento). La tarea diaria `borrar_reportes_huerfanos` quita carpetas de experimentos que ya no existen. Pruebas del worker escritas (`test_reportes.py`, corren en la imagen); falta probarlo contra el backend
 - [ ] Indican si hubo revisión humana
-- [ ] Los reportes se conservan aunque el video se borre
+- [ ] Los reportes se conservan aunque el video se borre. Hecho en código (encargo 34): borrar un video (30 días o disco) no invalida el reporte (RN-06); falta probarlo
 
 ## 9. Notificaciones y correo (§11.2)
 - [x] `EmailService` genérico (destinatario, asunto, texto)
@@ -203,7 +204,7 @@ real con sesión (la hará el usuario en otra PC).
 - [ ] No se puede quitar al último Administrador
 - [x] Un Día 1 se guarda sin análisis
 - [ ] Con dos análisis en cola, el worker los procesa uno a la vez. Hecho: probado en desarrollo (23-oct) con dos vueltas reales de la cola (`cola.vuelta`) y un procesamiento simulado de 6 s: el más antiguo primero, un solo `procesando` a la vez y el segundo espera. Falta repetirlo con dos videos reales y el modelo (varios minutos y unos 3.5 GB de memoria)
-- [ ] Un reporte se regenera si hay un análisis más nuevo
+- [ ] Un reporte se regenera si hay un análisis más nuevo. Hecho en código (encargo 34): al completar un análisis el worker invalida los reportes del experimento; falta probarlo con dos análisis reales
 - [ ] Cuatro sesiones simultáneas responden en 3 s o menos
 - [ ] El resumen final anota los puntos [ABIERTO] que se resolvieron con el valor por defecto
 

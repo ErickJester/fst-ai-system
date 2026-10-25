@@ -3,6 +3,7 @@ configuración (variables de entorno), conexión a la base, rutas del volumen y 
 
 import logging
 import os
+import shutil
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
@@ -83,6 +84,30 @@ def borrar_archivo(ruta):
         return True
     except FileNotFoundError:
         return False
+
+
+def bloquear_experimento(cur, id_experimento):
+    """Bloquea la fila del experimento (FOR UPDATE). Debe ser el PRIMER paso de toda transacción que invalida reportes,
+    antes de tocar análisis, SEGUNDO u otra tabla: el mismo orden de candados que el backend (ver ReporteAlmacen)."""
+    cur.execute("SELECT idexperimento FROM experimento WHERE idexperimento = %s FOR UPDATE", (id_experimento,))
+
+
+def invalidar_reportes(cur, id_experimento):
+    """Un reporte guardado ya no refleja los datos (C-07): se borran sus filas, dentro de la transacción de quien llama.
+    Después del commit, borrar_reportes_del_disco quita la carpeta reportes/{id}/."""
+    cur.execute("DELETE FROM reporte WHERE idexperimento = %s", (id_experimento,))
+
+
+def borrar_reportes_del_disco(id_experimento):
+    """Borra reportes/{id}/ del volumen, DESPUÉS del commit. Un fallo es solo un aviso en el log: la fila ya no existe,
+    así que la próxima descarga regenera el reporte."""
+    carpeta = ARCHIVOS / "reportes" / str(id_experimento)
+    try:
+        shutil.rmtree(carpeta)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        log.warning("No se pudo borrar la carpeta de reportes %s: %s", carpeta, error)
 
 
 def letra_tanda(ordinal):

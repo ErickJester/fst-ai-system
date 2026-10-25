@@ -49,6 +49,9 @@ public class RevisionServiceImpl implements RevisionService {
 
 	private static final Logger log = LoggerFactory.getLogger(RevisionServiceImpl.class);
 
+	@Autowired
+	private ReporteAlmacen reportes;
+
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	// Dominio tipo_conducta de la base, tomado del enum. La conducta nula también es válida (no se ve o no se decidió).
@@ -256,6 +259,8 @@ public class RevisionServiceImpl implements RevisionService {
 	@Transactional
 	public Map<String, Object> corregir(Integer idExperimento, Integer idAnalisis, Map<String, Object> cuerpo,
 			Authentication authentication) {
+		// Primer paso de la transacción: el candado del experimento (orden de candados, ver ReporteAlmacen).
+		reportes.bloquearExperimento(idExperimento);
 		Datos a = cargar(idExperimento, idAnalisis);
 		if (!puedeCorregir(a, authentication)) {
 			throw new ErrorApi(HttpStatus.FORBIDDEN,
@@ -277,9 +282,9 @@ public class RevisionServiceImpl implements RevisionService {
 				throw malaPeticion("El segundo " + c.segundo() + " no existe en este análisis.");
 			}
 		}
-		// Un reporte guardado ya no refleja los datos: se borran para que ninguno quede como vigente. Hoy el PDF
-		// se genera al vuelo y no hay archivos que borrar.
-		jdbc.update("DELETE FROM reporte WHERE idexperimento = ?", idExperimento);
+		// Las correcciones cambian los resultados: el reporte guardado (filas y carpeta reportes/{id}/) ya no los refleja.
+		// Se regenera en la próxima descarga del PDF.
+		reportes.invalidar(idExperimento);
 
 		// Los totales nuevos, de los especímenes de ESTA tanda, con la misma forma que /results.
 		String tanda = a.etiqueta() + " · " + letra(a.ordinal());

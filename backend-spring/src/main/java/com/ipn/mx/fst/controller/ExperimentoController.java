@@ -1,13 +1,14 @@
 package com.ipn.mx.fst.controller;
 
 import com.ipn.mx.fst.domain.Experimento;
+import com.ipn.mx.fst.domain.valores.FormatoReporte;
 import com.ipn.mx.fst.service.ExperimentoService;
+import com.ipn.mx.fst.service.ReporteAlmacen;
 import com.ipn.mx.fst.utilerias.Respuesta;
 import jakarta.validation.Valid;
-import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,6 +38,9 @@ public class ExperimentoController {
 	@Autowired
 	private ExperimentoService experimentoService;
 
+	@Autowired
+	private ReporteAlmacen reportes;
+
 	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
 	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400.
 	@GetMapping
@@ -45,13 +49,13 @@ public class ExperimentoController {
 	}
 
 	// Reporte de resultados en PDF (sección 8 de la guía). Es de las pocas respuestas que no llevan el
-	// envoltorio, porque devuelve un archivo: se genera en memoria y se responde con Content-Disposition
-	// "inline" para que el navegador lo muestre. Si el experimento no existe, buscar da el 404 con envoltorio;
-	// si generarReporte falla, la excepción sube a ManejadorErrores (500).
+	// envoltorio, porque devuelve un archivo, con Content-Disposition "inline" para que el navegador lo muestre.
+	// Pasa por ReporteAlmacen: si el PDF guardado sigue vigente, sale del archivo; si no, generarReporte lo arma y se
+	// guarda. 404 con envoltorio si el experimento no existe; si la generación falla, sube a ManejadorErrores (500).
 	@GetMapping("/{id}/report/pdf")
-	public ResponseEntity<InputStreamResource> generarPdf(@PathVariable Integer id) {
-		experimentoService.buscar(id);
-		ByteArrayInputStream pdf = experimentoService.generarReporte(id);
+	public ResponseEntity<byte[]> generarPdf(@PathVariable Integer id) throws IOException {
+		byte[] pdf = reportes.obtener(id, FormatoReporte.PDF, "experimento",
+				() -> experimentoService.generarReporte(id).readAllBytes());
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.add("Content-Disposition", "inline; filename=reporte_experimento_" + id + ".pdf");
@@ -60,7 +64,7 @@ public class ExperimentoController {
 				.ok()
 				.headers(headers)
 				.contentType(MediaType.APPLICATION_PDF)
-				.body(new InputStreamResource(pdf));
+				.body(pdf);
 	}
 
 	// Detalle con el árbol de grupos, tandas y videos (guía 6.1).

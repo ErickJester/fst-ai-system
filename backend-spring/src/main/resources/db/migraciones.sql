@@ -6,3 +6,7 @@
 -- 20-oct-2026: nombre original del video, como lo subió el usuario (solo para mostrarlo). NULL en los videos
 -- anteriores.
 ALTER TABLE video ADD COLUMN IF NOT EXISTS nombreoriginal varchar(255);
+
+-- 25-oct-2026 (C-07): un experimento puede tener varios reportes del mismo formato (uno por alcance: el experimento,
+-- cada grupo, cada tanda). La unicidad es por ruta (uq_reporte_ruta), que ya distingue el alcance.
+ALTER TABLE reporte DROP CONSTRAINT IF EXISTS uq_reporte_formato;

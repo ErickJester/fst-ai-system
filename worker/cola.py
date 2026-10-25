@@ -16,7 +16,9 @@ from diagnostico import generar_diagnostico
 from tiempos import cerrar_archivo
 from comun import (
     DAILY_HOUR, PAUSE_TIMEOUT_HOURS, POLL_SECONDS,
-    ahora, carpeta_analisis, configurar_log, conectar, datos_analisis, enviar_correos, log, notificar, relativa,
+    ahora, bloquear_experimento, borrar_reportes_del_disco, carpeta_analisis, configurar_log, conectar, datos_analisis,
+    enviar_correos, invalidar_reportes,
+    log, notificar, relativa,
 )
 
 
@@ -126,15 +128,18 @@ def marcar_error(conn, d, etapa, mensaje):
 
     pendientes = []
     with conn.cursor() as cur:
+        bloquear_experimento(cur, d["idexperimento"])     # primer paso: el candado del experimento, antes del UPDATE
         # rutadiagnostico y estado en el mismo UPDATE: el CHECK de la tabla solo admite la ruta con 'error'.
         cur.execute(
             "UPDATE analisis SET estado = 'error', rutadiagnostico = %s, fechaanalisis = now() WHERE idanalisis = %s",
             (relativa(pdf), d["idanalisis"]),
         )
+        invalidar_reportes(cur, d["idexperimento"])     # el estado del análisis cambia: un reporte guardado ya no vale
         notificar(cur, pendientes, d["idinstitucional"], d["correo"], "error del pipeline",
                   f"El análisis de {d['tanda']} del experimento '{d['nombre']}' terminó con error "
                   f"en la etapa '{etapa}': {mensaje}", d["idexperimento"])
     conn.commit()
+    borrar_reportes_del_disco(d["idexperimento"])   # después del commit
     cerrar_archivo(d["idanalisis"])     # el cronómetro se detiene donde llegó
     enviar_correos(pendientes)
     log.info("Análisis %s en error (%s): %s", d["idanalisis"], etapa, mensaje)
