@@ -45,6 +45,13 @@ public class PausaController {
 		return Respuesta.ok(null, HttpStatus.OK);
 	}
 
+	@PostMapping("/pause/continue")
+	public ResponseEntity<Map<String, Object>> continuar(@PathVariable Integer id, @PathVariable Integer idAnalisis,
+			Authentication authentication) {
+		pausaService.continuar(id, idAnalisis, authentication);
+		return Respuesta.ok(null, HttpStatus.OK);
+	}
+
 	@PostMapping("/cancel")
 	public ResponseEntity<Map<String, Object>> cancelar(@PathVariable Integer id, @PathVariable Integer idAnalisis,
 			Authentication authentication) {

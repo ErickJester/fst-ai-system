@@ -405,6 +405,25 @@ describe('pausa del análisis (R-15)', () => {
   })
 })
 
+describe('pausa: recuadro bien o casi igual (encargo 33)', () => {
+  it('«El recuadro está bien, continuar» vuelve el análisis a la cola sin cambiar el recuadro', async () => {
+    const user = await conSesion('/experimentos/7/analisis/502/pausa')
+    await user.click(await screen.findByRole('button', { name: 'El recuadro está bien, continuar' }))
+    expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
+    expect(screen.getByText(/sigue desde el segundo 142\. No se volverá a pausar en ese mismo tramo/)).toBeTruthy()
+  })
+
+  it('ajustar sin mover el recuadro muestra el 422 en la misma pantalla con los tres botones', async () => {
+    const user = await conSesion('/experimentos/7/analisis/502/pausa')
+    await user.click(await screen.findByRole('button', { name: 'Ajustar y continuar' }))
+    expect(await screen.findByText(/El recuadro casi no cambió: ningún borde se movió más de 3 px/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'No se ve al espécimen del cilindro 2 (segundo 142)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ajustar y continuar' }).disabled).toBe(false)
+    expect(screen.getByRole('button', { name: 'El recuadro está bien, continuar' }).disabled).toBe(false)
+    expect(screen.getByRole('button', { name: 'Cancelar análisis' }).disabled).toBe(false)
+  })
+})
+
 describe('revisión segundo a segundo (R-14)', () => {
   it('en pausa, una tecla cambia solo ese segundo; guardar deja la revisión', async () => {
     const user = await conSesion('/experimentos/7/analisis/402/revision')

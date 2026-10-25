@@ -386,8 +386,16 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// Actualiza nombre, fecha y notas. El creador no cambia aunque venga otro en el JSON.
 	@Override
 	@Transactional
-	public Experimento actualizar(Integer id, Experimento datos) {
+	public Experimento actualizar(Integer id, Experimento datos, Authentication authentication) {
 		Experimento actual = buscar(id);
+
+		// C-03 (decidido por Erick): solo quien creó el experimento o un Administrador lo edita. Mismo criterio que eliminar.
+		boolean esCreador = actual.getIdInstitucional().equals(authentication.getName());
+		boolean esAdministrador = authentication.getAuthorities().stream()
+				.anyMatch(permiso -> permiso.getAuthority().equals("ROLE_ADMINISTRADOR"));
+		if (!esCreador && !esAdministrador) {
+			throw new ErrorApi(HttpStatus.FORBIDDEN, "Solo quien creó el experimento o un Administrador puede editarlo");
+		}
 
 		if (experimentoRepository.existsByNombreAndIdExperimentoNot(datos.getNombre(), id)) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "Ya existe otro experimento con el nombre '" + datos.getNombre() + "'");

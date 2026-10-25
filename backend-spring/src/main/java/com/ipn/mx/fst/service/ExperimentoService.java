@@ -30,8 +30,9 @@ public interface ExperimentoService {
 	// el nombre ya existe.
 	Experimento crear(Experimento experimento, String idCreador);
 
-	// 404 si no existe, 409 si el nombre ya lo tiene otro experimento. El creador no cambia.
-	Experimento actualizar(Integer id, Experimento datos);
+	// 404 si no existe, 403 si quien pide no creó el experimento ni es Administrador (C-03), 409 si el nombre ya lo tiene
+	// otro experimento. El creador no cambia.
+	Experimento actualizar(Integer id, Experimento datos, Authentication authentication);
 
 	// Elimina el experimento completo (D-87): grupos, tandas, videos, análisis, resultados, reportes y notificaciones.
 	// 404 si no existe, 403 si quien pide no es el creador ni Administrador (R-08), 409 si algún análisis está

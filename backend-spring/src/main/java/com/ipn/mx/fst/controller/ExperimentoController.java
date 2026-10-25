@@ -88,8 +88,9 @@ public class ExperimentoController {
 
 	// Actualiza nombre, fecha y notas. El creador no cambia aunque venga otro en el JSON.
 	@PutMapping("/{id}")
-	public ResponseEntity<Map<String, Object>> update(@Valid @RequestBody Experimento experimento, @PathVariable Integer id) {
-		return Respuesta.ok(experimentoService.actualizar(id, experimento), HttpStatus.OK);
+	public ResponseEntity<Map<String, Object>> update(@Valid @RequestBody Experimento experimento, @PathVariable Integer id,
+			Authentication authentication) {
+		return Respuesta.ok(experimentoService.actualizar(id, experimento, authentication), HttpStatus.OK);
 	}
 
 	// Elimina una tanda con sus videos y resultados, para dejar libre su letra si se subió mal: solo el creador del

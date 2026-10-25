@@ -40,6 +40,10 @@ public class PausaServiceImpl implements PausaService {
 	@Value("${PAUSE_TIMEOUT_HOURS:72}")
 	private int horasDePausa;
 
+	// Píxeles que un borde tiene que moverse, como mínimo, para contar como ajuste (app.pausa.umbral-recuadro-px).
+	@Value("${app.pausa.umbral-recuadro-px:3}")
+	private int umbralRecuadro;
+
 	@Autowired
 	private JdbcTemplate jdbc;
 
@@ -100,11 +104,8 @@ public class PausaServiceImpl implements PausaService {
 		int y1 = numero(recuadro, "y1");
 
 		// El cilindro debe existir en la pausa, y la caja dentro de la imagen con x0 < x1 y y0 < y1.
-		boolean existe = false;
-		for (JsonNode r : pausa.path("recuadros")) {
-			existe |= r.path("cilindro").asInt() == cilindro;
-		}
-		if (!existe) {
+		JsonNode automatico = recuadroDe(pausa, cilindro);
+		if (automatico == null) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El cilindro " + cilindro + " no está en la pausa");
 		}
 		int ancho = pausa.path("ancho").asInt(0);
@@ -112,6 +113,13 @@ public class PausaServiceImpl implements PausaService {
 		if (x0 < 0 || y0 < 0 || x0 >= x1 || y0 >= y1 || (ancho > 0 && x1 > ancho) || (alto > 0 && y1 > alto)) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST,
 					"El recuadro no es válido: debe caer dentro de la imagen con x0 < x1 y y0 < y1");
+		}
+
+		// «Recuadro casi igual»: si ningún borde se movió más del umbral, no es un ajuste (422).
+		if (movimientoMayor(automatico, x0, y0, x1, y1) <= umbralRecuadro) {
+			throw new ErrorApi(HttpStatus.UNPROCESSABLE_ENTITY,
+					"El recuadro casi no cambió: ningún borde se movió más de " + umbralRecuadro
+							+ " px. Muévelo sobre el tubo o elige «El recuadro está bien, continuar».");
 		}
 
 		// Regla (a): primero el archivo, con escritura atómica; después el estado, solo si sigue en pausa (regla b).
@@ -132,6 +140,30 @@ public class PausaServiceImpl implements PausaService {
 			// Ya no estaba en pausa: se deshace el ajuste que se acaba de escribir, para que el worker no aplique
 			// una corrección de un análisis que no está en pausa (409).
 			escribirAtomico(idAnalisis, quitarAjuste(pausa));
+			throw new ErrorApi(HttpStatus.CONFLICT, "El análisis ya no está en pausa");
+		}
+	}
+
+	// «El recuadro está bien, continuar»: el usuario acepta la racha tal como está. Mismo orden que ajustar: primero el
+	// archivo (continuar), después el estado (en cola), conservando fechaAnalisis.
+	@Override
+	@Transactional
+	public void continuar(Integer idExperimento, Integer idAnalisis, Authentication authentication) {
+		exigirPausa(idExperimento, idAnalisis, authentication);
+		ObjectNode pausa = leerPausa(idAnalisis).deepCopy();
+		ObjectNode continuar = JSON.createObjectNode();
+		continuar.put("hora", OffsetDateTime.now().toString());
+		pausa.set("continuar", continuar);
+		pausa.putNull("ajuste");
+		escribirAtomico(idAnalisis, pausa);
+
+		int cambios = jdbc.update("UPDATE analisis SET estado = ? WHERE idanalisis = ? AND estado = ?",
+				EstadoAnalisis.EN_COLA.valor(), idAnalisis, EstadoAnalisis.EN_PAUSA.valor());
+		if (cambios == 0) {
+			// Ya no estaba en pausa: se quita «continuar» para que el worker no acepte una racha por nada.
+			ObjectNode deshecha = pausa.deepCopy();
+			deshecha.remove("continuar");
+			escribirAtomico(idAnalisis, deshecha);
 			throw new ErrorApi(HttpStatus.CONFLICT, "El análisis ya no está en pausa");
 		}
 	}
@@ -201,6 +233,23 @@ public class PausaServiceImpl implements PausaService {
 	}
 
 	// La pausa tal como estaba antes del ajuste: sin el campo "ajuste" (o con ajuste null, como la escribe el worker).
+	// El mayor movimiento (en px) de cualquier borde entre el recuadro automático y el que mandó la persona.
+	static int movimientoMayor(JsonNode automatico, int x0, int y0, int x1, int y1) {
+		return Math.max(
+				Math.max(Math.abs(x0 - automatico.path("x0").asInt()), Math.abs(y0 - automatico.path("y0").asInt())),
+				Math.max(Math.abs(x1 - automatico.path("x1").asInt()), Math.abs(y1 - automatico.path("y1").asInt())));
+	}
+
+	// El recuadro automático de ese cilindro dentro de pausa.json, o null si la pausa no lo trae.
+	static JsonNode recuadroDe(JsonNode pausa, int cilindro) {
+		for (JsonNode r : pausa.path("recuadros")) {
+			if (r.path("cilindro").asInt() == cilindro) {
+				return r;
+			}
+		}
+		return null;
+	}
+
 	private static JsonNode quitarAjuste(JsonNode pausa) {
 		ObjectNode copia = ((ObjectNode) pausa).deepCopy();
 		copia.putNull("ajuste");

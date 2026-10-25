@@ -190,6 +190,7 @@ def procesar_real(conn, id_analisis):
     # §4.3: si el usuario ajustó una pausa, su corrección se acumula en correcciones.json y se pasa a etiquetar.py.
     # Las correcciones acumuladas son todas las del análisis (una por cada pausa atendida).
     correcciones = acumular_correccion(id_analisis)
+    aceptar_racha(id_analisis)     # el usuario dijo «el recuadro está bien»: esa racha ya no vuelve a pausar
     argumentos_correccion = ["--correccion", str(correcciones)] if correcciones else []
     codigo = correr([sys.executable, "etiquetar.py", str(video), "--tubos", str(tubos),
                      "--salida", str(trabajo), *argumentos_correccion], registro, vigilante_cilindros)
@@ -222,7 +223,8 @@ def procesar_real(conn, id_analisis):
     cuadros_cil = pd.read_csv(trabajo / f"{nombre}_cuadros.csv", encoding="utf-8-sig")
     ultimo = int(float(cuadros_cil["t"].max())) + 1
     inicio_guardado = max(1, ultimo - MAX_SEGUNDOS + 1)
-    racha = racha_de_pausa(segundos_sin_animal(cuadros_cil, ultimo), inicio_guardado, ultimo)
+    racha = racha_de_pausa(segundos_sin_animal(cuadros_cil, ultimo), inicio_guardado, ultimo,
+                           rachas_aceptadas(id_analisis))
     if racha is not None:
         cilindro, desde = racha
         pausado = pausar_analisis(conn, d, id_analisis, cilindro, desde, video, tabla, carpeta_analisis(id_analisis))
@@ -271,18 +273,61 @@ def segundos_sin_animal(cuadros, ultimo_segundo):
     return sin
 
 
-def racha_de_pausa(sin_animal, inicio, fin):
+def racha_de_pausa(sin_animal, inicio, fin, aceptadas=None):
     """La racha de RACHA_PAUSA_S segundos seguidos sin animal MÁS TEMPRANA en el tiempo, dentro de [inicio, fin], en
     cualquier cilindro. En empate de segundo gana el cilindro de número menor. Devuelve (cilindro, desde_segundo) o None.
-    Solo mira el tramo que se guarda (los últimos 300 s, D-54)."""
+    Solo mira el tramo que se guarda (los últimos 300 s, D-54). Un tramo «no se ve» que contiene un segundo aceptado
+    (aceptadas: {cilindro: set de desde_segundo}) no vuelve a pausar; los demás tramos sí."""
+    aceptadas = aceptadas or {}
     mejor = None
     for cilindro in sorted(sin_animal):
+        conjunto = sin_animal[cilindro]
         for s in range(inicio, fin - RACHA_PAUSA_S + 2):
-            if all(k in sin_animal[cilindro] for k in range(s, s + RACHA_PAUSA_S)):
+            if all(k in conjunto for k in range(s, s + RACHA_PAUSA_S)):
+                if tramo_aceptado(conjunto, s, aceptadas.get(cilindro, ())):
+                    continue                          # este tramo ya se aceptó; se busca el siguiente
                 if mejor is None or s < mejor[1]:      # sorted() por cilindro: en empate se queda el de número menor
                     mejor = (cilindro, s)
                 break                                 # la primera racha de este cilindro es la suya más temprana
     return mejor
+
+
+def tramo_aceptado(conjunto, s, aceptados):
+    """True si el tramo de segundos seguidos «no se ve» que contiene a s incluye algún segundo aceptado."""
+    ini = fin = s
+    while ini - 1 in conjunto:
+        ini -= 1
+    while fin + 1 in conjunto:
+        fin += 1
+    return any(ini <= a <= fin for a in aceptados)
+
+
+def leer_lista(ruta):
+    return json.loads(ruta.read_text(encoding="utf-8")) if ruta.exists() else []
+
+
+def rachas_aceptadas(id_analisis):
+    """{cilindro: set de desde_segundo} de las rachas que el usuario aceptó en este análisis."""
+    acumuladas = {}
+    for r in leer_lista(carpeta_analisis(id_analisis) / "rachas_aceptadas.json"):
+        acumuladas.setdefault(int(r["cilindro"]), set()).add(int(r["desde_segundo"]))
+    return acumuladas
+
+
+def aceptar_racha(id_analisis):
+    """Si pausa.json trae «continuar» (el usuario dijo que el recuadro está bien), la racha (cilindro, desde_segundo)
+    se agrega a rachas_aceptadas.json, acumulada y con escritura atómica, y se borran pausa.json y pausa.jpg. No toca
+    correcciones.json ni nada que etiquetar.py lea."""
+    carpeta = carpeta_analisis(id_analisis)
+    pausa = leer_pausa(id_analisis)
+    if not (pausa and pausa.get("continuar")):
+        return False
+    lista = leer_lista(carpeta / "rachas_aceptadas.json")
+    lista.append({"cilindro": int(pausa["cilindro"]), "desde_segundo": int(pausa["desde_segundo"])})
+    escribir_atomico(carpeta / "rachas_aceptadas.json", lista)
+    borrar_archivo(carpeta / "pausa.json")
+    borrar_archivo(carpeta / "pausa.jpg")
+    return True
 
 
 def instante_de_la_pausa(desde_segundo):
@@ -351,10 +396,8 @@ def pausar_analisis(conn, d, id_analisis, cilindro, desde_segundo, video, rasgos
     estado ya no es 'procesando' (lo cancelaron o lo borraron a medias), se borran los archivos y no se crea nada."""
     import cv2
     instante = instante_de_la_pausa(desde_segundo)
-    # Sin enderezar (ORIENTATION_AUTO = 0): el fotograma es el mismo que lee fst_auto con ROT = 0, y los recuadros salen de ahí.
-    # (con set(), no como parámetro de apertura: OpenCV 5 rechaza ese parámetro y la captura queda en None)
+    # Igual que fst_auto (lib.py), sin tocar la orientación: la foto es el mismo fotograma que mide fst_auto.
     cap = cv2.VideoCapture(str(video))
-    cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
     cap.set(cv2.CAP_PROP_POS_MSEC, instante * 1000)
     ok, fotograma = cap.read()
     cap.release()

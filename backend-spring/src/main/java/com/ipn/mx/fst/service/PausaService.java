@@ -19,6 +19,10 @@ public interface PausaService {
 	// Agrega el recuadro corregido a pausa.json y devuelve el análisis a 'en cola'. Conserva fechaAnalisis (D-79).
 	void ajustar(Integer idExperimento, Integer idAnalisis, Map<String, Object> recuadro, Authentication authentication);
 
+	// «El recuadro está bien, continuar»: marca la pausa como aceptada en pausa.json y devuelve el análisis a 'en cola'
+	// (fechaAnalisis intacta). El worker no vuelve a pausar esa racha. 409 si ya no estaba en pausa.
+	void continuar(Integer idExperimento, Integer idAnalisis, Authentication authentication);
+
 	// Cancela el análisis en pausa por decisión del usuario. No crea notificación (solo la crea el vencimiento).
 	void cancelar(Integer idExperimento, Integer idAnalisis, Authentication authentication);
 }

@@ -114,11 +114,55 @@ class InstanteYTamano(unittest.TestCase):
         with mock.patch("cv2.VideoCapture", return_value=captura) as vc, \
                 mock.patch.object(w, "notificar"), mock.patch.object(w, "enviar_correos"):
             w.pausar_analisis(conn, d, 7, 1, 142, Path("video.mp4"), rasgos, self.carpeta)
-        captura.set.assert_any_call(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+        # igual que fst_auto (lib.py): no se toca la orientación, solo se busca el instante
+        self.assertFalse(any(c.args[0] == cv2.CAP_PROP_ORIENTATION_AUTO for c in captura.set.call_args_list))
         captura.set.assert_called_with(cv2.CAP_PROP_POS_MSEC, 142500.0)
         pausa = json.loads((self.carpeta / "pausa.json").read_text(encoding="utf-8"))
         self.assertEqual((pausa["ancho"], pausa["alto"]), (500, 900))
         self.assertEqual(pausa["instante_imagen_s"], 142.5)
+
+
+class RachasAceptadas(unittest.TestCase):
+    def setUp(self):
+        self.carpeta = Path(tempfile.mkdtemp())
+        import cola
+        self.parches = [mock.patch.object(w, "carpeta_analisis", lambda _id: self.carpeta),
+                        mock.patch.object(cola, "carpeta_analisis", lambda _id: self.carpeta)]
+        for p in self.parches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_un_tramo_aceptado_no_pausa_aunque_sea_mas_largo_que_3_s(self):
+        sin = {1: {5, 6, 7, 8, 9}}                      # un tramo de 5 s que empieza en 5
+        self.assertIsNone(w.racha_de_pausa(sin, 1, 300, {1: {5}}))
+
+    def test_un_tramo_distinto_del_mismo_cilindro_si_pausa(self):
+        sin = {1: {5, 6, 7, 8, 9, 20, 21, 22}}          # el tramo de 5 se aceptó; el de 20 no
+        self.assertEqual(w.racha_de_pausa(sin, 1, 300, {1: {5}}), (1, 20))
+
+    def test_otro_cilindro_no_se_afecta(self):
+        sin = {1: {5, 6, 7}, 2: {5, 6, 7}}              # el cilindro 1 se aceptó en 5; el 2 sigue pausando
+        self.assertEqual(w.racha_de_pausa(sin, 1, 300, {1: {5}}), (2, 5))
+
+    def test_aceptar_racha_acumula_y_borra_la_pausa(self):
+        (self.carpeta / "pausa.jpg").write_bytes(b"jpg")
+        pausa = {"version": 1, "cilindro": 2, "desde_segundo": 142, "ajuste": None,
+                 "continuar": {"hora": "2026-10-25T12:00:00-06:00"}}
+        (self.carpeta / "pausa.json").write_text(json.dumps(pausa), encoding="utf-8")
+        (self.carpeta / "rachas_aceptadas.json").write_text(
+            json.dumps([{"cilindro": 1, "desde_segundo": 50}]), encoding="utf-8")
+        self.assertTrue(w.aceptar_racha(7))
+        lista = json.loads((self.carpeta / "rachas_aceptadas.json").read_text(encoding="utf-8"))
+        self.assertEqual(lista, [{"cilindro": 1, "desde_segundo": 50}, {"cilindro": 2, "desde_segundo": 142}])
+        self.assertFalse((self.carpeta / "pausa.json").exists())
+        self.assertFalse((self.carpeta / "pausa.jpg").exists())
+        self.assertEqual(w.rachas_aceptadas(7), {1: {50}, 2: {142}})
+
+    def test_sin_continuar_no_toca_nada(self):
+        (self.carpeta / "pausa.json").write_text(json.dumps({"version": 1, "ajuste": None}), encoding="utf-8")
+        self.assertFalse(w.aceptar_racha(7))
+        self.assertTrue((self.carpeta / "pausa.json").exists())
+        self.assertFalse((self.carpeta / "rachas_aceptadas.json").exists())
 
 
 class ConductaNula(unittest.TestCase):

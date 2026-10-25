@@ -123,6 +123,12 @@ export async function ajustarRecuadro(clave, id, recuadro) {
   if (USE_MOCKS) {
     const { job, i, error } = pausaPropia(clave, id)
     if (error) return error
+    // Igual que el backend: si ningún borde se movió más de 3 px, no es un ajuste (422).
+    const automatico = job.pausa.recuadros.find((r) => r.cilindro === recuadro.cilindro)
+    const movido = automatico && Math.max(...['x0', 'y0', 'x1', 'y1'].map((k) => Math.abs(recuadro[k] - automatico[k])))
+    if (movido !== undefined && movido <= 3) {
+      return fail(422, 'El recuadro casi no cambió: ningún borde se movió más de 3 px. Muévelo sobre el tubo o elige «El recuadro está bien, continuar».')
+    }
     db.pausedJobs.splice(i, 1)
     job.pausa.ajuste = { ...recuadro, hora: new Date().toISOString() }
     Object.assign(job, { status: 'QUEUED', stage: null, progress_pct: 0 })
@@ -136,6 +142,28 @@ export async function ajustarRecuadro(clave, id, recuadro) {
     return reply({ ok: true })
   }
   return (await api.post(`/experiments/${clave}/analyses/${id}/pause/adjust`, recuadro)).data
+}
+
+// POST /experiments/:clave/analyses/:id/pause/continue (sin cuerpo) → «El recuadro está bien»: el
+// análisis vuelve a la cola sin cambiar el recuadro, y el worker no vuelve a pausar esa racha.
+// 409 si ya no está en pausa.
+export async function continuarRecuadro(clave, id) {
+  if (USE_MOCKS) {
+    const { job, i, error } = pausaPropia(clave, id)
+    if (error) return error
+    db.pausedJobs.splice(i, 1)
+    job.pausa.continuar = { hora: new Date().toISOString() }
+    Object.assign(job, { status: 'QUEUED', stage: null, progress_pct: 0 })
+    let k = db.queue.findIndex((j) => j.status === 'QUEUED' && j.job_id > job.job_id)
+    if (k < 0) k = db.queue.length
+    db.queue.splice(k, 0, job)
+    db.queue.forEach((j, n) => { j.posicion = n + 1 })
+    const t = buscarTanda(job)
+    if (t) Object.assign(t, { estado: 'QUEUED', progreso: null })
+    resumir(clave)
+    return reply({ ok: true })
+  }
+  return (await api.post(`/experiments/${clave}/analyses/${id}/pause/continue`)).data
 }
 
 // POST /experiments/:clave/analyses/:id/cancel → el análisis queda cancelado; 409 si ya no
