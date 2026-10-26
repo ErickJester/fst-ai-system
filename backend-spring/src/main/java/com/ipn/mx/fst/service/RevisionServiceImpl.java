@@ -343,6 +343,85 @@ public class RevisionServiceImpl implements RevisionService {
 	}
 
 	// ---------------------------------------------------------------------------
+	//  POST /restart (R-04)
+	// ---------------------------------------------------------------------------
+
+	// Lo que deja una corrida anterior y haría que la nueva arrancara sucia: la pausa y su foto (y el .tmp de una escritura
+	// cortada), las correcciones y rachas aceptadas que el worker lee al retomar, y trabajo/ (CSV del pipeline: el worker daría
+	// por buenos los viejos si el pipeline fallara sin escribir). NO se tocan el video, web.mp4 ni cajas.json (el worker los
+	// reescribe al completar), ni progreso.json ni tiempos.json: el worker los reescribe desde cero apenas toma el análisis.
+	// Se borran DENTRO de la transacción, no después del commit: hasta el commit el análisis no es visible como 'en cola' para el
+	// worker (su SELECT ... FOR UPDATE SKIP LOCKED no ve el cambio), así que no puede empezar a escribir en la carpeta mientras
+	// se borra. Si el commit fallara, solo se perdería trabajo/ de un análisis completado, que únicamente sirve para revisarlo a mano.
+	private static final List<String> ARCHIVOS_DE_LA_CORRIDA = List.of("pausa.json", "pausa.json.tmp", "pausa.jpg",
+			"correcciones.json", "correcciones.json.tmp", "rachas_aceptadas.json", "rachas_aceptadas.json.tmp");
+
+	@Override
+	@Transactional
+	public Map<String, Object> reiniciar(Integer idExperimento, Integer idAnalisis, Authentication authentication) {
+		// Primer paso de la transacción: el candado del experimento (orden de candados, ver ReporteAlmacen). Dos reinicios a la
+		// vez se esperan aquí, y el segundo ya encuentra el análisis en cola.
+		reportes.bloquearExperimento(idExperimento);
+		Datos a = cargar(idExperimento, idAnalisis);
+		if (!puedeCorregir(a, authentication)) {
+			throw new ErrorApi(HttpStatus.FORBIDDEN,
+					"Solo quien subió el video o un Administrador puede reiniciar este análisis.");
+		}
+		if (!EstadoAnalisis.COMPLETADO.es(a.estado())) {
+			throw new ErrorApi(HttpStatus.CONFLICT,
+					"Solo se puede reiniciar un análisis completado; este está " + a.estado() + ".");
+		}
+		if (a.archivo() == null) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Sin el video no se puede reiniciar el análisis.");
+		}
+
+		// De completado a en cola con un UPDATE condicional, con los valores de arranque de la subida de un video (los DEFAULT de
+		// la tabla): etapa y nivel de arranque y rutadiagnostico nula. fechaAnalisis = ahora: entra al final de la cola.
+		int cambios = jdbc.update("UPDATE analisis SET estado = ?::estado_analisis, etapa = DEFAULT, nivelclasif = DEFAULT, "
+				+ "rutadiagnostico = NULL, fechaanalisis = now() WHERE idanalisis = ? AND estado = ?::estado_analisis",
+				EstadoAnalisis.EN_COLA.valor(), idAnalisis, EstadoAnalisis.COMPLETADO.valor());
+		if (cambios == 0) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "El análisis ya no está completado.");
+		}
+		// El resultado anterior, con la revisión humana. El video no se toca.
+		jdbc.update("DELETE FROM segundo WHERE idobservacion IN (SELECT idobservacion FROM observacion WHERE idvideo = ?)",
+				a.idVideo());
+		jdbc.update("DELETE FROM observacion WHERE idvideo = ?", a.idVideo());
+		// Los resultados desaparecen: el reporte guardado (filas y carpeta reportes/{id}/) ya no vale.
+		reportes.invalidar(idExperimento);
+
+		// Último paso: los archivos de la corrida anterior (ver ARCHIVOS_DE_LA_CORRIDA por qué va antes del commit).
+		limpiarCarpeta(carpeta(idAnalisis));
+
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("idAnalisis", idAnalisis);
+		datos.put("estado", EstadoAnalisis.EN_COLA.valor());
+		return datos;
+	}
+
+	// Un fallo al borrar solo se registra (no deshace el reinicio): el worker reescribe lo que usa.
+	private void limpiarCarpeta(Path carpeta) {
+		for (String nombre : ARCHIVOS_DE_LA_CORRIDA) {
+			try {
+				Files.deleteIfExists(carpeta.resolve(nombre));
+			} catch (IOException e) {
+				log.warn("No se pudo borrar {}: {}", carpeta.resolve(nombre), e.getMessage());
+			}
+		}
+		Path trabajo = carpeta.resolve("trabajo");
+		if (!Files.isDirectory(trabajo)) {
+			return;
+		}
+		try (var rutas = Files.walk(trabajo)) {
+			for (Path ruta : rutas.sorted(java.util.Comparator.reverseOrder()).toList()) {
+				Files.delete(ruta);
+			}
+		} catch (IOException e) {
+			log.warn("No se pudo borrar {}: {}", trabajo, e.getMessage());
+		}
+	}
+
+	// ---------------------------------------------------------------------------
 
 	// El análisis con su tanda y el creador del experimento. 404 si el experimento no existe o el análisis es de
 	// otro experimento.

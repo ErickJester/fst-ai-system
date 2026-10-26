@@ -10,8 +10,9 @@ Al final guarda en SEGUNDO los últimos 300 s de cada espécimen, la copia web.m
 Supuestos:
   - El pipeline numera los tubos de izquierda a derecha, de 1 a N. El espécimen k del pipeline es el
     ESPECIMEN de la tanda con numerocilindro k.
-  - Este modelo no detecta "no se ve al espécimen", así que la pausa de la sección 4.3 (R-15) no se
-    implementa aquí: ningún análisis pasa a 'en pausa'. (cola.revisar_pausas sí atiende las que ya existan.)
+  - La pausa de la sección 4.3 (R-15) sí se implementa: tres segundos seguidos sin animal en un cilindro pausan
+    el análisis ('en pausa', pausa.json y pausa.jpg). Cuando el usuario ajusta o continúa, el backend lo deja
+    'en cola' y este worker lo retoma; cola.revisar_pausas cancela las pausas vencidas.
   - La carpeta analisis/{id}/trabajo/ (CSV del pipeline, _control.jpg y pipeline.log) se conserva para
     poder revisar a mano un análisis.
 """

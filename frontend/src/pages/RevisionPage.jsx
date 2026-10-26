@@ -259,7 +259,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   }
 
   async function reiniciar() {
-    if (!window.confirm('¿Reiniciar el análisis? Se borrará el resultado actual, también las correcciones guardadas, y el video vuelve a la cola.')) return
+    if (!window.confirm('¿Reiniciar el análisis? Se borrará el resultado actual y toda la revisión humana (las correcciones guardadas y las que tengas sin guardar). No se puede deshacer. El video vuelve a la cola.')) return
     setPlay(false)
     try {
       await reiniciarAnalisis(clave, id)
@@ -538,7 +538,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
 
             <div>
               <div className="k" style={{ marginBottom: 10 }}>Reiniciar el análisis</div>
-              <p className="hint" style={{ margin: '0 0 10px' }}>Vuelve a analizar el video desde cero. Al empezar se borra el resultado actual, también las correcciones guardadas.</p>
+              <p className="hint" style={{ margin: '0 0 10px' }}>Vuelve a analizar el video desde cero. Se pierde toda la revisión humana de este análisis, guardada o no, y no se puede recuperar.</p>
               <button type="button" className="btn btn-secondary" disabled={soloLectura} onClick={reiniciar}>Reiniciar el análisis…</button>
             </div>
           </div>

@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (25-oct-2026, versión 0.84.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (25-oct-2026, versión 0.85.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -18,7 +18,8 @@ probada en desarrollo con una pausa forzada; y el encargo 33 (foto de la pausa i
 botón «El recuadro está bien, continuar» y editar experimento solo el creador o un Administrador), en código con pruebas
 unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `REPORTE` y su invalidación, §8), igual;
 y el encargo 35 (administración y recuperar contraseña, §2, §3 y §11), con pruebas JUnit contra una PostgreSQL de
-prueba y sin probar con el correo real ni el navegador. Erick prueba los tres en su máquina. **Sin hacer:** reinicio (§6),
+prueba y sin probar con el correo real ni el navegador; y el encargo 36 (reiniciar un análisis, §6), con pruebas JUnit
+contra una PostgreSQL de prueba y sin probar con el worker real. Erick prueba los cuatro en su máquina. **Sin hacer:**
 bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 
 ## 0. Base y Docker
@@ -102,7 +103,7 @@ bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 - [x] D-107 (23-oct): solo el creador sube videos; `403` ("Solo quien creó el experimento sube sus videos.") a cualquier otra cuenta, también a un Administrador. El `404` va primero. Probado con otro Investigador y con otro Administrador: sin filas ni archivos nuevos. Motivo: `VIDEO` no guarda quién lo subió y `subidoPor` es el creador del experimento
 
 ## 6. Contrato con el worker (§4.2 a §4.8)
-- [ ] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7)
+- [x] El backend nunca escribe `estado`, `etapa` ni `nivelClasif`, salvo al encolar, al reiniciar y en la pausa (§4.7). Revisado en todo el código (encargo 36): solo `VideoServiceImpl` (el `INSERT` con los valores de arranque), `PausaServiceImpl` (ajustar y continuar a `en cola`, cancelar a `cancelado`) y `RevisionServiceImpl.reiniciar`; no hay repositorio ni `setEstado` de `Analisis`
 - [x] `GET /experiments/{id}/status` con porcentaje de 0, 33, 67 o 100 por etapa. Es la única fuente del progreso: el frontend ya no usa una cola global
 - [ ] Pausa. Hecho: diseño aprobado por Erick el 23-oct, siguiendo §4.3 de la guía, en dos encargos. El 31 (fst_auto acepta `--correccion` para medir un cilindro con el recuadro que ajusta el usuario desde el segundo de la pausa) está TERMINADO en la rama `wip/correccion-recuadro` de fst-etiquetador (commit `6b27226`; `main` de fst_auto sigue en `9844e57`) y copiado a `pipeline/` (`b22b205`); sin la opción da lo mismo que antes. El 32 se cerró el 25-oct: el worker detecta 3 s seguidos sin ver al espécimen (la racha más temprana de los últimos 300 s; en empate, el cilindro menor), pausa (primero el archivo, después el estado), guarda «no se ve» como conducta nula y al retomar acumula `correcciones.json` y llama a `etiquetar.py --correccion`; el backend tiene `GET .../pause`, `.../pause/image`, `POST .../pause/adjust` y `.../cancel` (`PausaController`). Convención: el segundo k va del instante k−1 al k; con la racha k, k+1, k+2 la foto va en k+0.5 y la corrección empieza en k−1; `ancho` y `alto` de `pausa.json` salen de la foto. 36 pruebas unitarias del worker. Prueba en desarrollo (25-oct, `Acu-YBN-1.MOV` recortado a 150 s): un cilindro tapado con color plano o con el fondo del video NO provocó la racha (el detector siguió viendo manchas), así que la pausa se forzó llamando a `pausar_analisis` con k = 71: foto en 71.5 s, 1920×1080 y 4 recuadros que caen sobre los tubos; el ajuste válido dejó `correcciones.json` con `desde_segundo` 70 y, al retomar, de 600 segundos solo cambiaron 3 del cilindro corregido (75, 99 y 133) y ninguno antes del 70. Encargo 33 (25-oct, en código sin probar contra el stack, a pedido de Erick): la foto se abre igual que fst_auto (`cv2.VideoCapture` sin tocar la orientación, como `lib.py`); regla de «recuadro casi igual» y ruta `continue` (casillas de abajo). Falta: (1) probar en la máquina de Erick el encargo 33 y la pantalla de pausa contra el backend real; (2) la racha y los segundos nulos disparados por un video real: solo con pruebas unitarias, porque en los 15 videos de `fst_auto/etiquetas` ningún espécimen dejó de verse 3 s seguidos (máximo 1 s, dos veces) y un video fabricado no la provoca
   - [x] `GET .../pause` lee `pausa.json` y calcula `segundosRestantes`. Probado en desarrollo (25-oct): `200` con una pausa real del worker
@@ -113,12 +114,12 @@ bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
   - [x] Actualización condicional atómica (`UPDATE ... WHERE estado='en pausa'`; si no cambia nada, el ajuste se deshace y responde `409`)
   - [ ] «Recuadro casi igual» (Erick, 25-oct): si ningún borde del ajuste se movió más de `app.pausa.umbral-recuadro-px` (3 por omisión, `PAUSA_UMBRAL_RECUADRO_PX`) respecto al recuadro automático de ese cilindro en `pausa.json`, `adjust` responde `422` con el aviso. Hecho en código (encargo 33) con 4 pruebas JUnit que pasan (`PausaServiceUmbralTest`, la primera prueba de Java del backend); falta probarlo contra el backend
   - [ ] `POST .../pause/continue` («El recuadro está bien, continuar»): mismos permisos y errores; escribe `continuar` en `pausa.json` y después pasa a `en cola` conservando `fechaAnalisis` (si no cambia nada, lo deshace y `409`). Al retomar, el worker guarda la racha en `rachas_aceptadas.json` y ya no pausa en ese tramo «no se ve» (todo el tramo seguido, aunque dure más de 3 s); otro tramo sí pausa; esos segundos quedan con conducta nula. Hecho en código (encargo 33) con pruebas unitarias del worker escritas (corren en la imagen) y 4 de vitest de la pantalla que pasan; falta probarlo contra el backend
-- [ ] `POST .../restart` (R-04):
-  - [ ] Solo desde `completado`
-  - [ ] Solo para quien subió el video o un Administrador
-  - [ ] En una transacción: borra `OBSERVACION` y `SEGUNDO`, borra los reportes y deja `en cola` con los valores de arranque
-  - [ ] `409` en `error`, `en pausa`, `cancelado` o en curso
-  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo), porque reiniciar vuelve a correr el análisis sobre el video
+- [x] `POST .../restart` (R-04), `202` con `{idAnalisis, estado}` (encargo 36):
+  - [x] Solo desde `completado`
+  - [x] Solo para quien subió el video o un Administrador (`404` primero, luego `403`)
+  - [x] En una transacción: borra `OBSERVACION` y `SEGUNDO`, borra los reportes y deja `en cola` con los valores de arranque (`etapa` y `nivelClasif` por `DEFAULT`, `rutaDiagnostico` nula, `fechaAnalisis` = la hora del reinicio, así que entra al final de la cola). Como último paso de la transacción (el worker no ve el análisis en cola hasta el commit) borra `pausa.json`, `pausa.jpg`, `correcciones.json`, `rachas_aceptadas.json` y `trabajo/`; no toca el video, `web.mp4`, `cajas.json`, `progreso.json` ni `tiempos.json` (el worker los reescribe). Probado con JUnit, incluidos dos reinicios a la vez; falta probarlo con el worker real
+  - [x] `409` en `error`, `en pausa`, `cancelado` o en curso (también `en cola`)
+  - [x] `409` si el video ya se borró (`VIDEO.archivo` nulo), porque reiniciar vuelve a correr el análisis sobre el video
 - [x] `GET .../diagnostic` entrega el PDF de diagnóstico
 
 ## 7. Resultados y revisión

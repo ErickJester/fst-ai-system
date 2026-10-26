@@ -60,4 +60,11 @@ public class RevisionController {
 		return Respuesta.ok(revisionService.corregir(id, idAnalisis, cuerpo, authentication), HttpStatus.OK);
 	}
 
+	// R-04: 202, porque el trabajo sigue: el análisis queda en cola y el worker lo corre otra vez.
+	@PostMapping("/restart")
+	public ResponseEntity<Map<String, Object>> reiniciar(@PathVariable Integer id, @PathVariable Integer idAnalisis,
+			Authentication authentication) {
+		return Respuesta.ok(revisionService.reiniciar(id, idAnalisis, authentication), HttpStatus.ACCEPTED);
+	}
+
 }

@@ -26,4 +26,10 @@ public interface RevisionService {
 	Map<String, Object> corregir(Integer idExperimento, Integer idAnalisis, Map<String, Object> cuerpo,
 			Authentication authentication);
 
+	// R-04: tira el resultado del análisis (OBSERVACION, SEGUNDO y las correcciones humanas), invalida los reportes del
+	// experimento y lo deja 'en cola' con los valores de arranque, para que el worker lo corra desde cero sobre el mismo video.
+	// 403 si quien pide no subió el video ni es Administrador; 409 si no está completado, si otro reinicio se adelantó o si el
+	// video ya se borró. Devuelve {idAnalisis, estado}.
+	Map<String, Object> reiniciar(Integer idExperimento, Integer idAnalisis, Authentication authentication);
+
 }
