@@ -132,7 +132,7 @@ export default function PausaPage() {
               <input className="input num" id={'r' + k} type="number" value={recuadro[k]} onChange={setCampo(k)} />
             </div>
           ))}
-          <span className="hint" style={{ marginLeft: 6, marginBottom: 10 }}>Píxeles de la imagen ({p.ancho} × {p.alto}). Con el foco en el recuadro: flechas para moverlo, Alt + flechas para el tamaño.</span>
+          <span className="hint" style={{ marginLeft: 6, marginBottom: 10 }}>Píxeles de la imagen{p.ancho > 0 && p.alto > 0 ? ` (${p.ancho} × ${p.alto})` : ''}. Con el foco en el recuadro: flechas para moverlo, Alt + flechas para el tamaño.</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>

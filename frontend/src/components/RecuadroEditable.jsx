@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState } from 'react'
 
 const MIN = 40 // lado mínimo del recuadro, en píxeles de la imagen
 const ESQUINAS = [['x0', 'y0'], ['x1', 'y0'], ['x0', 'y1'], ['x1', 'y1']]
@@ -10,8 +10,12 @@ const limitar = (v, a, b) => Math.min(b, Math.max(a, v))
 // recuadro, las flechas lo mueven (Mayús: 20 px) y Alt + flechas cambian su tamaño.
 // Los demás cilindros se ven punteados, solo como referencia.
 // Sin imagen (src null) se ve el aviso sinImagen sobre un fondo oscuro del mismo tamaño.
-export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [], onChange, etiqueta, sinImagen }) {
+// Si el backend no trae el tamaño (ancho o alto en 0), se toma el de la imagen al cargarla.
+export default function RecuadroEditable({ src, ancho: anchoDado, alto: altoDado, recuadro, otros = [], onChange, etiqueta, sinImagen }) {
   const svgRef = useRef(null)
+  const [natural, setNatural] = useState(null)
+  const ancho = anchoDado || natural?.ancho || 0
+  const alto = altoDado || natural?.alto || 0
   const arrastre = useRef(null) // { modo: 'mover' | [kx, ky], desde: {x, y}, inicial }
 
   // Punto del puntero → coordenadas de la imagen.
@@ -79,13 +83,14 @@ export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [
   return (
     <div style={{ position: 'relative', lineHeight: 0, background: '#111', userSelect: 'none' }}>
       {src
-        ? <img src={src} alt="Imagen fija del instante de la pausa" style={{ width: '100%', display: 'block' }} />
+        ? <img src={src} alt="Imagen fija del instante de la pausa" style={{ width: '100%', display: 'block' }}
+            onLoad={(e) => setNatural({ ancho: e.currentTarget.naturalWidth, alto: e.currentTarget.naturalHeight })} />
         : (
           <div style={{ aspectRatio: ancho + ' / ' + alto, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
             {sinImagen && <p style={{ margin: '18px 24px 0', maxWidth: 560, lineHeight: 1.5, fontSize: 12.5, color: '#d6d7d9', textAlign: 'center' }}>{sinImagen}</p>}
           </div>
         )}
-      <svg ref={svgRef} viewBox={`0 0 ${ancho} ${alto}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
+      {ancho > 0 && alto > 0 && <svg ref={svgRef} viewBox={`0 0 ${ancho} ${alto}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none' }}
         onPointerMove={seguir} onPointerUp={soltar} onPointerCancel={soltar}>
         {/* Oscurece todo menos el recuadro que se ajusta. */}
         <path d={`M0 0H${ancho}V${alto}H0Z M${r.x0} ${r.y0}V${r.y1}H${r.x1}V${r.y0}Z`} fill="rgba(0,0,0,.35)" fillRule="evenodd" pointerEvents="none" />
@@ -102,7 +107,7 @@ export default function RecuadroEditable({ src, ancho, alto, recuadro, otros = [
           <rect key={kx + ky} x={r[kx] - lado / 2} y={r[ky] - lado / 2} width={lado} height={lado} fill="#fff" stroke="#e8336f" strokeWidth={ancho / 500}
             style={{ cursor: (kx === 'x0') === (ky === 'y0') ? 'nwse-resize' : 'nesw-resize' }} onPointerDown={empezar([kx, ky])} />
         ))}
-      </svg>
+      </svg>}
     </div>
   )
 }
