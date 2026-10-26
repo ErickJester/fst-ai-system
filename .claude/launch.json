@@ -4,20 +4,44 @@
     {
       "name": "fst-labeler",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["tools/fst_labeler/app.py"],
+      "runtimeArgs": [
+        "tools/fst_labeler/app.py"
+      ],
       "port": 5055
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "mockups-v2",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "mockup/v2"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--directory",
+        "mockup/v2"
+      ],
       "port": 8765
+    },
+    {
+      "name": "frontend-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "demo"
+      ],
+      "port": 5174
     }
   ]
 }
