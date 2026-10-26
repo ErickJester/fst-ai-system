@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,6 +128,19 @@ public class ReporteAlmacen {
 			});
 		} else {
 			borrarCarpeta(idExperimento);
+		}
+	}
+
+	// Cambió el nombre o los apellidos de una cuenta: el PDF de cada experimento suyo muestra el nombre del creador, así que sus
+	// reportes guardados ya no lo reflejan. Bloquea TODOS los experimentos de la cuenta en orden de idexperimento (un solo
+	// SELECT ... FOR UPDATE con ORDER BY: PostgreSQL bloquea en el orden del ORDER BY) y luego invalida cada reporte. Va después
+	// de la fila de la cuenta (CandadosDeCuenta) y antes del UPDATE de usuario. Lo usan PATCH /users/me y PATCH /admin/users/{id}.
+	public void invalidarDeLaCuenta(String idInstitucional) {
+		List<Integer> experimentos = jdbc.queryForList(
+				"SELECT idexperimento FROM experimento WHERE idinstitucional = ? ORDER BY idexperimento FOR UPDATE",
+				Integer.class, idInstitucional);
+		for (Integer idExperimento : experimentos) {
+			invalidar(idExperimento);
 		}
 	}
 

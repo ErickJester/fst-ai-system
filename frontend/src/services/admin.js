@@ -68,10 +68,11 @@ export async function createUser({ nombre, apellidos, email, identificador }) {
   return { ...deCuenta({ ...datos, rol: 'Investigador', activo: true, cambioRequerido: true }), password_temporal: d.passwordTemporal }
 }
 
-// PATCH /admin/users/:idInstitucional { nombre, apellidos, correo, idInstitucional, rol } (9.6,
-// editar cuenta). 409 si el correo ya existe o si deja el sistema sin administradores activos (R-16).
-export async function updateUser(id, { nombre, apellidos, email, identificador, role }) {
-  const cambios = { nombre, apellidos, correo: email, idInstitucional: identificador, rol: ROL.aGuia[role] }
+// PATCH /admin/users/:idInstitucional { nombre, apellidos, correo, rol } (9.6, editar cuenta). 409 si el
+// correo ya existe o si deja el sistema sin administradores activos (R-16). El identificador es la llave de
+// la cuenta y no se cambia: no se manda (el backend rechaza uno distinto con 400).
+export async function updateUser(id, { nombre, apellidos, email, role }) {
+  const cambios = { nombre, apellidos, correo: email, rol: ROL.aGuia[role] }
   const d = USE_MOCKS ? await mock.modificar(id, cambios) : (await api.patch(`/admin/users/${id}`, cambios)).data
   return deCuenta(d)
 }

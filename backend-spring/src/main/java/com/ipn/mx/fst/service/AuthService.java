@@ -18,4 +18,12 @@ public interface AuthService {
 	// datos de la cuenta, sin token.
 	Map<String, Object> actualizarPerfil(String id, PerfilPeticion peticion);
 
+	// Manda por correo un enlace para restablecer la contraseña, si el correo es de una cuenta activa. No dice si lo encontró: el
+	// controller responde lo mismo en los dos casos (R-01).
+	void recuperar(String correo);
+
+	// Cambia la contraseña con el enlace del correo. 400 si el enlace venció, no es válido o ya se usó (la contraseña cambió desde
+	// que se emitió); 422 si la contraseña nueva no cumple las reglas. Deja cambioRequerido en false.
+	void restablecer(String token, String nueva);
+
 }

@@ -8,7 +8,7 @@ import { useAsync, useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hoo
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { mensajeError } from '../services/api'
-import { esCorreo, DIA } from '../lib/fst'
+import { esCorreo, DIA, nombreDeConductaBD } from '../lib/fst'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
 const VACIO = { nombre: '', apellidos: '', correo: '', id: '', rol: 'INVESTIGADOR' }
@@ -214,7 +214,7 @@ export default function AdminPage() {
               <Campo id="cNombre" label="Nombre"><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></Campo>
               <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
               <Campo id="cCorreo" label="Correo electrónico"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
-              <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} /></Campo>
+              <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} disabled={!!editando} /></Campo>
               {editando
                 ? (
                   <Campo label="Rol">
@@ -357,7 +357,7 @@ function Disco({ d }) {
 
 // Solo de consulta: ningún requisito permite cambiar las conductas.
 const catalogos = (s) => [
-  { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: c, m: 'sin duración mínima' })) },
+  { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: nombreDeConductaBD(c), m: 'sin duración mínima' })) },
 ]
 
 // La contraseña temporal se muestra una sola vez: no se cierra con Escape ni al hacer clic

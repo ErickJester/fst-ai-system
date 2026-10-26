@@ -76,6 +76,13 @@ export const ESTADO_EXPERIMENTO = {
 export const CONDUCTA_BD = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
 export const DE_BD = Object.fromEntries(Object.entries(CONDUCTA_BD).map(([k, v]) => [v, k]))
 
+// Cómo se llama cada conducta en pantalla. El backend manda el nombre de la base («nado activo»); la pantalla
+// muestra «Nado activo», «Conducta activa»…
+export const NOMBRE_CONDUCTA = { nado: 'Nado activo', inmovilidad: 'Inmovilidad', escalamiento: 'Escalamiento', activa: 'Conducta activa' }
+
+// De la conducta como la guarda la base («nado activo») al nombre de pantalla. Un nombre desconocido se muestra tal cual.
+export const nombreDeConductaBD = (bd) => NOMBRE_CONDUCTA[DE_BD[bd]] ?? bd
+
 // Revisión segundo a segundo de un análisis completado (R-14).
 export const enlaceRevision = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/revision`
 

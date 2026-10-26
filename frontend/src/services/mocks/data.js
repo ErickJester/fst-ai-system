@@ -192,8 +192,8 @@ export const users = [
 // Estado del sistema (2g): disco en GB y catálogo de conductas.
 export const system = {
   disco: { usado_gb: 412, total_gb: 500, videos_gb: 381, resultados_gb: 2.4, por_liberar_7d_gb: 48 },
-  // Las cuatro conductas de la tabla CONDUCTA; ninguna tiene duración mínima (RF-18).
-  conductas: ['Nado activo', 'Inmovilidad', 'Escalamiento', 'Conducta activa'],
+  // Las cuatro conductas como las manda el backend (los nombres de la base); ninguna tiene duración mínima (RF-18).
+  conductas: ['nado activo', 'inmovilidad', 'escalamiento', 'conducta activa'],
 }
 
 // Notificaciones de la cuenta (2k), con los campos de la guía. tipo: los seis de la base

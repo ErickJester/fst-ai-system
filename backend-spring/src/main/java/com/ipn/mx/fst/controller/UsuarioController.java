@@ -24,7 +24,8 @@ public class UsuarioController {
 	private AuthService authService;
 
 	// Si cambia el nombre o los apellidos, se invalidan los reportes guardados de todos los experimentos de la cuenta
-	// (AuthServiceImpl.actualizarPerfil). Cuando exista PATCH /admin/users/{id} (§3), debe hacer lo mismo.
+	// (AuthServiceImpl.actualizarPerfil). PATCH /admin/users/{id} (AdminServiceImpl.modificar) hace lo mismo, con los mismos
+	// candados en el mismo orden (CandadosDeCuenta).
 	@PatchMapping("/me")
 	public ResponseEntity<Map<String, Object>> actualizarPerfil(@Valid @RequestBody PerfilPeticion peticion,
 			Authentication authentication) {

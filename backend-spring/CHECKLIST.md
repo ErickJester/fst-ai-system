@@ -10,15 +10,16 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (25-oct-2026, versión 0.83.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (25-oct-2026, versión 0.84.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
 probada en desarrollo con una pausa forzada; y el encargo 33 (foto de la pausa igual que fst_auto, «recuadro casi igual»,
 botón «El recuadro está bien, continuar» y editar experimento solo el creador o un Administrador), en código con pruebas
-unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `REPORTE` y su invalidación, §8), igual:
-Erick prueba los dos en su máquina. **Sin hacer:** administración y recuperación de contraseña (§3),
-reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
+unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `REPORTE` y su invalidación, §8), igual;
+y el encargo 35 (administración y recuperar contraseña, §2, §3 y §11), con pruebas JUnit contra una PostgreSQL de
+prueba y sin probar con el correo real ni el navegador. Erick prueba los tres en su máquina. **Sin hacer:** reinicio (§6),
+bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -48,8 +49,8 @@ reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificaci
 - [x] `POST /auth/login` con error `401` genérico (R-01), el mismo con contraseña mala, correo inexistente o cuenta inactiva. La respuesta trae `token`, `idInstitucional`, `nombre`, `apellidos`, `correo`, `rol` y `cambioRequerido`, sin el hash
 - [x] `POST /auth/logout`, sin lista de bloqueo: pide token (§6) y responde `200`
 - [x] `PATCH /auth/password`, y el cambio es obligatorio si `cambioRequerido`: mientras no la cambie, todo salvo esta ruta y el logout responde `403`; mínimo 8 caracteres y máximo 72 bytes (límite de bcrypt)
-- [ ] `POST /auth/recover` envía un enlace JWT firmado por correo, con vigencia `RESET_LINK_MINUTES`
-- [ ] `POST /auth/reset`
+- [x] `POST /auth/recover` envía un enlace JWT firmado por correo, con vigencia `RESET_LINK_MINUTES` (60 por omisión). Responde `200` igual exista o no el correo (o la cuenta esté desactivada) y el correo sale en otro hilo. Probado con JUnit contra una PostgreSQL de prueba (encargo 35); falta probarlo con el correo real y el navegador
+- [x] `POST /auth/reset` `{token, contrasenaNueva}`: el enlace sirve una sola vez y sin tablas nuevas (el token lleva una huella HMAC del hash de la contraseña; al cambiar esta deja de servir, también por el cambio normal o por una temporal nueva). `400` si venció, ya se usó o no es un enlace; `422` si la contraseña no cumple (no gasta el enlace); dos usos a la vez, solo pasa uno. Probado con JUnit (encargo 35)
 - [x] `PATCH /users/me` (perfil): nombre, apellidos y correo, `409` si el correo es de otra cuenta
 - [x] Todo exige JWT salvo login, recover, reset, `/health` y Swagger: sin token se responde `401` con envoltorio; CORS centralizado y el preflight de `localhost:5173` pasa
 - [x] Respuesta con envoltorio `{data, error, status}`, salvo las rutas que devuelven archivo (§6): `Respuesta.ok/error` en `/experiments` y `/health`, y `401`/`403` de Spring Security escritos con la misma forma
@@ -57,13 +58,13 @@ reinicio (§6), bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificaci
 - [x] Comando para crear el primer administrador con `ADMIN_*`, que ponga `cambioRequerido = true` y lo inserte en `ADMINISTRADOR` (§11.7): `AdminInicial` al arrancar; idempotente (al reiniciar dice "ya existe" y no duplica), sin escribir la contraseña en el log; con `ADMIN_ID` vacío solo avisa
 
 ## 3. Administración (§6, R-07, R-16)
-- [ ] Verificación de rol Administrador en el backend en cada `/admin/*`, con `403` si no lo es
-- [ ] `GET /admin/users` con filtros de rol y estado
-- [ ] `POST /admin/users` genera una contraseña temporal, la envía por correo y la muestra una sola vez
-- [ ] `409` si el identificador o el correo ya existen
-- [ ] `PATCH /admin/users/{id}` modifica datos y rol, o desactiva con `activo = false`, nunca con `DELETE`
-- [ ] `409` al desactivar la última cuenta de Administrador activa o quitarle el rol (R-16)
-- [ ] `GET /admin/system` con disco y cola
+- [x] Verificación de rol Administrador en el backend en cada `/admin/*`, con `403` si no lo es (`SeguridadConfig`, el rol se lee de la base en cada petición). Probado con JUnit (encargo 35)
+- [x] `GET /admin/users?rol=&estado=` (`Investigador`/`Administrador`, `activa`/`inactiva`; `400` con otro valor); trae `nExperimentos`. Probado con JUnit
+- [x] `POST /admin/users` genera una contraseña temporal (12 caracteres, `SecureRandom`), la envía por correo después del commit, la devuelve una sola vez en `passwordTemporal` y pone `cambioRequerido = true`; con ella solo se puede cambiar la contraseña. `POST /admin/users/{id}/reset-temporal` hace lo mismo para una cuenta existente (la anterior y los enlaces pendientes dejan de servir). Probado con JUnit; el correo real no
+- [x] `409` si el identificador o el correo ya existen (también con dos peticiones a la vez). Probado con JUnit
+- [x] `PATCH /admin/users/{id}` modifica nombre, apellidos, correo y rol, o desactiva con `activo = false`; no hay `DELETE`. El identificador no se cambia (`400` si llega uno distinto): es la llave de la cuenta. Si cambia el nombre o los apellidos invalida los reportes de la cuenta, igual que `PATCH /users/me`. Probado con JUnit
+- [x] `409` al desactivar la última cuenta de Administrador activa o quitarle el rol (R-16): `ReglaAdministradores`, con la parte pura probada sola y las filas de `ADMINISTRADOR` bloqueadas en orden, así que dos peticiones a la vez no dejan el sistema sin ninguno (25 vueltas de cada caso; sin el candado fallan). Candados de cuenta con `FOR NO KEY UPDATE` (`CandadosDeCuenta`), también en `PATCH /users/me`
+- [x] `GET /admin/system` con disco y cola: `disco {usado_gb, total_gb, videos_gb, resultados_gb, por_liberar_7d_gb}` (calculado y guardado un minuto), `conductas` y `cola`. Probado con JUnit la forma y el orden; el disco con un volumen real no
 
 ## 4. Experimentos
 - [x] `POST /experiments` con nombre único y fecha: `201`, `400`, `404`, `409` y `500`; el creador sale del JWT y se ignora el `idInstitucional` del cuerpo
@@ -200,8 +201,8 @@ real con sesión (la hará el usuario en otra PC).
 
 ## 11. Criterios de aceptación finales (§12)
 - [ ] `docker compose up` arranca en una máquina limpia, y en una segunda máquina. Hecho: el portable se probó desde el zip el 18-oct y Erick lo usa en otra PC; falta probar el compose definitivo de la raíz
-- [ ] Un investigador recibe `403` en `/admin/*`
-- [ ] No se puede quitar al último Administrador
+- [x] Un investigador recibe `403` en `/admin/*`. Probado con JUnit (encargo 35)
+- [x] No se puede quitar al último Administrador. Probado con JUnit, también con dos peticiones a la vez (encargo 35)
 - [x] Un Día 1 se guarda sin análisis
 - [ ] Con dos análisis en cola, el worker los procesa uno a la vez. Hecho: probado en desarrollo (23-oct) con dos vueltas reales de la cola (`cola.vuelta`) y un procesamiento simulado de 6 s: el más antiguo primero, un solo `procesando` a la vez y el segundo espera. Falta repetirlo con dos videos reales y el modelo (varios minutos y unos 3.5 GB de memoria)
 - [ ] Un reporte se regenera si hay un análisis más nuevo. Hecho en código (encargo 34): al completar un análisis el worker invalida los reportes del experimento; falta probarlo con dos análisis reales
@@ -220,7 +221,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `/status`: campo extra `motivoCancelacion` (`usuario` o `plazo`). Decidido (D-112): no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa)
 - [ ] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); el worker ya crea pausas (25-oct), pero no se ha comprobado este campo en `/status` con una (ver la casilla «Pausa» de la sección 6)
 - [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
-- [ ] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada
+- [x] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada (el que se procesa primero). `conductas` trae los nombres de la base y el frontend los convierte
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
 - [x] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
 - [x] `/results`: cada espécimen trae además `idGrupo`

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, enHoraLocal, pctDeEtapa, PESO_ETAPA, mmss, plazoRestante, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, enHoraLocal, pctDeEtapa, PESO_ETAPA, mmss, plazoRestante, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition, nombreDeConductaBD, NOMBRE_CONDUCTA } from './fst'
 
 describe('plazoRestante: lo que queda de las 72 h de la pausa', () => {
   it('en horas y minutos; con menos de una hora solo minutos', () => {
@@ -145,5 +145,19 @@ describe('resultados', () => {
     expect(primeraTandaLista(exp)).toEqual({ gid: 'G-02', letra: 'B' })
     expect(primeraTandaLista({ grupos: [] })).toBeNull()
     expect(enlaceResultados('EXP-2026-02', 'G-02', 'B')).toBe('/experimentos/EXP-2026-02/resultados?grupo=G-02&tanda=B')
+  })
+})
+
+describe('nombres de las conductas en pantalla', () => {
+  it('lo que guarda la base («nado activo») sale con su nombre de pantalla, igual que en Resultados y Revisión', () => {
+    expect(nombreDeConductaBD('nado activo')).toBe('Nado activo')
+    expect(nombreDeConductaBD('inmovilidad')).toBe('Inmovilidad')
+    expect(nombreDeConductaBD('escalamiento')).toBe('Escalamiento')
+    expect(nombreDeConductaBD('conducta activa')).toBe('Conducta activa')
+    expect(Object.values(NOMBRE_CONDUCTA)).toEqual(['Nado activo', 'Inmovilidad', 'Escalamiento', 'Conducta activa'])
+  })
+
+  it('un nombre que no conoce se muestra tal cual, sin romper la pantalla', () => {
+    expect(nombreDeConductaBD('nadoactivo')).toBe('nadoactivo')
   })
 })

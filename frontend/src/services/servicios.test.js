@@ -522,3 +522,19 @@ describe('envoltorio y mensajes de error del servidor (§6)', () => {
     expect(esEnvoltorio({ idExperimento: 7 })).toBe(false)
   })
 })
+
+describe('administración con el backend real', () => {
+  it('editar una cuenta no manda el identificador (es la llave de la cuenta) y manda el rol de la guía', async () => {
+    // VITE_API_REAL=admin: la parte de administración llama a la API en vez de usar los datos de ejemplo.
+    vi.stubEnv('VITE_API_REAL', 'admin')
+    vi.resetModules()
+    const apiReal = (await import('./api')).default
+    const adminReal = await import('./admin')
+    const patch = vi.spyOn(apiReal, 'patch').mockResolvedValue({ data: { idInstitucional: '2', nombre: 'Ana', apellidos: 'Pérez', correo: 'a@ipn.mx', rol: 'Administrador', activo: true } })
+    await adminReal.updateUser('2', { nombre: 'Ana', apellidos: 'Pérez', email: 'a@ipn.mx', identificador: '999', role: 'ADMIN' })
+    expect(patch).toHaveBeenCalledWith('/admin/users/2', { nombre: 'Ana', apellidos: 'Pérez', correo: 'a@ipn.mx', rol: 'Administrador' })
+    patch.mockRestore()
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+})

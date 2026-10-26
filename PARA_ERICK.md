@@ -161,7 +161,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 | `PATCH /me` | `{ nombre, apellidos, email }` | usuario · 409 si el correo ya existe |
 | `GET /admin/users` | — | lista de cuentas (sin contraseñas) |
 | `POST /admin/users` | `{ nombre, apellidos, email, identificador }` | **201** con `password_temporal` (una sola vez) · 409 si el correo existe |
-| `PATCH /admin/users/:id` | `{ is_active }` o `{ nombre, apellidos, email, identificador, role }` | cuenta · 409 si el correo existe o si deja el sistema sin administradores |
+| `PATCH /admin/users/:id` | `{ is_active }` o `{ nombre, apellidos, email, role }` | cuenta · 409 si el correo existe o si deja el sistema sin administradores. El identificador es la llave de la cuenta y no se puede cambiar (400 si llega uno distinto) |
 | `POST /admin/users/:id/reset-temporal` | — | `{ password_temporal }` (una sola vez); la anterior deja de servir y vuelve `cambioRequerido` |
 | `GET /admin/system` | — | `{ disco, conductas, modelo }` |
 | `GET /experiments` | — | lista con estado calculado, `tratamientos` (lista), `creador_id` y `aviso_vencimiento` |
@@ -204,7 +204,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 8. **Contraseñas y permisos**: modal en Admin que muestra la contraseña temporal una sola vez; pantalla `/restablecer` con caso de enlace vencido; los datos de ejemplo comprueban contraseñas de las cuentas creadas; 403 con aviso.
 9. **Versión 0.3.0**, como pediste en `PARA_VANESA.md`.
 10. **Datos de ejemplo persistentes** en `localStorage` y botón «Reiniciar datos» en la franja de MODO DEMO.
-11. **Admin**: editar cuenta (nombre, apellidos, correo, identificador, rol), restablecer la contraseña temporal (mismo modal, se muestra una vez) y reactivar cuentas inactivas. La cuenta propia se edita en Mi perfil y el rol del único Administrador activo no se puede cambiar.
+11. **Admin**: editar cuenta (nombre, apellidos, correo y rol; el identificador es la llave de la cuenta y no se puede cambiar), restablecer la contraseña temporal (mismo modal, se muestra una vez) y reactivar cuentas inactivas. La cuenta propia se edita en Mi perfil y el rol del único Administrador activo no se puede cambiar.
 12. **Calidad**: pruebas automáticas con Vitest (`npm test`, 24 pruebas) y revisión con ESLint (`npm run lint`).
 13. **Errores y rutas**: aviso «Algo salió mal» en lugar de pantalla en blanco; una ruta inexistente lleva a la pantalla de inicio de la cuenta, y con sesión abierta `/login` ya no muestra el formulario.
 14. **Detalles de uso**: sugerencias de grupo con el teclado (flechas, Enter, Escape) en Cargar video; especie y notas en el encabezado de Experimento; cada enlace a resultados lleva a su tanda, y sin resultados se ve «Todavía no hay resultados».
@@ -313,7 +313,7 @@ Son **propuestas** hechas desde el frontend; el backend tiene la última palabra
 3. **Duración de la sesión**: si no debe sobrevivir al cerrar la pestaña, se queda `sessionStorage` y conviene bajar `JWT_EXPIRES_HOURS` (168 h hoy) a algo como 12 h. Si debe sobrevivir, cookie HttpOnly (Set-Cookie, SameSite, CORS con credenciales, CSRF, y logout que borre la cookie).
 4. **Nombres de campos**: el documento dice `cambioRequerido`; el frontend usa `must_change_password`, `role`, `email`, `is_active`. Con la lista real de `/auth/login` y `/admin/users` se alinean los datos de ejemplo de una vez.
 5. **Recuperación**: ¿la ruta del enlace es `/restablecer?token=…` y el enlace vencido responde `400 { error }`?
-6. **Editar cuenta (§9.6)**: el frontend ya lo tiene con `PATCH /admin/users/:id` y los campos nombre, apellidos, correo, identificador y rol. Falta que el backend confirme campos y ruta.
+6. **Editar cuenta (§9.6)**: el frontend ya lo tiene con `PATCH /admin/users/:id` y los campos nombre, apellidos, correo y rol (el identificador es la llave de la cuenta y no se puede cambiar). Falta que el backend confirme campos y ruta.
 
 ---
 

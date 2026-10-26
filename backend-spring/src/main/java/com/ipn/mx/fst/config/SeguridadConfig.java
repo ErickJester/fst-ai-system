@@ -110,6 +110,9 @@ public class SeguridadConfig {
 						// Solo ese GET y esa ruta exacta; todo lo demás de /experiments sigue pidiendo sesión.
 						.requestMatchers(HttpMethod.GET, "/experiments/*/analyses/*/video").permitAll()
 						.requestMatchers("/v3/api-docs/**", "/documentacion/**", "/swagger-ui/**", "/error").permitAll()
+						// R-07: todo /admin/** es solo de Administradores (403 a los demás). El rol sale de la base en cada petición
+						// (ConvertidorJwt), no del token.
+						.requestMatchers("/admin/**").hasRole("ADMINISTRADOR")
 						.anyRequest().authenticated())
 				// El token se acepta solo en la cabecera "Authorization: Bearer" (el resolver por defecto),
 				// nunca en la URL, porque las URL quedan en los registros.

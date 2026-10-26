@@ -2,6 +2,8 @@ package com.ipn.mx.fst.controller;
 
 import com.ipn.mx.fst.dto.CambioContrasenaPeticion;
 import com.ipn.mx.fst.dto.LoginPeticion;
+import com.ipn.mx.fst.dto.RecuperarPeticion;
+import com.ipn.mx.fst.dto.RestablecerPeticion;
 import com.ipn.mx.fst.service.AuthService;
 import com.ipn.mx.fst.utilerias.Respuesta;
 import jakarta.validation.Valid;
@@ -28,6 +30,20 @@ public class AuthController {
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginPeticion peticion) {
 		return Respuesta.ok(authService.login(peticion.getCorreo(), peticion.getContrasena()), HttpStatus.OK);
+	}
+
+	// 200 siempre que el cuerpo sea válido, exista o no la cuenta (R-01): no se revela qué correos están registrados.
+	@PostMapping("/recover")
+	public ResponseEntity<Map<String, Object>> recuperar(@Valid @RequestBody RecuperarPeticion peticion) {
+		authService.recuperar(peticion.getCorreo());
+		return Respuesta.ok(null, HttpStatus.OK);
+	}
+
+	// Sin sesión: el enlace del correo es la credencial. 400 si ya no sirve, 422 si la contraseña no cumple las reglas.
+	@PostMapping("/reset")
+	public ResponseEntity<Map<String, Object>> restablecer(@Valid @RequestBody RestablecerPeticion peticion) {
+		authService.restablecer(peticion.getToken(), peticion.getContrasenaNueva());
+		return Respuesta.ok(null, HttpStatus.OK);
 	}
 
 	// Cambia la contraseña de quien tiene la sesión abierta (el usuario sale del token). Es lo único, junto
