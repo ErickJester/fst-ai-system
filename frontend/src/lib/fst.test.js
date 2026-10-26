@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, enHoraLocal, pctDeEtapa, PESO_ETAPA, mmss, plazoRestante, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition, nombreDeConductaBD, NOMBRE_CONDUCTA } from './fst'
+import { mean, variance, fmt, r1, fechaCorta, fechaRango, norm, esCorreo, primeraTandaLista, enlaceResultados, enHoraLocal, pctDeEtapa, PESO_ETAPA, mmss, plazoRestante, segundosDesde, nombreEquipo, tiempoDeEtapa, textoVideo, nombreDeContentDisposition, nombreDeConductaBD, NOMBRE_CONDUCTA, finDeBloque, columnasDeBloques } from './fst'
 
 describe('plazoRestante: lo que queda de las 72 h de la pausa', () => {
   it('en horas y minutos; con menos de una hora solo minutos', () => {
@@ -159,5 +159,21 @@ describe('nombres de las conductas en pantalla', () => {
 
   it('un nombre que no conoce se muestra tal cual, sin romper la pantalla', () => {
     expect(nombreDeConductaBD('nadoactivo')).toBe('nadoactivo')
+  })
+})
+
+describe('bloques de 5 s', () => {
+  const bloque = (inicio, n) => ({ inicio, segundos: Array(n).fill(null) })
+
+  it('el bloque termina donde acaba su último segundo, también si es incompleto', () => {
+    expect(fmt(finDeBloque(bloque(1, 5)))).toBe('0:05')
+    expect(fmt(finDeBloque(bloque(296, 5)))).toBe('5:00')
+    expect(fmt(finDeBloque(bloque(296, 2)))).toBe('4:57')
+  })
+
+  it('las columnas son las del espécimen con más bloques, y al menos una', () => {
+    expect(columnasDeBloques([{ bloques: Array(60).fill(0) }, { bloques: Array(58).fill(0) }])).toBe(60)
+    expect(columnasDeBloques([{ bloques: Array(3).fill(0) }])).toBe(3)
+    expect(columnasDeBloques([])).toBe(1)
   })
 })

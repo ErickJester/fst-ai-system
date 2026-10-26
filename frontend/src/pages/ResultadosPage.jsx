@@ -8,7 +8,7 @@ import BotonSalidaModelo from '../components/BotonSalidaModelo'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal, finDeBloque, columnasDeBloques } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -519,13 +519,16 @@ function Bloques({ clave, gid, letras }) {
   if (!data) {
     return (
       <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
-        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, 60 bloques con la conducta que ocupa más de sus cinco segundos (si nado activo y escalamiento empatan, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus cinco segundos, y rayados los que no se vieron bien. Todavía no está disponible.
+        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, bloques de cinco segundos con la conducta que ocupa más segundos (si hay empate arriba, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus segundos, y rayados los bloques en los que algún segundo no se vio bien. Todavía no está disponible.
       </div>
     )
   }
 
   const sel = abierto && data.especimenes.find((e) => e.letra === abierto.letra && e.numeroCilindro === abierto.numeroCilindro)?.bloques[abierto.i]
-  const desc = (b) => fmt(b.inicio - 1) + '–' + fmt(b.inicio + 4) + ' · ' + LBL[b.conducta] + (b.matiz ? ' (no se vio bien)' : '')
+  // Las columnas son las del espécimen con más bloques: el mismo segundo queda a la misma altura en todas las filas y las más
+  // cortas terminan antes (un video más corto, o un último bloque con menos de 5 s, no estira las celdas).
+  const columnas = columnasDeBloques(data.especimenes)
+  const desc = (b) => fmt(b.inicio - 1) + '–' + fmt(finDeBloque(b)) + ' · ' + LBL[b.conducta] + (b.matiz ? ' (no se vio bien)' : '')
 
   return (
     <div style={{ border: '1px solid var(--color-divider)', padding: '16px 18px' }}>
@@ -533,7 +536,7 @@ function Bloques({ clave, gid, letras }) {
         {data.especimenes.map((e) => (
           <div key={e.letra + e.numeroCilindro} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ width: 132, fontSize: 11.5, color: MUT60 }}>{especimen(e.numeroCilindro, e.letra)}</span>
-            <div role="group" aria-label={'Bloques de ' + especimen(e.numeroCilindro, e.letra)} style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(60, 1fr)', height: 18, border: '1px solid var(--color-divider)' }}>
+            <div role="group" aria-label={'Bloques de ' + especimen(e.numeroCilindro, e.letra)} style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${columnas}, 1fr)`, height: 18, border: '1px solid var(--color-divider)' }}>
               {e.bloques.map((b, i) => {
                 const on = abierto?.letra === e.letra && abierto.numeroCilindro === e.numeroCilindro && abierto.i === i
                 return (
@@ -564,7 +567,7 @@ function Bloques({ clave, gid, letras }) {
         </div>
       ) : (
         <p className="hint" style={{ margin: '12px 0 0' }}>
-          Cada celda es un bloque de 5 s con la conducta que ocupa más de sus segundos; si nado activo y escalamiento empatan, el bloque es conducta activa. Las celdas rayadas no se vieron bien. Haz clic en una para ver sus cinco segundos.
+          Cada celda es un bloque de 5 s con la conducta que ocupa más de sus segundos; si hay empate arriba, el bloque es conducta activa. Las celdas rayadas tienen algún segundo que no se vio bien. Haz clic en una para ver sus segundos.
         </p>
       )}
     </div>
