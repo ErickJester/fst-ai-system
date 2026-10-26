@@ -9,6 +9,8 @@ No cubre el backend, el worker ni el SQL y Docker de los anexos (ver `backend-sp
 ya existe una parte y la nota dice qué falta. Una casilla de pantalla marcada `[x]` significa que **la pantalla lo hace
 con datos de ejemplo**; que funcione contra el backend real se cuenta aparte, en las secciones 1 y 13.
 
+**Prueba del 26-oct-2026 (Vanesa, backend 0.86.1 `aba64af`):** con las rutas nuevas del backend se probaron y marcaron 11 casillas: `reset-temporal`, la ruta del enlace de recuperación, el PDF de diagnóstico, la imagen de la pausa, los bloques de 5 s, los 403 de `/admin/*`, la cuenta nueva con cambio obligatorio, la regla del último Administrador y el 409 al eliminar con un análisis en pausa. Van **156 de 165**. Lo que falta: probar en los tres navegadores, la prueba con personas, CSV y XLSX (backend), el correo de copia, los filtros en el servidor, el 409 con el video borrado, el ajuste y el vencimiento de la pausa de punta a punta, y el compose de desarrollo.
+
 **Revisión del 23-oct-2026 (rama `poc/backend-spring`, versión 0.80.0):** se agregó la casilla de eliminar una tanda con la regla nueva del grupo (§5), y se actualizó el empaquetado (§0): el compose definitivo está en la raíz y ya no existen `docker-compose.prod.yml` ni el servicio de desarrollo en el 5173. El cambio del frontend de Vanesa que falta traer a esta rama (D-107 en la pantalla, commit `6067e4c`) no está contado aquí.
 
 **Última revisión del estado (17-oct-2026, Vanesa):** se conectaron los servicios a las formas y rutas de la guía (pasos 1 a 10 de `PARA_VANESA_API.md`, puntos 41 a 51 de `PARA_ERICK.md`). Pruebas, lint y build pasan. Lo que queda abierto depende del backend real, de una confirmación de Erick o de pruebas con personas. Revisión anterior (15-oct-2026):
@@ -39,7 +41,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Desenvolver la respuesta `{data, error, status}` (§6) en el interceptor de `services/api.js`; los archivos no se tocan
 - [x] Leer el error solo del campo `error` del envoltorio, que es el formato acordado (§6)
 - [x] Equivalencias guía ↔ pantallas en `src/lib/contrato.js`, en los dos sentidos
-- [ ] Rutas alineadas con §6 y §6.1. Hecho: las de arriba. Falta lo siguiente
+- [x] Rutas alineadas con §6 y §6.1. Hecho: las de arriba. Falta lo siguiente
   - [x] Recuperar contraseña: `POST /auth/recover` con `{correo}`
   - [x] Cambiar contraseña: `PATCH /auth/password` con `{contrasenaActual, contrasenaNueva}` (nombres por confirmar)
   - [x] Perfil: `PATCH /users/me` con `{nombre, apellidos, correo}`
@@ -51,7 +53,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] Sugerir grupos y la siguiente tanda con `GET /experiments/{id}/groups?q=` (forma de la respuesta propuesta)
   - [x] Resultados con `/results`, `/results/byminute`, `/results/groups` y `/results/blocks`; el filtro por grupo o tanda, en el navegador (D-93)
   - [x] Progreso con `GET /experiments/{id}/status` (`/analisis?experimento=`; sin experimento junta los activos); Administración toma la cola de `/admin/system`. Ya no se usa `/queue`
-  - [ ] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
+  - [x] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación). Probado el 26-oct contra el backend 0.86.1 (`aba64af`): el backend ya la tiene (responde 200 con `passwordTemporal`; un investigador recibe 403)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
 - [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: lo que el backend aún no tiene (administración, recuperar contraseña, pausa, bloques, CSV y XLSX) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
@@ -66,7 +68,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Sin sesión se va al login; con sesión, el login no se vuelve a mostrar
 - [x] Validación de formularios en el cliente: correo con forma válida y contraseña nueva de 8 caracteres o más
 - [x] Mensaje genérico en el login con el backend real: un correo que existe con contraseña mala y uno que no existe dan el mismo 401 «Correo o contraseña incorrectos» (R-01)
-- [ ] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo
+- [x] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): el backend arma `WEB_URL + "/restablecer?token="` (`AuthServiceImpl`), la misma ruta del router
 
 ## 3. Dashboard de experimentos (§9.2)
 - [x] Tabla con nombre, fecha, grupos, estado y acciones, más especímenes, Día 2 analizados, responsable y retención
@@ -124,8 +126,8 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
 - [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
-- [ ] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje
-- [ ] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso
+- [x] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): el análisis con error devuelve `application/pdf`
+- [x] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): `/pause/image` devuelve el JPG
 
 ## 7. Resultados (§9.5, R-12, R-13)
 - [x] Selector «Ver»: una tanda o el grupo completo, con cada espécimen rotulado con su tanda (D-55, D-93)
@@ -139,7 +141,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
 - [ ] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). Falta: CSV y XLSX, que el backend aún no tiene (404)
-- [ ] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará
+- [x] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): `/results/blocks` responde 200
 
 ## 8. Administración (§9.6, R-16)
 - [x] Lista de cuentas con filtros de rol y estado, y la columna de experimentos
@@ -153,7 +155,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Acceso a la lista de todos los experimentos
 - [x] Un usuario que no es Administrador no entra a `/admin` (el router lo manda a Experimentos)
 - [x] Restablecer la contraseña temporal de una cuenta (propuesta del frontend)
-- [ ] El backend responde 403 en `/admin/*` aunque se conozca la URL. Hecho: el frontend oculta y redirige. Falta: depende del backend (§6)
+- [x] El backend responde 403 en `/admin/*` aunque se conozca la URL. Hecho: el frontend oculta y redirige. Falta: depende del backend (§6). Probado el 26-oct contra el backend 0.86.1 (`aba64af`): un investigador recibe 403 en `/admin/users`, `/admin/system` y `reset-temporal`
 
 ## 9. Revisión segundo a segundo (§9.7, R-14)
 - [x] Solo se abre con el análisis `completado`, y muestra una pantalla propia en 403 y 409
@@ -200,14 +202,14 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 
 ## 13. Criterios de aceptación finales (§12)
 En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta verlo de punta a punta.
-- [ ] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas
+- [x] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): la cuenta nueva entra con `cambioRequerido: true`, y hasta cambiarla el backend responde 401
 - [x] Subir un `.mp4` o `.mov` en horizontal crea un análisis `en cola`, el worker lo lleva a `completado` (entonces con el simulador, retirado el 20-oct) y Progreso lo refleja sin recargar (probado con el backend real)
 - [x] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor con 422 y su mensaje (probado con el backend real)
-- [ ] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo
-- [ ] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección
+- [x] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): desactivarse o quitarse el rol siendo el último da 409 «Debe existir al menos un Administrador activo.»
+- [x] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): ver la casilla de los 403 de §8
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
-- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
-- [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
+- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): ajustar y cancelar fuera de la pausa dan 409 «El análisis no está en pausa». Falta ver el ajuste y el vencimiento de punta a punta
+- [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): 409 «No se puede eliminar mientras un análisis está procesando o en pausa»
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
