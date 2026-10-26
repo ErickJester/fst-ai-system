@@ -17,6 +17,10 @@ public interface ResultadosService {
 	// Lo mismo que resultados y, en cada espécimen, los segundos de cada conducta por minuto.
 	Map<String, Object> resultadosPorMinuto(Integer idExperimento);
 
+	// {"especimenes": [...]}: los especímenes con análisis completado y, de cada uno, sus bloques de 5 s (R-12, D-53): inicio (segundo,
+	// desde 1), conducta que gana, matiz y los segundos del bloque. Se calculan desde SEGUNDO al pedirlos; no se guardan (D-52).
+	Map<String, Object> resultadosPorBloques(Integer idExperimento);
+
 	// Un renglón por grupo con el promedio y la desviación estándar de cada conducta (guía 7).
 	List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento);
 

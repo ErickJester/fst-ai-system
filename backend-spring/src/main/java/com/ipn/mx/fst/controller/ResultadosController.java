@@ -50,6 +50,11 @@ public class ResultadosController {
 		return Respuesta.ok(resultadosService.resultadosPorMinuto(id), HttpStatus.OK);
 	}
 
+	@GetMapping("/{id}/results/blocks")
+	public ResponseEntity<Map<String, Object>> resultsPorBloques(@PathVariable Integer id) {
+		return Respuesta.ok(resultadosService.resultadosPorBloques(id), HttpStatus.OK);
+	}
+
 	@GetMapping("/{id}/results/groups")
 	public ResponseEntity<Map<String, Object>> resultsPorGrupo(@PathVariable Integer id) {
 		return Respuesta.ok(resultadosService.resultadosPorGrupo(id), HttpStatus.OK);

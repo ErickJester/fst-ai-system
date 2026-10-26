@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (25-oct-2026, versión 0.85.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (25-oct-2026, versión 0.86.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -19,8 +19,9 @@ botón «El recuadro está bien, continuar» y editar experimento solo el creado
 unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `REPORTE` y su invalidación, §8), igual;
 y el encargo 35 (administración y recuperar contraseña, §2, §3 y §11), con pruebas JUnit contra una PostgreSQL de
 prueba y sin probar con el correo real ni el navegador; y el encargo 36 (reiniciar un análisis, §6), con pruebas JUnit
-contra una PostgreSQL de prueba y sin probar con el worker real. Erick prueba los cuatro en su máquina. **Sin hacer:**
-bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
+contra una PostgreSQL de prueba y sin probar con el worker real; y el encargo 37 (bloques de 5 s y pruebas JUnit de las
+reglas del video, su token, la revisión y `PUT .../segundos`, §7), sin probar contra el front. Erick prueba los cinco en
+su máquina. **Sin hacer:** CSV y XLSX (§8), el correo de cada notificación (§9) y el `error_log` de nginx con `?vt=` (§7).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -126,20 +127,20 @@ bloques de 5 s y CSV y XLSX (§8) y el correo de cada notificación (§9).
 - [x] `GET .../results`, con totales y porcentaje por conducta y la bandera `revisado`
 - [x] `GET .../results/byminute`: cada espécimen con sus minutos (las cuatro conductas siempre), desde `SEGUNDO`
 - [x] `GET .../results/groups`, con promedio (no suma), datos faltantes y aviso si mezcla `preciso` y `agrupado`
-- [ ] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12)
+- [x] `GET .../results/blocks`, bloques de 5 s con la mayoritaria y el desempate entre nado y escalamiento por "conducta activa" (R-12). Regla en `BloquesDeCinco` (12 pruebas unitarias) y la ruta en `BloquesDeResultadosTest` (5 pruebas con la base): gana la conducta con más segundos; cualquier empate arriba es «conducta activa»; los cinco sin ver, «conducta activa» con matiz; matiz si algún segundo del bloque no se vio; el último bloque de un video que no mide múltiplo de 5 s trae solo los segundos que existen y su ausencia no da matiz; «conducta activa» del modelo cuenta como una conducta más (no se suma a nado ni a escalamiento)
 - [x] Los totales se calculan desde `SEGUNDO`, nunca se guardan (D-52)
-- [x] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos: la revisión carga con el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`; `PARA_ERICK.md`, punto 54). Sin probar: `puedeCorregir` en falso con otra cuenta
-- [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct). Hecho: el video con `?vt=` responde `206` con `Range` y un `web.mp4` real (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`); las reglas de abajo siguen sin probar
-  - [ ] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]. Hecho: responde `200` con `{token}` cuando lo pide el front (Vanesa, 20-oct, backend `e66ce40`); sin probar las reglas de quién lo pide y de qué análisis
-  - [ ] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas. Hecho: con un `vt` válido responde `206` (Vanesa, 20-oct, `e66ce40`); sin `vt` o con uno inválido da `401` (probado sin sesión); sin probar que el token de otro análisis o el JWT de sesión en la URL se rechacen
+- [x] `GET .../review`, con `puedeCorregir`, recuadros desde `cajas.json` y segundos: la revisión carga con el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`; `PARA_ERICK.md`, punto 54). `puedeCorregir` en falso con otra cuenta y sin video, y en verdadero para el creador y el Administrador, probado con JUnit (`RevisionYVideoTest`)
+- [ ] `GET .../video` con soporte de `Range` y token de video (decidido el 15-oct). Hecho: el video con `?vt=` responde `206` con `Range` y un `web.mp4` real (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`, y con JUnit); falta la casilla de los logs de nginx
+  - [x] `POST .../analyses/{idAnalisis}/video-token`: token firmado de solo lectura de ese análisis, con vigencia `VIDEO_TOKEN_MINUTES`; solo para quien subió el video o un Administrador, con el análisis `completado` y el video disponible [PROPUESTA]. Hecho: responde `200` con `{token}` cuando lo pide el front (Vanesa, 20-oct, backend `e66ce40`); probado con JUnit (`RevisionYVideoTest`): creador y Administrador `200`, otra cuenta `403`, sin sesión `401`, `409` si no está completado (los cinco estados) o sin video (`archivo` nulo o sin `web.mp4`), `404` si el análisis no es de ese experimento
+  - [x] `GET .../video` acepta `?vt=` solo en esta ruta y solo para ese análisis; el JWT de sesión no se acepta en la URL y el token de video no sirve en otras rutas. Hecho: con un `vt` válido responde `206` (Vanesa, 20-oct, `e66ce40`); sin `vt` o con uno inválido da `401` (probado sin sesión); probado con JUnit: el token de otro análisis, el JWT de sesión (en la URL o en la cabecera), un token inventado y la ausencia de token dan `401`; el token de video con `Authorization: Bearer` o en `?vt=` no sirve en `/review`, `/results`, `/video-token`, `/restart` ni `/users/me` (`401`)
   - [ ] Sin query string en los logs de nginx ni de Spring. Hecho: el `access_log` de nginx ya no guarda `?vt=` y Spring no la registra. Falta: el `error_log` de nginx sí escribe la petición completa, con `?vt=`, cuando falla el backend (hallazgo del 19-oct, pendiente)
-  - [ ] Si el video ya se borró, responde que ya no existe (`404`). Sin probar
-- [ ] `PUT .../segundos`: Hecho: responde `200` al guardar desde el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`); las reglas de abajo están implementadas (encargo 15) y ninguna se ha probado
-  - [ ] Solo los segundos que cambiaron. Sin probar
-  - [ ] `origen` en `confirmada`, `corregida` o `dudosa`. Sin probar
-  - [ ] Solo el que subió el video o un Administrador (`403` a otra cuenta). Sin probar
-  - [ ] Solo sobre un análisis `completado`. Sin probar
-  - [ ] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige. Sin probar
+  - [x] Si el video ya se borró, responde que ya no existe (`404`), con `VIDEO.archivo` nulo o sin `web.mp4`, aunque el token sea válido. Probado con JUnit
+- [x] `PUT .../segundos`: Hecho: responde `200` al guardar desde el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`); las reglas de abajo están implementadas (encargo 15) y probadas con JUnit (`RevisionYVideoTest`, encargo 37)
+  - [x] Solo los segundos que cambiaron: el backend guarda exactamente los segundos que trae el cuerpo y no toca los demás (no compara con lo que hay). Todo o nada: un error en cualquiera no guarda ninguno. Probado con JUnit
+  - [x] `origen` en `confirmada`, `corregida` o `dudosa` (`maquina`, otro valor, vacío o sin origen dan `400`). Probado con JUnit
+  - [x] Solo el que subió el video o un Administrador (`403` a otra cuenta, `401` sin sesión). Probado con JUnit
+  - [x] Solo sobre un análisis `completado` (`409` en los otros cinco estados). Probado con JUnit
+  - [x] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige. Probado con JUnit
 
 ## 8. Reportes (§7, R-06)
 - [ ] CSV con las columnas `Grupo, Tanda, Espécimen, Tiempo, Nado, Escalamiento, Inmovilidad, Conducta activa`
@@ -227,7 +228,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `{grupo}` en la URL de subida es la etiqueta del grupo, codificada (ver `services/groups.js` del frontend)
 - [x] `/results`: cada espécimen trae además `idGrupo`
 - [x] `/results/groups`: forma `[{idGrupo, etiqueta, tipo, tratamiento, n, nTotal, faltantes, nivelMixto, promedios, porNivel}]`
-- [ ] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]`
+- [x] `/results/blocks`: cada espécimen con `bloques: [{inicio, conducta, matiz, segundos}]` (y `tanda`, `ordinal`, `numeroCilindro`, `idGrupo`)
 - [x] `GET .../review`: agregar `duracion`, `ancho` y `alto` (sin ellos el frontend asume 300 s y 1920 × 1080): los trae (`duracion` = segundos guardados; `ancho` y `alto` de `cajas.json`) y la revisión carga con el front (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`)
 - [x] Notificaciones: el id se llama `idNotificacion`; «marcar todas» se hace con un `PATCH` por notificación, sin `POST /notifications/read-all`
 - [x] `POST .../video-token` responde `{token}` y el video con `?vt=` admite `Range` con un `web.mp4` real: `200` con el token y `206` con `Range` (probado por Vanesa en el navegador, 20-oct, backend `e66ce40`)

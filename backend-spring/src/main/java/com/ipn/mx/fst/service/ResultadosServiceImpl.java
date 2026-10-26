@@ -481,6 +481,59 @@ public class ResultadosServiceImpl implements ResultadosService {
 
 	@Override
 	@Transactional(readOnly = true)
+	public Map<String, Object> resultadosPorBloques(Integer idExperimento) {
+		existe(idExperimento);
+
+		// Un renglón por segundo (ya con las correcciones guardadas), de cada espécimen con análisis completado; los segundos sin
+		// conducta (NULL) también vienen, y son los "no se vio".
+		Map<String, Map<String, Object>> porEspecimen = new LinkedHashMap<>();
+		Map<String, List<String>> conductas = new HashMap<>();
+		jdbc.query("""
+				SELECT g.idgrupo, g.etiqueta, t.ordinal, e.numerocilindro, s.segundo, s.conducta
+				FROM analisis a
+				JOIN video v       ON v.idvideo = a.idvideo
+				JOIN tanda t       ON t.idtanda = v.idtanda
+				JOIN grupo g       ON g.idgrupo = t.idgrupo
+				JOIN especimen e   ON e.idtanda = t.idtanda
+				JOIN observacion o ON o.idespecimen = e.idespecimen AND o.idvideo = v.idvideo
+				JOIN segundo s     ON s.idobservacion = o.idobservacion
+				WHERE g.idexperimento = ? AND a.estado = 'completado'
+				ORDER BY g.idgrupo, t.ordinal, e.numerocilindro, s.segundo
+				""", rs -> {
+			int idGrupo = rs.getInt("idgrupo");
+			int ordinal = rs.getInt("ordinal");
+			int cilindro = rs.getInt("numerocilindro");
+			String etiqueta = rs.getString("etiqueta");
+			String clave = idGrupo + "|" + ordinal + "|" + cilindro;
+			porEspecimen.computeIfAbsent(clave, k -> {
+				Map<String, Object> item = new LinkedHashMap<>();
+				item.put("tanda", etiqueta + " · " + letra(ordinal));
+				item.put("ordinal", ordinal);
+				item.put("numeroCilindro", cilindro);
+				item.put("idGrupo", idGrupo);
+				return item;
+			});
+			List<String> lista = conductas.computeIfAbsent(clave, k -> new ArrayList<>());
+			// Un segundo que falte en la tabla (no debería) es un segundo sin ver: se rellena hasta el número que sigue.
+			int segundo = rs.getInt("segundo");
+			while (lista.size() < segundo - 1) {
+				lista.add(null);
+			}
+			lista.add(rs.getString("conducta"));
+		}, idExperimento);
+
+		List<Map<String, Object>> lista = new ArrayList<>();
+		for (Map.Entry<String, Map<String, Object>> e : porEspecimen.entrySet()) {
+			e.getValue().put("bloques", BloquesDeCinco.armar(conductas.get(e.getKey())));
+			lista.add(e.getValue());
+		}
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("especimenes", lista);
+		return datos;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento) {
 		existe(idExperimento);
 
