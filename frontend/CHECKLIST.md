@@ -9,6 +9,8 @@ No cubre el backend, el worker ni el SQL y Docker de los anexos (ver `backend-sp
 ya existe una parte y la nota dice qué falta. Una casilla de pantalla marcada `[x]` significa que **la pantalla lo hace
 con datos de ejemplo**; que funcione contra el backend real se cuenta aparte, en las secciones 1 y 13.
 
+**Revisión del 23-oct-2026 (rama `poc/backend-spring`, versión 0.80.0):** se agregó la casilla de eliminar una tanda con la regla nueva del grupo (§5), y se actualizó el empaquetado (§0): el compose definitivo está en la raíz y ya no existen `docker-compose.prod.yml` ni el servicio de desarrollo en el 5173. El cambio del frontend de Vanesa que falta traer a esta rama (D-107 en la pantalla, commit `6067e4c`) no está contado aquí.
+
 **Última revisión del estado (17-oct-2026, Vanesa):** se conectaron los servicios a las formas y rutas de la guía (pasos 1 a 10 de `PARA_VANESA_API.md`, puntos 41 a 51 de `PARA_ERICK.md`). Pruebas, lint y build pasan. Lo que queda abierto depende del backend real, de una confirmación de Erick o de pruebas con personas. Revisión anterior (15-oct-2026):
 los tres commits de Vanesa del mismo día, que cerraron lo que era solo del frontend). Leí todo `frontend/src` y el diff
 posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo que se ponga en `false`) y
@@ -17,8 +19,8 @@ posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo 
 
 ## 0. Base y empaquetado
 - [x] React 18, Vite 8, React Router 7 y axios; cada pantalla se descarga al abrirla con `React.lazy` (§2)
-- [x] `frontend/Dockerfile` de desarrollo y servicio `frontend` en `docker-compose.yml`, puerto 5173 (§2)
-- [x] `Dockerfile.prod`, nginx con las rutas de la app y `/api/` hacia el backend, y `docker-compose.prod.yml` (propuesta, no está en la guía)
+- [ ] `frontend/Dockerfile` de desarrollo y servicio `frontend` en `docker-compose.yml`, puerto 5173 (§2). Hecho: `frontend/Dockerfile` existe; desde el 23-oct el `docker-compose.yml` de la raíz es el definitivo y levanta la versión de producción (servicio `web`), así que ya no hay servicio de desarrollo en el 5173: en desarrollo se usa `npm run dev`
+- [x] `Dockerfile.prod`, nginx con las rutas de la app y `/api/` hacia el backend. Desde el 23-oct es el servicio `web` del `docker-compose.yml` definitivo de la raíz (solo él publica puerto, el 8088; se levanta con `portable\iniciar.bat`); `docker-compose.prod.yml` se borró junto con el backend de Flask
 - [x] Fuente Archivo incluida en la app: no depende de internet al usarla
 - [x] Solo escritorio, sin versión móvil (§2)
 - [x] `client_max_body_size` de nginx en 2048 MB, igual que `MAX_UPLOAD_MB` (§11.5)
@@ -106,6 +108,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Ver resultados del grupo completo» y «Ver resultados de esta tanda» (RF-19, D-93)
 - [x] Una tanda con solo el Día 1 se muestra «En espera del Día 2» (D-83)
 - [x] Indicar que el video ya se borró (§11.13): Grupo lo avisa y deja «Revisar segundo a segundo» en gris con «Video no disponible», igual que Resultados
+- [x] Eliminar una tanda (D-115) desde el grupo, con confirmación, solo para quien creó el experimento o un Administrador. Si es la única tanda del grupo, el diálogo avisa «Es la única tanda de este grupo: el grupo también se eliminará.» y, al eliminarla, la pantalla vuelve al experimento (23-oct, un grupo nunca queda sin tandas; `eliminarTanda.test.jsx`, 157 pruebas pasan)
 
 ## 6. Progreso y pausa (§9.4, R-04, R-15)
 - [x] Trabajo en curso con sus tres etapas (preprocesamiento, cilindros y clasificación) y el porcentaje 33, 67 o 100
@@ -121,7 +124,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
 - [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
-- [x] Descargar el PDF de diagnóstico real: probado el 20-oct con el backend `9f8b614` y el simulador del worker (grupo «Falla», antes de retirarlo): el análisis termina en error en la etapa de cilindros, Progreso lo muestra con su mensaje y `.../diagnostic` responde el PDF (200, `application/pdf`)
+- [ ] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje
 - [ ] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso
 
 ## 7. Resultados (§9.5, R-12, R-13)

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Cargando, FieldError } from '../components/ui'
 import RecuadroEditable from '../components/RecuadroEditable'
-import { getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from '../services/queue'
+import { getPausa, getImagenPausa, ajustarRecuadro, continuarRecuadro, cancelarAnalisis } from '../services/queue'
 import { getQueue } from '../services/progreso'
 import { mensajeError } from '../services/api'
 import { useAsync, useAsyncVivo, CADA_ACTIVO_MS } from '../hooks/useAsync'
@@ -66,7 +66,21 @@ export default function PausaPage() {
       await ajustarRecuadro(clave, id, { cilindro, x0, y0, x1, y1 })
       navigate('/analisis?experimento=' + clave, { state: { aviso: 'Recuadro del cilindro ' + cilindro + ' ajustado. El análisis volvió a la cola, por delante de los que llegaron después, y sigue desde el segundo ' + p.desdeSegundo + '.' } })
     } catch (e) {
+      // 422: el recuadro casi no cambió; el mensaje lo dice el backend. Se queda en la pantalla con los tres botones.
       setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron las 72 horas y se canceló.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
+      setEnviando(false)
+    }
+  }
+
+  // «El recuadro está bien»: el análisis sigue desde ese segundo sin cambiar el recuadro.
+  async function continuar() {
+    setEnviando(true)
+    setErrAccion('')
+    try {
+      await continuarRecuadro(clave, id)
+      navigate('/analisis?experimento=' + clave, { state: { aviso: 'El análisis volvió a la cola y sigue desde el segundo ' + p.desdeSegundo + '. No se volverá a pausar en ese mismo tramo.' } })
+    } catch (e) {
+      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron las 72 horas y se canceló.' : mensajeError(e, 'No se pudo continuar el análisis. Inténtalo de nuevo.'))
       setEnviando(false)
     }
   }
@@ -123,6 +137,7 @@ export default function PausaPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
           <button type="button" className="btn btn-primary" style={btnLeft} disabled={enviando || vencido} onClick={ajustar}>Ajustar y continuar</button>
+          <button type="button" className="btn btn-secondary" style={btnLeft} disabled={enviando || vencido} onClick={continuar}>El recuadro está bien, continuar</button>
           <button type="button" className="btn btn-secondary" style={btnLeft} disabled={enviando || vencido} onClick={cancelar}>Cancelar análisis</button>
           <div style={{ flex: 1 }} />
           <Link to="/analisis" style={{ fontSize: 12.5 }}>Volver a Análisis en curso</Link>

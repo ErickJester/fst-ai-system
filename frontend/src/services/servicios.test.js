@@ -10,7 +10,7 @@ import { subirVideo, sugerirGrupos } from './groups'
 
 // Sube el video de una tanda (por defecto, la A del grupo nuevo «Control», Día 2).
 const subir = (clave, extra = {}, alAvanzar) => subirVideo(clave, { grupo: 'Control', nuevo: true, tipo: 'CONTROL', tratamiento: 'Solución salina', letra: 'A', sesion: 'DAY2', nCilindros: 4, file: null, ...extra }, alAvanzar)
-import { getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, cancelarAnalisis } from './queue'
+import { getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, continuarRecuadro, cancelarAnalisis } from './queue'
 import { getQueue } from './progreso'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
 import { reiniciarDatos, resetTokens } from './mocks/data'
@@ -385,6 +385,23 @@ describe('pausa del análisis (R-15, D-89)', () => {
     expect(await status(ajustarRecuadro('7', 502, { cilindro: 2, x0: 0, y0: 0, x1: 99, y1: 99 }))).toBe(409)
   })
 
+  it('un recuadro casi igual al automático responde 422 con el mensaje; con 4 px ya es ajuste', async () => {
+    sesion(1)
+    const c2 = (await getPausa('7', 502)).recuadros.find((r) => r.cilindro === 2)
+    const casi = await ajustarRecuadro('7', 502, { cilindro: 2, x0: c2.x0 + 3, y0: c2.y0, x1: c2.x1, y1: c2.y1 }).catch((e) => e)
+    expect(casi.response.status).toBe(422)
+    expect(casi.response.data.error).toBe('El recuadro casi no cambió: ningún borde se movió más de 3 px. Muévelo sobre el tubo o elige «El recuadro está bien, continuar».')
+    expect(await status(ajustarRecuadro('7', 502, { cilindro: 2, x0: c2.x0 + 4, y0: c2.y0, x1: c2.x1, y1: c2.y1 }))).toBe('ok')
+  })
+
+  it('el recuadro está bien: continuar devuelve el análisis a la cola sin cambiar el recuadro; otra vez, 409', async () => {
+    sesion(1)
+    expect(await status(continuarRecuadro('7', 502))).toBe('ok')
+    expect((await getQueue()).cola.map((j) => j.job_id)).toContain(502)
+    expect((await tandaB()).estado).toBe('QUEUED')
+    expect(await status(continuarRecuadro('7', 502))).toBe(409)
+  })
+
   it('cancelar lo termina; una segunda vez responde 409', async () => {
     sesion(1)
     expect(await status(cancelarAnalisis('7', 502))).toBe('ok')
@@ -510,5 +527,21 @@ describe('envoltorio y mensajes de error del servidor (§6)', () => {
     expect(esEnvoltorio({ data: { idExperimento: 7 }, error: null, status: 200 })).toBe(true)
     expect(esEnvoltorio(new Blob(['%PDF']))).toBe(false)
     expect(esEnvoltorio({ idExperimento: 7 })).toBe(false)
+  })
+})
+
+describe('administración con el backend real', () => {
+  it('editar una cuenta no manda el identificador (es la llave de la cuenta) y manda el rol de la guía', async () => {
+    // VITE_API_REAL=admin: la parte de administración llama a la API en vez de usar los datos de ejemplo.
+    vi.stubEnv('VITE_API_REAL', 'admin')
+    vi.resetModules()
+    const apiReal = (await import('./api')).default
+    const adminReal = await import('./admin')
+    const patch = vi.spyOn(apiReal, 'patch').mockResolvedValue({ data: { idInstitucional: '2', nombre: 'Ana', apellidos: 'Pérez', correo: 'a@ipn.mx', rol: 'Administrador', activo: true } })
+    await adminReal.updateUser('2', { nombre: 'Ana', apellidos: 'Pérez', email: 'a@ipn.mx', identificador: '999', role: 'ADMIN' })
+    expect(patch).toHaveBeenCalledWith('/admin/users/2', { nombre: 'Ana', apellidos: 'Pérez', correo: 'a@ipn.mx', rol: 'Administrador' })
+    patch.mockRestore()
+    vi.unstubAllEnvs()
+    vi.resetModules()
   })
 })

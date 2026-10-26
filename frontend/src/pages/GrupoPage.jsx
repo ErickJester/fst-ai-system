@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { EstadoTag, TipoTag, Migas, Cargando, NoEncontrado } from '../components/ui'
 import { getGroup } from '../services/groups'
@@ -33,6 +33,7 @@ function notaDia2(t) {
 export default function GrupoPage() {
   const { clave, gid } = useParams()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [dlgTanda, setDlgTanda] = useState(null) // la tanda que se está por eliminar
   // Se vuelve a consultar sola: cada 5 s mientras alguna tanda se analiza, si no cada 30 s.
   const { data: g, error, loading, reload } = useAsyncVivo(() => getGroup(clave, gid), [clave, gid], (grupo) =>
@@ -157,8 +158,15 @@ export default function GrupoPage() {
       </div>
 
       {dlgTanda && (
-        <EliminarTanda clave={exp.clave} grupo={nombreGrupo} tanda={dlgTanda} onCerrar={() => setDlgTanda(null)}
-          onEliminada={() => { setDlgTanda(null); reload() }} />
+        <EliminarTanda clave={exp.clave} grupo={nombreGrupo} tanda={dlgTanda} ultima={g.tandas.length === 1}
+          onCerrar={() => setDlgTanda(null)}
+          onEliminada={() => {
+            setDlgTanda(null)
+            // Si era la única tanda, el servidor borró también el grupo: recargar daría «No encontrado», así que se vuelve
+            // al experimento (con replace, para que «atrás» no regrese a un grupo que ya no existe).
+            if (g.tandas.length === 1) navigate(`/experimentos/${exp.clave}`, { replace: true })
+            else reload()
+          }} />
       )}
     </div>
   )

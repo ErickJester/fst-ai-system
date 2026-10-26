@@ -7,6 +7,10 @@ export const variance = (a) => {
   return a.reduce((s, v) => s + (v - m) * (v - m), 0) / (a.length - 1)
 }
 export const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')
+// Bloques de 5 s (D-53): el segundo en que termina un bloque (el último puede tener menos de 5) y las columnas de la rejilla,
+// que son las del espécimen con más bloques.
+export const finDeBloque = (b) => b.inicio - 1 + b.segundos.length
+export const columnasDeBloques = (especimenes) => Math.max(1, ...especimenes.map((e) => e.bloques.length))
 export const r1 = (n) => (Math.round(n * 10) / 10).toFixed(1)
 
 // '2026-02-18' → '18 feb 2026' (sin pasar por Date, para no depender de la zona horaria).
@@ -75,6 +79,13 @@ export const ESTADO_EXPERIMENTO = {
 // Nombres de las conductas en la base (CONDUCTA.nombre) ↔ claves del frontend.
 export const CONDUCTA_BD = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
 export const DE_BD = Object.fromEntries(Object.entries(CONDUCTA_BD).map(([k, v]) => [v, k]))
+
+// Cómo se llama cada conducta en pantalla. El backend manda el nombre de la base («nado activo»); la pantalla
+// muestra «Nado activo», «Conducta activa»…
+export const NOMBRE_CONDUCTA = { nado: 'Nado activo', inmovilidad: 'Inmovilidad', escalamiento: 'Escalamiento', activa: 'Conducta activa' }
+
+// De la conducta como la guarda la base («nado activo») al nombre de pantalla. Un nombre desconocido se muestra tal cual.
+export const nombreDeConductaBD = (bd) => NOMBRE_CONDUCTA[DE_BD[bd]] ?? bd
 
 // Revisión segundo a segundo de un análisis completado (R-14).
 export const enlaceRevision = (clave, idAnalisis) => `/experimentos/${clave}/analisis/${idAnalisis}/revision`

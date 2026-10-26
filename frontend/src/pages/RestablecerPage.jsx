@@ -7,7 +7,7 @@ import { mensajeError } from '../services/api'
 import { textoTarjeta } from '../lib/estilos'
 
 // 2h · Restablecer contraseña desde el enlace del correo (/restablecer?token=…).
-// El enlace vale 60 minutos y un solo uso; si venció, se pide uno nuevo.
+// El enlace vale 60 minutos (RESET_LINK_MINUTES) y un solo uso; si venció, se pide uno nuevo.
 export default function RestablecerPage() {
   const [params] = useSearchParams()
   const token = params.get('token') || ''
