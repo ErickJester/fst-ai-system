@@ -82,6 +82,20 @@ los videos no se tocan. Para hacerlo, abre una ventana de comandos en la carpeta
    datos se restauraron completos.
 3. Vuelve a prender el sistema con **iniciar.bat**.
 
+## Entrar desde otra computadora (Tailscale)
+
+Para abrir el sistema desde otra computadora sin abrir puertos en el router, se usa Tailscale (gratis, todo va cifrado).
+
+1. Instala Tailscale en esta PC y en la otra (tailscale.com/download) e inicia sesion con la misma cuenta.
+2. En esta PC, mira su direccion con `tailscale ip -4` (por ejemplo `100.96.161.1`).
+3. En `portable\.env` pon esa direccion con el puerto: `ORIGENES_EXTRA=http://100.96.161.1:8088`. Sin esto la pagina carga pero la API responde 403.
+4. Vuelve a ejecutar `iniciar.bat` para que el sistema tome el cambio.
+5. Abre el puerto solo para Tailscale (PowerShell como administrador, una sola vez):
+   `New-NetFirewallRule -DisplayName "FST 8088 Tailscale" -Direction Inbound -Protocol TCP -LocalPort 8088 -Action Allow -InterfaceAlias "Tailscale"`
+6. En la otra computadora abre `http://100.96.161.1:8088`.
+
+Esta PC debe estar encendida, sin suspenderse y con Docker Desktop abierto.
+
 ## Si algo falla
 
 - "Docker no está respondiendo": abre Docker Desktop y espera a que diga que está corriendo.

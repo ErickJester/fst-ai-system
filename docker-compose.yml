@@ -48,7 +48,9 @@ services:
       # La pagina se abre en http://localhost:PUERTO_WEB. nginx reenvia el Host sin el puerto y el backend
       # tomaria la peticion del navegador (que trae Origin con puerto) como de otro origen y la rechazaria
       # con 403; con esto reconoce la direccion de la pagina como propia.
-      CORS_ORIGINS: "http://localhost:${PUERTO_WEB:-8088},http://127.0.0.1:${PUERTO_WEB:-8088}"
+      # ORIGENES_EXTRA (opcional, en portable\.env): otras direcciones desde donde se abre la pagina, separadas por
+      # comas, p. ej. http://100.96.161.1:8088 para entrar por Tailscale desde otra computadora.
+      CORS_ORIGINS: "http://localhost:${PUERTO_WEB:-8088},http://127.0.0.1:${PUERTO_WEB:-8088}${ORIGENES_EXTRA:+,${ORIGENES_EXTRA}}"
       # true: herramientas de desarrollo (cronometro y tiempos, banner BETA). false (lo normal) las apaga.
       MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     volumes:
