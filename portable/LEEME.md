@@ -96,6 +96,17 @@ Para abrir el sistema desde otra computadora sin abrir puertos en el router, se 
 
 Esta PC debe estar encendida, sin suspenderse y con Docker Desktop abierto.
 
+### Abrirlo desde un navegador sin instalar nada (Tailscale Funnel)
+
+Funnel publica el sistema en internet con una direccion `https://<esta-pc>.<tu-red>.ts.net`. Cualquiera con el enlace llega al inicio de sesion, asi que antes de usarlo cambia `ADMIN_PASSWORD` y `POSTGRES_PASSWORD` por contrasenas largas y propias.
+
+1. En el panel de Tailscale (login.tailscale.com/admin/dns) activa MagicDNS y HTTPS Certificates.
+2. En Access controls agrega el atributo `funnel` a este equipo (`"nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}]`).
+3. Agrega la direccion publica a `ORIGENES_EXTRA` en `portable\.env`, separada por coma: `ORIGENES_EXTRA=http://100.96.161.1:8088,https://pci78200.tail5a3d50.ts.net` (con el nombre real que muestra `tailscale status`). Ejecuta `iniciar.bat` otra vez.
+4. Activa Funnel: `tailscale funnel --bg 8088`. Para quitarlo: `tailscale funnel --bg 8088 off`.
+
+Los videos de hasta 2 GB pueden subirse lento o cortarse por los limites de ancho de banda de Funnel; para subir videos conviene la conexion normal de Tailscale (sin Funnel).
+
 ## Si algo falla
 
 - "Docker no está respondiendo": abre Docker Desktop y espera a que diga que está corriendo.
