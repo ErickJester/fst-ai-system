@@ -1,7 +1,14 @@
 # Sistema FST: el docker-compose DEFINITIVO del sistema (db, api, worker y web). Se lleva a otra PC con Windows y
 # Docker Desktop y se levanta con portable\iniciar.bat (que prepara portable\.env y llama a
-# "docker compose -f ..\docker-compose.yml --env-file .env up -d --build" desde la carpeta portable).
+# "docker compose -p ... -f ..\docker-compose.yml --env-file .env up -d --no-build" desde la carpeta portable).
 # El de desarrollo es otro: backend-spring/docker-compose.yml.
+#
+# IMAGENES CONSTRUIDAS (encargo 42): api, worker y web son imagenes con version (fst-api:X.Y.Z, ...) que se construyen
+# UNA vez (portable\empaquetar.ps1) y se llevan en un archivo (fst-imagenes-X.Y.Z.tar); la PC de destino las carga con
+# "docker load" y arranca con --no-build, sin internet ni construir nada: corre exactamente lo que se probo. Por eso
+# pull_policy es "never": nunca se descarga nada. build: se conserva para poder construirlas en la PC de desarrollo.
+# La version sale del archivo VERSION de la raiz del paquete: portable\iniciar.bat la copia a FST_VERSION en portable\.env
+# cada vez que arranca, asi que no se puede desalinear del paquete.
 #
 # El nombre del proyecto (fst-portable) hace que sus contenedores, su red y sus volumenes sean propios y no se
 # mezclen con los del entorno de desarrollo (backend-spring, proyecto fst-spring). NO se cambia: los datos
@@ -11,13 +18,24 @@
 # nginx reenvia /api/ al backend. La base y el backend no se pueden alcanzar desde fuera.
 name: fst-portable
 
+# Rotacion de registros: sin esto el log de cada contenedor crece sin limite y llena el disco. Maximo 5 archivos de 10 MB
+# por servicio.
+x-registro: &registro
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # Base de datos. El esquema solo se aplica la primera vez, con el volumen vacio. Se monta SOLO
   # 001_esquema.sql y no toda la carpeta backend-spring/db/init: 002_dev_usuario.sql es una cuenta de prueba
   # del entorno de desarrollo y no debe existir en una instalacion para otra PC. Si se agrega un script nuevo
   # que SI haga falta (003_...), hay que montarlo aqui tambien.
+  # Version EXACTA (sin tags flotantes): empaquetar.ps1 la guarda en el tar de imagenes. Si se cambia aqui, el paquete la
+  # toma de este archivo.
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
+    pull_policy: never
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-fst}
@@ -31,11 +49,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *registro
 
   # El backend (Spring Boot). Se llama "api" y escucha en el 8000 porque el nginx del frontend
   # (frontend/nginx.conf) reenvia /api/ a http://api:8000: asi no hace falta tocar ese archivo.
+  # Corre sin root (el entrypoint de la imagen solo arregla los permisos del volumen y se baja a un usuario sin privilegios).
   api:
+    image: 'fst-api:${FST_VERSION:?Falta FST_VERSION. Arranca con portable\iniciar.bat}'
     build: ./backend-spring
+    pull_policy: never
     restart: unless-stopped
     env_file:
       - path: portable/.env
@@ -45,10 +67,14 @@ services:
       DB_PORT: "5432"
       SERVER_PORT: "8000"
       ARCHIVOS_DIR: /data/archivos
-      # La pagina se abre en http://localhost:PUERTO_WEB. nginx reenvia el Host sin el puerto y el backend
-      # tomaria la peticion del navegador (que trae Origin con puerto) como de otro origen y la rechazaria
-      # con 403; con esto reconoce la direccion de la pagina como propia.
-      CORS_ORIGINS: "http://localhost:${PUERTO_WEB:-8088},http://127.0.0.1:${PUERTO_WEB:-8088}"
+      # Ya no se listan origenes a mano: nginx reenvia el Host con el puerto que escribio el navegador (frontend/nginx.conf,
+      # $http_host), asi que Spring reconoce la pagina como del mismo origen con localhost, con la IP de la PC o con su nombre.
+      # CORS_ORIGINS queda solo para el frontend de desarrollo (Vite).
+      # La direccion que va en los correos (recuperar contrasena, primer acceso). iniciar.bat la calcula si DIRECCION_WEB
+      # esta vacia en portable\.env.
+      WEB_URL: ${DIRECCION_WEB:-}
+      # Swagger (la documentacion interactiva de la API) apagado en produccion: /api/v3/api-docs y la pagina dan 404.
+      SWAGGER_HABILITADO: "false"
       # true: herramientas de desarrollo (cronometro y tiempos, banner BETA). false (lo normal) las apaga.
       MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     volumes:
@@ -56,13 +82,24 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    # La JVM toma el 75 % de este limite para el heap (-XX:MaxRAMPercentage=75 en la imagen).
+    mem_limit: 1536m
+    logging: *registro
 
   # El que analiza los videos con el modelo (./modelos/fst_cnn_seg.pt, que no va dentro de la imagen).
   # Toma de la base un analisis a la vez y guarda los resultados en la misma base y el mismo volumen.
   worker:
+    image: 'fst-worker:${FST_VERSION:?Falta FST_VERSION. Arranca con portable\iniciar.bat}'
     build:
       context: .
       dockerfile: worker/Dockerfile
+    pull_policy: never
     restart: unless-stopped
     env_file:
       - path: portable/.env
@@ -85,10 +122,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # El analisis de un video usa hasta unos 3.5 GB: el limite deja margen sin dejar que el worker se coma toda la memoria
+    # de Docker Desktop (que necesita al menos 8 GB asignados).
+    mem_limit: 5g
+    # El worker puede estar horas dentro de un analisis, asi que no hay un archivo de latido que se pueda exigir fresco:
+    # se comprueba que el proceso todavia llega a la base de datos con su configuracion.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import comun; comun.conectar().close()"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    logging: *registro
 
   # La pagina (React) servida por nginx. VITE_* se graban al compilar, por eso van como argumentos de
   # construccion: sin datos de ejemplo (VITE_USE_MOCKS=false) y llamando al backend por /api.
   web:
+    image: 'fst-web:${FST_VERSION:?Falta FST_VERSION. Arranca con portable\iniciar.bat}'
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
@@ -96,11 +146,15 @@ services:
         VITE_USE_MOCKS: "false"
         VITE_API_BASE: /api
         VITE_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-2048}
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "${PUERTO_WEB:-8088}:80"
+    # Hasta que el backend responde, nginx daria 502 a quien entre: se espera a que este sano.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    logging: *registro
 
 volumes:
   pgdata:

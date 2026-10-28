@@ -152,12 +152,18 @@ def notificar(cur, pendientes, id_institucional, correo, tipo, mensaje, id_exper
 def enviar_correos(pendientes):
     """Copia por correo de cada aviso. Si el envío falla, el aviso ya quedó en la campanita y el
     worker sigue (sección 4.4 de la guía)."""
-    host = os.environ.get("SMTP_HOST", "localhost")
+    host = os.environ.get("SMTP_HOST", "localhost").strip()
+    if not host:
+        # El .env de la versión portable trae SMTP_HOST vacío mientras no se configure el correo: sin servidor no se intenta
+        # nada (el aviso ya quedó en la campanita; iniciar.bat avisa que no hay correo).
+        pendientes.clear()
+        return
     puerto = _entero("SMTP_PORT", 1025)
     usuario = os.environ.get("SMTP_USER", "")
     contrasena = os.environ.get("SMTP_PASSWORD", "")
     starttls = os.environ.get("SMTP_STARTTLS", "false").lower() == "true"
-    remitente = os.environ.get("SMTP_FROM", "no-reply@fst.local")
+    # SMTP_FROM vacío (el .env lo trae así hasta que se llena) también cae en el remitente por omisión.
+    remitente = os.environ.get("SMTP_FROM", "").strip() or "no-reply@fst.local"
 
     for correo, asunto, texto in pendientes:
         if not correo:

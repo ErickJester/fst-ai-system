@@ -39,6 +39,8 @@ services:
       DB_PORT: "5432"
       ARCHIVOS_DIR: /data/archivos
       SMTP_HOST: ${SMTP_HOST:-mailhog}
+      # Swagger prendido en desarrollo (en el compose de la raíz, el definitivo, va en false).
+      SWAGGER_HABILITADO: "true"
       # true: herramientas de desarrollo (cronómetro y tiempos, banner BETA). false (lo normal) las apaga.
       MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     depends_on:

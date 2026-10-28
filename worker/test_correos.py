@@ -1,6 +1,7 @@
 """Pruebas del correo de las notificaciones del worker (encargo 41): enviar_correos de comun.py contra un servidor SMTP falso
 (un socket en un hilo, sin dependencias) y los asuntos de los seis tipos de aviso. Sin base de datos. Se corren dentro de la
 imagen del worker: python -m unittest test_correos -v"""
+import logging
 import os
 import re
 import socketserver
@@ -113,6 +114,21 @@ class EnvioPorCorreo(unittest.TestCase):
         self.assertEqual(1, len(mensajes))
         self.assertEqual("ana@fst.mx", mensajes[0]["To"])
 
+    def test_con_smtp_host_vacio_no_se_intenta_nada_ni_se_registra_error(self):
+        # El .env de la versión portable trae SMTP_HOST vacío mientras no se configure el correo.
+        pendientes = [("ana@fst.mx", "A", "1")]
+        with mock.patch.dict(os.environ, {"SMTP_HOST": "  "}), mock.patch.object(comun.smtplib, "SMTP") as smtp_falso:
+            with self.assertNoLogs("worker", level="ERROR"):
+                comun.enviar_correos(pendientes)
+        smtp_falso.assert_not_called()
+        self.assertEqual([], pendientes)
+        self.assertEqual([], self._recibidos())
+
+    def test_con_smtp_from_vacio_usa_el_remitente_por_omision(self):
+        with mock.patch.dict(os.environ, {"SMTP_FROM": ""}):
+            comun.enviar_correos([("ana@fst.mx", "A", "1")])
+        self.assertEqual("no-reply@fst.local", self._recibidos()[0]["From"])
+
     def test_un_correo_rechazado_solo_se_registra_y_los_demas_salen(self):
         self.servidor.rechazar.add("malo@fst.mx")
         pendientes = [("uno@fst.mx", "A", "1"), ("malo@fst.mx", "B", "2"), ("tres@fst.mx", "C", "3")]
@@ -173,6 +189,71 @@ class AsuntosDeLasNotificaciones(unittest.TestCase):
         self.assertEqual([("ana@fst.mx", asunto, f"mensaje de {tipo}") for tipo, asunto in comun.ASUNTOS.items()], pendientes)
         # Y la fila de la campanita se inserta una vez por tipo.
         self.assertEqual(6, cur.execute.call_count)
+
+
+class ProbarCorreo(unittest.TestCase):
+    """probar_correo.py (portable\\probar_correo.bat, encargo 42): el correo de prueba usa el mismo envío que los avisos."""
+
+    def setUp(self):
+        self.servidor = _Servidor()
+        threading.Thread(target=self.servidor.serve_forever, daemon=True).start()
+        self.addCleanup(self.servidor.server_close)
+        self.addCleanup(self.servidor.shutdown)
+        self.entorno = {"SMTP_HOST": "127.0.0.1", "SMTP_PORT": str(self.servidor.server_address[1]),
+                        "SMTP_USER": "", "SMTP_PASSWORD": "", "SMTP_STARTTLS": "false", "SMTP_FROM": "no-reply@fst.local"}
+        parche = mock.patch.dict(os.environ, self.entorno)
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def test_manda_el_correo_de_prueba_y_dice_que_salio(self):
+        import probar_correo
+        salio, texto = probar_correo.probar("admin@fst.mx")
+        self.assertTrue(salio, texto)
+        self.assertIn("admin@fst.mx", texto)
+        mensajes = [message_from_bytes(c, policy=policy.default) for _, _, c in self.servidor.mensajes]
+        self.assertEqual(1, len(mensajes))
+        self.assertEqual("admin@fst.mx", mensajes[0]["To"])
+        self.assertEqual("Prueba de correo del Sistema FST", mensajes[0]["Subject"])
+
+    def test_si_el_servidor_rechaza_dice_el_motivo_y_no_sale(self):
+        import probar_correo
+        self.servidor.rechazar.add("malo@fst.mx")
+        salio, texto = probar_correo.probar("malo@fst.mx")
+        self.assertFalse(salio)
+        self.assertIn("No se pudo enviar el correo", texto)
+        self.assertIn("malo@fst.mx", texto)
+
+    def test_sin_servidor_dice_el_error_de_conexion(self):
+        import probar_correo
+        cerrado = _Servidor()
+        puerto = cerrado.server_address[1]
+        cerrado.server_close()
+        with mock.patch.dict(os.environ, {"SMTP_PORT": str(puerto)}):
+            salio, texto = probar_correo.probar("admin@fst.mx")
+        self.assertFalse(salio)
+        self.assertIn("No se pudo enviar el correo", texto)
+
+    def test_con_smtp_host_vacio_avisa_que_no_hay_correo_configurado(self):
+        import probar_correo
+        with mock.patch.dict(os.environ, {"SMTP_HOST": ""}):
+            salio, texto = probar_correo.probar("admin@fst.mx")
+            self.assertFalse(salio)
+            self.assertIn("SMTP_HOST esta vacio", texto)
+            self.assertEqual(2, probar_correo.main(["probar_correo.py", "admin@fst.mx"]))
+        self.assertEqual([], self.servidor.mensajes)
+
+    def test_el_codigo_de_salida_es_0_si_salio_y_1_si_no_y_2_sin_destinatario(self):
+        import probar_correo
+        self.assertEqual(0, probar_correo.main(["probar_correo.py", "admin@fst.mx"]))
+        self.servidor.rechazar.add("malo@fst.mx")
+        self.assertEqual(1, probar_correo.main(["probar_correo.py", "malo@fst.mx"]))
+        self.assertEqual(2, probar_correo.main(["probar_correo.py"]))
+
+    def test_el_manejador_del_log_se_quita_al_terminar(self):
+        import probar_correo
+        antes = list(logging.getLogger("worker").handlers)
+        probar_correo.probar("admin@fst.mx")
+        self.assertEqual(antes, logging.getLogger("worker").handlers)
 
 
 if __name__ == "__main__":

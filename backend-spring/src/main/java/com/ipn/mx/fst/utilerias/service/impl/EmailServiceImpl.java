@@ -31,7 +31,9 @@ public class EmailServiceImpl implements EmailService {
 		}
 
 		SimpleMailMessage correo = new SimpleMailMessage();
-		correo.setFrom(remitente);
+		// El .env de la versión portable trae SMTP_FROM vacío hasta que se llena: con la variable vacía el remitente quedaría
+		// en blanco (el valor por omisión de application.properties solo cubre la variable que no existe).
+		correo.setFrom(remitente == null || remitente.isBlank() ? "no-reply@fst.local" : remitente);
 		correo.setTo(destinatario);
 		correo.setSubject(asunto);
 		correo.setText(texto);
