@@ -196,7 +196,7 @@ y tareas diarias pasaron a `../worker`.
 Agregado el 19-oct (versión 0.22.0): **progreso real** (encargo 14: `progreso.json`, `/status` con `porcentajeEtapa`
 y el porcentaje general, pesos medidos 1/9/90); **tiempos del análisis** (encargo 16: `tiempos.json` con segundos
 por etapa y el equipo, en Progreso, Resultados y el PDF); **`MODO_DESARROLLADOR`** (encargo 17: con `false` se
-apagan los tiempos y el banner rojo "BETA vX.Y.Z"). Probado con pruebas automáticas y sin sesión; falta una corrida
+apagan los tiempos y el banner rojo "vX.Y.Z"). Probado con pruebas automáticas y sin sesión; falta una corrida
 real con sesión (la hará el usuario en otra PC).
 - [x] Toma un análisis a la vez, el más antiguo primero (`cola.py`: `tomar_siguiente`, `ORDER BY fechaanalisis, idanalisis` con `FOR UPDATE SKIP LOCKED`). Probado en desarrollo (23-oct): con dos análisis `en cola` de fechas del año 2000, `tomar_siguiente` toma el más antiguo aunque el otro tenga id menor; con ese bloqueado sin confirmar por otra conexión, la segunda conexión toma el otro y no el mismo; y dos vueltas reales de la cola (`cola.vuelta`) con un procesamiento simulado de 6 s muestran un solo análisis `procesando` a la vez
 - [x] Caso exitoso: pasa por las etapas (`preprocesamiento`, `cilindros`, `clasificacion`), escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación `analisis completado`. Probado con `AcuBN1.MOV` (18-oct); en el portable hay dos análisis completados (19-oct) con su notificación

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-// Modo desarrollador: el banner BETA y los tiempos del análisis se ven solo con el modo prendido.
+// Modo desarrollador: el banner con la versión y los tiempos del análisis se ven solo con el modo prendido.
 import React from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { version as versionDelPaquete } from '../package.json'
 import { ModoContext } from './contexts/ModoContext'
-import BannerBeta from './components/BannerBeta'
+import BannerVersion from './components/BannerVersion'
 import BotonSalidaModelo from './components/BotonSalidaModelo'
 import { TrabajoActual } from './pages/ProgresoPage'
 
@@ -15,25 +15,27 @@ const conModo = (valor, hijo) => <ModoContext.Provider value={valor}>{hijo}</Mod
 const PRENDIDO = { modoDesarrollador: true, version: '0.22.0' }
 const APAGADO = { modoDesarrollador: false, version: '0.22.0' }
 
-describe('banner BETA', () => {
-  it('con modo desarrollador: «BETA v0.22.0»', () => {
-    render(conModo(PRENDIDO, <BannerBeta />))
-    const banner = screen.getByText('BETA v0.22.0')
-    expect(banner.className).toBe('beta-banner')
+describe('banner con la versión', () => {
+  it('con modo desarrollador: solo «v0.22.0», sin BETA', () => {
+    render(conModo(PRENDIDO, <BannerVersion />))
+    const banner = screen.getByText('v0.22.0')
+    expect(banner.className).toBe('version-banner')
+    expect(banner.getAttribute('role')).toBe('status')
+    expect(banner.textContent).not.toMatch(/beta/i)
   })
 
   it('sin modo desarrollador no hay banner', () => {
-    const { container } = render(conModo(APAGADO, <BannerBeta />))
-    expect(container.querySelector('.beta-banner')).toBeNull()
-    expect(screen.queryByText(/BETA/)).toBeNull()
+    const { container } = render(conModo(APAGADO, <BannerVersion />))
+    expect(container.querySelector('.version-banner')).toBeNull()
+    expect(screen.queryByText(/^v\d/)).toBeNull()
   })
 
   it('sin proveedor (por omisión) tampoco, y sin versión del backend usa la del paquete', () => {
-    const { container } = render(<BannerBeta />)
-    expect(container.querySelector('.beta-banner')).toBeNull()
+    const { container } = render(<BannerVersion />)
+    expect(container.querySelector('.version-banner')).toBeNull()
     cleanup()
-    render(conModo({ modoDesarrollador: true, version: null }, <BannerBeta />))
-    expect(screen.getByText('BETA v' + versionDelPaquete)).toBeTruthy()
+    render(conModo({ modoDesarrollador: true, version: null }, <BannerVersion />))
+    expect(screen.getByText('v' + versionDelPaquete)).toBeTruthy()
   })
 })
 

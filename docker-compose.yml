@@ -75,7 +75,7 @@ services:
       WEB_URL: ${DIRECCION_WEB:-}
       # Swagger (la documentacion interactiva de la API) apagado en produccion: /api/v3/api-docs y la pagina dan 404.
       SWAGGER_HABILITADO: "false"
-      # true: herramientas de desarrollo (cronometro y tiempos, banner BETA). false (lo normal) las apaga.
+      # true: herramientas de desarrollo (cronometro y tiempos, banner con la version). false (lo normal) las apaga.
       MODO_DESARROLLADOR: ${MODO_DESARROLLADOR:-false}
     volumes:
       - videos_reportes:/data/archivos
