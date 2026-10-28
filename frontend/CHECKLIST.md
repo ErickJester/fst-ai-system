@@ -56,7 +56,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] `POST /admin/users/:id/reset-temporal`: propuesta del frontend que la guía no trae, por confirmar con Erick. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación). Probado el 26-oct contra el backend 0.86.1 (`aba64af`): el backend ya la tiene (responde 200 con `passwordTemporal`; un investigador recibe 403)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
-- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: lo que el backend aún no tiene (administración, recuperar contraseña, pausa, bloques, CSV y XLSX) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
+- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: probar en el navegador lo que el backend agregó después (administración, recuperar contraseña, pausa y bloques hasta la v0.86.1; CSV y XLSX en la v0.87.0, encargo 39) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
 - [x] Inicio de sesión con correo y contraseña, y error de credenciales (R-01)
@@ -80,7 +80,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Eliminar» con confirmación explícita, solo para quien creó el experimento o un Administrador (R-08, D-63)
 - [x] Los errores 403 y 409 de eliminar se muestran en el diálogo
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
-- [ ] Filtros y paginación en el servidor. Hecho: se hacen en el navegador sobre la lista completa. La lista ya usa `GET /experiments?pagina=` con `{pagina, total, items}` de §6.1 y junta todas las páginas
+- [x] Filtros y paginación en el servidor. Hecho (encargo 43): la lista pide UNA página de 20 a `GET /experiments?pagina=&estado=&fecha=&tratamiento=&q=` y el servidor filtra, busca (sin acentos) y pagina; el «10 por página» de antes pasó a 20, como el servidor. `listExperiments({estado, anio, tratamiento, q, pagina})` devuelve `{pagina, total, porPagina, items, resumen}`; los conteos por estado, los años, los tratamientos, los avisos de vencimiento y el estado vacío («Aún no hay experimentos» / «Ningún experimento coincide») salen de `resumen`, que es de todos los experimentos. La búsqueda espera 300 ms tras la última tecla, un filtro nuevo vuelve a la página 1 y mientras llega una página se sigue viendo la anterior. El modo demo hace lo mismo en memoria. Quien necesite todos los experimentos (Análisis en curso) usa `listAllExperiments()`, que junta las páginas
 - [x] La columna «Retención» dice «Videos borrados» y explica el motivo al pasar el mouse
 
 ## 4. Crear experimento y cargar video (§9.3, R-02, R-03, R-09)
@@ -140,7 +140,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Aviso «Todavía no hay resultados» cuando no hay tandas completadas
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
-- [ ] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). Falta: CSV y XLSX, que el backend aún no tiene (404)
+- [x] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit). Probado en Chrome el 27-oct (nginx de la v0.88.0, puerto 8099, inicio de sesión real): en Resultados · Tanda A, los botones CSV y XLSX bajan `reporte_1_tandaA.csv` (660 bytes) y `reporte_1_tandaA.xlsx` (4286 bytes); el nombre lo pone el frontend (el `Content-Disposition` del servidor trae otro: `reporte_experimento_1_grupo-1_tanda-A.csv`). Los dos archivos se abrieron antes en Excel 16 por COM; el PDF no se repitió en el navegador esta vez
 - [x] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): `/results/blocks` responde 200
 
 ## 8. Administración (§9.6, R-16)

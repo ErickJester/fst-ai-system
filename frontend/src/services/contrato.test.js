@@ -42,7 +42,7 @@ beforeAll(async () => {
     llamadas.push([metodo, url, cuerpo])
     const ruta = url.split('?')[0]
     if (ruta === '/auth/login') return desenvolver(env({ token: 'jwt', rol: 'Investigador', nombre: 'Mariana', cambioRequerido: false, idInstitucional: '2019630871', apellidos: 'Rivera Alcántara', correo: 'mrivera@ipn.mx' }))
-    if (ruta === '/experiments') return desenvolver(env({ pagina: 1, total: 1, items: [{ idExperimento: 7, nombre: 'Exp. A', fecha: '2026-10-01', nGrupos: 3, estado: 'completado', avisoVencimiento: { fechaBorrado: '2026-11-12' } }] }))
+    if (ruta === '/experiments') return desenvolver(env({ pagina: 1, total: 1, items: [{ idExperimento: 7, nombre: 'Exp. A', fecha: '2026-10-01', nGrupos: 3, estado: 'completado', avisoVencimiento: { fechaBorrado: '2026-11-12' } }], resumen: { total: 30, porEstado: { completado: 1, 'en espera del Día 2': 4, 'sin videos': 25 }, anios: ['2026', '2025'], tratamientos: ['Ácido Fólico', 'Control'], avisos: [{ idExperimento: 7, nombre: 'Exp. A', fechaBorrado: '2026-11-12' }] } }))
     if (ruta === '/experiments/7') return desenvolver(env(DETALLE))
     if (ruta === '/experiments/7/status') return desenvolver(env(STATUS))
     if (ruta === '/experiments/7/results') return desenvolver(env(RESULTADOS))
@@ -71,10 +71,31 @@ describe('servicios contra un backend que responde como la guía', () => {
   })
 
   it('lista y detalle con /status', async () => {
-    expect((await experiments.listExperiments())[0]).toMatchObject({ clave: '7', titulo: 'Exp. A', estado: 'DONE', aviso_vencimiento: { fecha_borrado: '2026-11-12' } })
+    const lista = await experiments.listExperiments()
+    expect(lista.items[0]).toMatchObject({ clave: '7', titulo: 'Exp. A', estado: 'DONE', aviso_vencimiento: { fecha_borrado: '2026-11-12' } })
+    expect(lista).toMatchObject({ pagina: 1, total: 1, porPagina: 20 })
+    // El resumen, con la clave del frontend en los conteos y la forma de la pantalla en los avisos.
+    expect(lista.resumen).toEqual({
+      total: 30, por_estado: { DONE: 1, ESPERA_DIA2: 4, SIN_VIDEOS: 25 }, anios: ['2026', '2025'], tratamientos: ['Ácido Fólico', 'Control'],
+      avisos: [{ clave: '7', titulo: 'Exp. A', fecha_borrado: '2026-11-12' }],
+    })
     const e = await experiments.getExperiment('7')
     expect(e.grupos[0]).toMatchObject({ id: '1', nombre: 'Control', tipo: 'CONTROL' })
     expect(e.grupos[0].tandas[0]).toMatchObject({ letra: 'A', estado: 'DONE', id_analisis: 1, analisis_fecha: '2026-10-02T10:00:00', subido_por: '2019630871' })
+  })
+
+  it('la lista manda al servidor los filtros con los valores de la guía y no manda los vacíos', async () => {
+    await experiments.listExperiments()
+    expect(llamadas.at(-1)).toEqual(['get', '/experiments', { params: { pagina: 1 } }])
+    await experiments.listExperiments({ estado: 'ESPERA_DIA2', anio: '2026', tratamiento: 'Ácido Fólico', q: '  solucion ', pagina: 2 })
+    expect(llamadas.at(-1)).toEqual(['get', '/experiments', { params: { pagina: 2, estado: 'en espera del Día 2', fecha: '2026', tratamiento: 'Ácido Fólico', q: 'solucion' } }])
+    await experiments.listExperiments({ estado: '', anio: '', tratamiento: '', q: '   ' })
+    expect(llamadas.at(-1)[2]).toEqual({ params: { pagina: 1 } })
+    // Cada estado del frontend tiene su valor de la guía (incluidos «sin videos» y «en espera del Día 2»).
+    for (const [estado, guia] of [['SIN_VIDEOS', 'sin videos'], ['ESPERA_DIA2', 'en espera del Día 2'], ['QUEUED', 'en cola'], ['RUNNING', 'procesando'], ['PAUSED', 'en pausa'], ['DONE', 'completado'], ['FAILED', 'error'], ['CANCELED', 'cancelado']]) {
+      await experiments.listExperiments({ estado })
+      expect(llamadas.at(-1)[2].params.estado).toBe(guia)
+    }
   })
 
   it('resultados de una tanda: filtra por «etiqueta · letra» y ordena los especímenes', async () => {

@@ -1,12 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperimento'
-import { listExperiments } from '../services/experiments'
+import { listExperiments, POR_PAGINA } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { useAviso } from '../hooks/useAviso'
-import { norm, fechaCorta, ESTADO_EXPERIMENTO } from '../lib/fst'
+import { fechaCorta, ESTADO_EXPERIMENTO } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
 // Apariencia de cada estado calculado del experimento (ESTADO_EXPERIMENTO).
@@ -36,46 +36,54 @@ function retencion(e) {
   return { texto: e.retencion_dias + ' d', color: e.retencion_dias <= 7 ? 'var(--color-accent-700)' : 'inherit' }
 }
 
-// Valores distintos, ordenados, para las opciones de un filtro.
-const opciones = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'es'))
-
 // Los reportes llevan a los resultados del experimento; sin ningún Día 2 analizado no hay
 // nada que exportar. Sin backend, solo el experimento de ejemplo tiene detalle.
 const conReportes = (e) => e.con_detalle && e.videos_dia2_listos > 0
 const chipInactivo = { opacity: 0.4, cursor: 'default' }
-const POR_PAGINA = 10
+// Cuánto espera la búsqueda después de la última tecla antes de pedir la lista al servidor.
+const ESPERA_BUSQUEDA_MS = 300
 
 // 2a · Experimentos (dashboard): todos los del laboratorio, con estado calculado, filtros
 // por estado, año y tratamiento, aviso de videos por borrarse y eliminar (R-08, D-63).
+// Los filtros, la búsqueda y las páginas (de 20) los hace el servidor; los conteos por estado, las opciones de los filtros,
+// los avisos y el estado vacío salen del resumen de TODOS los experimentos que trae cada respuesta.
 export default function ExperimentosPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
   const sinPermiso = useAviso('sin-permiso')
   const [filtro, setFiltro] = useState({ estado: '', anio: '', tratamiento: '' })
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState('')            // lo que hay en la caja de búsqueda
+  const [busqueda, setBusqueda] = useState('') // lo que ya se pidió al servidor (q, 300 ms después de la última tecla)
   const [pagina, setPagina] = useState(1)
   const [borrar, setBorrar] = useState(null) // experimento del diálogo de eliminar
   const [eliminados, setEliminados] = useState([]) // títulos eliminados desde esta lista
-  const { data, error, loading, reload } = useAsync(listExperiments)
+  // Mientras llega una página nueva se sigue mostrando la anterior, y una respuesta vieja no pisa a una nueva (useAsync).
+  const { data, error, loading, reload } = useAsync(
+    () => listExperiments({ ...filtro, q: busqueda, pagina }),
+    [filtro.estado, filtro.anio, filtro.tratamiento, busqueda, pagina])
+
+  useEffect(() => {
+    if (q.trim() === busqueda) return
+    const id = setTimeout(() => { setBusqueda(q.trim()); setPagina(1) }, ESPERA_BUSQUEDA_MS)
+    return () => clearTimeout(id)
+  }, [q, busqueda])
+
+  // Una página que quedó vacía (se eliminó el último experimento de la última página) baja a la que sí tiene.
+  useEffect(() => {
+    if (data && data.items.length === 0 && data.total > 0 && pagina > 1) setPagina(Math.max(1, Math.ceil(data.total / POR_PAGINA)))
+  }, [data, pagina])
 
   // Tras «Eliminar experimento…» en el detalle, el experimento ya no aparece.
   const eliminado = params.get('eliminado')
-  const experiments = (data || []).filter((e) => e.clave !== eliminado)
-  const anios = opciones(experiments.map((e) => e.fecha_inicio.slice(0, 4))).reverse()
-  const tratamientos = opciones(experiments.flatMap((e) => e.tratamientos))
-  const avisos = experiments.filter((e) => e.aviso_vencimiento)
-
-  const nq = norm(q.trim())
-  const list = experiments
-    .filter((e) => !filtro.estado || e.estado === filtro.estado)
-    .filter((e) => !filtro.anio || e.fecha_inicio.startsWith(filtro.anio))
-    // Basta con que algún grupo tenga ese tratamiento.
-    .filter((e) => !filtro.tratamiento || e.tratamientos.includes(filtro.tratamiento))
-    .filter((e) => !nq || norm(e.titulo + ' ' + e.tratamientos.join(' ')).includes(nq))
-  const filtrar = (campo) => (ev) => { setFiltro((f) => ({ ...f, [campo]: ev.target.value })); setPagina(1) }
-  const paginas = Math.max(1, Math.ceil(list.length / POR_PAGINA))
+  const resumen = data?.resumen
+  const enPagina = (data?.items || []).filter((e) => e.clave !== eliminado)
+  const anios = resumen?.anios || []
+  const tratamientos = resumen?.tratamientos || []
+  const avisos = resumen?.avisos || []
+  const total = data?.total ?? 0
+  const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
   const actual = Math.min(pagina, paginas)
-  const enPagina = list.slice((actual - 1) * POR_PAGINA, actual * POR_PAGINA)
+  const filtrar = (campo) => (ev) => { setFiltro((f) => ({ ...f, [campo]: ev.target.value })); setPagina(1) }
 
   function alEliminar(exp) {
     setBorrar(null)
@@ -109,7 +117,7 @@ export default function ExperimentosPage() {
         {avisos.length > 0 && (
           <div style={{ padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)', fontSize: 12.5, lineHeight: 1.55 }}>
             {avisos.map((e) => (
-              <div key={e.clave}>Los videos de <strong>{e.titulo}</strong> se borran el <strong className="num">{fechaCorta(e.aviso_vencimiento.fecha_borrado)}</strong>.</div>
+              <div key={e.clave}>Los videos de <strong>{e.titulo}</strong> se borran el <strong className="num">{fechaCorta(e.fecha_borrado)}</strong>.</div>
             ))}
             <div style={{ color: 'var(--muted-2)', marginTop: 4 }}>El borrado es irreversible. Resultados y reportes se conservan siempre.</div>
           </div>
@@ -119,9 +127,9 @@ export default function ExperimentosPage() {
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor="fEstado">Estado</label>
             <select className="input" id="fEstado" style={{ width: 200 }} value={filtro.estado} onChange={filtrar('estado')}>
-              <option value="">Todos · {experiments.length}</option>
+              <option value="">Todos · {resumen?.total ?? 0}</option>
               {Object.entries(ESTADO_EXPERIMENTO).map(([v, label]) => (
-                <option key={v} value={v}>{label} · {experiments.filter((e) => e.estado === v).length}</option>
+                <option key={v} value={v}>{label} · {resumen?.por_estado[v] ?? 0}</option>
               ))}
             </select>
           </div>
@@ -140,7 +148,7 @@ export default function ExperimentosPage() {
             </select>
           </div>
           <div style={{ flex: 1 }} />
-          <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => { setQ(e.target.value); setPagina(1) }} />
+          <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
 
         <table className="table">
@@ -197,20 +205,20 @@ export default function ExperimentosPage() {
               <button key={n} type="button" className={'btn ' + (n === actual ? 'btn-primary' : 'btn-ghost')} aria-current={n === actual ? 'page' : undefined} onClick={() => setPagina(n)}>{n}</button>
             ))}
             <button type="button" className="btn btn-ghost" disabled={actual === paginas} aria-label="Página siguiente" onClick={() => setPagina(actual + 1)}>›</button>
-            <span className="hint" style={{ marginLeft: 8 }}>{list.length} experimentos</span>
+            <span className="hint" style={{ marginLeft: 8 }}>{total} experimentos</span>
           </nav>
         )}
         {loading && <p className="hint" style={{ margin: '14px 0 0' }}>Cargando experimentos…</p>}
         {error && <p className="hint" style={{ margin: '14px 0 0', color: 'var(--color-accent-700)' }}>No se pudo cargar la lista de experimentos.</p>}
         {/* Sin ningún experimento (§9.2): se invita a crear el primero. Con filtros, otro aviso. */}
-        {data && experiments.length === 0 && (
+        {data && resumen.total === 0 && (
           <div style={{ marginTop: 18, padding: '28px 24px', border: '2px dashed var(--color-divider)', textAlign: 'center' }}>
             <div className="nd" style={{ fontSize: 16, marginBottom: 8 }}>Aún no hay experimentos</div>
             <p className="hint" style={{ margin: '0 0 16px' }}>Crea el primero: solo pide nombre, fecha y notas. Los grupos y los videos se agregan después.</p>
             <Link className="btn btn-primary" to="/experimentos/nuevo">Nuevo experimento</Link>
           </div>
         )}
-        {data && experiments.length > 0 && list.length === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
+        {data && resumen.total > 0 && total === 0 && <p className="hint" style={{ margin: '14px 0 0' }}>Ningún experimento coincide con los filtros.</p>}
         <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--muted)' }}>
           Eliminar un experimento es permanente e irreversible. Solo puede hacerlo quien lo creó o un Administrador, y no mientras un análisis esté procesando o en pausa.
         </p>
