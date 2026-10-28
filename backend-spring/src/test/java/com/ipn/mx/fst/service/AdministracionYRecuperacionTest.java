@@ -336,6 +336,20 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	void con_la_temporal_el_health_publico_sigue_dando_200_pero_lo_demas_no() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, true);
+		String admin = login("admin@fst.mx", CLAVE);
+		String tokenViejo = login("inv@fst.mx", CLAVE);
+		mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk());
+
+		// La web pide /health al cargar cualquier pantalla (también /primer-acceso): no debe cerrarle la sesión.
+		mvc.perform(conToken(get("/health"), tokenViejo)).andExpect(status().isOk());
+		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isUnauthorized());
+		mvc.perform(conToken(get("/notifications"), tokenViejo)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
 	void si_el_correo_falla_responde_200_con_la_temporal_y_esta_sirve() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "inv@fst.mx", false, true);

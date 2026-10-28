@@ -129,7 +129,12 @@ public class AdminServiceImpl implements AdminService {
 		Usuario usuario = new Usuario(id, peticion.getNombre().trim(), peticion.getApellidos().trim(), correo,
 				passwordEncoder.encode(temporal), true, true);
 		try {
-			usuarioRepository.saveAndFlush(usuario);
+			// INSERT de verdad y no save(): con el identificador ya puesto, save() hace un merge (SELECT y luego INSERT o UPDATE), y
+			// si otra petición con el mismo identificador acababa de confirmar, el segundo merge actualizaba esa cuenta (cambiaba su
+			// contraseña) y respondía 201 en lugar de 409. Con INSERT la llave primaria decide: el segundo falla y cae en el catch.
+			jdbc.update("INSERT INTO usuario (idinstitucional, nombre, apellidos, correo, contrasenahash, activo, cambiorequerido) "
+					+ "VALUES (?, ?, ?, ?, ?, true, true)", id, usuario.getNombre(), usuario.getApellidos(), correo,
+					usuario.getContrasenaHash());
 			if (administrador) {
 				jdbc.update("INSERT INTO administrador (idinstitucional) VALUES (?)", id);
 			}

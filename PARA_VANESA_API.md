@@ -98,7 +98,7 @@ Ya coinciden: `/auth/login`, `/auth/reset`, `/pause`, `/pause/image`, `/pause/ad
 
 Filtros de la lista (v0.88.0, encargo 41): `GET /experiments` ya acepta `estado` (el mismo texto que trae cada item, por ejemplo `en cola` o `en espera del Día 2`), `fecha` (`AAAA` o `AAAA-MM-DD`) y `tratamiento` (el de algún grupo, sin distinguir mayúsculas ni acentos), todos opcionales y combinables; un valor que no es de esos formatos da `400`, y `total` son los que pasan el filtro. Tu código actual, que pide todas las páginas y filtra en el navegador, sigue funcionando sin cambios; si quieres que el servidor filtre, ya puedes usarlos.
 
-`POST /admin/users/{id}/reset-temporal` ya existe. «Marcar todas» se hace con un `PATCH` por notificación (sin `read-all`).
+`POST /admin/users/:id/reset-temporal` quedó como ruta oficial (Erick la aceptó el 28-oct, v0.91.0): responde `{passwordTemporal}`; `403` si no es Administrador, `404` si la cuenta no existe, `409` si está desactivada o si es la propia cuenta del Administrador (que usa «Mi perfil»); deja una línea de auditoría en el registro del servidor. `POST /notifications/read-all` ya no se usa (un `PATCH` por notificación).
 
 ## 9. Orden para conectar
 

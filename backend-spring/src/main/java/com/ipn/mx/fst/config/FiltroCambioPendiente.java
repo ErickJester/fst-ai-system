@@ -39,12 +39,15 @@ public class FiltroCambioPendiente extends OncePerRequestFilter {
 		cadena.doFilter(peticion, respuesta);
 	}
 
-	// Lo único que se deja hacer con una contraseña temporal.
+	// Lo único que se deja hacer con una contraseña temporal. GET /health es público (lo pide la web al cargar cualquier
+	// pantalla, también /primer-acceso, para saber la versión y el modo): si con el token de la temporal diera 401, recargar la
+	// pantalla de primer acceso cerraría la sesión y habría que volver a entrar (visto en el navegador el 28-oct, encargo 46).
 	private boolean permitida(HttpServletRequest peticion) {
 		String metodo = peticion.getMethod();
 		String ruta = peticion.getRequestURI();
 		return ("PATCH".equals(metodo) && "/auth/password".equals(ruta))
-				|| ("POST".equals(metodo) && "/auth/logout".equals(ruta));
+				|| ("POST".equals(metodo) && "/auth/logout".equals(ruta))
+				|| ("GET".equals(metodo) && "/health".equals(ruta));
 	}
 
 }

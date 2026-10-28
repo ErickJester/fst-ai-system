@@ -11,7 +11,7 @@ con datos de ejemplo**; que funcione contra el backend real se cuenta aparte, en
 
 **Revisión del 23-oct-2026 (rama `poc/backend-spring`, versión 0.80.0):** se agregó la casilla de eliminar una tanda con la regla nueva del grupo (§5), y se actualizó el empaquetado (§0): el compose definitivo está en la raíz y ya no existen `docker-compose.prod.yml` ni el servicio de desarrollo en el 5173. El cambio del frontend de Vanesa que falta traer a esta rama (D-107 en la pantalla, commit `6067e4c`) no está contado aquí.
 
-**Última revisión del estado (17-oct-2026, Vanesa):** se conectaron los servicios a las formas y rutas de la guía (pasos 1 a 10 de `PARA_VANESA_API.md`, puntos 41 a 51 de `PARA_ERICK.md`). Pruebas, lint y build pasan. Lo que queda abierto depende del backend real, de una confirmación de Erick o de pruebas con personas. Revisión anterior (15-oct-2026):
+**Última revisión del estado (28-oct-2026, encargo 46):** las pantallas se probaron en el navegador contra el backend de Spring detrás de nginx (administración, primer acceso, recuperar contraseña, bloques de 5 s, notificaciones, pausa y error; el detalle está en la nota de cada casilla). **Revisión anterior (17-oct-2026, Vanesa):** se conectaron los servicios a las formas y rutas de la guía (pasos 1 a 10 de `PARA_VANESA_API.md`, puntos 41 a 51 de `PARA_ERICK.md`). Pruebas, lint y build pasan. Lo que queda abierto depende del backend real, de una confirmación de Erick o de pruebas con personas. Revisión anterior (15-oct-2026):
 los tres commits de Vanesa del mismo día, que cerraron lo que era solo del frontend). Leí todo `frontend/src` y el diff
 posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo que se ponga en `false`) y
 **nada se ha probado contra el backend real**. Las pruebas, el lint y el build **no se ejecutaron en esta revisión**:
@@ -19,7 +19,7 @@ posterior. Todo corre con datos de ejemplo (`VITE_USE_MOCKS` es verdadero salvo 
 
 ## 0. Base y empaquetado
 - [x] React 18, Vite 8, React Router 7 y axios; cada pantalla se descarga al abrirla con `React.lazy` (§2)
-- [ ] `frontend/Dockerfile` de desarrollo y servicio `frontend` en `docker-compose.yml`, puerto 5173 (§2). Hecho: `frontend/Dockerfile` existe; desde el 23-oct el `docker-compose.yml` de la raíz es el definitivo y levanta la versión de producción (servicio `web`), así que ya no hay servicio de desarrollo en el 5173: en desarrollo se usa `npm run dev`
+- [x] Imagen del frontend: `frontend/Dockerfile` (de desarrollo), `frontend/Dockerfile.prod` con nginx y, en el `docker-compose.yml` de la raíz (el definitivo), el servicio `web` que la sirve; para desarrollar se usa `npm run dev` (§2). Hecho: el servicio de desarrollo en el 5173 se descartó el 23-oct, cuando el compose de la raíz pasó a ser el de producción (la imagen con versión `fst-web:X.Y.Z`, nginx reenviando `/api/` al backend). `frontend/Dockerfile` sigue existiendo pero ningún compose lo usa
 - [x] `Dockerfile.prod`, nginx con las rutas de la app y `/api/` hacia el backend. Desde el 23-oct es el servicio `web` del `docker-compose.yml` definitivo de la raíz (solo él publica puerto, el 8088; se levanta con `portable\iniciar.bat`); `docker-compose.prod.yml` se borró junto con el backend de Flask
 - [x] Fuente Archivo incluida en la app: no depende de internet al usarla
 - [x] Solo escritorio, sin versión móvil (§2)
@@ -54,7 +54,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] `POST /admin/users/:id/reset-temporal`: ruta oficial, aceptada por Erick el 28-oct (la guía no la trae; encargo 44). Responde `{passwordTemporal}` con 403 (no es Administrador), 404 (no existe) y 409 (cuenta desactivada o la propia cuenta). En «Editar cuenta», una cuenta desactivada no trae el botón sino «Reactiva la cuenta para darle una contraseña temporal nueva.», y la propia cuenta no se edita ahí (va a Mi perfil); el modo demo da los mismos 404 y 409. Probado con pruebas del servicio y de la pantalla, y en el navegador contra el backend de Spring (base desechable): la temporal nueva entra y lleva a `/primer-acceso`, y con la cuenta desactivada ya no sale el botón. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
-- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: probar en el navegador lo que el backend agregó después (administración, recuperar contraseña, pausa y bloques hasta la v0.86.1) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
+- [x] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (28-oct, encargo 46): administración completa, primer acceso, recuperar contraseña, bloques de 5 s, notificaciones, pausa y error, en Chrome contra el compose de producción con nginx (proyecto `fst-enc46`, puerto 8146, ya borrado; ver las casillas de abajo). Con eso ya no queda nada abierto en esta casilla, salvo lo que depende del modelo real: ningún análisis de estos se hizo con el worker procesando un video (el error y la pausa se sembraron en la base y el volumen) Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Antes faltaba: probar en el navegador lo que el backend agregó después (administración, recuperar contraseña, pausa y bloques hasta la v0.86.1; CSV y XLSX en la v0.87.0, encargo 39, que se probaron en el encargo 41) y error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video): todo hecho el 28-oct
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
 - [x] Inicio de sesión con correo y contraseña, y error de credenciales (R-01)
@@ -66,7 +66,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Sin sesión se va al login; con sesión, el login no se vuelve a mostrar
 - [x] Validación de formularios en el cliente: correo con forma válida y contraseña nueva de 8 caracteres o más
 - [x] Mensaje genérico en el login con el backend real: un correo que existe con contraseña mala y uno que no existe dan el mismo 401 «Correo o contraseña incorrectos» (R-01)
-- [x] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo (AuthServiceImpl.java:198, router.jsx:77)
+- [x] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo. Hecho (28-oct): `AuthServiceImpl` arma `DIRECCION_WEB/restablecer?token=`; en el navegador, «Olvidé mi contraseña» → el correo llegó a MailHog con `http://localhost:8146/restablecer?token=…` (la dirección de `DIRECCION_WEB`) → el enlace abre la pantalla de contraseña nueva → guarda → la contraseña nueva entra y la anterior da 401 (comprobado por la API). El mismo enlace por segunda vez y un token alterado dan el `400` y muestran la misma pantalla, «El enlace ya no es válido»: la web no distingue entre usado e inválido
 
 ## 3. Dashboard de experimentos (§9.2)
 - [x] Tabla con nombre, fecha, grupos, estado y acciones, más especímenes, Día 2 analizados, responsable y retención
@@ -124,8 +124,8 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Ajustar y continuar» y «Cancelar análisis» (con confirmación), solo para quien subió el video o un Administrador
 - [x] 409 («ya no está en pausa») y 403 mostrados con su mensaje
 - [x] Progreso por experimento (`/analisis?experimento=`), con una barra por video y «Experimento · Grupo · Tanda» y el día de cada uno; sin experimento, junta los activos
-- [ ] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Falta: sin backend solo muestra un mensaje
-- [ ] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Falta: sin backend se ve un aviso
+- [x] Descargar el PDF de diagnóstico real. Hecho: el botón y el reintento. Probado el 28-oct contra el backend con un análisis en `error` sembrado (con un PDF en el volumen y la imagen de control): la pantalla de análisis muestra el error, la imagen de control y «Descargar reporte de diagnóstico (PDF)», y la API entrega el PDF (200, `application/pdf`) y la imagen (200, `image/jpeg`). El PDF de la prueba es uno cualquiera sembrado; el de verdad lo arma el worker y no se probó aquí. No se hizo clic en el enlace del PDF en el navegador
+- [x] Mostrar la imagen de la pausa real. Hecho: la pantalla la pide como archivo. Probado el 28-oct con una pausa sembrada (`pausa.json` con sus recuadros y `pausa.jpg` en la carpeta del análisis, estado `en pausa` por SQL): se ve la imagen con el recuadro del cilindro 2, el título «No se ve al espécimen del cilindro 2 (segundo 142)» y «Tiempo para responder: 71 h 59 min». Hallazgo: una pausa cuyo `pausa.json` no trae `recuadros` deja la pantalla en «Cargando…» para siempre; el worker siempre los escribe, por eso no se tocó
 
 ## 7. Resultados (§9.5, R-12, R-13)
 - [x] Selector «Ver»: una tanda o el grupo completo, con cada espécimen rotulado con su tanda (D-55, D-93)
@@ -139,7 +139,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
 - [x] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit). Probado en Chrome el 27-oct (nginx de la v0.88.0, puerto 8099, inicio de sesión real): en Resultados · Tanda A, los botones CSV y XLSX bajan `reporte_1_tandaA.csv` (660 bytes) y `reporte_1_tandaA.xlsx` (4286 bytes); el nombre lo pone el frontend (el `Content-Disposition` del servidor trae otro: `reporte_experimento_1_grupo-1_tanda-A.csv`). Los dos archivos se abrieron antes en Excel 16 por COM; el PDF no se repitió en el navegador esta vez
-- [ ] Bloques de 5 s reales. Hecho: el backend la calcula (GET .../results/blocks, encargo 37) y la pantalla usa tantas columnas como bloques tenga el espécimen más largo (encargo 38). Falta: verla en el navegador con datos reales.
+- [x] Bloques de 5 s reales. Hecho: la pantalla. Probado el 28-oct con el experimento completo sembrado (2 especímenes de 5 min): la pestaña dibuja 60 bloques por espécimen y `/results/blocks` trae 60 por espécimen
 
 ## 8. Administración (§9.6, R-16)
 - [x] Lista de cuentas con filtros de rol y estado, y la columna de experimentos
@@ -153,7 +153,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Acceso a la lista de todos los experimentos
 - [x] Un usuario que no es Administrador no entra a `/admin` (el router lo manda a Experimentos)
 - [x] Restablecer la contraseña temporal de una cuenta (propuesta del frontend)
-- [x] El backend responde 403 en `/admin/*` aunque se conozca la URL (SeguridadConfig.java:115-122; backend CHECKLIST §3, probado con JUnit, encargo 35). Hecho: el frontend oculta y redirige.
+- [x] El backend responde 403 en `/admin/*` aunque se conozca la URL. Hecho: el frontend oculta y redirige. Probado el 28-oct: con la sesión de un investigador, `/api/admin/users` da 403 (y JUnit, encargo 35)
 
 ## 9. Revisión segundo a segundo (§9.7, R-14)
 - [x] Solo se abre con el análisis `completado`, y muestra una pantalla propia en 403 y 409
@@ -180,7 +180,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Campana con las notificaciones, que se consultan cada 30 s, con marcar como leída o no leída y marcar todas
 - [x] Los seis tipos, cada uno con su enlace: análisis completado, error, pausa, cancelado, alerta de disco (solo Administradores) y video borrado
 - [x] Mi perfil: nombre, apellidos y correo (con el 409 de correo repetido), identificador de solo lectura y cambio de contraseña
-- [ ] Notificaciones reales con el correo de copia (§11.2). Hecho: la campana. Falta: el correo lo envía el backend
+- [x] Notificaciones reales con el correo de copia (§11.2). Hecho: la campana. Probado el 28-oct con MailHog: los análisis en cola sembrados terminaron en `error` en el worker (el video no estaba en el volumen) y dejaron la notificación «Error en el análisis» (la campana marcó 7 sin leer) y el correo «Error en el análisis» en MailHog. No se provocó con la subida de un archivo que no es video, y no se probó «marcar como leída» en esa corrida
 
 ## 11. Textos y reglas de la interfaz (§9.8)
 - [x] Se dice «espécimen» y no aparecen «rata» ni «animal» en ningún archivo
@@ -200,14 +200,14 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 
 ## 13. Criterios de aceptación finales (§12)
 En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta verlo de punta a punta.
-- [x] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas (AdminController.java:40; backend CHECKLIST §3, `cambioRequerido`)
+- [x] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas. Probado el 28-oct contra el backend: se creó la cuenta (el correo repetido mostró el 409 en el formulario), entró con la temporal, la llevó a `/primer-acceso`, cambió la contraseña y quedó en `/experimentos`. Hallazgo arreglado (v0.91.2): con la temporal, recargar `/primer-acceso` daba 401 en `GET /health` y cerraba la sesión; ahora `/health` se permite
 - [x] Subir un `.mp4` o `.mov` en horizontal crea un análisis `en cola`, el worker lo lleva a `completado` (entonces con el simulador, retirado el 20-oct) y Progreso lo refleja sin recargar (probado con el backend real)
 - [x] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor con 422 y su mensaje (probado con el backend real)
-- [x] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo (AdminPage.jsx:68, :177; backend CHECKLIST §3, 409, probado con JUnit)
-- [x] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección (SeguridadConfig.java:115; backend CHECKLIST §11)
+- [x] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo
+- [x] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección. Probado el 28-oct: escribir `/admin` con la sesión de un investigador lo devuelve a `/experimentos` (sin el enlace «Administración») y `/api/admin/users` da 403
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
-- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Backend hecho (PausaController.java:41, :55; backend CHECKLIST §6 y §10); falta probar la pantalla con el worker real.
-- [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje (backend CHECKLIST §4, probado con los dos estados)
+- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Probado el 28-oct contra el backend: la pantalla de una pausa sembrada y el 409 de ajustar, continuar y cancelar con un análisis `procesando` (y de ajustar y cancelar con uno en `error`), por la API. Falta: ajustar y cancelar DENTRO de una pausa y el vencimiento a las 72 h (no se hicieron para no tocar la pausa sembrada; el backend los prueba con JUnit y el worker en desarrollo, §10 del backend)
+- [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje. Probado el 28-oct contra el backend, con los dos estados puestos por SQL: el diálogo muestra «No se puede eliminar mientras un análisis está procesando o en pausa» (`DELETE` con 409) y el experimento sigue en la lista
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
