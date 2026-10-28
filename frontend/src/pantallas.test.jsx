@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
-import { reiniciarDatos, experiments } from './services/mocks/data'
+import { reiniciarDatos, experiments, users } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
 
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
@@ -126,6 +126,33 @@ describe('administración', () => {
     await user.selectOptions(screen.getByLabelText('Estado'), 'inactiva')
     expect(screen.getByText('Ninguna cuenta coincide con los filtros.')).toBeTruthy()
     expect(screen.getAllByText('sin duración mínima')).toHaveLength(4) // las cuatro conductas (RF-18)
+  })
+
+  // Abre «Editar cuenta» de la fila de este correo.
+  async function editar(user, correo) {
+    const fila = (await screen.findByText(correo)).closest('tr')
+    await user.click(within(fila).getByRole('button', { name: 'Editar' }))
+    return screen.getByRole('dialog', { name: /^Editar cuenta/ })
+  }
+
+  it('restablecer la temporal de una cuenta activa pide confirmación y la muestra una sola vez', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    const dialogo = await editar(user, 'mrivera@ipn.mx')
+    expect(within(dialogo).queryByText('Reactiva la cuenta para darle una contraseña temporal nueva.')).toBeNull()
+    await user.click(within(dialogo).getByRole('button', { name: 'Restablecer contraseña temporal' }))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('¿Restablecer la contraseña temporal de'))
+    const nueva = await screen.findByRole('dialog', { name: 'Contraseña temporal nueva' })
+    expect(within(nueva).getByText(/Dale esta contraseña temporal nueva/)).toBeTruthy()
+    window.confirm.mockRestore()
+  })
+
+  it('una cuenta desactivada no trae el botón: pide reactivarla', async () => {
+    users.find((u) => u.correo === 'lortega@ipn.mx').activo = false
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    const dialogo = await editar(user, 'lortega@ipn.mx')
+    expect(within(dialogo).queryByRole('button', { name: 'Restablecer contraseña temporal' })).toBeNull()
+    expect(within(dialogo).getByText('Reactiva la cuenta para darle una contraseña temporal nueva.')).toBeTruthy()
   })
 
   it('crear una cuenta muestra la contraseña temporal una sola vez', async () => {

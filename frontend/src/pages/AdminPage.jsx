@@ -231,8 +231,14 @@ export default function AdminPage() {
             </div>
             {editando && (
               <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '0 16px 14px' }}>
-                <button type="button" className="btn btn-ghost" style={btnLeft} onClick={nuevaTemporal}>Restablecer contraseña temporal</button>
-                <span className="hint">Para quien perdió su contraseña temporal o no puede entrar: se genera otra y la anterior deja de servir.</span>
+                {editando.is_active
+                  ? (
+                    <>
+                      <button type="button" className="btn btn-ghost" style={btnLeft} onClick={nuevaTemporal}>Restablecer contraseña temporal</button>
+                      <span className="hint">Para quien perdió su contraseña temporal o no puede entrar: se genera otra y la anterior deja de servir.</span>
+                    </>
+                  )
+                  : <span className="hint">Reactiva la cuenta para darle una contraseña temporal nueva.</span>}
               </div>
             )}
             <FieldError msg={err.msg} style={{ padding: '0 16px 14px', margin: 0 }} />
