@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (28-oct-2026, versión 0.91.2):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (28-oct-2026, versión 0.91.3):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -224,7 +224,7 @@ real con sesión (la hará el usuario en otra PC).
 - [x] Un Día 1 se guarda sin análisis
 - [ ] Con dos análisis en cola, el worker los procesa uno a la vez. Hecho: probado en desarrollo (23-oct) con dos vueltas reales de la cola (`cola.vuelta`) y un procesamiento simulado de 6 s: el más antiguo primero, un solo `procesando` a la vez y el segundo espera. Falta repetirlo con dos videos reales y el modelo (varios minutos y unos 3.5 GB de memoria)
 - [x] Un reporte se regenera si hay un análisis más nuevo. Hecho en código (encargo 34): al completar un análisis el worker invalida los reportes del experimento; falta probarlo con dos análisis reales
-- [ ] Cuatro sesiones simultáneas responden en 3 s o menos
+- [x] Cuatro sesiones simultáneas responden en 3 s o menos. Hecho el 28-oct (encargo 47): 4 clientes con su propia sesión, 25 rondas sincronizadas contra una base desechable con 1 experimento de 48 especímenes y 14 400 segundos (login, lista, detalle, `/status`, `/results`, `/byminute`, `/blocks`, `/groups`, `/report/csv` y `/report/xlsx`). Todo en 200; el p95 más alto fue `/results/blocks` con 0.086 s; reportes en frío: CSV máx 0.155 s y XLSX máx 0.229 s; el máximo de toda la sesión, 0.888 s, fue la primera ronda con la JVM sin calentar. Sin nginx ni red de por medio, y sin `/report/pdf` ni la subida de videos
 - [ ] El resumen final anota los puntos [ABIERTO] que se resolvieron con el valor por defecto
 
 ## 12. Decisiones por tomar con el frontend (18-oct-2026)
