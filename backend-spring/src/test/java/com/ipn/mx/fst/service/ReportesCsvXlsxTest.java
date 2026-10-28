@@ -158,6 +158,25 @@ class ReportesCsvXlsxTest {
 		assertEquals(",,Aviso,Mezcla tandas de clasificación precisa y agrupada", lineas.get(8));
 	}
 
+	@Test
+	void un_grupo_cuyo_nombre_empieza_con_igual_sale_con_apostrofo_en_el_csv_y_como_texto_en_el_xlsx() throws Exception {
+		jdbc.update("UPDATE grupo SET etiqueta = '=Control' WHERE idgrupo = ?", control);
+		String creador = login("creador@fst.mx");
+
+		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,5,2,4,0", lineas.get(1));
+		assertEquals(",,Media,,3.0,0.7,3.0,0.0", lineas.get(4));
+
+		// El XLSX guarda el nombre tal cual, como texto y no como fórmula.
+		byte[] xlsx = mvc.perform(get(ruta("xlsx", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+		try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
+			assertEquals(org.apache.poi.ss.usermodel.CellType.STRING, libro.getSheet("Resultados").getRow(1).getCell(0).getCellType());
+			assertEquals("=Control", libro.getSheet("Resultados").getRow(1).getCell(0).getStringCellValue());
+		}
+	}
+
 	// ----------------------------------------------------------------- XLSX
 
 	@Test

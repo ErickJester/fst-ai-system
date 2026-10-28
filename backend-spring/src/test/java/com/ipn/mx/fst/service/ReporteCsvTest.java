@@ -100,4 +100,64 @@ class ReporteCsvTest {
 		assertEquals("\"Grupo, \"\"uno\"\"\",A,Espécimen 1,0:00-1:00,10,20,30,0", lineas.get(1));
 	}
 
+	// ----------------------------------------------------------------- fórmulas (encargo 40)
+
+	@Test
+	void un_grupo_que_empieza_con_igual_mas_menos_arroba_tabulador_o_retorno_lleva_apostrofo() {
+		assertEquals("'=Control", ReporteCsv.texto("=Control"));
+		assertEquals("'+1", ReporteCsv.texto("+1"));
+		assertEquals("'-x", ReporteCsv.texto("-x"));
+		assertEquals("'@SUMA", ReporteCsv.texto("@SUMA"));
+		assertEquals("'\tx", ReporteCsv.texto("\tx"));
+		// El retorno obliga además a las comillas de RFC 4180.
+		assertEquals("\"'\rx\"", ReporteCsv.texto("\rx"));
+
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("=Control", false, List.of()))).get(1));
+		assertEquals("'@SUMA,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("@SUMA", false, List.of()))).get(1));
+	}
+
+	@Test
+	void un_texto_normal_o_con_igual_en_medio_no_cambia() {
+		assertEquals("Control", ReporteCsv.texto("Control"));
+		assertEquals("a=b", ReporteCsv.texto("a=b"));
+		assertEquals("x+y-z@w", ReporteCsv.texto("x+y-z@w"));
+		assertEquals("", ReporteCsv.texto(""));
+		assertEquals("a=b,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("a=b", false, List.of()))).get(1));
+	}
+
+	@Test
+	void el_apostrofo_va_antes_de_las_comillas() {
+		assertEquals("\"'=A,1\"", ReporteCsv.texto("=A,1"));
+		assertEquals("\"'=\"\"x\"\",1\"", ReporteCsv.texto("=\"x\",1"));
+		assertEquals("\"'=A,1\",A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("=A,1", false, List.of()))).get(1));
+	}
+
+	@Test
+	void los_numeros_nunca_llevan_apostrofo() {
+		List<String> lineas = lineas(ReporteCsv.armar(tabla("=Control", true, List.of(new Revisado("A", 2)))));
+		// Segundos y estadísticos sin apóstrofo, y las etiquetas de la columna Espécimen (texto) intactas porque no empiezan así.
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas.get(1));
+		assertEquals(",,Media,,35.5,0.0,12.3,0.5", lineas.get(4));
+		assertEquals(",,Varianza,,50.0,0.0,9.0,0.5", lineas.get(6));
+		for (int i = 1; i <= 6; i++) {
+			String[] celdas = lineas.get(i).split(",");
+			for (int c = 4; c < celdas.length; c++) {
+				assertFalse(celdas[c].startsWith("'"), lineas.get(i));
+			}
+		}
+	}
+
+	@Test
+	void ninguna_celda_de_texto_del_archivo_empieza_como_formula() {
+		// Con un grupo "=Control" y todas las filas finales (revisión y aviso incluidos), las cuatro primeras columnas son texto
+		// y las demás números.
+		List<String> lineas = lineas(ReporteCsv.armar(tabla("=Control", true, List.of(new Revisado("A", 2)))));
+		for (String linea : lineas.subList(0, lineas.size() - 1)) {
+			String[] celdas = linea.split(",", -1);
+			for (int c = 0; c < Math.min(4, celdas.length); c++) {
+				assertFalse(!celdas[c].isEmpty() && "=+-@\t\r".indexOf(celdas[c].charAt(0)) >= 0, linea);
+			}
+		}
+	}
+
 }

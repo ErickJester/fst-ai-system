@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (25-oct-2026, versión 0.87.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (27-oct-2026, versión 0.87.1):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -20,10 +20,11 @@ unitarias y sin probar contra el stack; y el encargo 34 (reportes guardados en `
 y el encargo 35 (administración y recuperar contraseña, §2, §3 y §11), con pruebas JUnit contra una PostgreSQL de
 prueba y sin probar con el correo real ni el navegador; y el encargo 36 (reiniciar un análisis, §6), con pruebas JUnit
 contra una PostgreSQL de prueba y sin probar con el worker real; y el encargo 37 (bloques de 5 s y pruebas JUnit de las
-reglas del video, su token, la revisión y `PUT .../segundos`, §7), sin probar contra el front; y el encargo 39 (reportes CSV
+reglas del video, su token, la revisión y `PUT .../segundos`, §7), sin probar contra el front. **Hecho el 27-oct:** el encargo 39 (reportes CSV
 y XLSX de un grupo o una tanda con media, desviación estándar y varianza, y la revisión humana en los tres reportes, §8), con
 pruebas JUnit contra una PostgreSQL de prueba y sin abrir los archivos en el navegador. Erick prueba los seis en su máquina.
-**Sin hacer:** el correo de cada notificación (§9) y el `error_log` de nginx con `?vt=` (§7).
+**Sin hacer:** el correo de cada notificación (§9), el `error_log` de nginx con `?vt=` (§7) y los filtros de
+`GET /experiments` en el servidor (§4).
 
 ## 0. Base y Docker
 - [x] `docker compose up` levanta `db`, `backend`, `worker` y `mailhog` (dev), con volúmenes `videos_reportes` y `pgdata` (§2)
@@ -145,8 +146,7 @@ pruebas JUnit contra una PostgreSQL de prueba y sin abrir los archivos en el nav
   - [x] `409` si el video ya se borró (`VIDEO.archivo` nulo): sin video no se corrige. Probado con JUnit
 
 ## 8. Reportes (§7, R-06)
-- [x] CSV con las columnas `Grupo, Tanda, Espécimen, Tiempo (min:seg), Nado, Escalamiento, Inmovilidad, Conducta activa` (D-99). Encargo 39: `GET /experiments/{id}/report/csv?grupo={idGrupo}[&tanda={letra}]` (`400` sin grupo o con una letra que no es A-Z, `404` si el grupo no es del experimento o no tiene esa tanda, `409` sin análisis completados, cualquier usuario autenticado). UTF-8 con BOM, `
-`, comillas RFC 4180, una fila por espécimen y minuto, y al final las filas Media, Desviación estándar, Varianza, Revisión humana y, si mezcla niveles de clasificación, Aviso. Pasa por `ReporteAlmacen` (`grupo-{id}` o `tanda-{id}`). Probado con JUnit: 8 pruebas del CSV sin base (`ReporteCsvTest`) y, contra PostgreSQL, el CSV de un grupo y de una tanda, el aviso de niveles mezclados, los `400`/`404`/`409`/`401`, que el `409` no deja fila ni archivo y que la segunda descarga sale del archivo guardado (`ReportesCsvXlsxTest`); falta abrirlo en Excel
+- [x] CSV con las columnas `Grupo, Tanda, Espécimen, Tiempo (min:seg), Nado, Escalamiento, Inmovilidad, Conducta activa` (D-99). Encargo 39: `GET /experiments/{id}/report/csv?grupo={idGrupo}[&tanda={letra}]` (`400` sin grupo o con una letra que no es A-Z, `404` si el grupo no es del experimento o no tiene esa tanda, `409` sin análisis completados, cualquier usuario autenticado). UTF-8 con BOM, `\r\n` al final de cada línea, comillas RFC 4180, una fila por espécimen y minuto, y al final las filas Media, Desviación estándar, Varianza, Revisión humana y, si mezcla niveles de clasificación, Aviso. Pasa por `ReporteAlmacen` (`grupo-{id}` o `tanda-{id}`). Probado con JUnit: 8 pruebas del CSV sin base (`ReporteCsvTest`) y, contra PostgreSQL, el CSV de un grupo y de una tanda, el aviso de niveles mezclados, los `400`/`404`/`409`/`401`, que el `409` no deja fila ni archivo y que la segunda descarga sale del archivo guardado (`ReportesCsvXlsxTest`); falta abrirlo en Excel. Escapa las fórmulas (encargo 40): toda celda de texto (grupo, tanda, espécimen, tiempo, etiquetas y textos de las filas finales) que empieza con `=`, `+`, `-`, `@`, tabulador o retorno lleva un apóstrofo delante, antes de las comillas; los números (segundos y estadísticos) no se tocan, porque el código separa las celdas de texto de las numéricas. El XLSX no lo necesita (guarda texto, no fórmulas). Probado con JUnit: 5 pruebas más en `ReporteCsvTest` y una contra PostgreSQL con un grupo llamado `=Control`
 - [x] Estadísticas por grupo: media, desviación estándar y varianza. Encargo 39: muestrales (n − 1) sobre los totales por espécimen, con un decimal, en la clase pura `Estadisticos` (6 pruebas: n = 0, 1, 2 y valores conocidos); `GET /results/groups` trae `varianza` junto a `media` y `de` en cada conducta (campo nuevo, no rompe al frontend) y los reportes CSV y XLSX llevan las mismas tres filas. Probado con JUnit contra PostgreSQL
 - [x] XLSX (Apache POI 5.5.1). Encargo 39: `GET /experiments/{id}/report/xlsx?grupo=&tanda=` con los mismos permisos, errores y almacén que el CSV; una hoja «Resultados» con el encabezado en negrita, los segundos y los estadísticos como números, las filas de estadísticos en gris, ancho de columnas automático y solo valores (sin fórmulas). Probado con JUnit: 5 pruebas abriendo los bytes con POI (`ReporteXlsxTest`) y la descarga contra PostgreSQL; falta abrirlo en Excel
 - [x] PDF de resultados con iText (`GET /experiments/{id}/report/pdf`), con los minutos contados desde `SEGUNDO`
