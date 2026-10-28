@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (28-oct-2026, versión 0.91.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (28-oct-2026, versión 0.91.2):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -237,7 +237,7 @@ endpoint correspondiente queda hecho. Sin respuesta, el frontend usa su propuest
 - [x] `GET /experiments/{id}/status`: incluye todos los análisis vigentes, también los `completado`
 - [x] `/status`: `fechaAnalisis` es la hora de entrada a la cola mientras el análisis no termina (D-79); el frontend ordena la cola con ella
 - [x] `/status`: campo extra `motivoCancelacion` (`usuario` o `plazo`). Decidido (D-112): no se guarda; el backend manda `null` y el frontend dice «El análisis se canceló.» (commit `3d9ccec` de Vanesa)
-- [ ] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); el worker ya crea pausas (25-oct), pero no se ha comprobado este campo en `/status` con una (ver la casilla «Pausa» de la sección 6)
+- [x] `/status`: campo extra `pausa.desdeSegundo`. Hecho: el backend lo lee de `pausa.json` (`ResultadosServiceImpl.pausa`); comprobado el 28-oct con `EstadoConPausaTest` (encargo 46, 5 pruebas contra una base desechable): con `pausa.json` devuelve `cilindro`, `desdeSegundo` y el plazo que queda; sin el archivo, con el archivo dañado o sin `hora_pausa`, y con el análisis fuera de «en pausa», `pausa` es `null`
 - [x] `GET /experiments/{id}`: cada video trae `fecha`; `/status` trae `fechaAnalisis` por análisis
 - [x] `GET /admin/system`: forma `{disco, conductas, cola: [{idAnalisis, idExperimento, experimento, grupo, letra, sesion, estado}]}`, en orden de llegada (el que se procesa primero). `conductas` trae los nombres de la base y el frontend los convierte
 - [x] `GET /experiments/{id}/groups?q=`: forma `[{idGrupo, etiqueta, tipo, tratamiento, siguienteOrdinal}]`
