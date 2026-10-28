@@ -44,6 +44,7 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -79,6 +80,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
 	private static final int POR_PAGINA = 20;
+	// Los estados que puede tener un experimento en la lista (los de calcularEstado): los dos de antes de que haya análisis y
+	// los seis de un análisis.
+	private static final List<String> ESTADOS_DE_EXPERIMENTO = Stream.concat(
+			Stream.of("sin videos", "en espera del Día 2"), Stream.of(EstadoAnalisis.values()).map(EstadoAnalisis::valor)).toList();
 	// R-05: el video se borra 30 días después de un análisis completado; con 7 días o menos la lista avisa.
 	private static final int DIAS_RETENCION = 30;
 	private static final int DIAS_AVISO = 7;
@@ -125,31 +130,98 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public Map<String, Object> listar(int pagina) {
+	public Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento) {
 		if (pagina < 1) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'pagina' no tiene un valor válido");
 		}
-
-		List<FilaExperimento> filas = experimentoRepository.buscarPagina(POR_PAGINA, (long) (pagina - 1) * POR_PAGINA);
-		List<Map<String, Object>> items = new ArrayList<>();
-		if (!filas.isEmpty()) {
-			// Una consulta de grupos y otra de tandas con videos para TODA la página, no una por experimento.
-			List<Integer> ids = filas.stream().map(FilaExperimento::getIdExperimento).toList();
-			Map<Integer, List<FilaGrupo>> gruposDe = grupoRepository.buscarGrupos(ids).stream()
-					.collect(Collectors.groupingBy(FilaGrupo::getIdExperimento));
-			Map<Integer, List<FilaTandaVideo>> tandasDe = tandaRepository.buscarTandasYVideos(ids).stream()
-					.collect(Collectors.groupingBy(FilaTandaVideo::getIdExperimento));
-			for (FilaExperimento fila : filas) {
-				items.add(itemDeLista(fila, gruposDe.getOrDefault(fila.getIdExperimento(), List.of()),
-						tandasDe.getOrDefault(fila.getIdExperimento(), List.of())));
-			}
+		String estadoPedido = sinEspacios(estado);
+		if (estadoPedido != null && !ESTADOS_DE_EXPERIMENTO.contains(estadoPedido)) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'estado' no tiene un valor válido; puede ser: "
+					+ String.join(", ", ESTADOS_DE_EXPERIMENTO));
 		}
+		String fechaPedida = sinEspacios(fecha);
+		if (fechaPedida != null && !fechaValida(fechaPedida)) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'fecha' debe ser AAAA o AAAA-MM-DD");
+		}
+		String tratamientoPedido = sinEspacios(tratamiento);
 
 		Map<String, Object> datos = new LinkedHashMap<>();
 		datos.put("pagina", pagina);
-		datos.put("total", experimentoRepository.count());
-		datos.put("items", items);
+		if (estadoPedido == null && fechaPedida == null && tratamientoPedido == null) {
+			// Sin filtros: paginada en SQL, como siempre.
+			datos.put("total", experimentoRepository.count());
+			datos.put("items", armarItems(experimentoRepository.buscarPagina(POR_PAGINA, (long) (pagina - 1) * POR_PAGINA)));
+			return datos;
+		}
+
+		// Con algún filtro: el estado se calcula, no se guarda, así que no se puede filtrar en SQL con LIMIT y OFFSET. Se leen
+		// todos los experimentos (primero los de la fecha pedida, para armar menos), se arman sus items, se filtra y se pagina
+		// aquí. Es un laboratorio: cientos de experimentos, no millones.
+		List<FilaExperimento> filas = experimentoRepository.buscarTodos();
+		if (fechaPedida != null) {
+			filas = filas.stream().filter(f -> coincideFecha(f.getFecha(), fechaPedida)).toList();
+		}
+		String buscado = tratamientoPedido == null ? null : sinAcentos(tratamientoPedido);
+		List<Map<String, Object>> filtrados = armarItems(filas).stream()
+				.filter(item -> estadoPedido == null || estadoPedido.equals(item.get("estado")))
+				.filter(item -> buscado == null || tieneTratamiento(item, buscado))
+				.toList();
+
+		int desde = (int) Math.min((long) (pagina - 1) * POR_PAGINA, filtrados.size());
+		datos.put("total", filtrados.size());
+		datos.put("items", filtrados.subList(desde, Math.min(filtrados.size(), desde + POR_PAGINA)));
 		return datos;
+	}
+
+	// Los items de la lista para estas filas, con una consulta de grupos y otra de tandas con videos para TODAS, no una por
+	// experimento.
+	private List<Map<String, Object>> armarItems(List<FilaExperimento> filas) {
+		List<Map<String, Object>> items = new ArrayList<>();
+		if (filas.isEmpty()) {
+			return items;
+		}
+		List<Integer> ids = filas.stream().map(FilaExperimento::getIdExperimento).toList();
+		Map<Integer, List<FilaGrupo>> gruposDe = grupoRepository.buscarGrupos(ids).stream()
+				.collect(Collectors.groupingBy(FilaGrupo::getIdExperimento));
+		Map<Integer, List<FilaTandaVideo>> tandasDe = tandaRepository.buscarTandasYVideos(ids).stream()
+				.collect(Collectors.groupingBy(FilaTandaVideo::getIdExperimento));
+		for (FilaExperimento fila : filas) {
+			items.add(itemDeLista(fila, gruposDe.getOrDefault(fila.getIdExperimento(), List.of()),
+					tandasDe.getOrDefault(fila.getIdExperimento(), List.of())));
+		}
+		return items;
+	}
+
+	// null si el filtro no viene o está en blanco.
+	private static String sinEspacios(String valor) {
+		return valor == null || valor.isBlank() ? null : valor.trim();
+	}
+
+	// AAAA (cuatro dígitos) o AAAA-MM-DD (una fecha que existe).
+	private static boolean fechaValida(String fecha) {
+		if (fecha.length() == 4) {
+			return fecha.chars().allMatch(c -> c >= '0' && c <= '9');
+		}
+		if (fecha.length() != 10) {
+			return false;
+		}
+		try {
+			LocalDate.parse(fecha);
+			return true;
+		} catch (DateTimeParseException e) {
+			return false;
+		}
+	}
+
+	// fecha es la del experimento en AAAA-MM-DD; el filtro, AAAA o AAAA-MM-DD ya validado.
+	private static boolean coincideFecha(String fecha, String filtro) {
+		return filtro.length() == 4 ? fecha.startsWith(filtro + "-") : fecha.equals(filtro);
+	}
+
+	// ¿Algún grupo del item tiene exactamente este tratamiento (ya sin acentos ni mayúsculas)?
+	@SuppressWarnings("unchecked")
+	private static boolean tieneTratamiento(Map<String, Object> item, String buscado) {
+		return ((List<String>) item.get("tratamientos")).stream().anyMatch(t -> sinAcentos(t).equals(buscado));
 	}
 
 	private Map<String, Object> itemDeLista(FilaExperimento fila, List<FilaGrupo> grupos, List<FilaTandaVideo> filas) {

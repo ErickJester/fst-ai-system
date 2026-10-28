@@ -138,7 +138,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Aviso «Todavía no hay resultados» cuando no hay tandas completadas
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
-- [ ] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit); falta probar las descargas en el navegador
+- [x] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit). Probado en Chrome el 27-oct (nginx de la v0.88.0, puerto 8099, inicio de sesión real): en Resultados · Tanda A, los botones CSV y XLSX bajan `reporte_1_tandaA.csv` (660 bytes) y `reporte_1_tandaA.xlsx` (4286 bytes); el nombre lo pone el frontend (el `Content-Disposition` del servidor trae otro: `reporte_experimento_1_grupo-1_tanda-A.csv`). Los dos archivos se abrieron antes en Excel 16 por COM; el PDF no se repitió en el navegador esta vez
 - [ ] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará
 
 ## 8. Administración (§9.6, R-16)

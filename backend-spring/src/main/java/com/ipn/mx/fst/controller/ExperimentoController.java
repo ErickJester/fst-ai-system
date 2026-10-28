@@ -53,10 +53,14 @@ public class ExperimentoController {
 			.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
 	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
-	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400.
+	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400. Filtros opcionales: estado (el que trae
+	// cada item), fecha (AAAA o AAAA-MM-DD) y tratamiento (de algún grupo, sin distinguir mayúsculas ni acentos); un valor
+	// que no es de esos formatos responde 400.
 	@GetMapping
-	public ResponseEntity<Map<String, Object>> readAll(@RequestParam(defaultValue = "1") int pagina) {
-		return Respuesta.ok(experimentoService.listar(pagina), HttpStatus.OK);
+	public ResponseEntity<Map<String, Object>> readAll(@RequestParam(defaultValue = "1") int pagina,
+			@RequestParam(required = false) String estado, @RequestParam(required = false) String fecha,
+			@RequestParam(required = false) String tratamiento) {
+		return Respuesta.ok(experimentoService.listar(pagina, estado, fecha, tratamiento), HttpStatus.OK);
 	}
 
 	// Reporte de resultados en PDF (sección 8 de la guía). Es de las pocas respuestas que no llevan el

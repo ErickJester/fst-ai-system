@@ -13,7 +13,11 @@ public interface ExperimentoService {
 	// Una página (de 20) de la lista, de la más reciente a la más antigua: {pagina, total, items}. 400 si
 	// pagina no es ≥ 1. Cada item trae lo que la pantalla de la lista necesita (guía 6.1), calculado en pocas
 	// consultas para toda la página.
-	Map<String, Object> listar(int pagina);
+	// Filtros opcionales (null o en blanco = sin filtro): estado, uno de los que calcula el servicio (el mismo texto que trae
+	// cada item); fecha, AAAA (el año) o AAAA-MM-DD (esa fecha); tratamiento, el de algún grupo del experimento, sin distinguir
+	// mayúsculas ni acentos. Un valor que no es de esos formatos da 400. Con algún filtro, total son los experimentos que lo
+	// cumplen y una página fuera de rango devuelve la lista vacía con ese total.
+	Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento);
 
 	// El detalle de un experimento con su árbol de grupos, tandas y videos. 404 si no existe.
 	Map<String, Object> detalle(Integer id);

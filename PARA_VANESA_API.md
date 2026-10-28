@@ -94,6 +94,8 @@ Es una [PROPUESTA] mía, la guía no la trae. Si el video ya se borró, la revis
 
 Ya coinciden: `/auth/login`, `/auth/reset`, `/pause`, `/pause/image`, `/pause/adjust`, `/cancel`, `/diagnostic`, `/review`, `/segundos`, `/restart`, `/report/{formato}`, `/admin/users`, `/admin/system`, `/notifications` y `/experiments` (GET, POST y DELETE).
 
+Filtros de la lista (v0.88.0, encargo 41): `GET /experiments` ya acepta `estado` (el mismo texto que trae cada item, por ejemplo `en cola` o `en espera del Día 2`), `fecha` (`AAAA` o `AAAA-MM-DD`) y `tratamiento` (el de algún grupo, sin distinguir mayúsculas ni acentos), todos opcionales y combinables; un valor que no es de esos formatos da `400`, y `total` son los que pasan el filtro. Tu código actual, que pide todas las páginas y filtra en el navegador, sigue funcionando sin cambios; si quieres que el servidor filtre, ya puedes usarlos.
+
 Dos rutas son propuestas tuyas que la guía no trae: `POST /admin/users/:id/reset-temporal` y `POST /notifications/read-all`. Las dejo por ahora y las vuelvo a revisar al implementar.
 
 ## 9. Orden para conectar

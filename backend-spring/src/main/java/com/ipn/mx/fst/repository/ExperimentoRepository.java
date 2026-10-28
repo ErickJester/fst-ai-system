@@ -34,6 +34,22 @@ public interface ExperimentoRepository extends JpaRepository<Experimento, Intege
 			""", nativeQuery = true)
 	List<FilaExperimento> buscarPagina(@Param("limite") int limite, @Param("salto") long salto);
 
+	// Todos los experimentos, en el mismo orden y con las mismas columnas que buscarPagina pero sin LIMIT. Es para la lista con
+	// filtros: el estado no se guarda, se calcula, así que no se puede filtrar y paginar en SQL.
+	@Query(value = """
+			SELECT e.idexperimento                       AS "idExperimento",
+			       e.nombre                              AS "nombre",
+			       to_char(e.fecha, 'YYYY-MM-DD')        AS "fecha",
+			       e.notas                               AS "notas",
+			       u.idinstitucional                     AS "creadorId",
+			       u.nombre                              AS "creadorNombre",
+			       u.apellidos                           AS "creadorApellidos"
+			FROM experimento e
+			JOIN usuario u ON u.idinstitucional = e.idinstitucional
+			ORDER BY e.fecha DESC, e.idexperimento DESC
+			""", nativeQuery = true)
+	List<FilaExperimento> buscarTodos();
+
 	// Un experimento con su creador, para el detalle.
 	@Query(value = """
 			SELECT e.idexperimento                       AS "idExperimento",
