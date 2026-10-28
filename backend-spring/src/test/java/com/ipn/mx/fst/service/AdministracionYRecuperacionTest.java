@@ -275,6 +275,95 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(conToken(post("/admin/users/999/reset-temporal"), admin)).andExpect(status().isNotFound());
 	}
 
+	// Encargo 44: «Restablecer contraseña temporal» es ruta oficial; estos son sus huecos.
+
+	@Test
+	void una_cuenta_desactivada_da_409_y_no_cambia_nada() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, false);
+		String admin = login("admin@fst.mx", CLAVE);
+		String hash = hashDe("2");
+
+		mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").exists());
+		assertEquals(hash, hashDe("2"));
+		assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '2'", Boolean.class));
+		verify(emailService, never()).enviarCorreo(anyString(), anyString(), anyString());
+	}
+
+	@Test
+	void el_administrador_no_puede_darse_una_temporal_a_si_mismo() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "otro@fst.mx", true, true);
+		String admin = login("admin@fst.mx", CLAVE);
+		String hash = hashDe("1");
+
+		mvc.perform(conToken(post("/admin/users/1/reset-temporal"), admin)).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("Para cambiar tu propia contraseña usa Mi perfil."));
+		assertEquals(hash, hashDe("1"));
+		assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '1'", Boolean.class));
+		verify(emailService, never()).enviarCorreo(anyString(), anyString(), anyString());
+		// Su sesión sigue sirviendo, y a otro Administrador sí se le puede dar.
+		mvc.perform(conToken(get("/admin/users"), admin)).andExpect(status().isOk());
+		mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk());
+		// El 404 va primero: una cuenta que no existe no es «la propia».
+		mvc.perform(conToken(post("/admin/users/999/reset-temporal"), admin)).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void el_token_que_la_cuenta_tenia_queda_bloqueado_hasta_que_cambia_la_contrasena() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, true);
+		String admin = login("admin@fst.mx", CLAVE);
+		String tokenViejo = login("inv@fst.mx", CLAVE);
+		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isOk());
+
+		MvcResult r = mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk()).andReturn();
+		String temporal = JsonPath.read(r.getResponse().getContentAsString(), "$.data.passwordTemporal");
+
+		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isUnauthorized());
+		// Solo se puede cambiar la contraseña (con la temporal como actual) y cerrar sesión.
+		mvc.perform(conToken(patch("/auth/password"), tokenViejo).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\"}"))
+				.andExpect(status().isOk());
+		// Y con la contraseña nueva, el mismo token vuelve a servir.
+		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isOk());
+		assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '2'", Boolean.class));
+	}
+
+	@Test
+	void si_el_correo_falla_responde_200_con_la_temporal_y_esta_sirve() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, true);
+		String admin = login("admin@fst.mx", CLAVE);
+		org.mockito.Mockito.doThrow(new RuntimeException("SMTP caído")).when(emailService)
+				.enviarCorreo(anyString(), anyString(), anyString());
+
+		MvcResult r = mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk()).andReturn();
+		String temporal = JsonPath.read(r.getResponse().getContentAsString(), "$.data.passwordTemporal");
+		assertEquals(12, temporal.length());
+		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"" + temporal + "\"}")).andExpect(status().isOk());
+	}
+
+	@Test
+	void dos_restablecimientos_seguidos_dejan_servir_solo_la_ultima_temporal() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, true);
+		String admin = login("admin@fst.mx", CLAVE);
+
+		String primera = JsonPath.read(mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString(), "$.data.passwordTemporal");
+		String segunda = JsonPath.read(mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString(), "$.data.passwordTemporal");
+		assertFalse(primera.equals(segunda));
+
+		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"" + primera + "\"}")).andExpect(status().isUnauthorized());
+		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"" + segunda + "\"}")).andExpect(status().isOk());
+	}
+
 	// ---------------------------------------------------------------- PATCH: datos, rol, desactivar, nunca DELETE
 
 	@Test
@@ -640,6 +729,10 @@ class AdministracionYRecuperacionTest {
 	}
 
 	// ---------------------------------------------------------------- ayudas
+
+	private String hashDe(String id) {
+		return jdbc.queryForObject("SELECT contrasenahash FROM usuario WHERE idinstitucional = ?", String.class, id);
+	}
 
 	private void cuenta(String id, String correo, boolean administrador, boolean activo) {
 		jdbc.update("INSERT INTO usuario (idinstitucional, nombre, apellidos, correo, contrasenahash, activo, cambiorequerido) "

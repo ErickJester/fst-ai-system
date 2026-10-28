@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (27-oct-2026, versión 0.90.0):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (28-oct-2026, versión 0.91.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -29,7 +29,10 @@ Excel, §8), todo en un stack aparte (proyecto `fst-enc41`, puerto 8099, volúme
 encargo 42 (Docker de producción: imágenes construidas con versión y paquete sin internet, acceso desde otras PCs, correo
 real y contenedores endurecidos, §13), probado con una instalación desde el zip en otro proyecto de Docker; y el encargo 43
 (`GET /experiments` con el filtro de texto `q` y el campo `resumen` de todos los experimentos, §4; la lista del frontend filtra,
-busca y pagina en el servidor), con 14 pruebas JUnit de la lista y una prueba en el navegador contra una base desechable
+busca y pagina en el servidor), con 14 pruebas JUnit de la lista y una prueba en el navegador contra una base desechable. **Hecho el 28-oct:** el encargo 44
+(`POST /admin/users/{id}/reset-temporal` queda como ruta oficial, aceptada por Erick: 409 si el Administrador se la pide a su propia
+cuenta, línea de auditoría en el registro sin la contraseña y Swagger, §3), con 5 pruebas JUnit nuevas y una prueba en el navegador
+contra una base desechable
 (`fst-prod-prueba`, puerto 8097, todo ya borrado). Erick prueba los ocho en su máquina. **Sin hacer:** entrar de verdad
 desde otra PC de la red (con `abrir_red.bat` y la red como «Privada»), el correo con un SMTP real y un análisis completo
 con un video real en el paquete de producción (§13); lo demás abierto abajo son pruebas con el modelo real, con la carga
@@ -74,7 +77,7 @@ o en otras PC.
 ## 3. Administración (§6, R-07, R-16)
 - [x] Verificación de rol Administrador en el backend en cada `/admin/*`, con `403` si no lo es (`SeguridadConfig`, el rol se lee de la base en cada petición). Probado con JUnit (encargo 35)
 - [x] `GET /admin/users?rol=&estado=` (`Investigador`/`Administrador`, `activa`/`inactiva`; `400` con otro valor); trae `nExperimentos`. Probado con JUnit
-- [x] `POST /admin/users` genera una contraseña temporal (12 caracteres, `SecureRandom`), la envía por correo después del commit, la devuelve una sola vez en `passwordTemporal` y pone `cambioRequerido = true`; con ella solo se puede cambiar la contraseña. `POST /admin/users/{id}/reset-temporal` hace lo mismo para una cuenta existente (la anterior y los enlaces pendientes dejan de servir). Probado con JUnit; el correo real no
+- [x] `POST /admin/users` genera una contraseña temporal (12 caracteres, `SecureRandom`), la envía por correo después del commit, la devuelve una sola vez en `passwordTemporal` y pone `cambioRequerido = true`; con ella solo se puede cambiar la contraseña. `POST /admin/users/{id}/reset-temporal` hace lo mismo para una cuenta existente (la anterior y los enlaces pendientes dejan de servir). Encargo 44: es ruta oficial (Erick la aceptó el 28-oct) y se revisa en este orden: `404` si la cuenta no existe, `409` «Para cambiar tu propia contraseña usa Mi perfil.» si el Administrador se la pide a su propia cuenta (el id sale de `authentication.getName()`) y `409` si la cuenta está desactivada; después del guardado deja en el registro `El Administrador {} le dio una contraseña temporal nueva a la cuenta {}` (nunca la temporal ni el hash; `enviarTemporal` y `EmailServiceImpl` tampoco las escriben, y en la prueba del navegador no aparecieron en el log). Documentada en Swagger (`@Operation` y `@ApiResponse` 200/403/404/409). Probado con JUnit (`AdministracionYRecuperacionTest`, 5 pruebas nuevas): cuenta desactivada y propia cuenta (409, sin cambios y sin correo), el token que la cuenta tenía antes da 401 y vuelve a servir tras `PATCH /auth/password`, el correo que falla responde 200 con la temporal y dos restablecimientos seguidos (solo sirve la última); el correo real no
 - [x] `409` si el identificador o el correo ya existen (también con dos peticiones a la vez). Probado con JUnit
 - [x] `PATCH /admin/users/{id}` modifica nombre, apellidos, correo y rol, o desactiva con `activo = false`; no hay `DELETE`. El identificador no se cambia (`400` si llega uno distinto): es la llave de la cuenta. Si cambia el nombre o los apellidos invalida los reportes de la cuenta, igual que `PATCH /users/me`. Probado con JUnit
 - [x] `409` al desactivar la última cuenta de Administrador activa o quitarle el rol (R-16): `ReglaAdministradores`, con la parte pura probada sola y las filas de `ADMINISTRADOR` bloqueadas en orden, así que dos peticiones a la vez no dejan el sistema sin ninguno (25 vueltas de cada caso; sin el candado fallan). Candados de cuenta con `FOR NO KEY UPDATE` (`CandadosDeCuenta`), también en `PATCH /users/me`

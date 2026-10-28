@@ -209,12 +209,17 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	@Transactional
-	public Map<String, Object> nuevaTemporal(String id) {
+	public Map<String, Object> nuevaTemporal(String id, String idSesion) {
 		if (!candados.bloquearCuenta(id)) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "La cuenta " + id + " no existe.");
 		}
 		Usuario usuario = usuarioRepository.findById(id)
 				.orElseThrow(() -> new ErrorApi(HttpStatus.NOT_FOUND, "La cuenta " + id + " no existe."));
+		// Con su propia cuenta su sesión quedaría en 401 y la temporal le llegaría por correo: para cambiar su contraseña tiene
+		// PATCH /auth/password. Va después del 404 y antes del 409 de desactivada: no revela nada, el Administrador ya sabe su id.
+		if (id.equals(idSesion)) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Para cambiar tu propia contraseña usa Mi perfil.");
+		}
 		if (!usuario.getActivo()) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "La cuenta está desactivada: reactívala antes de darle una contraseña temporal.");
 		}
@@ -224,6 +229,8 @@ public class AdminServiceImpl implements AdminService {
 		usuario.setContrasenaHash(passwordEncoder.encode(temporal));
 		usuario.setCambioRequerido(true);
 		usuarioRepository.saveAndFlush(usuario);
+		// Auditoría: quién se la dio a quién. NUNCA se registra la temporal ni su hash.
+		log.info("El Administrador {} le dio una contraseña temporal nueva a la cuenta {}", idSesion, id);
 
 		enviarTemporal(usuario, temporal, false);
 		Map<String, Object> datos = new LinkedHashMap<>();

@@ -4,11 +4,14 @@ import com.ipn.mx.fst.dto.CrearCuentaPeticion;
 import com.ipn.mx.fst.dto.ModificarCuentaPeticion;
 import com.ipn.mx.fst.service.AdminService;
 import com.ipn.mx.fst.utilerias.Respuesta;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,10 +48,22 @@ public class AdminController {
 		return Respuesta.ok(adminService.modificar(id, peticion), HttpStatus.OK);
 	}
 
-	// Ruta propuesta por el frontend (la guía no la trae). Responde {passwordTemporal}, que solo se devuelve aquí.
+	// Ruta oficial (la guía no la trae; Erick la aceptó el 28-oct-2026). Responde {passwordTemporal}, que solo se devuelve aquí.
+	// authentication.getName() es el idInstitucional de la sesión: con él el servicio rechaza que el Administrador se la dé a
+	// su propia cuenta (para eso está PATCH /auth/password).
+	@Operation(summary = "Restablecer contraseña temporal", description = """
+			Le da a una cuenta existente una contraseña temporal nueva (12 caracteres), la manda por correo y la devuelve UNA vez en \
+			`passwordTemporal`. La cuenta queda con `cambioRequerido = true`: sus tokens anteriores dan 401 salvo en \
+			`PATCH /auth/password` y `POST /auth/logout`, la contraseña vieja y los enlaces de restablecer pendientes dejan de servir. \
+			Si el correo falla igual responde 200 con la temporal. Queda una línea de auditoría en el registro del servidor (sin la \
+			contraseña).""")
+	@ApiResponse(responseCode = "200", description = "{passwordTemporal}")
+	@ApiResponse(responseCode = "403", description = "La sesión no es de un Administrador")
+	@ApiResponse(responseCode = "404", description = "La cuenta no existe")
+	@ApiResponse(responseCode = "409", description = "La cuenta está desactivada, o es la propia cuenta del Administrador (usa Mi perfil)")
 	@PostMapping("/users/{id}/reset-temporal")
-	public ResponseEntity<Map<String, Object>> nuevaTemporal(@PathVariable String id) {
-		return Respuesta.ok(adminService.nuevaTemporal(id), HttpStatus.OK);
+	public ResponseEntity<Map<String, Object>> nuevaTemporal(@PathVariable String id, Authentication authentication) {
+		return Respuesta.ok(adminService.nuevaTemporal(id, authentication.getName()), HttpStatus.OK);
 	}
 
 	@GetMapping("/system")

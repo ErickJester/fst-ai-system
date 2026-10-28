@@ -3,6 +3,7 @@ import { usaEjemplo } from './config'
 import { reply, fail } from './mocks/delay'
 import * as db from './mocks/data'
 import { deCuenta, cuentaPublica } from './auth'
+import { usuarioDeLaSesion } from './mocks/sesion'
 import { ROL, ESTADO, SESION } from '../lib/contrato'
 
 // Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
@@ -44,9 +45,12 @@ const mock = {
     Object.assign(c, cambios)
     return reply(cuentaPublica(c))
   },
+  // Las mismas revisiones y en el mismo orden que el backend: 404, la propia cuenta y desactivada.
   temporal(id) {
     const c = db.users.find((x) => x.idInstitucional === id)
     if (!c) return fail(404, 'No existe esa cuenta.')
+    if (usuarioDeLaSesion()?.idInstitucional === id) return fail(409, 'Para cambiar tu propia contraseña usa Mi perfil.')
+    if (!c.activo) return fail(409, 'La cuenta está desactivada: reactívala antes de darle una contraseña temporal.')
     const password = temporal()
     Object.assign(c, { password, cambioRequerido: true })
     return reply({ passwordTemporal: password })
@@ -77,9 +81,11 @@ export async function updateUser(id, { nombre, apellidos, email, role }) {
   return deCuenta(d)
 }
 
-// POST /admin/users/:idInstitucional/reset-temporal → { passwordTemporal }. Propuesta: la guía
-// no la trae. Genera otra temporal (se muestra una sola vez), invalida la contraseña anterior
-// y la cuenta vuelve a pedir el cambio en su próximo acceso.
+// POST /admin/users/:idInstitucional/reset-temporal → { passwordTemporal }. Ruta oficial (la guía
+// no la trae; Erick la aceptó el 28-oct-2026). Genera otra temporal (se muestra una sola vez),
+// invalida la contraseña anterior y la cuenta vuelve a pedir el cambio en su próximo acceso.
+// 403 si la sesión no es de un Administrador, 404 si la cuenta no existe, 409 si es la propia
+// cuenta (para eso está «Mi perfil») o si está desactivada.
 export async function resetTemporal(id) {
   const d = USE_MOCKS ? await mock.temporal(id) : (await api.post(`/admin/users/${id}/reset-temporal`)).data
   return { password_temporal: d.passwordTemporal }

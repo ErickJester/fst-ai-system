@@ -21,8 +21,10 @@ public interface AdminService {
 	Map<String, Object> modificar(String id, ModificarCuentaPeticion peticion);
 
 	// Otra contraseña temporal para la cuenta: mismas reglas que al crearla (una vez, por correo, cambioRequerido = true). La
-	// anterior y cualquier enlace de restablecer pendiente dejan de servir. 404 si no existe, 409 si la cuenta está desactivada.
-	Map<String, Object> nuevaTemporal(String id);
+	// anterior y cualquier enlace de restablecer pendiente dejan de servir. idSesion es el idInstitucional del Administrador que
+	// la pide. Se revisa en este orden: 404 si la cuenta no existe, 409 si es la propia cuenta del Administrador (para eso está
+	// PATCH /auth/password) y 409 si la cuenta está desactivada. Deja una línea de auditoría en el registro, sin la contraseña.
+	Map<String, Object> nuevaTemporal(String id, String idSesion);
 
 	// Disco, conductas y cola de análisis, en orden de llegada (el que se procesa primero).
 	Map<String, Object> sistema();

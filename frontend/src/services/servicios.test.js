@@ -13,6 +13,7 @@ const subir = (clave, extra = {}, alAvanzar) => subirVideo(clave, { grupo: 'Cont
 import { getDiagnostico, getPausa, getImagenPausa, ajustarRecuadro, continuarRecuadro, cancelarAnalisis } from './queue'
 import { getQueue } from './progreso'
 import { getBatchResults, getGroupComparison, getBlocks, getReporte } from './results'
+import * as db from './mocks/data'
 import { reiniciarDatos, resetTokens } from './mocks/data'
 import { listNotifications, markAllRead, deNotificacion } from './notifications'
 import { getRevision, guardarSegundos, reiniciarAnalisis, urlDeVideo } from './revision'
@@ -177,6 +178,33 @@ describe('contraseña temporal', () => {
     expect(await status(auth.login('lperez@ipn.mx', 'mi-clave-123'))).toBe(401)
     const r = await auth.login('lperez@ipn.mx', password_temporal)
     expect(r.user.must_change_password).toBe(true)
+  })
+
+  it('restablecer la temporal deja la cuenta con el cambio pendiente y una contraseña distinta', async () => {
+    const u = await admin.createUser({ nombre: 'Luis', apellidos: 'Pérez', email: 'lperez@ipn.mx', identificador: '1' })
+    await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123')
+    const cuenta = db.users.find((x) => x.idInstitucional === u.id)
+    expect(cuenta).toMatchObject({ cambioRequerido: false, password: 'mi-clave-123' })
+    const { password_temporal } = await admin.resetTemporal(u.id)
+    expect(cuenta).toMatchObject({ cambioRequerido: true, password: password_temporal })
+    expect(password_temporal).not.toBe('mi-clave-123')
+  })
+
+  it('restablecer la temporal da los mismos 404 y 409 que el backend', async () => {
+    sesion(2) // C. Reyes, Administrador
+    expect(await status(admin.resetTemporal('999'))).toBe(404)
+    // Una cuenta desactivada: se reactiva antes de darle otra temporal.
+    const lortega = db.users.find((x) => x.correo === 'lortega@ipn.mx')
+    await admin.setUserActive(lortega.idInstitucional, false)
+    expect(await status(admin.resetTemporal(lortega.idInstitucional))).toBe(409)
+    expect(lortega.cambioRequerido).toBe(false)
+    await admin.setUserActive(lortega.idInstitucional, true)
+    expect(await status(admin.resetTemporal(lortega.idInstitucional))).toBe('ok')
+    // La propia cuenta: para eso está «Mi perfil». El 409 sale con el mensaje del servidor.
+    const propia = await admin.resetTemporal(ID_INSTITUCIONAL[2]).catch((e) => e)
+    expect(propia.response.status).toBe(409)
+    expect(mensajeError(propia, 'x')).toBe('Para cambiar tu propia contraseña usa Mi perfil.')
+    expect(db.users.find((x) => x.idInstitucional === ID_INSTITUCIONAL[2]).cambioRequerido).toBe(false)
   })
 
   it('no permite dos cuentas con el mismo correo', async () => {
