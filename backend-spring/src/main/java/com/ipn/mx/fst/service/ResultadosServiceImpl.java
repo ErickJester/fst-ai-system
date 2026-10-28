@@ -611,37 +611,95 @@ public class ResultadosServiceImpl implements ResultadosService {
 		return grupos;
 	}
 
-	// Promedio (no suma: el tamaño del grupo no distorsiona, guía 7) y desviación estándar MUESTRAL (n − 1) de
-	// los segundos de cada conducta por espécimen, con un decimal. Con un solo espécimen la desviación es 0 y
-	// sin especímenes los dos valores son null.
+	// Promedio (no suma: el tamaño del grupo no distorsiona, guía 7), desviación estándar y varianza MUESTRALES (n − 1) de
+	// los segundos de cada conducta por espécimen, con un decimal. Con un solo espécimen la desviación y la varianza son 0
+	// y sin especímenes los tres valores son null.
 	private Map<String, Object> promedios(List<Espec> especimenes) {
 		Map<String, Object> promedios = new LinkedHashMap<>();
 		for (String conducta : CONDUCTAS) {
+			List<Long> totales = totalesDe(especimenes, conducta);
 			Map<String, Object> par = new LinkedHashMap<>();
-			if (especimenes.isEmpty()) {
-				par.put("media", null);
-				par.put("de", null);
-			} else {
-				double suma = 0;
-				for (Espec e : especimenes) {
-					suma += e.total.getOrDefault(conducta, 0L);
-				}
-				double media = suma / especimenes.size();
-				double de = 0;
-				if (especimenes.size() > 1) {
-					double cuadrados = 0;
-					for (Espec e : especimenes) {
-						double diferencia = e.total.getOrDefault(conducta, 0L) - media;
-						cuadrados += diferencia * diferencia;
-					}
-					de = Math.sqrt(cuadrados / (especimenes.size() - 1));
-				}
-				par.put("media", redondear(media));
-				par.put("de", redondear(de));
-			}
+			par.put("media", Estadisticos.redondear(Estadisticos.media(totales)));
+			par.put("de", Estadisticos.redondear(Estadisticos.desviacion(totales)));
+			par.put("varianza", Estadisticos.redondear(Estadisticos.varianza(totales)));
 			promedios.put(conducta, par);
 		}
 		return promedios;
+	}
+
+	// Los segundos de una conducta de cada espécimen (0 si no tuvo).
+	private static List<Long> totalesDe(List<Espec> especimenes, String conducta) {
+		return especimenes.stream().map(e -> e.total.getOrDefault(conducta, 0L)).toList();
+	}
+
+	// ---------------------------------------------------------------------------
+	//  Reportes CSV y XLSX
+	// ---------------------------------------------------------------------------
+
+	@Override
+	@Transactional(readOnly = true)
+	public AlcanceDeReporte alcanceDeReporte(Integer idExperimento, Integer idGrupo, String letra) {
+		existe(idExperimento);
+		if (idGrupo == null) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "Falta el grupo: ?grupo=<idGrupo> (y tanda=<letra> para una sola).");
+		}
+		List<String> etiquetas = jdbc.queryForList("SELECT etiqueta FROM grupo WHERE idgrupo = ? AND idexperimento = ?",
+				String.class, idGrupo, idExperimento);
+		if (etiquetas.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El grupo " + idGrupo + " no existe en el experimento " + idExperimento);
+		}
+		if (letra == null || letra.isBlank()) {
+			return new AlcanceDeReporte(idGrupo, etiquetas.get(0), null, null, null);
+		}
+
+		String l = letra.trim().toUpperCase(java.util.Locale.ROOT);
+		if (l.length() != 1 || l.charAt(0) < 'A' || l.charAt(0) > 'Z') {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST, "La tanda debe ser una letra, por ejemplo A.");
+		}
+		int ordinal = l.charAt(0) - 'A' + 1;
+		List<Integer> tandas = jdbc.queryForList("SELECT idtanda FROM tanda WHERE idgrupo = ? AND ordinal = ?",
+				Integer.class, idGrupo, ordinal);
+		if (tandas.isEmpty()) {
+			throw new ErrorApi(HttpStatus.NOT_FOUND, "El grupo " + etiquetas.get(0) + " no tiene la tanda " + l);
+		}
+		return new AlcanceDeReporte(idGrupo, etiquetas.get(0), tandas.get(0), ordinal, l);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public TablaDeReporte tablaDeReporte(Integer idExperimento, Integer idGrupo, String letra) {
+		AlcanceDeReporte alcance = alcanceDeReporte(idExperimento, idGrupo, letra);
+		List<Espec> especimenes = leerEspecimenes(idExperimento).stream()
+				.filter(e -> e.idGrupo == alcance.idGrupo() && (alcance.ordinal() == null || e.ordinal == alcance.ordinal()))
+				.toList();
+		if (especimenes.isEmpty()) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Todavía no hay análisis completados en "
+					+ (alcance.letra() == null ? "el grupo " + alcance.etiqueta()
+							: "la tanda " + alcance.letra() + " del grupo " + alcance.etiqueta()));
+		}
+
+		List<TablaDeReporte.FilaDeReporte> filas = new ArrayList<>();
+		List<TablaDeReporte.Revisado> revisados = new ArrayList<>();
+		for (Espec e : especimenes) {
+			int ultimo = (int) Math.ceil(e.filas / 60.0);
+			for (int minuto = 1; minuto <= ultimo; minuto++) {
+				Map<String, Long> delMinuto = e.porMinuto.getOrDefault(minuto, Map.of());
+				List<Long> segundos = TablaDeReporte.CONDUCTAS.stream().map(c -> delMinuto.getOrDefault(c, 0L)).toList();
+				filas.add(new TablaDeReporte.FilaDeReporte(letra(e.ordinal), e.cilindro, minuto, segundos));
+			}
+			if (e.revisado) {
+				revisados.add(new TablaDeReporte.Revisado(letra(e.ordinal), e.cilindro));
+			}
+		}
+
+		List<TablaDeReporte.Estadistico> estadisticos = new ArrayList<>();
+		for (String conducta : TablaDeReporte.CONDUCTAS) {
+			List<Long> totales = totalesDe(especimenes, conducta);
+			estadisticos.add(new TablaDeReporte.Estadistico(Estadisticos.redondear(Estadisticos.media(totales)),
+					Estadisticos.redondear(Estadisticos.desviacion(totales)), Estadisticos.redondear(Estadisticos.varianza(totales))));
+		}
+		boolean mixto = especimenes.stream().map(e -> e.nivel).distinct().count() > 1;
+		return new TablaDeReporte(alcance.etiqueta(), filas, estadisticos, mixto, revisados);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -818,7 +876,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 	}
 
 	private static double redondear(double valor) {
-		return Math.round(valor * 10.0) / 10.0;
+		return Estadisticos.redondear(valor);
 	}
 
 }

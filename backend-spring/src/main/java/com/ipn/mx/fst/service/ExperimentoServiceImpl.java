@@ -603,6 +603,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		Experimento experimento = experimentoRepository.findById(idExperimento).orElseThrow();
 		Usuario creador = experimento.getUsuario();
 		List<FilaResultado> filas = segundoRepository.buscarResultados(idExperimento);
+		// Los especímenes con segundos que no son de la máquina: "grupo|ordinal|cilindro".
+		Set<String> revisados = segundoRepository.buscarRevisados(idExperimento).stream()
+				.map(r -> r.getGrupo() + "|" + r.getOrdinal().intValue() + "|" + r.getCilindro().intValue())
+				.collect(Collectors.toSet());
 
 		Document documento = new Document(PageSize.LETTER);
 		ByteArrayOutputStream salida = new ByteArrayOutputStream();
@@ -628,6 +632,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			if (experimento.getNotas() != null && !experimento.getNotas().isBlank()) {
 				documento.add(new Paragraph("Notas: " + experimento.getNotas(), letraDato));
 			}
+			documento.add(new Paragraph("Revisión humana: " + (revisados.isEmpty() ? "No"
+					: "Sí (" + revisados.size() + (revisados.size() == 1 ? " espécimen" : " especímenes")
+					+ " con segundos corregidos)"), letraDato));
 			documento.add(new Paragraph("Generado: "
 					+ LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), letraDato));
 			documento.add(Chunk.NEWLINE);
@@ -636,7 +643,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				documento.add(new Paragraph(
 						"Sin resultados: el experimento todavía no tiene análisis completados.", letraDato));
 			} else {
-				documento.add(armarTabla(filas));
+				documento.add(armarTabla(filas, revisados));
 				documento.add(new Paragraph("Segundos de cada conducta en cada minuto. Un minuto suma menos de "
 						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió).",
 						letraNota));
@@ -676,7 +683,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// La consulta trae una fila por conducta; la tabla lleva una fila por espécimen y minuto con las cuatro
 	// conductas en columnas. Este método junta las cuatro filas de la consulta en una de la tabla.
-	private PdfPTable armarTabla(List<FilaResultado> filas) throws DocumentException {
+	private PdfPTable armarTabla(List<FilaResultado> filas, Set<String> revisados) throws DocumentException {
 		PdfPTable tabla = new PdfPTable(6);
 		tabla.setWidthPercentage(100);
 		tabla.setWidths(new float[] {3.2f, 1.6f, 1f, 1.3f, 1.2f, 1.3f});
@@ -699,6 +706,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		for (FilaResultado f : filas) {
 			char letraTanda = (char) ('A' + f.getOrdinal().intValue() - 1);
 			String especimen = f.getGrupo() + " · Tanda " + letraTanda + " · Espécimen " + f.getCilindro();
+			if (revisados.contains(f.getGrupo() + "|" + f.getOrdinal().intValue() + "|" + f.getCilindro().intValue())) {
+				especimen += " · revisado";
+			}
 			int minuto = f.getMinuto().intValue();
 			String tiempo = (minuto - 1) + ":00-" + minuto + ":00";
 			String llave = especimen + "|" + minuto;

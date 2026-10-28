@@ -32,4 +32,22 @@ public interface SegundoRepository extends JpaRepository<Segundo, SegundoId> {
 			""", nativeQuery = true)
 	List<FilaResultado> buscarResultados(@Param("idExperimento") Integer idExperimento);
 
+	// Los especímenes del experimento con algún segundo que no es de la máquina (corregido, confirmado o dudoso): los que tuvieron
+	// revisión humana. Cuenta también los segundos sin conducta (los marcados dudosos), que buscarResultados no trae.
+	@Query(value = """
+			SELECT g.etiqueta        AS grupo,
+			       t.ordinal         AS ordinal,
+			       e.numerocilindro  AS cilindro
+			FROM segundo s
+			JOIN observacion o ON o.idobservacion = s.idobservacion
+			JOIN especimen   e ON e.idespecimen   = o.idespecimen
+			JOIN tanda       t ON t.idtanda       = e.idtanda
+			JOIN grupo       g ON g.idgrupo       = t.idgrupo
+			WHERE g.idexperimento = :idExperimento
+			  AND s.origen <> 'maquina'
+			GROUP BY g.etiqueta, t.ordinal, e.numerocilindro
+			ORDER BY g.etiqueta, t.ordinal, e.numerocilindro
+			""", nativeQuery = true)
+	List<FilaEspecimenRevisado> buscarRevisados(@Param("idExperimento") Integer idExperimento);
+
 }

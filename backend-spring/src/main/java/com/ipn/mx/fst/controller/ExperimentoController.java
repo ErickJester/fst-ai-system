@@ -4,6 +4,10 @@ import com.ipn.mx.fst.domain.Experimento;
 import com.ipn.mx.fst.domain.valores.FormatoReporte;
 import com.ipn.mx.fst.service.ExperimentoService;
 import com.ipn.mx.fst.service.ReporteAlmacen;
+import com.ipn.mx.fst.service.ReporteCsv;
+import com.ipn.mx.fst.service.ReporteXlsx;
+import com.ipn.mx.fst.service.ResultadosService;
+import com.ipn.mx.fst.service.ResultadosService.AlcanceDeReporte;
 import com.ipn.mx.fst.utilerias.Respuesta;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -41,6 +45,13 @@ public class ExperimentoController {
 	@Autowired
 	private ReporteAlmacen reportes;
 
+	@Autowired
+	private ResultadosService resultadosService;
+
+	private static final MediaType CSV = MediaType.parseMediaType("text/csv; charset=UTF-8");
+	private static final MediaType XLSX = MediaType
+			.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
 	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
 	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400.
 	@GetMapping
@@ -65,6 +76,42 @@ public class ExperimentoController {
 				.headers(headers)
 				.contentType(MediaType.APPLICATION_PDF)
 				.body(pdf);
+	}
+
+	// Reporte de un grupo completo (?grupo=idGrupo) o de una tanda (?grupo=idGrupo&tanda=A) en CSV (D-99). Es un archivo, así que
+	// tampoco lleva el envoltorio; se descarga (attachment). Pasa por ReporteAlmacen como el PDF: 400 sin grupo o con una letra
+	// que no es A-Z, 404 si el grupo o la tanda no existen y 409 si no hay análisis completados. Esos errores salen antes de guardar
+	// nada: el 409 lo lanza el generador dentro de la transacción del almacén, que se deshace sin dejar fila ni archivo.
+	@GetMapping("/{id}/report/csv")
+	public ResponseEntity<byte[]> generarCsv(@PathVariable Integer id, @RequestParam(required = false) Integer grupo,
+			@RequestParam(required = false) String tanda) throws IOException {
+		AlcanceDeReporte alcance = resultadosService.alcanceDeReporte(id, grupo, tanda);
+		byte[] csv = reportes.obtener(id, FormatoReporte.CSV, alcance.alcance(),
+				() -> ReporteCsv.armar(resultadosService.tablaDeReporte(id, grupo, tanda)));
+		return descarga(csv, CSV, nombreDeArchivo(id, alcance, "csv"));
+	}
+
+	// Lo mismo en XLSX (Apache POI, una hoja «Resultados»).
+	@GetMapping("/{id}/report/xlsx")
+	public ResponseEntity<byte[]> generarXlsx(@PathVariable Integer id, @RequestParam(required = false) Integer grupo,
+			@RequestParam(required = false) String tanda) throws IOException {
+		AlcanceDeReporte alcance = resultadosService.alcanceDeReporte(id, grupo, tanda);
+		byte[] xlsx = reportes.obtener(id, FormatoReporte.XLSX, alcance.alcance(),
+				() -> ReporteXlsx.armar(resultadosService.tablaDeReporte(id, grupo, tanda)));
+		return descarga(xlsx, XLSX, nombreDeArchivo(id, alcance, "xlsx"));
+	}
+
+	// reporte_experimento_{id}_grupo-{idGrupo}.ext o, de una tanda, reporte_experimento_{id}_grupo-{idGrupo}_tanda-{letra}.ext
+	// (la letra sola no distingue entre los grupos). Todo sale de ids y de una letra A-Z ya validada.
+	private static String nombreDeArchivo(Integer id, AlcanceDeReporte alcance, String extension) {
+		String tanda = alcance.letra() == null ? "" : "_tanda-" + alcance.letra();
+		return "reporte_experimento_" + id + "_grupo-" + alcance.idGrupo() + tanda + "." + extension;
+	}
+
+	private static ResponseEntity<byte[]> descarga(byte[] archivo, MediaType tipo, String nombre) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Content-Disposition", "attachment; filename=" + nombre);
+		return ResponseEntity.ok().headers(headers).contentType(tipo).body(archivo);
 	}
 
 	// Detalle con el árbol de grupos, tandas y videos (guía 6.1).

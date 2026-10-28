@@ -60,6 +60,12 @@
 			<artifactId>itextpdf</artifactId>
 			<version>5.5.13.3</version>
 		</dependency>
+		<!-- XLSX del reporte (encargo 39): Apache POI en memoria, solo valores, sin fórmulas -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.5.1</version>
+		</dependency>
 
 		<!-- Seguridad: Spring Security y su soporte de JWT (Nimbus). No se usa jjwt porque arrastra Jackson 2 y
 		     Spring Boot 4 trae Jackson 3 -->

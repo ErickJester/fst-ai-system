@@ -21,8 +21,27 @@ public interface ResultadosService {
 	// desde 1), conducta que gana, matiz y los segundos del bloque. Se calculan desde SEGUNDO al pedirlos; no se guardan (D-52).
 	Map<String, Object> resultadosPorBloques(Integer idExperimento);
 
-	// Un renglón por grupo con el promedio y la desviación estándar de cada conducta (guía 7).
+	// Un renglón por grupo con el promedio, la desviación estándar y la varianza de cada conducta (guía 7).
 	List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento);
+
+	// De qué grupo o tanda es un reporte CSV/XLSX: idTanda, ordinal y letra son null cuando es el grupo completo.
+	record AlcanceDeReporte(int idGrupo, String etiqueta, Integer idTanda, Integer ordinal, String letra) {
+
+		// El alcance de ReporteAlmacen: grupo-{idGrupo} o tanda-{idTanda}.
+		public String alcance() {
+			return idTanda == null ? "grupo-" + idGrupo : "tanda-" + idTanda;
+		}
+	}
+
+	// Resuelve y valida el alcance de un reporte (letra nula o en blanco = el grupo completo). 400 sin grupo o si la letra no es
+	// una sola letra de la A a la Z; 404 si el experimento no existe, si el grupo no es de ese experimento o si el grupo no tiene
+	// esa tanda.
+	AlcanceDeReporte alcanceDeReporte(Integer idExperimento, Integer idGrupo, String letra);
+
+	// Lo que llevan los reportes CSV y XLSX del grupo o de la tanda (D-99): una fila por espécimen y minuto, media, desviación
+	// estándar y varianza por conducta, y qué especímenes se revisaron. Los mismos errores que alcanceDeReporte y 409 si el
+	// alcance no tiene ningún espécimen con análisis completado.
+	TablaDeReporte tablaDeReporte(Integer idExperimento, Integer idGrupo, String letra);
 
 	// Una fila por tanda con análisis completado, para la sección "Tiempos de análisis" del PDF de resultados:
 	// grupo, tanda (letra), duracionVideo (segundos) y tiempos (lo de tiempos.json, o null si no hay archivo).
