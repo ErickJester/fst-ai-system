@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (28-oct-2026, versión 0.91.3):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (28-oct-2026, versión 0.91.1):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
