@@ -130,7 +130,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento) {
+	public Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento, String q) {
 		if (pagina < 1) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'pagina' no tiene un valor válido");
 		}
@@ -144,33 +144,65 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El parámetro 'fecha' debe ser AAAA o AAAA-MM-DD");
 		}
 		String tratamientoPedido = sinEspacios(tratamiento);
+		String tratamientoBuscado = tratamientoPedido == null ? null : sinAcentos(tratamientoPedido);
+		String textoPedido = sinEspacios(q);
+		String textoBuscado = textoPedido == null ? null : sinAcentos(textoPedido);
 
-		Map<String, Object> datos = new LinkedHashMap<>();
-		datos.put("pagina", pagina);
-		if (estadoPedido == null && fechaPedida == null && tratamientoPedido == null) {
-			// Sin filtros: paginada en SQL, como siempre.
-			datos.put("total", experimentoRepository.count());
-			datos.put("items", armarItems(experimentoRepository.buscarPagina(POR_PAGINA, (long) (pagina - 1) * POR_PAGINA)));
-			return datos;
-		}
-
-		// Con algún filtro: el estado se calcula, no se guarda, así que no se puede filtrar en SQL con LIMIT y OFFSET. Se leen
-		// todos los experimentos (primero los de la fecha pedida, para armar menos), se arman sus items, se filtra y se pagina
-		// aquí. Es un laboratorio: cientos de experimentos, no millones.
-		List<FilaExperimento> filas = experimentoRepository.buscarTodos();
-		if (fechaPedida != null) {
-			filas = filas.stream().filter(f -> coincideFecha(f.getFecha(), fechaPedida)).toList();
-		}
-		String buscado = tratamientoPedido == null ? null : sinAcentos(tratamientoPedido);
-		List<Map<String, Object>> filtrados = armarItems(filas).stream()
+		// El estado se calcula, no se guarda, y el resumen cuenta TODOS los experimentos: no se puede filtrar y paginar en SQL
+		// con LIMIT y OFFSET. Se leen todos y se arman sus items una vez (con una consulta de grupos y otra de tandas para
+		// todos); con eso salen el resumen, el filtro y la página. Es un laboratorio: cientos de experimentos, no millones.
+		List<Map<String, Object>> todos = armarItems(experimentoRepository.buscarTodos());
+		List<Map<String, Object>> filtrados = todos.stream()
+				.filter(item -> fechaPedida == null || coincideFecha((String) item.get("fecha"), fechaPedida))
 				.filter(item -> estadoPedido == null || estadoPedido.equals(item.get("estado")))
-				.filter(item -> buscado == null || tieneTratamiento(item, buscado))
+				.filter(item -> tratamientoBuscado == null || tieneTratamiento(item, tratamientoBuscado))
+				.filter(item -> textoBuscado == null || coincideTexto(item, textoBuscado))
 				.toList();
 
 		int desde = (int) Math.min((long) (pagina - 1) * POR_PAGINA, filtrados.size());
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("pagina", pagina);
 		datos.put("total", filtrados.size());
 		datos.put("items", filtrados.subList(desde, Math.min(filtrados.size(), desde + POR_PAGINA)));
+		datos.put("resumen", resumenDeLista(todos));
 		return datos;
+	}
+
+	// Lo que la pantalla necesita saber de TODOS los experimentos, con o sin filtros: cuántos hay, cuántos por estado (solo los
+	// estados que tienen alguno), los años (el más reciente primero), los tratamientos (sin repetir, ordenados) y los avisos de
+	// vencimiento (R-05) de los videos que se borran en 7 días o menos.
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> resumenDeLista(List<Map<String, Object>> todos) {
+		Map<String, Integer> porEstado = new LinkedHashMap<>();
+		Set<String> anios = new java.util.TreeSet<>(java.util.Comparator.reverseOrder());
+		Map<String, String> tratamientos = new LinkedHashMap<>();   // sin acentos ni mayúsculas → el texto con que se escribió
+		List<Map<String, Object>> avisos = new ArrayList<>();
+		for (Map<String, Object> item : todos) {
+			porEstado.merge((String) item.get("estado"), 1, Integer::sum);
+			anios.add(((String) item.get("fecha")).substring(0, 4));
+			for (String t : (List<String>) item.get("tratamientos")) {
+				tratamientos.putIfAbsent(sinAcentos(t), t);
+			}
+			Map<String, String> aviso = (Map<String, String>) item.get("avisoVencimiento");
+			if (aviso != null) {
+				Map<String, Object> a = new LinkedHashMap<>();
+				a.put("idExperimento", item.get("idExperimento"));
+				a.put("nombre", item.get("nombre"));
+				a.put("fechaBorrado", aviso.get("fechaBorrado"));
+				avisos.add(a);
+			}
+		}
+		java.text.Collator orden = java.text.Collator.getInstance(Locale.forLanguageTag("es"));
+		List<String> listaDeTratamientos = new ArrayList<>(tratamientos.values());
+		listaDeTratamientos.sort(orden);
+
+		Map<String, Object> resumen = new LinkedHashMap<>();
+		resumen.put("total", todos.size());
+		resumen.put("porEstado", porEstado);
+		resumen.put("anios", new ArrayList<>(anios));
+		resumen.put("tratamientos", listaDeTratamientos);
+		resumen.put("avisos", avisos);
+		return resumen;
 	}
 
 	// Los items de la lista para estas filas, con una consulta de grupos y otra de tandas con videos para TODAS, no una por
@@ -216,6 +248,13 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// fecha es la del experimento en AAAA-MM-DD; el filtro, AAAA o AAAA-MM-DD ya validado.
 	private static boolean coincideFecha(String fecha, String filtro) {
 		return filtro.length() == 4 ? fecha.startsWith(filtro + "-") : fecha.equals(filtro);
+	}
+
+	// ¿El nombre del experimento o el tratamiento de algún grupo CONTIENE el texto (ya sin acentos ni mayúsculas)?
+	@SuppressWarnings("unchecked")
+	private static boolean coincideTexto(Map<String, Object> item, String buscado) {
+		return sinAcentos((String) item.get("nombre")).contains(buscado)
+				|| ((List<String>) item.get("tratamientos")).stream().anyMatch(t -> sinAcentos(t).contains(buscado));
 	}
 
 	// ¿Algún grupo del item tiene exactamente este tratamiento (ya sin acentos ni mayúsculas)?

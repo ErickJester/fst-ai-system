@@ -3,7 +3,7 @@
 // (escribir, hacer clic, leer lo que aparece). Usan los datos de ejemplo.
 import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, within } from '@testing-library/react'
+import { render, screen, cleanup, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
@@ -451,6 +451,9 @@ describe('revisión segundo a segundo (R-14)', () => {
 })
 
 describe('experimentos (dashboard)', () => {
+  // Las filas de la tabla (sin el encabezado) tardan en cambiar: la lista se pide al servidor con cada filtro.
+  const filas = async (n) => waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(n + 1))
+
   it('sin experimentos invita a crear el primero (§9.2)', async () => {
     experiments.splice(0, experiments.length)
     const user = await conSesion('/experimentos')
@@ -460,14 +463,20 @@ describe('experimentos (dashboard)', () => {
     expect(await screen.findByRole('heading', { name: 'Datos generales' })).toBeTruthy()
   })
 
-  it('pagina de 10 en 10', async () => {
-    for (let i = 0; i < 7; i++) await createExperiment({ titulo: 'Prueba ' + i, fecha_inicio: '2026-10-0' + (i + 1), notas: '' })
+  it('pagina de 20 en 20 con el total del servidor', async () => {
+    for (let i = 0; i < 25; i++) await createExperiment({ titulo: 'Prueba ' + String(i).padStart(2, '0'), fecha_inicio: '2026-10-01', notas: '' })
     const user = await conSesion('/experimentos')
-    await screen.findByText('Prueba 0')
-    expect(screen.getAllByRole('row')).toHaveLength(11) // encabezado + 10
+    await screen.findByText('Prueba 24')
+    await filas(20)
+    expect(screen.getByText('30 experimentos')).toBeTruthy() // 5 de ejemplo + 25
     await user.click(screen.getByRole('button', { name: '2' }))
-    expect(screen.getAllByRole('row')).toHaveLength(3) // los 2 que faltan de 12
+    await filas(10)
+    expect(screen.getByText('Prueba 00')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Página siguiente' }).disabled).toBe(true)
+    // Un filtro vuelve a la página 1.
+    await user.selectOptions(screen.getByLabelText('Fecha'), '2026')
+    await screen.findByText('Prueba 24')
+    expect(screen.getByRole('button', { name: '1' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('filtra por estado, fecha y tratamiento, y avisa de los videos por borrarse', async () => {
@@ -476,12 +485,40 @@ describe('experimentos (dashboard)', () => {
     expect(screen.getByText(/Los videos de/).textContent).toMatch(/Extracto de Valeriana officinalis se borran el/)
 
     await user.selectOptions(screen.getByLabelText('Estado'), 'FAILED')
-    expect(screen.getAllByRole('row')).toHaveLength(2) // encabezado + el de ejemplo
+    await filas(1) // el de ejemplo
+    // Los conteos y las opciones salen del resumen de todos, no de lo filtrado.
+    expect(screen.getByRole('option', { name: 'Completado · 4' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Todos · 5' })).toBeTruthy()
+    expect(screen.getByText(/Los videos de/)).toBeTruthy() // el aviso sigue aunque el filtrado no lo incluya
     await user.selectOptions(screen.getByLabelText('Estado'), '')
     await user.selectOptions(screen.getByLabelText('Fecha'), '2025')
-    expect(screen.queryByText('Compuesto CSR-14 · curva de dosis')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('Compuesto CSR-14 · curva de dosis')).toBeNull())
     await user.selectOptions(screen.getByLabelText('Tratamiento'), 'Fluoxetina 20 mg/kg')
-    expect(screen.getAllByRole('row')).toHaveLength(2)
+    await filas(1)
     expect(screen.getByText('Fluoxetina · calibración del clasificador')).toBeTruthy()
+  })
+
+  it('busca por nombre o tratamiento sin acentos, esperando a que termine de teclear', async () => {
+    const user = await conSesion('/experimentos')
+    await screen.findByText('Compuesto CSR-14 · curva de dosis')
+    const caja = screen.getByLabelText('Buscar por nombre o tratamiento')
+    await user.type(caja, 'replica')
+    await filas(1)
+    expect(screen.getByText('Réplica interanalista · control metodológico')).toBeTruthy()
+    await user.clear(caja)
+    await user.type(caja, 'SOLUCIÓN') // el tratamiento «Placebo (solución salina)»: todos lo tienen
+    await filas(5)
+    await user.clear(caja)
+    await user.type(caja, '20 mg')
+    await filas(2) // Fluoxetina 20 mg/kg y Salvia 20 mg/kg
+  })
+
+  it('con filtros que no dejan nada, lo dice; con el resumen intacto', async () => {
+    const user = await conSesion('/experimentos')
+    await screen.findByText('Compuesto CSR-14 · curva de dosis')
+    await user.type(screen.getByLabelText('Buscar por nombre o tratamiento'), 'zzz')
+    expect(await screen.findByText('Ningún experimento coincide con los filtros.')).toBeTruthy()
+    expect(screen.queryByText('Aún no hay experimentos')).toBeNull()
+    expect(screen.getByRole('option', { name: 'Todos · 5' })).toBeTruthy()
   })
 })

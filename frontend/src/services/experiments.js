@@ -5,6 +5,7 @@ import * as db from './mocks/data'
 import { usuarioDeLaSesion, esAdmin } from './mocks/sesion'
 import { ESTADO, ETAPA, TIPO_GRUPO, ordinalDeLetra, letraDeOrdinal } from '../lib/contrato'
 import { getStatus } from './queue'
+import { norm } from '../lib/fst'
 
 // Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
 const USE_MOCKS = usaEjemplo('experimentos')
@@ -50,10 +51,50 @@ export const deFila = (e) => ({
   con_detalle: e.conDetalle ?? true, // con el backend, todos tienen detalle
 })
 
+// Experimentos por página: los mismos 20 que da el servidor.
+export const POR_PAGINA = 20
+
+// El resumen de la lista (§6.1, GET /experiments → resumen) → forma de la pantalla: los conteos con la clave de cada estado,
+// y los avisos de vencimiento con la clave del experimento.
+export const deResumen = (r) => ({
+  total: r?.total ?? 0,
+  por_estado: Object.fromEntries(Object.entries(r?.porEstado || {}).map(([estado, n]) => [ESTADO.aFront[estado], n])),
+  anios: r?.anios || [],
+  tratamientos: r?.tratamientos || [],
+  avisos: (r?.avisos || []).map((a) => ({ clave: String(a.idExperimento), titulo: a.nombre, fecha_borrado: a.fechaBorrado })),
+})
+
 const mock = {
-  // Sin backend, una sola página con todo (el servidor pagina con ?pagina=).
-  listar() {
-    return reply({ pagina: 1, total: db.experiments.length, items: db.experiments.map((e) => ({ ...e, avisoVencimiento: avisoDe(e) })) })
+  // Lo mismo que el servidor, en memoria: filtra por estado (el texto de la guía), fecha (AAAA o AAAA-MM-DD), tratamiento
+  // completo y q (un pedazo del nombre o de algún tratamiento, sin acentos ni mayúsculas), pagina de 20 en 20 y arma el
+  // resumen de TODOS los experimentos.
+  listar({ pagina = 1, estado, fecha, tratamiento, q } = {}) {
+    const todos = db.experiments.map((e) => ({ ...e, avisoVencimiento: avisoDe(e) }))
+    const tratamientoBuscado = tratamiento ? norm(tratamiento.trim()) : null
+    const texto = q && q.trim() ? norm(q.trim()) : null
+    const filtrados = todos
+      .filter((e) => !estado || e.estado === estado)
+      .filter((e) => !fecha || (fecha.length === 4 ? e.fecha.startsWith(fecha + '-') : e.fecha === fecha))
+      .filter((e) => !tratamientoBuscado || e.tratamientos.some((t) => norm(t) === tratamientoBuscado))
+      .filter((e) => !texto || norm(e.nombre).includes(texto) || e.tratamientos.some((t) => norm(t).includes(texto)))
+    const porEstado = {}
+    const tratamientos = new Map()
+    for (const e of todos) {
+      porEstado[e.estado] = (porEstado[e.estado] || 0) + 1
+      e.tratamientos.forEach((t) => { if (!tratamientos.has(norm(t))) tratamientos.set(norm(t), t) })
+    }
+    return reply({
+      pagina,
+      total: filtrados.length,
+      items: filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
+      resumen: {
+        total: todos.length,
+        porEstado,
+        anios: [...new Set(todos.map((e) => e.fecha.slice(0, 4)))].sort().reverse(),
+        tratamientos: [...tratamientos.values()].sort((a, b) => a.localeCompare(b, 'es')),
+        avisos: todos.filter((e) => e.avisoVencimiento).map((e) => ({ idExperimento: e.idExperimento, nombre: e.nombre, fechaBorrado: e.avisoVencimiento.fechaBorrado })),
+      },
+    })
   },
   crear({ nombre, fecha, notas }) {
     if (db.experiments.some((e) => e.nombre.trim().toLowerCase() === nombre.trim().toLowerCase())) {
@@ -72,16 +113,29 @@ const mock = {
   },
 }
 
-// GET /experiments?pagina= → { pagina, total, items } (§6.1). Los filtros y las páginas de la
-// pantalla siguen en el navegador: aquí se piden todas las páginas y se juntan.
-export async function listExperiments() {
+// GET /experiments?pagina=&estado=&fecha=&tratamiento=&q= → { pagina, total, items, resumen } (§6.1): una página de 20 con los
+// filtros aplicados en el servidor, y el resumen de TODOS los experimentos (conteos por estado, años, tratamientos y avisos)
+// para que la pantalla no necesite la lista completa. estado va como en el frontend (ESTADO_EXPERIMENTO) y anio como fecha; los
+// filtros vacíos no se mandan.
+export async function listExperiments({ estado, anio, tratamiento, q, pagina = 1 } = {}) {
+  const params = { pagina }
+  if (estado) params.estado = ESTADO.aGuia[estado]
+  if (anio) params.fecha = anio
+  if (tratamiento) params.tratamiento = tratamiento
+  if (q && q.trim()) params.q = q.trim()
+  const d = USE_MOCKS ? await mock.listar(params) : (await api.get('/experiments', { params })).data
+  return { pagina: d.pagina, total: d.total, porPagina: POR_PAGINA, items: d.items.map(deFila), resumen: deResumen(d.resumen) }
+}
+
+// Todos los experimentos, juntando las páginas: para quien necesita la lista completa y no una página (los análisis en curso).
+export async function listAllExperiments() {
   const items = []
   for (let pagina = 1; ; pagina++) {
-    const d = USE_MOCKS ? await mock.listar() : (await api.get('/experiments', { params: { pagina } })).data
+    const d = await listExperiments({ pagina })
     items.push(...d.items)
     if (!d.items.length || items.length >= d.total) break
   }
-  return items.map(deFila)
+  return items
 }
 
 // POST /experiments { nombre, fecha, notas } → { idExperimento }. Paso 1, «Datos generales»

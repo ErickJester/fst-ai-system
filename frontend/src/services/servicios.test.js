@@ -5,7 +5,7 @@ import api from './api'
 import * as auth from './auth'
 import { mensajeError, esEnvoltorio } from './api'
 import * as admin from './admin'
-import { createExperiment, deleteExperiment, getExperiment, listExperiments, deFila, deDetalle } from './experiments'
+import { createExperiment, deleteExperiment, getExperiment, listAllExperiments, listExperiments, deFila, deDetalle, deResumen } from './experiments'
 import { subirVideo, sugerirGrupos } from './groups'
 
 // Sube el video de una tanda (por defecto, la A del grupo nuevo «Control», Día 2).
@@ -41,6 +41,48 @@ describe('lista de experimentos con la forma de §6.1', () => {
       creador: { idInstitucional: '2019630871', nombre: 'Mariana', apellidos: 'Rivera Alcántara' } }
     expect(deFila(e)).toMatchObject({ clave: '7', titulo: 'Exp. A', fecha_inicio: '2026-10-01', n_grupos: 3, estado: 'ESPERA_DIA2',
       aviso_vencimiento: { fecha_borrado: '2026-11-12' }, responsable: 'M. Rivera', creador_id: '2019630871', tratamientos: [], con_detalle: true })
+  })
+})
+
+describe('lista de experimentos en el modo demo: lo mismo que el servidor', () => {
+  it('pagina de 20 en 20 y el resumen cuenta todos', async () => {
+    for (let i = 0; i < 25; i++) await createExperiment({ titulo: 'Prueba ' + String(i).padStart(2, '0'), fecha_inicio: '2026-10-01', notas: '' })
+    const uno = await listExperiments()
+    const dos = await listExperiments({ pagina: 2 })
+    expect([uno.items.length, dos.items.length, uno.total, dos.total, uno.porPagina]).toEqual([20, 10, 30, 30, 20])
+    expect(dos.pagina).toBe(2)
+    expect(dos.resumen).toEqual(uno.resumen)
+    expect(uno.resumen.total).toBe(30)
+    expect(uno.resumen.por_estado).toMatchObject({ SIN_VIDEOS: 25, DONE: 4, FAILED: 1 })
+    expect((await listExperiments({ pagina: 3 })).items).toEqual([])
+    expect((await listAllExperiments())).toHaveLength(30)
+  })
+
+  it('filtra por estado, año y tratamiento, y busca sin acentos ni mayúsculas', async () => {
+    expect((await listExperiments({ estado: 'FAILED' })).items.map((e) => e.clave)).toEqual(['7'])
+    expect((await listExperiments({ anio: '2025' })).total).toBe(3)
+    expect((await listExperiments({ tratamiento: 'fluoxetina 20 MG/KG' })).items.map((e) => e.clave)).toEqual(['3'])
+    expect((await listExperiments({ tratamiento: 'Fluoxetina' })).total).toBe(0) // el tratamiento completo, no un pedazo
+    expect((await listExperiments({ q: 'replica' })).items.map((e) => e.clave)).toEqual(['4'])   // «Réplica» del nombre
+    expect((await listExperiments({ q: ' SOLUCION ' })).total).toBe(5)                           // «solución» del tratamiento
+    expect((await listExperiments({ q: 'salvia', anio: '2026' })).items.map((e) => e.clave)).toEqual(['6'])
+    expect((await listExperiments({ q: 'salvia', anio: '2025' })).items).toEqual([])
+    // Y el resumen sigue siendo el de todos.
+    expect((await listExperiments({ q: 'zzz' })).resumen.total).toBe(5)
+  })
+
+  it('el resumen trae los años, los tratamientos sin repetir y los avisos con la clave', async () => {
+    const { resumen } = await listExperiments({ estado: 'DONE' })
+    expect(resumen.anios).toEqual(['2026', '2025'])
+    expect(resumen.tratamientos).toEqual([...resumen.tratamientos].sort((a, b) => a.localeCompare(b, 'es')))
+    expect(new Set(resumen.tratamientos).size).toBe(resumen.tratamientos.length)
+    expect(resumen.tratamientos).toContain('Placebo (solución salina)')
+    expect(resumen.avisos).toHaveLength(1)
+    expect(resumen.avisos[0]).toMatchObject({ clave: '5', titulo: 'Extracto de Valeriana officinalis' })
+  })
+
+  it('deResumen tolera una respuesta sin resumen', () => {
+    expect(deResumen(undefined)).toEqual({ total: 0, por_estado: {}, anios: [], tratamientos: [], avisos: [] })
   })
 })
 
@@ -198,7 +240,7 @@ describe('experimentos', () => {
     expect(clave).toBe('8')
     const exp = await getExperiment(clave)
     expect(exp.grupos).toEqual([])
-    expect((await listExperiments())[0]).toMatchObject({ clave, estado: 'SIN_VIDEOS', n_grupos: 0 })
+    expect((await listAllExperiments())[0]).toMatchObject({ clave, estado: 'SIN_VIDEOS', n_grupos: 0 })
   })
 
   it('el nombre es único en todo el sistema (EXPERIMENTO.nombre UNIQUE)', async () => {
@@ -215,7 +257,7 @@ describe('experimentos', () => {
     expect((await getQueue()).cola.at(-1)).toMatchObject({ job_id: r.job_id, grupo: 'Control', tanda: 'A', status: 'QUEUED', posicion: 3 })
     const tanda = (await getExperiment(clave)).grupos[0].tandas[0]
     expect(tanda).toMatchObject({ letra: 'A', desde: 1, n_cilindros: 4, estado: 'QUEUED' })
-    const fila = (await listExperiments()).find((e) => e.clave === clave)
+    const fila = (await listAllExperiments()).find((e) => e.clave === clave)
     expect(fila).toMatchObject({ n_grupos: 1, n_especimenes: 4, videos_dia2_total: 1, videos_dia2_cargados: 1, estado: 'QUEUED' })
   })
 
@@ -228,7 +270,7 @@ describe('experimentos', () => {
     const tanda = (await getExperiment(clave)).grupos[0].tandas[0]
     expect(tanda).toMatchObject({ letra: 'A', n_cilindros: 3, estado: 'SIN_VIDEO', dia1: { cargado: true } })
     // Solo con el Día 1, el experimento queda «en espera del Día 2» (D-83).
-    expect((await listExperiments()).find((e) => e.clave === clave).estado).toBe('ESPERA_DIA2')
+    expect((await listAllExperiments()).find((e) => e.clave === clave).estado).toBe('ESPERA_DIA2')
   })
 
   it('una tanda lleva un solo video por sesión: el segundo de ese día responde 409', async () => {
@@ -255,14 +297,14 @@ describe('experimentos', () => {
 
   it('el estado del experimento sigue la precedencia del documento', async () => {
     // El de ejemplo tiene una tanda con error: «Con error» manda sobre las demás.
-    expect((await listExperiments()).find((e) => e.clave === '7').estado).toBe('FAILED')
+    expect((await listAllExperiments()).find((e) => e.clave === '7').estado).toBe('FAILED')
   })
 
   it('eliminar: solo quien lo creó o un Administrador, sin pedir nombre ni contraseña (D-63, R-08)', async () => {
     sesion(1) // M. Rivera
     expect(await status(deleteExperiment('6'))).toBe(403) // lo creó J. Domínguez
     expect(await status(deleteExperiment('5'))).toBe('ok')
-    expect((await listExperiments()).some((e) => e.clave === '5')).toBe(false)
+    expect((await listAllExperiments()).some((e) => e.clave === '5')).toBe(false)
     expect(await status(deleteExperiment('5'))).toBe(404)
     sesion(2) // Administrador
     expect(await status(deleteExperiment('6'))).toBe('ok')
@@ -283,7 +325,7 @@ describe('experimentos', () => {
   })
 
   it('avisa con la fecha exacta los videos que se borran en 7 días o menos (R-05)', async () => {
-    const lista = await listExperiments()
+    const lista = await listAllExperiments()
     const valeriana = lista.find((e) => e.clave === '5') // le quedan 4 días
     const d = new Date()
     d.setDate(d.getDate() + 4)

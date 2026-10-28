@@ -1,4 +1,4 @@
-import { listExperiments, detalleConStatus } from './experiments'
+import { listAllExperiments, detalleConStatus } from './experiments'
 import { ESTADO, ETAPA, SESION } from '../lib/contrato'
 import { nombreEquipo } from '../lib/fst'
 
@@ -52,7 +52,7 @@ function trabajo(exp, g, t, a) {
 // en que entró a la cola (D-79). Uno ajustado tras una pausa conserva la suya y vuelve por
 // delante de los que llegaron después; uno reiniciado entra con la hora del reinicio.
 export async function getQueue(clave = null) {
-  const claves = clave ? [clave] : (await listExperiments()).filter((e) => CON_ANALISIS.includes(e.estado)).map((e) => e.clave)
+  const claves = clave ? [clave] : (await listAllExperiments()).filter((e) => CON_ANALISIS.includes(e.estado)).map((e) => e.clave)
   const todos = []
   for (const c of claves) {
     let r

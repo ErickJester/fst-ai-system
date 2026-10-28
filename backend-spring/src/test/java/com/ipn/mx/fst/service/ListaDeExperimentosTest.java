@@ -192,6 +192,99 @@ class ListaDeExperimentosTest {
 		mvc.perform(get("/experiments?estado=error")).andExpect(status().isUnauthorized());
 	}
 
+	// ----------------------------------------------------------- q y resumen (encargo 43)
+
+	@Test
+	void q_busca_por_nombre_sin_distinguir_mayusculas_y_por_un_pedazo() throws Exception {
+		assertEquals(List.of("Alfa"), nombres(lista("q=alfa")));
+		assertEquals(List.of("Alfa"), nombres(lista("q=ALF")));
+		assertEquals(List.of("Alfa"), nombres(lista("q=%20lfa%20")));          // recorta espacios
+		assertEquals(25, (int) JsonPath.read(lista("q=relleno").getResponse().getContentAsString(), "$.data.total"));
+		assertEquals(List.of("Relleno 25"), nombres(lista("q=relleno%2025")));
+		assertEquals(List.of(), nombres(lista("q=zzz")));
+		// Vacío o en blanco es sin filtro.
+		assertEquals(30, (int) JsonPath.read(lista("q=").getResponse().getContentAsString(), "$.data.total"));
+		assertEquals(30, (int) JsonPath.read(lista("q=%20").getResponse().getContentAsString(), "$.data.total"));
+	}
+
+	@Test
+	void q_busca_en_el_tratamiento_de_cualquier_grupo_sin_acentos() throws Exception {
+		assertEquals(List.of("Alfa", "Epsilon"), nombres(lista("q=acupun")));            // un pedazo del tratamiento
+		assertEquals(List.of("Beta"), nombres(lista("q=acido")));                       // «Ácido Fólico» sin acento
+		assertEquals(List.of("Beta"), nombres(lista("q=%C3%81CIDO%20F%C3%93LICO")));    // con acentos y mayúsculas
+		assertEquals(List.of("Beta"), nombres(lista("q=folico")));
+		assertEquals(List.of("Delta", "Epsilon", "Gamma"), nombres(lista("q=control")));
+		assertEquals(25, (int) JsonPath.read(lista("q=masiv").getResponse().getContentAsString(), "$.data.total"));
+		// El texto no cruza el nombre y el tratamiento: «Alfa Acupuntura» no está en ninguno de los dos por separado.
+		assertEquals(List.of(), nombres(lista("q=alfa%20acupuntura")));
+	}
+
+	@Test
+	void q_se_combina_con_los_otros_filtros_y_con_las_paginas() throws Exception {
+		assertEquals(List.of("Epsilon"), nombres(lista("q=control&estado=error")));
+		assertEquals(List.of("Delta"), nombres(lista("q=control&fecha=2026-10-25")));
+		assertEquals(List.of("Alfa", "Epsilon"), nombres(lista("q=acupuntura&fecha=2026")));
+		assertEquals(List.of("Epsilon"), nombres(lista("q=acupuntura&tratamiento=control")));
+		assertEquals(List.of(), nombres(lista("q=acupuntura&estado=en%20cola")));
+		MvcResult segunda = lista("q=masivo&pagina=2");
+		assertEquals(5, nombres(segunda).size());
+		assertEquals(25, (int) JsonPath.read(segunda.getResponse().getContentAsString(), "$.data.total"));
+	}
+
+	@Test
+	void el_resumen_cuenta_todos_los_experimentos_con_o_sin_filtros() throws Exception {
+		String sinFiltros = mvc.perform(pedir("", login())).andReturn().getResponse().getContentAsString();
+		java.util.Map<String, Object> resumen = JsonPath.read(sinFiltros, "$.data.resumen");
+		assertEquals(30, resumen.get("total"));
+		assertEquals(java.util.Map.of("completado", 1, "en cola", 1, "error", 1, "en espera del Día 2", 1, "sin videos", 26),
+				resumen.get("porEstado"));
+		assertEquals(List.of("2026", "2025", "2024"), resumen.get("anios"));
+		// Sin repetir y ordenados como en español (el acento no cambia el lugar de la letra): «Ácido» va antes que «Acupuntura».
+		assertEquals(List.of("Ácido Fólico", "Acupuntura", "Control", "Masivo"), resumen.get("tratamientos"));
+		assertEquals(List.of(), resumen.get("avisos"));
+
+		// Con filtros que dejan uno, dos o ninguno, el resumen es el mismo.
+		for (String consulta : List.of("estado=error", "fecha=2025", "tratamiento=masivo&pagina=2", "q=acupuntura", "q=zzz",
+				"estado=completado&q=control", "pagina=9")) {
+			String filtrada = lista(consulta).getResponse().getContentAsString();
+			assertEquals(resumen, JsonPath.read(filtrada, "$.data.resumen"), consulta);
+		}
+	}
+
+	@Test
+	void el_resumen_trae_los_avisos_de_vencimiento() throws Exception {
+		// El análisis de Alfa se completó hace 25 días: al video le quedan 5 de los 30 de retención (R-05).
+		jdbc.update("UPDATE analisis SET fechaanalisis = now() - interval '25 days' WHERE estado = 'completado'");
+		int alfa = jdbc.queryForObject("SELECT idexperimento FROM experimento WHERE nombre = 'Alfa'", Integer.class);
+		String respuesta = lista("estado=error").getResponse().getContentAsString();    // un filtro que NO deja a Alfa
+		List<java.util.Map<String, Object>> avisos = JsonPath.read(respuesta, "$.data.resumen.avisos");
+		assertEquals(1, avisos.size());
+		assertEquals(alfa, avisos.get(0).get("idExperimento"));
+		assertEquals("Alfa", avisos.get(0).get("nombre"));
+		assertEquals(java.time.LocalDate.now(java.time.ZoneId.of("America/Mexico_City")).plusDays(5).toString(),
+				avisos.get(0).get("fechaBorrado"));
+		// Y el item de Alfa en la lista trae el mismo aviso.
+		java.util.Map<String, Object> avisoDelItem = JsonPath.read(lista("q=alfa").getResponse().getContentAsString(),
+				"$.data.items[0].avisoVencimiento");
+		assertEquals(avisos.get(0).get("fechaBorrado"), avisoDelItem.get("fechaBorrado"));
+	}
+
+	@Test
+	void sin_experimentos_el_resumen_viene_vacio() throws Exception {
+		for (String tabla : List.of("segundo", "observacion", "especimen", "reporte", "analisis", "video", "tanda", "grupo",
+				"experimento")) {
+			jdbc.update("DELETE FROM " + tabla);
+		}
+		MvcResult r = lista("q=algo");
+		assertEquals(0, (int) JsonPath.read(r.getResponse().getContentAsString(), "$.data.total"));
+		assertEquals(0, (int) JsonPath.read(r.getResponse().getContentAsString(), "$.data.resumen.total"));
+		java.util.Map<String, Object> resumen = JsonPath.read(r.getResponse().getContentAsString(), "$.data.resumen");
+		assertEquals(java.util.Map.of(), resumen.get("porEstado"));
+		assertEquals(List.of(), resumen.get("anios"));
+		assertEquals(List.of(), resumen.get("tratamientos"));
+		assertEquals(List.of(), resumen.get("avisos"));
+	}
+
 	// ----------------------------------------------------------------- apoyo
 
 	private MvcResult lista(String consulta) throws Exception {

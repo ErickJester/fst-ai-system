@@ -78,7 +78,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] «Eliminar» con confirmación explícita, solo para quien creó el experimento o un Administrador (R-08, D-63)
 - [x] Los errores 403 y 409 de eliminar se muestran en el diálogo
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
-- [ ] Filtros y paginación en el servidor. Hecho: se hacen en el navegador sobre la lista completa. La lista ya usa `GET /experiments?pagina=` con `{pagina, total, items}` de §6.1 y junta todas las páginas
+- [x] Filtros y paginación en el servidor. Hecho (encargo 43): la lista pide UNA página de 20 a `GET /experiments?pagina=&estado=&fecha=&tratamiento=&q=` y el servidor filtra, busca (sin acentos) y pagina; el «10 por página» de antes pasó a 20, como el servidor. `listExperiments({estado, anio, tratamiento, q, pagina})` devuelve `{pagina, total, porPagina, items, resumen}`; los conteos por estado, los años, los tratamientos, los avisos de vencimiento y el estado vacío («Aún no hay experimentos» / «Ningún experimento coincide») salen de `resumen`, que es de todos los experimentos. La búsqueda espera 300 ms tras la última tecla, un filtro nuevo vuelve a la página 1 y mientras llega una página se sigue viendo la anterior. El modo demo hace lo mismo en memoria. Quien necesite todos los experimentos (Análisis en curso) usa `listAllExperiments()`, que junta las páginas
 - [x] La columna «Retención» dice «Videos borrados» y explica el motivo al pasar el mouse
 
 ## 4. Crear experimento y cargar video (§9.3, R-02, R-03, R-09)

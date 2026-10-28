@@ -10,14 +10,18 @@ import org.springframework.security.core.Authentication;
 // aquí: cuando una rechaza la petición, el servicio lanza ErrorApi con el código HTTP que corresponde.
 public interface ExperimentoService {
 
-	// Una página (de 20) de la lista, de la más reciente a la más antigua: {pagina, total, items}. 400 si
+	// Una página (de 20) de la lista, de la más reciente a la más antigua: {pagina, total, items, resumen}. 400 si
 	// pagina no es ≥ 1. Cada item trae lo que la pantalla de la lista necesita (guía 6.1), calculado en pocas
-	// consultas para toda la página.
+	// consultas para todos los experimentos.
 	// Filtros opcionales (null o en blanco = sin filtro): estado, uno de los que calcula el servicio (el mismo texto que trae
 	// cada item); fecha, AAAA (el año) o AAAA-MM-DD (esa fecha); tratamiento, el de algún grupo del experimento, sin distinguir
-	// mayúsculas ni acentos. Un valor que no es de esos formatos da 400. Con algún filtro, total son los experimentos que lo
-	// cumplen y una página fuera de rango devuelve la lista vacía con ese total.
-	Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento);
+	// mayúsculas ni acentos; q, un texto que el nombre del experimento o el tratamiento de algún grupo contiene (sin distinguir
+	// mayúsculas ni acentos). Un valor que no es de esos formatos da 400. Los filtros se combinan; total son los experimentos que
+	// los cumplen y una página fuera de rango devuelve la lista vacía con ese total.
+	// resumen es de TODOS los experimentos, con o sin filtros: {total, porEstado: {estado: n}, anios: [más reciente primero],
+	// tratamientos: [sin repetir, ordenados], avisos: [{idExperimento, nombre, fechaBorrado}]}; la pantalla saca de ahí los
+	// conteos por estado, las opciones de los filtros y los avisos de vencimiento sin pedir la lista completa.
+	Map<String, Object> listar(int pagina, String estado, String fecha, String tratamiento, String q);
 
 	// El detalle de un experimento con su árbol de grupos, tandas y videos. 404 si no existe.
 	Map<String, Object> detalle(Integer id);

@@ -9,6 +9,7 @@ import com.ipn.mx.fst.service.ReporteXlsx;
 import com.ipn.mx.fst.service.ResultadosService;
 import com.ipn.mx.fst.service.ResultadosService.AlcanceDeReporte;
 import com.ipn.mx.fst.utilerias.Respuesta;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.Map;
@@ -54,13 +55,21 @@ public class ExperimentoController {
 
 	// Lista paginada (20 por página) de todos los experimentos: todos los investigadores ven los de todos
 	// (R-07). pagina vale 1 por omisión; si no es un número entero ≥ 1 responde 400. Filtros opcionales: estado (el que trae
-	// cada item), fecha (AAAA o AAAA-MM-DD) y tratamiento (de algún grupo, sin distinguir mayúsculas ni acentos); un valor
-	// que no es de esos formatos responde 400.
+	// cada item), fecha (AAAA o AAAA-MM-DD), tratamiento (de algún grupo, completo) y q (un texto que contiene el nombre o el
+	// tratamiento de algún grupo); los textos no distinguen mayúsculas ni acentos y un valor que no es de esos formatos
+	// responde 400. Además de pagina, total e items trae resumen, de todos los experimentos.
+	@Operation(summary = "Lista de experimentos, filtrada y paginada (20 por página)", description = """
+			Los filtros son opcionales y se combinan: **estado** (el que trae cada item), **fecha** (AAAA o AAAA-MM-DD),
+			**tratamiento** (el de algún grupo, completo) y **q** (texto que contiene el nombre del experimento o el
+			tratamiento de algún grupo). Los textos no distinguen mayúsculas ni acentos; un valor inválido responde 400.
+			`total` son los experimentos que cumplen los filtros. `resumen` es de TODOS los experimentos, con o sin filtros:
+			`total`, `porEstado` (cuántos hay en cada estado), `anios` (el más reciente primero), `tratamientos` (sin repetir,
+			ordenados) y `avisos` (los videos que se borran en 7 días o menos: `idExperimento`, `nombre`, `fechaBorrado`).""")
 	@GetMapping
 	public ResponseEntity<Map<String, Object>> readAll(@RequestParam(defaultValue = "1") int pagina,
 			@RequestParam(required = false) String estado, @RequestParam(required = false) String fecha,
-			@RequestParam(required = false) String tratamiento) {
-		return Respuesta.ok(experimentoService.listar(pagina, estado, fecha, tratamiento), HttpStatus.OK);
+			@RequestParam(required = false) String tratamiento, @RequestParam(required = false) String q) {
+		return Respuesta.ok(experimentoService.listar(pagina, estado, fecha, tratamiento, q), HttpStatus.OK);
 	}
 
 	// Reporte de resultados en PDF (sección 8 de la guía). Es de las pocas respuestas que no llevan el

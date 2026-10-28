@@ -16,26 +16,10 @@ public interface ExperimentoRepository extends JpaRepository<Experimento, Intege
 	// ¿Hay OTRO experimento con este nombre? (para el PUT: el propio experimento no cuenta)
 	boolean existsByNombreAndIdExperimentoNot(String nombre, Integer idExperimento);
 
-	// Una página de la lista: el experimento y su creador, de los más recientes a los más antiguos (fecha y
-	// luego id, los dos descendentes). Nativa y con proyección (FilaExperimento) en lugar de la entidad, para
-	// traer al creador en la misma consulta sin una relación LAZY. LIMIT y OFFSET los pone el servicio.
-	@Query(value = """
-			SELECT e.idexperimento                       AS "idExperimento",
-			       e.nombre                              AS "nombre",
-			       to_char(e.fecha, 'YYYY-MM-DD')        AS "fecha",
-			       e.notas                               AS "notas",
-			       u.idinstitucional                     AS "creadorId",
-			       u.nombre                              AS "creadorNombre",
-			       u.apellidos                           AS "creadorApellidos"
-			FROM experimento e
-			JOIN usuario u ON u.idinstitucional = e.idinstitucional
-			ORDER BY e.fecha DESC, e.idexperimento DESC
-			LIMIT :limite OFFSET :salto
-			""", nativeQuery = true)
-	List<FilaExperimento> buscarPagina(@Param("limite") int limite, @Param("salto") long salto);
-
-	// Todos los experimentos, en el mismo orden y con las mismas columnas que buscarPagina pero sin LIMIT. Es para la lista con
-	// filtros: el estado no se guarda, se calcula, así que no se puede filtrar y paginar en SQL.
+	// Todos los experimentos con su creador, de los más recientes a los más antiguos (fecha y luego id, los dos descendentes).
+	// Nativa y con proyección (FilaExperimento) en lugar de la entidad, para traer al creador en la misma consulta sin una
+	// relación LAZY. Es para la lista: el estado no se guarda, se calcula, y el resumen cuenta todos, así que el servicio
+	// filtra y pagina en Java.
 	@Query(value = """
 			SELECT e.idexperimento                       AS "idExperimento",
 			       e.nombre                              AS "nombre",
