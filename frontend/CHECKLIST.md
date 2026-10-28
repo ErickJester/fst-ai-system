@@ -175,14 +175,14 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Borrador guardado por cuenta, y «Cerrar sesión» borra los de la revisión
 - [x] Sin video (ya se borró) la revisión es de solo lectura: explica el motivo y quita «Guardar correcciones» y «Reiniciar el análisis»
 - [x] Con `puedeCorregir: false` la revisión es de solo lectura
-- [ ] El backend responde 409 en `PUT .../segundos` y `POST .../restart` si el video ya se borró (`VIDEO.archivo` nulo). Hecho: el modo demo ya lo hace y la pantalla ya se comporta así. Falta: es una propuesta de Vanesa, sin visto bueno en la guía
+- [x] El backend responde 409 en `PUT .../segundos` y `POST .../restart` si el video ya se borró (`VIDEO.archivo` nulo). Hecho: el modo demo ya lo hace y la pantalla ya se comporta así. Falta: es una propuesta de Vanesa, sin visto bueno en la guía. Probado el 28-oct contra el backend 0.90.0 (`f41cd27`): con `VIDEO.archivo` en nulo (lo que hace la tarea diaria), `PUT .../segundos`, `POST .../restart` y `POST .../video-token` dan 409, y la revisión queda en solo lectura con el aviso y «Reiniciar» deshabilitado
 
 ## 10. Notificaciones, perfil y barra superior (§9, §11.2)
 - [x] Barra superior con el nombre del sistema, campana y menú de usuario con «Cerrar sesión» (§9)
 - [x] Campana con las notificaciones, que se consultan cada 30 s, con marcar como leída o no leída y marcar todas
 - [x] Los seis tipos, cada uno con su enlace: análisis completado, error, pausa, cancelado, alerta de disco (solo Administradores) y video borrado
 - [x] Mi perfil: nombre, apellidos y correo (con el 409 de correo repetido), identificador de solo lectura y cambio de contraseña
-- [ ] Notificaciones reales con el correo de copia (§11.2). Hecho: la campana. Falta: el correo lo envía el backend
+- [x] Notificaciones reales con el correo de copia (§11.2). Hecho: la campana. Falta: el correo lo envía el backend. Probado el 28-oct contra el backend 0.90.0 (`f41cd27`): con MailHog llegan la copia de «Análisis en pausa» (la manda el worker) y «Restablecer tu contraseña» (el backend), y el enlace abre `/restablecer` con el formulario
 
 ## 11. Textos y reglas de la interfaz (§9.8)
 - [x] Se dice «espécimen» y no aparecen «rata» ni «animal» en ningún archivo
@@ -209,7 +209,7 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [x] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): ver la casilla de los 403 de §8
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
-- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): ajustar y cancelar fuera de la pausa dan 409 «El análisis no está en pausa». Falta ver el ajuste y el vencimiento de punta a punta
+- [x] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): ajustar y cancelar fuera de la pausa dan 409 «El análisis no está en pausa». Falta ver el ajuste y el vencimiento de punta a punta. Probado el 28-oct contra el backend 0.90.0 (`f41cd27`): desde la pantalla, «Ajustar y continuar» vuelve a la cola y el análisis termina; «Cancelar» lo cancela (con confirmación); a las 72 h el worker lo cancela, avisa y la pantalla dice «Este análisis ya no está en pausa». «El recuadro está bien, continuar» responde 200 y la pantalla avisa bien; el simulador viejo no conoce «continuar» y vuelve a pausar, pero el worker real sí lo atiende (`aceptar_racha`)
 - [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje. Probado el 26-oct contra el backend 0.86.1 (`aba64af`): 409 «No se puede eliminar mientras un análisis está procesando o en pausa»
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)

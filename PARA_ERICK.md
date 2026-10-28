@@ -2,7 +2,7 @@
 
 ## ⚑ Lee esto primero (22-oct-2026)
 
-El frontend está terminado de nuestro lado: la checklist del front va en **156 de 165** (26-oct, probada contra tu 0.86.1) y lo que falta depende de tu backend o de una decisión tuya. Abajo, cada pendiente con **nuestra propuesta**. Para contestar basta con poner **«Sí»** o tu alternativa junto al número (aquí mismo, en un commit, o por mensaje). **Mientras no digas otra cosa, el front sigue con la propuesta**, que ya está programada y probada.
+El frontend está terminado de nuestro lado: la checklist del front va en **161 de 165** (28-oct, probada contra tu 0.90.0) y lo que falta depende de tu backend o de una decisión tuya. Abajo, cada pendiente con **nuestra propuesta**. Para contestar basta con poner **«Sí»** o tu alternativa junto al número (aquí mismo, en un commit, o por mensaje). **Mientras no digas otra cosa, el front sigue con la propuesta**, que ya está programada y probada.
 
 ### A. Decisiones que necesitamos
 
