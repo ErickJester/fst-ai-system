@@ -32,10 +32,21 @@ COMMIT = re.compile(r"^(feat|fix)(\([^)]*\))?!?:", re.IGNORECASE)
 
 
 def asuntos():
-    """Primer renglón de cada commit, del más viejo al más nuevo."""
+    """Primer renglón de cada commit, del más viejo al más nuevo.
+
+    El merge de poc/backend-spring a main trae dos copias (con otro hash) de los commits de main anteriores a la
+    reescritura de historia; un asunto feat/fix repetido se cuenta una sola vez para que la versión no suba de más.
+    """
     salida = subprocess.run(["git", "log", "--reverse", "--format=%s"], cwd=RAIZ, capture_output=True, text=True,
                             encoding="utf-8", check=True).stdout
-    return salida.splitlines()
+    vistos, lineas = set(), []
+    for linea in salida.splitlines():
+        if COMMIT.match(linea.strip()):
+            if linea in vistos:
+                continue
+            vistos.add(linea)
+        lineas.append(linea)
+    return lineas
 
 
 def subir(version, tipo):
