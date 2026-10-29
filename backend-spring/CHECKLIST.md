@@ -275,3 +275,39 @@ terminar.
 - [ ] Un análisis completo en el paquete de producción. No se hizo: se subió un video de prueba de 4 s (patrón de ffmpeg, no un experimento real) y el worker lo dejó en `error` en la etapa `cilindros` («video demasiado corto»), con su PDF de diagnóstico (se descargó por la API, 109 841 bytes) y su aviso por correo. El análisis real con el modelo, ya sin root, queda por probar
 - [x] `README.md` y `portable/LEEME.md` actualizados (instalación con el paquete de imágenes, acceso desde otras PCs, correo, actualizar y volver atrás, respaldo y restauración, qué hacer si otra PC no entra). `MANUAL.md` ya está marcado como obsoleto (sistema Flask) y apunta a `portable/LEEME.md`
 - Nota de la prueba: la PC de desarrollo tiene 15.7 GB de RAM y Docker llegó a retener 6 GB; correr `mvn test` y el stack a la vez la dejó sin memoria. Se probaron por separado
+
+## 14. Estado del 28-oct-2026: lo resuelto hoy y lo que falta
+**Resuelto hoy** (todo en `poc/backend-spring` y en `main`, que desde hoy apuntan al mismo commit):
+- [x] Encargo 46: pruebas de `GET /status` con la pausa (`EstadoConPausaTest`, 5 pruebas).
+- [x] Encargo 47: cuatro sesiones simultáneas (prueba de carga, sección 11).
+- [x] Encargo 49 (v0.92.0): «sin ver» como quinta columna en resultados y reportes CSV/XLSX (el segundo con conducta NULL), y
+  `RevisionServiceImpl.corregir` recalcula `nivelclasif` (`agrupado` si queda algún segundo «conducta activa», si no `preciso`).
+- [x] Documentación al día: checklist del frontend y `PARA_ERICK.md`, comando para correr las pruebas del worker dentro de su
+  imagen (71 pasan), notas de histórico en `PARA_VANESA*.md`, `portable/LEEME.md` y la sección «Cómo se decide la conducta» del
+  `README.md` (red de 3 salidas + regla de 0.80).
+- [x] Auditoría de cómo se decide la conducta (las tres revisiones coinciden): la red tiene 3 salidas (nado, inmovilidad,
+  escalamiento); «conducta activa» es la regla de `pipeline/segundos.py:54-66`; «no se ve» es NULL.
+- [x] `main` lleva todo `poc/backend-spring`: merge `db3e102`, sin force-push; los 13 commits que solo tenía `main` ya estaban en
+  esta rama con otro hash. `tools/version.py` cuenta una sola vez los asuntos feat/fix repetidos que trajo ese merge (`4a80655`).
+- [x] v0.92.1: la tarjeta del análisis cancelado solo dice el motivo si llega (`'plazo'` o `'usuario'`); sin motivo, que es lo
+  que manda hoy el backend (`motivoCancelacion` = null, D-112), dice «El análisis se canceló.». Prueba con los 3 casos; frontend
+  178/178.
+
+**Lo que falta**
+- [ ] Revisión del encargo 49 (R49), cosas sin arreglar:
+  - [ ] El PDF y `GET /results/groups` siguen con 4 conductas, sin «sin ver».
+  - [ ] El % del frontend usa `r.duracion_s` y el backend `e.filas`, y el redondeo puede no sumar 100.
+  - [ ] El UPDATE de `nivelclasif` al corregir no toma candado frente a un reinicio al mismo tiempo.
+  - [ ] Al corregir se acepta conducta null con cualquier `origen`.
+  - [ ] Pruebas: comentarios viejos, valores a mano en `ReporteCsvTest`, `SinVerYNivelTest` supone `MIN(idobservacion)`.
+  - [ ] Los datos de ejemplo del frontend no traen «sin ver».
+- [ ] Encargo 48 (en pausa): dos análisis en cola con videos reales.
+- [ ] Revisar en el navegador la vista de bloques de 5 s.
+- [ ] Regenerar `CHECKLIST.pdf` y volver a publicar el checklist en línea.
+- [ ] Rama `tailscale` sin juntar a propósito: el encargo 42 ya cubre lo de `ORIGENES_EXTRA` y juntarla choca en
+  `docker-compose.yml`.
+- [ ] Decisiones abiertas: si el token de video vuelve a revisar la cuenta, y si cambiar la contraseña cierra las otras sesiones.
+- [ ] Si se instala en una VPS: solo se publica `PUERTO_WEB` (8088; mejor 80/443 con un proxy con HTTPS); el SMTP de salida
+  (587) suele venir bloqueado en VPS nuevas; el enlace del correo de recuperación debe apuntar al dominio público.
+- [ ] Limpieza: el `.gitignore` ignora `/tools/` aunque `tools/version.py` está en git (un archivo nuevo ahí necesita `-f`), y el
+  archivo vacío `1.2` de la raíz (viene de `b4e84b8`).
