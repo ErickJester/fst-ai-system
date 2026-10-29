@@ -81,7 +81,7 @@ El administrador del sistema te entrega **dos archivos**:
 
 ## Correo
 
-El sistema manda correos por dos motivos: los **avisos** de los análisis (terminado, error, pausa, cancelado, disco lleno) y la
+El sistema manda correos por dos motivos: los **avisos** de los análisis (terminado, error, pausa, cancelado, disco lleno, video borrado) y la
 **recuperación de contraseña**. Sin correo, los avisos salen solo en la campana de la página y nadie puede recuperar su
 contraseña por correo (un administrador puede darle una temporal).
 
@@ -209,8 +209,6 @@ los videos no se tocan. Para hacerlo, abre una ventana de comandos en la carpeta
   volúmenes propios), `PUERTO_WEB` distinto en el `.env` y, si quieres que `iniciar.bat` no abra el navegador ni espere una
   tecla, `FST_SIN_NAVEGADOR=1` y `FST_SIN_PAUSA=1`.
 
-## Qué NO hace todavía
+## Lo que aún no incluye
 
-- Nada de lo anterior está fuera del sistema actual: la administración de cuentas, la recuperación de contraseña por correo,
-  la revisión segundo a segundo, los reportes en PDF, CSV y XLSX, la pausa cuando no se ve a un espécimen y las gráficas por
-  bloques de 5 s ya funcionan. La página va sin cifrado (http): es para la red del laboratorio, no para internet.
+- La página va sin cifrado (http): es para la red del laboratorio, no para internet.

@@ -1,5 +1,7 @@
 # Para Vanesa (y su Claude): qué se hizo y qué sigue
 
+> Documento histórico (4-5 oct 2026). El sistema cambió mucho desde entonces: backend en Spring Boot, worker real, web en el 8088. El estado actual está en `backend-spring/CHECKLIST.md` y `frontend/CHECKLIST.md`.
+
 Respuesta a `PARA_ERICK.md`. Resume lo hecho en el repo desde el 20 de septiembre y cómo seguimos.
 
 Autor: Erick · Fecha: 4 oct 2026 (actualizado el 5 oct, tras tu `PARA_ERICK.md` con la versión 0.3.0)

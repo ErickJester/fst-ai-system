@@ -1,5 +1,7 @@
 # Para Vanesa (y su Claude): conectar el frontend con el backend de Spring
 
+> Documento histórico (estado de antes del 20-oct). El sistema cambió mucho desde entonces: backend en Spring Boot, worker real, web en el 8088. El estado actual está en `backend-spring/CHECKLIST.md` y `frontend/CHECKLIST.md`.
+
 Autor: Erick · Fecha: 15 oct 2026 · Rama: `feat/frontend-v2-servicios`
 
 Vi tus tres commits de hoy (`af06ce5`, `d30dc69`, `a2f2235`): con eso queda cerrado todo lo que era solo del frontend. Lo que falta es **conectarlo con el backend**. Esta nota dice cómo, en qué orden y qué decidimos. Para leerla junto a `frontend/CHECKLIST.md` (secciones 1 y 9) y `PARA_ERICK.md`.
@@ -96,7 +98,7 @@ Ya coinciden: `/auth/login`, `/auth/reset`, `/pause`, `/pause/image`, `/pause/ad
 
 Filtros de la lista (v0.88.0, encargo 41): `GET /experiments` ya acepta `estado` (el mismo texto que trae cada item, por ejemplo `en cola` o `en espera del Día 2`), `fecha` (`AAAA` o `AAAA-MM-DD`) y `tratamiento` (el de algún grupo, sin distinguir mayúsculas ni acentos), todos opcionales y combinables; un valor que no es de esos formatos da `400`, y `total` son los que pasan el filtro. Tu código actual, que pide todas las páginas y filtra en el navegador, sigue funcionando sin cambios; si quieres que el servidor filtre, ya puedes usarlos.
 
-Dos rutas son propuestas tuyas que la guía no trae: `POST /admin/users/:id/reset-temporal` y `POST /notifications/read-all`. Las dejo por ahora y las vuelvo a revisar al implementar.
+`POST /admin/users/{id}/reset-temporal` ya existe. «Marcar todas» se hace con un `PATCH` por notificación (sin `read-all`).
 
 ## 9. Orden para conectar
 
@@ -113,7 +115,7 @@ Cuando termines una, **avísame** para que pruebe esa parte contra el backend, y
 
 ## 10. Confirmaciones pendientes del lado del backend
 
-- **`{grupo}` en la ruta de subir video.** El grupo puede no existir todavía, así que lo más probable es que sea su etiqueta (nombre), no un id. Lo confirmo al implementarlo.
+- **`{grupo}` en la ruta de subir video.** Es la etiqueta del grupo, codificada (decidido; ver `backend-spring/CHECKLIST.md` §12).
 - Cuándo exista cada ruta, te aviso con la fecha y los campos exactos que devuelve, para ajustar tus datos de ejemplo.
 
 ## 11. Instrucciones para Claude
