@@ -185,7 +185,7 @@ Probado con `AcuBN1.MOV` (18-oct): completado, 4 × 300 segundos en `SEGUNDO`, `
 notificación, y el camino de error con un archivo que no es video. Guarda en la base exactamente lo que da el modelo
 (100 %), pero el modelo en Docker coincide en 95.75 % de los segundos con el mismo modelo corrido en la PC (la diferencia
 nace al medir los fotogramas, antes de la red). Pruebas automáticas de `worker/` (`test_tiempos`, `test_vigilancia` y
-`test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct).
+`test_diagnostico`): 23 pasan dentro de la imagen del worker (23-oct). Comando reproducible: `docker run --rm --network none --entrypoint sh -v "<ruta de worker>":/src:ro fst-portable-worker:latest -c "mkdir -p /tmp/w && cp /src/*.py /tmp/w/ && cd /tmp/w && python -m unittest discover -p 'test_*.py'"` — 28-oct: 71 pruebas, OK (7 saltadas); el Dockerfile no copia los `test_*.py`, por eso se montan.
 **Pausa de R-15** (encargo 32, cerrado el 25-oct): revisa los segundos en que la segmentación de fst_auto no encontró al
 espécimen (`cx` vacío en `_cuadros.csv`), pausa con 3 seguidos ANTES de correr la red y guarda esos segundos con
 conducta nula; probada con una pausa forzada, ver la casilla «Pausa» de la sección 6. El aviso a 7 días no crea notificación: la guía (§8) dice que no se guarda
