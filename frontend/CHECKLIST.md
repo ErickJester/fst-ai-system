@@ -54,7 +54,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
   - [x] `POST /admin/users/:id/reset-temporal`: ruta oficial, aceptada por Erick el 28-oct (la guía no la trae; encargo 44). Responde `{passwordTemporal}` con 403 (no es Administrador), 404 (no existe) y 409 (cuenta desactivada o la propia cuenta). En «Editar cuenta», una cuenta desactivada no trae el botón sino «Reactiva la cuenta para darle una contraseña temporal nueva.», y la propia cuenta no se edita ahí (va a Mi perfil); el modo demo da los mismos 404 y 409. Probado con pruebas del servicio y de la pantalla, y en el navegador contra el backend de Spring (base desechable): la temporal nueva entra y lleva a `/primer-acceso`, y con la cuenta desactivada ya no sale el botón. (`POST /notifications/read-all` ya no se usa: un `PATCH` por notificación)
 - [x] Nombres de campo y valores de §6.1 en todo lo que llega del backend (cuentas, experimentos, detalle, `/status`, subida, resultados, notificaciones, pausa y revisión). Las pantallas siguen con `QUEUED`, `DONE`… y la traducción está en `services/` con `lib/contrato.js`
 - [x] Notificaciones con los campos de la guía (`idNotificacion`, `tipo`, `mensaje`, `leido`, `fechaCreacion`, `idExperimento`); el título y el enlace los arma el frontend, y la pausa abre el progreso de su experimento
-- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: probar en el navegador lo que el backend agregó después (administración, recuperar contraseña, pausa y bloques hasta la v0.86.1; CSV y XLSX en la v0.87.0, encargo 39) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
+- [ ] Probar cada pantalla con `VITE_USE_MOCKS=false` contra el backend de Spring y corregir lo que falle. Hecho (20-oct, backend `e66ce40` con el simulador del worker, retirado el 20-oct): inicio de sesión, primer acceso, perfil, lista, crear, detalle, grupo, cargar video, progreso, resultados, comparación, desglose por minuto, PDF, notificaciones y revisión segundo a segundo (cargar, video con token y guardar correcciones). Falta: probar en el navegador lo que el backend agregó después (administración, recuperar contraseña, pausa y bloques hasta la v0.86.1) y probar error y pausa (el simulador, retirado el 20-oct, no leía el nombre original del video)
 
 ## 2. Acceso y cuenta (§9.1, §11.1)
 - [x] Inicio de sesión con correo y contraseña, y error de credenciales (R-01)
@@ -66,7 +66,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Sin sesión se va al login; con sesión, el login no se vuelve a mostrar
 - [x] Validación de formularios en el cliente: correo con forma válida y contraseña nueva de 8 caracteres o más
 - [x] Mensaje genérico en el login con el backend real: un correo que existe con contraseña mala y uno que no existe dan el mismo 401 «Correo o contraseña incorrectos» (R-01)
-- [ ] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo
+- [x] Acordar la ruta del enlace de recuperación (`/restablecer?token=`) con quien arme el correo (AuthServiceImpl.java:198, router.jsx:77)
 
 ## 3. Dashboard de experimentos (§9.2)
 - [x] Tabla con nombre, fecha, grupos, estado y acciones, más especímenes, Día 2 analizados, responsable y retención
@@ -74,7 +74,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Filtros por estado, fecha (año) y tratamiento, más una búsqueda por nombre
 - [x] Aviso de video por vencer en 7 días o menos, con la fecha exacta (R-05)
 - [x] Estado vacío «Aún no hay experimentos» con el botón de crear
-- [x] Paginación de 10 en 10
+- [x] Paginación de 20 en 20, en el servidor (encargo 43)
 - [x] «Eliminar» con confirmación explícita, solo para quien creó el experimento o un Administrador (R-08, D-63)
 - [x] Los errores 403 y 409 de eliminar se muestran en el diálogo
 - [x] Todos los investigadores activos ven todos los experimentos (R-07)
@@ -139,7 +139,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Porcentaje de cada conducta junto a su tiempo (§9.5)
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
 - [x] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit). Probado en Chrome el 27-oct (nginx de la v0.88.0, puerto 8099, inicio de sesión real): en Resultados · Tanda A, los botones CSV y XLSX bajan `reporte_1_tandaA.csv` (660 bytes) y `reporte_1_tandaA.xlsx` (4286 bytes); el nombre lo pone el frontend (el `Content-Disposition` del servidor trae otro: `reporte_experimento_1_grupo-1_tanda-A.csv`). Los dos archivos se abrieron antes en Excel 16 por COM; el PDF no se repitió en el navegador esta vez
-- [ ] Bloques de 5 s reales. Hecho: la pantalla. Falta: sin backend explica qué mostrará
+- [ ] Bloques de 5 s reales. Hecho: el backend la calcula (GET .../results/blocks, encargo 37) y la pantalla usa tantas columnas como bloques tenga el espécimen más largo (encargo 38). Falta: verla en el navegador con datos reales.
 
 ## 8. Administración (§9.6, R-16)
 - [x] Lista de cuentas con filtros de rol y estado, y la columna de experimentos
@@ -153,7 +153,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Acceso a la lista de todos los experimentos
 - [x] Un usuario que no es Administrador no entra a `/admin` (el router lo manda a Experimentos)
 - [x] Restablecer la contraseña temporal de una cuenta (propuesta del frontend)
-- [ ] El backend responde 403 en `/admin/*` aunque se conozca la URL. Hecho: el frontend oculta y redirige. Falta: depende del backend (§6)
+- [x] El backend responde 403 en `/admin/*` aunque se conozca la URL (SeguridadConfig.java:115-122; backend CHECKLIST §3, probado con JUnit, encargo 35). Hecho: el frontend oculta y redirige.
 
 ## 9. Revisión segundo a segundo (§9.7, R-14)
 - [x] Solo se abre con el análisis `completado`, y muestra una pantalla propia en 403 y 409
@@ -173,7 +173,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Borrador guardado por cuenta, y «Cerrar sesión» borra los de la revisión
 - [x] Sin video (ya se borró) la revisión es de solo lectura: explica el motivo y quita «Guardar correcciones» y «Reiniciar el análisis»
 - [x] Con `puedeCorregir: false` la revisión es de solo lectura
-- [ ] El backend responde 409 en `PUT .../segundos` y `POST .../restart` si el video ya se borró (`VIDEO.archivo` nulo). Hecho: el modo demo ya lo hace y la pantalla ya se comporta así. Falta: es una propuesta de Vanesa, sin visto bueno en la guía
+- [x] El backend responde 409 en `PUT .../segundos` y `POST .../restart` si el video ya se borró (`VIDEO.archivo` nulo) (backend CHECKLIST §6 y §7, encargo 37). Hecho: el modo demo ya lo hace y la pantalla ya se comporta así. Pendiente: visto bueno de la guía (es una propuesta de Vanesa)
 
 ## 10. Notificaciones, perfil y barra superior (§9, §11.2)
 - [x] Barra superior con el nombre del sistema, campana y menú de usuario con «Cerrar sesión» (§9)
@@ -200,14 +200,14 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 
 ## 13. Criterios de aceptación finales (§12)
 En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta verlo de punta a punta.
-- [ ] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas
+- [x] Un administrador crea una cuenta y esa cuenta debe cambiar la contraseña al entrar. Hecho: ambas pantallas (AdminController.java:40; backend CHECKLIST §3, `cambioRequerido`)
 - [x] Subir un `.mp4` o `.mov` en horizontal crea un análisis `en cola`, el worker lo lleva a `completado` (entonces con el simulador, retirado el 20-oct) y Progreso lo refleja sin recargar (probado con el backend real)
 - [x] Un archivo que no es `.mp4` ni `.mov` se rechaza en el cliente; uno vertical o no reproducible lo rechaza el servidor con 422 y su mensaje (probado con el backend real)
-- [ ] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo
-- [ ] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección
+- [x] Un Administrador no puede desactivarse ni quitarse el rol si es el último. Hecho: el aviso y el bloqueo (AdminPage.jsx:68, :177; backend CHECKLIST §3, 409, probado con JUnit)
+- [x] Un investigador que no es Administrador recibe 403 en `/admin/*`. Hecho: la redirección (SeguridadConfig.java:115; backend CHECKLIST §11)
 - [x] «Cancelar análisis» solo existe en la pausa y «Reiniciar» solo en la revisión de un análisis `completado` (lo cubren las pruebas de pantalla de Pausa y Revisión)
 - [x] Un video del Día 1 se guarda sin análisis y el experimento muestra «En espera del Día 2»; un segundo Día 1 en la misma tanda da 409 (probado con el backend real)
-- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla
-- [ ] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje
+- [ ] Una pausa se ajusta (vuelve a la cola), se cancela o vence a las 72 horas (D-112), y ajustar o cancelar fuera de la pausa muestra el 409. Hecho: la pantalla. Backend hecho (PausaController.java:41, :55; backend CHECKLIST §6 y §10); falta probar la pantalla con el worker real.
+- [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje (backend CHECKLIST §4, probado con los dos estados)
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
