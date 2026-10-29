@@ -538,7 +538,7 @@ describe('comparación entre grupos calculada', () => {
       ['B', 'AGRUPADO', 4, { media_s: 101.3, de_s: 15.2 }],
     ])
     expect(expA).toMatchObject({ n: 4, pendientes: [{ tanda: 'B', estado: 'RUNNING' }] })
-    expect(expB).toMatchObject({ n: 0, por_conducta: { inmovilidad: { media_s: null } }, pendientes: [{ tanda: 'A', estado: 'QUEUED' }, { tanda: 'B', estado: 'FAILED' }] })
+    expect(expB).toMatchObject({ n: 0, por_conducta: { inmovilidad: { media_s: null } }, pendientes: [{ tanda: 'A', estado: 'QUEUED' }, { tanda: 'B', estado: 'FAILED' }, { tanda: 'C', estado: 'CANCELED' }] })
   })
 
   it('cada espécimen trae las cuatro conductas; con conducta activa el nivel es agrupado (R-12)', async () => {

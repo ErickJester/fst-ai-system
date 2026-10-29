@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
-import { reiniciarDatos, experiments, users } from './services/mocks/data'
+import { reiniciarDatos, experiments, users, canceledJobs } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
 
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
@@ -387,6 +387,22 @@ describe('progreso', () => {
     await conSesion('/analisis', 'jdominguez@ipn.mx')
     expect(await screen.findByText('Completados recientemente')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull()
+  })
+
+  it('el análisis cancelado dice el motivo solo si el backend lo manda (D-112)', async () => {
+    // Sin entrada en canceledJobs el motivo es null: la tarjeta no supone ninguno.
+    await conSesion('/analisis')
+    expect(await screen.findByText(/El análisis se canceló\. No se guardó/)).toBeTruthy()
+    cleanup()
+
+    canceledJobs.push({ job_id: 505, motivo: 'plazo' })
+    abrir('/analisis') // la sesión sigue guardada: no hace falta entrar otra vez
+    expect(await screen.findByText(/Pasaron 72 horas en pausa sin respuesta y el sistema canceló el análisis/)).toBeTruthy()
+    cleanup()
+
+    canceledJobs[0].motivo = 'usuario'
+    abrir('/analisis')
+    expect(await screen.findByText(/Se canceló desde la pantalla de pausa/)).toBeTruthy()
   })
 })
 
