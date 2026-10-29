@@ -65,7 +65,7 @@ def borrar_video(cur, id_video, archivo):
 
 
 def borrar_videos_vencidos(conn):
-    """R-05: 30 días después de un análisis completado. La fecha de borrado no se guarda: se
+    """RN-05 (regla) y RNF-08 (requisito): 30 días después de un análisis completado. La fecha de borrado no se guarda: se
     deriva de fechaanalisis + 30 días."""
     with conn.cursor() as cur:
         cur.execute(

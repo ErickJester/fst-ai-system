@@ -290,8 +290,8 @@ public class RevisionServiceImpl implements RevisionService {
 				    WHERE o.idvideo = ? AND s.conducta = 'conducta activa') THEN 'agrupado' ELSE 'preciso' END)::nivel_clasif_analisis
 				WHERE idanalisis = ?
 				""", a.idVideo(), idAnalisis);
-		// Las correcciones cambian los resultados: el reporte guardado (filas y carpeta reportes/{id}/) ya no los refleja.
-		// Se regenera en la próxima descarga del PDF.
+		// Las correcciones cambian los resultados: el reporte guardado de cualquier formato (filas y carpeta reportes/{id}/) ya no
+		// los refleja. Se regenera en la próxima descarga, de cualquier formato.
 		reportes.invalidar(idExperimento);
 
 		// Los totales nuevos, de los especímenes de ESTA tanda, con la misma forma que /results.

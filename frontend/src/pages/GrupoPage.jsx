@@ -135,7 +135,7 @@ export default function GrupoPage() {
                       {t.estado === 'DONE'
                         ? (
                           <span style={{ display: 'flex', gap: 14 }}>
-                            {t.id_analisis && (t.video_disponible === false
+                            {t.id_analisis && (user.admin || String(exp.creador_id) === user.id) && (t.video_disponible === false
                               ? <span title="Video no disponible" style={{ color: MUT60, opacity: 0.6, cursor: 'not-allowed' }}>Revisar segundo a segundo</span>
                               : <Link to={enlaceRevision(exp.clave, t.id_analisis)}>Revisar segundo a segundo</Link>)}
                             <Link to={enlaceResultados(exp.clave, g.id, t.letra)}>Ver resultados de esta tanda</Link>

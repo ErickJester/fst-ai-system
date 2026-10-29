@@ -44,6 +44,15 @@ public class ReporteAlmacen {
 		byte[] generar() throws IOException;
 	}
 
+	// Lo que devuelve un generador que decide si su resultado se guarda: false = se entrega, pero no queda en caché.
+	public record Generado(byte[] bytes, boolean guardar) {
+	}
+
+	@FunctionalInterface
+	public interface GeneradorGuardable {
+		Generado generar() throws IOException;
+	}
+
 	// Raíz del volumen, igual que las demás rutas que se guardan en la base (app.archivos.raiz).
 	@Value("${app.archivos.raiz}")
 	private String raizConfigurada;
@@ -79,12 +88,20 @@ public class ReporteAlmacen {
 	@Transactional
 	public byte[] obtener(Integer idExperimento, FormatoReporte formato, String alcance, Generador generador)
 			throws IOException {
+		return obtenerSiCorresponde(idExperimento, formato, alcance, () -> new Generado(generador.generar(), true));
+	}
+
+	// Como obtener, pero el generador decide si el resultado se guarda (un PDF sin resultados no se guarda: el siguiente
+	// análisis completado lo haría viejo sin que nada lo invalide). Con el modo desarrollador no se guarda nunca.
+	@Transactional
+	public byte[] obtenerSiCorresponde(Integer idExperimento, FormatoReporte formato, String alcance,
+			GeneradorGuardable generador) throws IOException {
 		if (jdbc.queryForList("SELECT idexperimento FROM experimento WHERE idexperimento = ? FOR UPDATE",
 				Integer.class, idExperimento).isEmpty()) {
 			throw new ErrorApi(HttpStatus.NOT_FOUND, "El experimento " + idExperimento + " no existe");
 		}
 		if (modoDesarrollador) {
-			return generador.generar();     // con los tiempos del análisis: no se guarda
+			return generador.generar().bytes();     // con los tiempos del análisis: no se guarda
 		}
 
 		String ruta = rutaRelativa(idExperimento, formato, alcance);
@@ -94,7 +111,11 @@ public class ReporteAlmacen {
 			return Files.readAllBytes(archivo);
 		}
 
-		byte[] bytes = generador.generar();
+		Generado generado = generador.generar();
+		if (!generado.guardar()) {
+			return generado.bytes();
+		}
+		byte[] bytes = generado.bytes();
 		escribirAtomico(archivo, bytes);
 		// ON CONFLICT: si la fila ya estaba (el archivo faltaba), se refresca la fecha en vez de duplicarla.
 		jdbc.update("INSERT INTO reporte (idexperimento, formato, ruta, fechageneracion) "

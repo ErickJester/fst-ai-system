@@ -49,6 +49,17 @@ public class NotificacionServiceImpl implements NotificacionService {
 				+ "ORDER BY fechacreacion DESC, idnotificacion DESC LIMIT ?", A_MAPA, idInstitucional, TOPE);
 	}
 
+	// El total de no leídas de la cuenta, sin el tope de listar: la campanita lo muestra aunque la lista tenga cien.
+	@Override
+	@Transactional(readOnly = true)
+	public Map<String, Object> contarNoLeidas(String idInstitucional) {
+		Long noLeidas = jdbc.queryForObject("SELECT COUNT(*) FROM notificacion WHERE idinstitucional = ? AND NOT leido",
+				Long.class, idInstitucional);
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("noLeidas", noLeidas == null ? 0L : noLeidas);
+		return datos;
+	}
+
 	// Un solo UPDATE ... RETURNING: solo toca la fila si es de esta cuenta, y devuelve la notificación ya
 	// actualizada. Si no devuelve nada, la notificación no existe o es de otra cuenta, y en los dos casos es
 	// el mismo 404, para no revelar que existe.

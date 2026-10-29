@@ -113,9 +113,10 @@ public class AdminServiceImpl implements AdminService {
 	@Override
 	@Transactional
 	public Map<String, Object> crear(CrearCuentaPeticion peticion) {
-		String id = peticion.getIdInstitucional().trim();
+		String id = peticion.getIdInstitucional();
 		String correo = peticion.getCorreo().trim().toLowerCase();
-		boolean administrador = esAdministrador(peticion.getRol());
+		// Toda alta nace como Investigador: el ascenso a Administrador es solo por PATCH /admin/users/{id}.
+		boolean administrador = false;
 
 		if (usuarioRepository.existsById(id)) {
 			throw new ErrorApi(HttpStatus.CONFLICT, ID_REPETIDO);
@@ -147,7 +148,7 @@ public class AdminServiceImpl implements AdminService {
 
 	@Override
 	@Transactional
-	public Map<String, Object> modificar(String id, ModificarCuentaPeticion peticion) {
+	public Map<String, Object> modificar(String id, ModificarCuentaPeticion peticion, String idSesion) {
 		if (peticion.getIdInstitucional() != null && !peticion.getIdInstitucional().equals(id)) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "El identificador institucional no se puede cambiar.");
 		}
@@ -171,6 +172,13 @@ public class AdminServiceImpl implements AdminService {
 		boolean seraAdministrador = rolNuevo == null ? eraAdministrador : nuevoAdministrador;
 		boolean eraActivo = usuario.getActivo();
 		boolean seraActivo = activoNuevo == null ? eraActivo : activoNuevo;
+
+		// Como reset-temporal: un Administrador no se desactiva ni se quita el rol a sí mismo (su sesión moriría en la siguiente
+		// petición). Cambiar su propio nombre, apellidos o correo sí se permite: la sesión sigue igual.
+		boolean quitaSuPropioAcceso = id.equals(idSesion) && eraAdministrador && eraActivo && (!seraAdministrador || !seraActivo);
+		if (quitaSuPropioAcceso) {
+			throw new ErrorApi(HttpStatus.CONFLICT, "Para cambiar tu propia cuenta usa Mi perfil.");
+		}
 
 		// R-16
 		reglaAdministradores.exigirAlMenosUno(id, eraAdministrador && eraActivo, seraAdministrador && seraActivo);

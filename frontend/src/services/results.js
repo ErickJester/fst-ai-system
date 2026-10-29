@@ -5,7 +5,7 @@ import * as db from './mocks/data'
 import { segundosDe, totalesDe, minutosDe, CONDUCTAS, DURACION_S } from './mocks/segundos'
 import { getExperiment } from './experiments'
 import { CONDUCTA, ESTADO, NIVEL, TIPO_GRUPO, ordinalDeLetra } from '../lib/contrato'
-import { mean, variance, nombreDeContentDisposition } from '../lib/fst'
+import { mean, variance, nombreDeContentDisposition, SEGUNDOS_ANALIZADOS } from '../lib/fst'
 
 // Datos de ejemplo, salvo que esta parte ya esté conectada (VITE_API_REAL).
 const USE_MOCKS = usaEjemplo('resultados')
@@ -122,7 +122,8 @@ export async function getBatchResults(clave, gid, letra) {
     dia: 'DAY2',
     // Duración del video del Día 2 según el detalle (300 s en un video normal de 5 min).
     duracion_s: t.duracion_s || DURACION_S,
-    duracion_analizada_s: t.duracion_s || DURACION_S,
+    // Lo que se analiza y se guarda: los últimos 300 s del video, o todo si dura menos.
+    duracion_analizada_s: Math.min(SEGUNDOS_ANALIZADOS, t.duracion_s || DURACION_S),
     analizado_en: t.analisis_fecha || exp.fecha_inicio,
     nivel: mios.some((e) => e.nivelClasif === 'agrupado') ? 'AGRUPADO' : 'PRECISO',
     revisado: mios.some((e) => e.revisado),
@@ -238,7 +239,9 @@ export async function getSalidaModelo(clave, alcance) {
   }
 }
 
+// Devuelve { archivo, nombre } con el nombre que manda el servidor (Content-Disposition), o null sin backend.
 export async function getReporte(clave, formato, alcance = null) {
   if (USE_MOCKS) return reply(null)
-  return (await api.get(`/experiments/${clave}/report/${formato}`, { params: alcance || undefined, responseType: 'blob' })).data
+  const res = await api.get(`/experiments/${clave}/report/${formato}`, { params: alcance || undefined, responseType: 'blob' })
+  return { archivo: res.data, nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) }
 }

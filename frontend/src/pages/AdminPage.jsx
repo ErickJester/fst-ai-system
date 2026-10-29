@@ -118,6 +118,7 @@ export default function AdminPage() {
     if (!v.apellidos) return fail('apellidos', 'Escribe los apellidos.')
     if (!esCorreo(v.correo)) return fail('correo', 'Escribe un correo electrónico válido.')
     if (!/^\d+$/.test(v.id)) return fail('id', 'El identificador institucional es numérico (boleta o número de empleado).')
+    if (v.id.length > 10) return fail('id', 'El identificador institucional tiene como máximo 10 dígitos.')
     fail(null, '')
     setGuardando(true)
     const datos = { nombre: v.nombre, apellidos: v.apellidos, email: v.correo, identificador: v.id }
@@ -135,7 +136,10 @@ export default function AdminPage() {
     } catch (e) {
       // El correo repetido lo detecta el servidor. El último administrador no llega aquí:
       // su rol no se puede cambiar en el formulario.
-      fail(e.response?.status === 409 ? 'correo' : null, mensajeError(e, editando ? 'No se pudieron guardar los cambios.' : 'No se pudo crear la cuenta.'))
+      // El servidor dice si el repetido es el identificador o el correo; al editar no hay identificador.
+      const texto = mensajeError(e, editando ? 'No se pudieron guardar los cambios.' : 'No se pudo crear la cuenta.')
+      const campo = e.response?.status === 409 ? (/identificador/.test(texto) ? 'id' : 'correo') : null
+      fail(campo, texto)
     } finally {
       setGuardando(false)
     }
@@ -214,7 +218,7 @@ export default function AdminPage() {
               <Campo id="cNombre" label="Nombre"><input ref={refs.nombre} className={cls('nombre')} id="cNombre" placeholder="Andrea" value={form.nombre} onChange={set('nombre')} /></Campo>
               <Campo id="cApe" label="Apellidos"><input ref={refs.apellidos} className={cls('apellidos')} id="cApe" placeholder="Barrera Solís" value={form.apellidos} onChange={set('apellidos')} /></Campo>
               <Campo id="cCorreo" label="Correo electrónico"><input ref={refs.correo} className={cls('correo', ' num')} id="cCorreo" type="email" placeholder="abarrera@ipn.mx" value={form.correo} onChange={set('correo')} /></Campo>
-              <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" placeholder="2021630154" value={form.id} onChange={set('id')} disabled={!!editando} /></Campo>
+              <Campo id="cId" label="Identificador institucional (boleta o número de empleado)"><input ref={refs.id} className={cls('id', ' num')} id="cId" inputMode="numeric" maxLength={10} placeholder="2021630154" value={form.id} onChange={set('id')} disabled={!!editando} /></Campo>
               {editando
                 ? (
                   <Campo label="Rol">

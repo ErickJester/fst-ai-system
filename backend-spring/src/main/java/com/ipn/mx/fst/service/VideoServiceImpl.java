@@ -48,7 +48,10 @@ public class VideoServiceImpl implements VideoService {
 	// Los valores del dominio tipo_grupo de la base, tomados del enum.
 	private static final Set<String> TIPOS = Arrays.stream(TipoGrupo.values()).map(TipoGrupo::valor)
 			.collect(Collectors.toUnmodifiableSet());
-	private static final String DANADO = "El video no se puede reproducir: el archivo está dañado o incompleto.";
+	// Largo máximo de la etiqueta del grupo (columna varchar(100)) y de la letra de la tanda (A a Z = 1 a 26).
+	private static final int LARGO_ETIQUETA = 100;
+	private static final int MAX_TANDAS = 26;
+	private static final String DANADO ="El video no se puede reproducir: el archivo está dañado o incompleto.";
 
 	// Raíz del volumen videos_reportes. Las rutas que se guardan en la base son RELATIVAS a ella.
 	@Value("${app.archivos.raiz}")
@@ -97,6 +100,10 @@ public class VideoServiceImpl implements VideoService {
 		String etiqueta = etiquetaGrupo == null ? "" : etiquetaGrupo.trim();
 		if (etiqueta.isEmpty()) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "La etiqueta del grupo no puede estar vacía.");
+		}
+		// La columna grupo.etiqueta es varchar(100): se cuentan caracteres, no bytes.
+		if (etiqueta.codePointCount(0, etiqueta.length()) > LARGO_ETIQUETA) {
+			throw unprocessable("La etiqueta del grupo no puede tener más de " + LARGO_ETIQUETA + " caracteres.");
 		}
 		if (archivo == null || archivo.isEmpty()) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "Falta el archivo del video.");
@@ -213,15 +220,16 @@ public class VideoServiceImpl implements VideoService {
 		// La tanda confirmada por el usuario; si no viene, la siguiente del grupo.
 		int ordinal;
 		if (ordinalPedido != null) {
-			if (ordinalPedido < 1 || ordinalPedido > Short.MAX_VALUE) {
-				throw unprocessable("El ordinal de la tanda no es válido.");
-			}
 			ordinal = ordinalPedido;
 		} else if (idGrupo == null) {
 			ordinal = 1;
 		} else {
 			ordinal = jdbc.queryForObject("SELECT COALESCE(MAX(ordinal), 0) + 1 FROM tanda WHERE idgrupo = ?",
 					Integer.class, idGrupo);
+		}
+		// La letra de la tanda va de A a Z: 1 a 26. Vale para la que manda el usuario y para la siguiente automática.
+		if (ordinal < 1 || ordinal > MAX_TANDAS) {
+			throw unprocessable("La tanda debe ir de A a Z.");
 		}
 
 		Integer idTanda = idGrupo == null ? null : primero(jdbc.queryForList(

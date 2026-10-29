@@ -55,4 +55,10 @@ public interface ExperimentoService {
 	// Reporte de resultados en PDF, generado en memoria.
 	ByteArrayInputStream generarReporte(Integer idExperimento);
 
+	// El PDF y si trae resultados: conResultados es false cuando el experimento no tiene análisis completados.
+	record ReporteDeResultados(byte[] pdf, boolean conResultados) {
+	}
+
+	ReporteDeResultados generarReporteDeResultados(Integer idExperimento);
+
 }

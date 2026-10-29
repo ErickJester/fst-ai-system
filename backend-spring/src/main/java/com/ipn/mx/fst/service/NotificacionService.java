@@ -10,6 +10,9 @@ public interface NotificacionService {
 	// Las más recientes de la cuenta idInstitucional, de la más nueva a la más vieja (con un tope).
 	List<Map<String, Object>> listar(String idInstitucional);
 
+	// Cuántas notificaciones no leídas tiene la cuenta, sin el tope de la lista: {noLeidas: n}. Es lo que muestra la campanita.
+	Map<String, Object> contarNoLeidas(String idInstitucional);
+
 	// Marca una notificación de la cuenta como leída o no leída y la devuelve. 404 si no existe o es de otra
 	// cuenta (no se revela cuál de las dos).
 	Map<String, Object> marcar(String idInstitucional, Integer idNotificacion, boolean leido);

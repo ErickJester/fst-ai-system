@@ -4,6 +4,7 @@ import com.ipn.mx.fst.service.NotificacionService;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import com.ipn.mx.fst.utilerias.Respuesta;
 import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,14 @@ public class NotificacionController {
 	@GetMapping
 	public ResponseEntity<Map<String, Object>> listar(Authentication authentication) {
 		return Respuesta.ok(notificacionService.listar(authentication.getName()), HttpStatus.OK);
+	}
+
+	// Cuántas no leídas tiene la cuenta: {noLeidas: n}. Sin el tope de GET /notifications (que trae las cien más recientes).
+	@Operation(summary = "Notificaciones no leídas", description = "Devuelve {noLeidas: n}: el total de la cuenta de la sesión, "
+			+ "sin el tope de la lista. La campanita muestra este número.")
+	@GetMapping("/unread-count")
+	public ResponseEntity<Map<String, Object>> noLeidas(Authentication authentication) {
+		return Respuesta.ok(notificacionService.contarNoLeidas(authentication.getName()), HttpStatus.OK);
 	}
 
 	// Cuerpo {"leido": true|false}. No hay "marcar todas": el frontend hace un PATCH por cada notificación.

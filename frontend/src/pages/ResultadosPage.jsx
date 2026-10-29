@@ -8,7 +8,7 @@ import BotonSalidaModelo from '../components/BotonSalidaModelo'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal, finDeBloque, columnasDeBloques } from '../lib/fst'
+import { mean, variance, fmt, r1, download, fechaCorta, mmss, textoVideo, primeraTandaLista, enlaceResultados, enlaceRevision, especimen, enHoraLocal, finDeBloque, columnasDeBloques, porcentajesDeFila } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
@@ -218,7 +218,13 @@ function ResultadosTanda({ clave, gid, letra }) {
   // sobre ellos: los de la tanda o los del grupo completo.
   const especimenes = rs.flatMap((x) => x.especimenes.map((e) => ({ ...e, letra: x.letra })))
   const col = (k) => especimenes.map((e) => e[k + '_s'] ?? 0)
-  const stats = estadisticos(r.duracion_s)
+  const stats = estadisticos(r.duracion_analizada_s)
+  // Cada fila suma 100 %: su denominador son los segundos guardados del espécimen (sus cinco columnas), no la duración del video.
+  const pctsDe = (e) => porcentajesDeFila(TODAS.map((k) => e[k + '_s'] ?? 0))
+  const anchoDe = (e, k) => {
+    const total = TODAS.reduce((a, x) => a + (e[x + '_s'] ?? 0), 0)
+    return total ? ((e[k + '_s'] ?? 0) / total) * 100 : 0
+  }
   const completadas = g.tandas.filter((t) => t.estado === 'DONE')
   const faltan = g.tandas.filter((t) => t.estado !== 'DONE')
   const nCompletos = completadas.reduce((a, t) => a + t.n_cilindros, 0)
@@ -240,10 +246,11 @@ function ResultadosTanda({ clave, gid, letra }) {
     setReporte({ formato, pidiendo: true })
     const alcance = formato === 'pdf' ? null : grupoCompleto ? { grupo: gid } : { grupo: gid, tanda: r.letra }
     try {
-      const archivo = await getReporte(exp.clave, formato, alcance)
-      if (!archivo) return setReporte({ formato })
+      const descarga = await getReporte(exp.clave, formato, alcance)
+      if (!descarga) return setReporte({ formato })
+      // El nombre que manda el servidor; si no viene, uno armado aquí.
       const nombre = ['reporte', exp.clave, alcance ? (grupoCompleto ? 'grupo-' + gid : 'tanda' + r.letra) : null].filter(Boolean).join('_')
-      download(nombre + '.' + formato, archivo, REPORTES[formato].tipo)
+      download(descarga.nombre || nombre + '.' + formato, descarga.archivo, REPORTES[formato].tipo)
       setReporte(null)
     } catch (e) {
       setReporte({ formato, error: mensajeError(e, 'No se pudo descargar el reporte. Inténtalo de nuevo.') })
@@ -285,7 +292,7 @@ function ResultadosTanda({ clave, gid, letra }) {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
-            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_s} s de evaluación · analizado {fechaCorta(analizado.slice(0, 10))}{analizado.length > 10 && ', ' + hora(analizado)}</div>
+            <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>{r.grupo.tratamiento} · Día 2, {r.duracion_analizada_s} s analizados de {r.duracion_s} s de video · analizado {fechaCorta(analizado.slice(0, 10))}{analizado.length > 10 && ', ' + hora(analizado)}</div>
             {/* El nombre del archivo del video, como lo subió el usuario; en el grupo completo, uno por tanda. */}
             <div className="num" style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 4 }}>
               {grupoCompleto ? rs.map((x) => 'Tanda ' + x.letra + ' · ' + textoVideo(x.nombre_video)).join('; ') : textoVideo(r.nombre_video)}
@@ -392,14 +399,14 @@ function ResultadosTanda({ clave, gid, letra }) {
                         <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{etiqueta(e, e.letra)}</span>
                       </div>
                     </td>
-                    {TODAS.map((k) => (
+                    {TODAS.map((k, i) => (
                       <td key={k} className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap', ...(k === SIN_VER.id && { color: MUT }) }}>
-                        {fmt(e[k + '_s'] ?? 0)} <span style={{ fontSize: 11, color: MUT }}>{Math.round(((e[k + '_s'] ?? 0) / r.duracion_s) * 100)} %</span>
+                        {fmt(e[k + '_s'] ?? 0)} <span style={{ fontSize: 11, color: MUT }}>{pctsDe(e)[i]} %</span>
                       </td>
                     ))}
                     <td>
                       <div style={{ display: 'flex', height: 16, border: '1px solid var(--color-divider)' }}>
-                        {TODAS.map((k) => <div key={k} title={LBL[k]} style={{ background: CMAP[k], width: ((e[k + '_s'] ?? 0) / r.duracion_s) * 100 + '%' }} />)}
+                        {TODAS.map((k) => <div key={k} title={LBL[k]} style={{ background: CMAP[k], width: anchoDe(e, k) + '%' }} />)}
                       </div>
                     </td>
                   </tr>

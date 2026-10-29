@@ -45,6 +45,8 @@ const duracion = (j) => DIA[j.dia] + ' · 5 min'
 
 // Si el PDF de diagnóstico aún no existe, se vuelve a pedir tras esta espera.
 const REINTENTO_DIAGNOSTICO_MS = 4000
+// Tope de reintentos automáticos (15 × 4 s ≈ 1 minuto). Después, el botón queda para volver a intentar a mano.
+const MAX_REINTENTOS_DIAGNOSTICO = 15
 
 // La cola se consulta cada 5 s mientras haya análisis activos (en cola o procesando);
 // sin ninguno, cada 30 s, solo para ver si llega uno nuevo.
@@ -222,18 +224,21 @@ export function ImagenControl({ j }) {
   )
 }
 
-function TrabajoFallido({ j }) {
+export function TrabajoFallido({ j }) {
   const { modoDesarrollador } = useModo()
   const detalle = duracion(j) + ' · detenido en ' + ETAPA[j.stage] + ' (' + j.progress_pct + ' %)' + (tardo(j, modoDesarrollador) ? ' · ' + tardo(j, modoDesarrollador) : '')
   // null | 'pidiendo' | 'preparando' (el PDF aún no existe: se reintenta solo) | 'demo' (sin backend) | 'error'
   const [diag, setDiag] = useState(null)
   const [errDiag, setErrDiag] = useState('')
   const reintento = useRef(null)
+  const intentos = useRef(0)
   useEffect(() => () => clearTimeout(reintento.current), [])
 
-  async function descargar() {
+  // manual: lo pide el investigador (el botón), así que empieza de nuevo el conteo de reintentos.
+  async function descargar(manual = false) {
     clearTimeout(reintento.current)
-    setDiag((d) => (d === 'preparando' ? d : 'pidiendo'))
+    if (manual) intentos.current = 0
+    setDiag((d) => (d === 'preparando' && !manual ? d : 'pidiendo'))
     setErrDiag('')
     try {
       const pdf = await getDiagnostico(j)
@@ -241,12 +246,18 @@ function TrabajoFallido({ j }) {
       download(['diagnostico', norm(j.experimento), norm(j.grupo), 'tanda' + j.tanda].join('_').replace(/\s+/g, '-') + '.pdf', pdf, 'application/pdf')
       setDiag(null)
     } catch (e) {
-      if (e.response?.status === 404) {
+      const texto = mensajeError(e, '')
+      // «ya no existe» (el PDF se borró) no se reintenta: no va a aparecer solo.
+      const borrado = e.response?.status === 404 && texto.includes('ya no existe')
+      if (e.response?.status === 404 && !borrado && intentos.current < MAX_REINTENTOS_DIAGNOSTICO) {
+        intentos.current += 1
         setDiag('preparando')
-        reintento.current = setTimeout(descargar, REINTENTO_DIAGNOSTICO_MS)
+        reintento.current = setTimeout(() => descargar(false), REINTENTO_DIAGNOSTICO_MS)
       } else {
         setDiag('error')
-        setErrDiag(mensajeError(e, 'No se pudo descargar el reporte de diagnóstico. Inténtalo de nuevo.'))
+        if (borrado) setErrDiag('El PDF de diagnóstico de este análisis ya no está en el servidor.')
+        else if (e.response?.status === 404) setErrDiag('El reporte de diagnóstico sigue sin estar listo. Vuelve a intentarlo en un momento.')
+        else setErrDiag(mensajeError(e, 'No se pudo descargar el reporte de diagnóstico. Inténtalo de nuevo.'))
       }
     }
   }
@@ -265,8 +276,8 @@ function TrabajoFallido({ j }) {
         <div className="nd" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{mensajeErrorAnalisis(j.stage)}</div>
         <ImagenControl j={j} />
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-          <button type="button" className="btn btn-primary" style={btnLeft} disabled={diag === 'pidiendo' || diag === 'preparando'} onClick={descargar}>
-            {diag === 'preparando' ? 'Preparando…' : 'Descargar reporte de diagnóstico (PDF)'}
+          <button type="button" className="btn btn-primary" style={btnLeft} disabled={diag === 'pidiendo' || diag === 'preparando'} onClick={() => descargar(true)}>
+            {diag === 'preparando' ? 'Preparando…' : diag === 'error' ? 'Volver a intentar' : 'Descargar reporte de diagnóstico (PDF)'}
           </button>
           <span className="hint" aria-live="polite">
             {diag === 'preparando' ? 'El reporte todavía se está generando; se descarga solo en cuanto esté listo.' : 'El investigador no puede reiniciar el análisis.'}

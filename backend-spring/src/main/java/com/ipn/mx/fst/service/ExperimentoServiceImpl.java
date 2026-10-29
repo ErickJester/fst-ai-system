@@ -77,6 +77,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// Las cuatro conductas en el orden de las columnas del reporte (sección 7 de la guía).
 	private static final String[] CONDUCTAS = {TipoConducta.NADO_ACTIVO.valor(), TipoConducta.ESCALAMIENTO.valor(),
 			TipoConducta.INMOVILIDAD.valor(), TipoConducta.CONDUCTA_ACTIVA.valor()};
+	// Las cuatro conductas y «Sin ver», en el orden de las columnas del PDF.
+	private static final List<String> COLUMNAS_PDF = Stream.concat(Stream.of(CONDUCTAS), Stream.of(TablaDeReporte.SIN_VER)).toList();
 
 	private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
 	private static final int POR_PAGINA = 20;
@@ -711,6 +713,14 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	@Override
 	@Transactional(readOnly = true)
 	public ByteArrayInputStream generarReporte(Integer idExperimento) {
+		return new ByteArrayInputStream(generarReporteDeResultados(idExperimento).pdf());
+	}
+
+	// Lo mismo que generarReporte, con la marca conResultados: false si el experimento no tiene análisis completados (el PDF
+	// dice «Sin resultados»). ReporteAlmacen no guarda ese PDF en caché.
+	@Override
+	@Transactional(readOnly = true)
+	public ReporteDeResultados generarReporteDeResultados(Integer idExperimento) {
 		Experimento experimento = experimentoRepository.findById(idExperimento).orElseThrow();
 		Usuario creador = experimento.getUsuario();
 		List<FilaResultado> filas = segundoRepository.buscarResultados(idExperimento);
@@ -789,19 +799,19 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			throw new IllegalStateException("No se pudo generar el PDF", e);
 		}
 
-		return new ByteArrayInputStream(salida.toByteArray());
+		return new ReporteDeResultados(salida.toByteArray(), !filas.isEmpty());
 	}
 
 	// La consulta trae una fila por conducta; la tabla lleva una fila por espécimen y minuto con las cuatro
 	// conductas en columnas. Este método junta las cuatro filas de la consulta en una de la tabla.
 	private PdfPTable armarTabla(List<FilaResultado> filas, Set<String> revisados) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(6);
+		PdfPTable tabla = new PdfPTable(7);
 		tabla.setWidthPercentage(100);
-		tabla.setWidths(new float[] {3.2f, 1.6f, 1f, 1.3f, 1.2f, 1.3f});
+		tabla.setWidths(new float[] {3.2f, 1.6f, 1f, 1.3f, 1.2f, 1.3f, 1f});
 
 		// Encabezados, como en la práctica: Stream.of con los títulos y una celda con formato por cada uno.
 		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-		Stream.of("Espécimen", "Tiempo (min:seg)", "Nado", "Escalamiento", "Inmovilidad", "Conducta activa")
+		Stream.of("Espécimen", "Tiempo (min:seg)", "Nado", "Escalamiento", "Inmovilidad", "Conducta activa", "Sin ver")
 				.forEach(textoEncabezado -> {
 					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
 					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -824,7 +834,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			String tiempo = (minuto - 1) + ":00-" + minuto + ":00";
 			String llave = especimen + "|" + minuto;
 
-			segundosPorFila.computeIfAbsent(llave, k -> new HashMap<>()).put(f.getConducta(), f.getSegundos());
+			// Un segundo sin conducta (NULL) es «Sin ver»: la quinta columna, igual que en CSV y XLSX (R49).
+			String columna = f.getConducta() == null ? TablaDeReporte.SIN_VER : f.getConducta();
+			segundosPorFila.computeIfAbsent(llave, k -> new HashMap<>()).put(columna, f.getSegundos());
 			etiquetasPorFila.put(llave, new String[] {especimen, tiempo});
 		}
 
@@ -833,7 +845,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			String[] etiquetas = etiquetasPorFila.get(fila.getKey());
 			tabla.addCell(new PdfPCell(new Phrase(etiquetas[0], letraTexto)));
 			tabla.addCell(celdaCentrada(etiquetas[1], letraTexto));
-			for (String conducta : CONDUCTAS) {
+			for (String conducta : COLUMNAS_PDF) {
 				BigDecimal segundos = fila.getValue().getOrDefault(conducta, BigDecimal.ZERO);
 				tabla.addCell(celdaCentrada(segundos.stripTrailingZeros().toPlainString(), letraTexto));
 			}

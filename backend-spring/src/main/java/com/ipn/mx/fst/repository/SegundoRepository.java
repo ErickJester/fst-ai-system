@@ -10,9 +10,9 @@ import org.springframework.data.repository.query.Param;
 public interface SegundoRepository extends JpaRepository<Segundo, SegundoId> {
 
 	// Resultados de un experimento para el reporte. Los totales por minuto no se guardan (D-52): se cuentan
-	// aquí desde SEGUNDO. El minuto sale del número de segundo (1-60 es el minuto 1, 61-120 el 2, ...), y los
-	// segundos sin conducta (nula: no se ve o no se decidió) no se cuentan, por eso un minuto puede sumar menos
-	// de 60. nativeQuery = true: es SQL de PostgreSQL tal cual, no JPQL. Ordenado como se imprime en el PDF.
+	// aquí desde SEGUNDO. El minuto sale del número de segundo (1-60 es el minuto 1, 61-120 el 2, ...). Los segundos sin
+	// conducta (nula: no se ve o no se decidió) vienen con conducta null y el PDF los suma como «Sin ver» (R49), así que
+	// un minuto suma 60 cuando todo el minuto tiene segundos. nativeQuery = true: es SQL de PostgreSQL tal cual, no JPQL.
 	@Query(value = """
 			SELECT g.etiqueta                      AS grupo,
 			       t.ordinal                       AS ordinal,
@@ -26,14 +26,13 @@ public interface SegundoRepository extends JpaRepository<Segundo, SegundoId> {
 			JOIN tanda       t ON t.idtanda       = e.idtanda
 			JOIN grupo       g ON g.idgrupo       = t.idgrupo
 			WHERE g.idexperimento = :idExperimento
-			  AND s.conducta IS NOT NULL
 			GROUP BY g.etiqueta, t.ordinal, e.numerocilindro, ((s.segundo - 1) / 60) + 1, s.conducta
 			ORDER BY g.etiqueta, t.ordinal, e.numerocilindro, minuto
 			""", nativeQuery = true)
 	List<FilaResultado> buscarResultados(@Param("idExperimento") Integer idExperimento);
 
 	// Los especímenes del experimento con algún segundo que no es de la máquina (corregido, confirmado o dudoso): los que tuvieron
-	// revisión humana. Cuenta también los segundos sin conducta (los marcados dudosos), que buscarResultados no trae.
+	// revisión humana. Cuenta también los segundos sin conducta (los marcados dudosos).
 	@Query(value = """
 			SELECT g.etiqueta        AS grupo,
 			       t.ordinal         AS ordinal,

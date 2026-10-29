@@ -54,6 +54,20 @@ export const PCT_ETAPA = { PREPROCESSING: 33, ROI_DETECTION: 67, CLASSIFICATION:
 // (worker/progreso.py). Solo sirven para dibujar dónde empieza cada etapa en la barra.
 export const PESO_ETAPA = { PREPROCESSING: 1, ROI_DETECTION: 9, CLASSIFICATION: 90 }
 
+// Segundos que se analizan y se guardan de cada video del Día 2: los últimos 300 s (worker.py, MAX_SEGUNDOS).
+export const SEGUNDOS_ANALIZADOS = 300
+
+// Porcentajes enteros de una fila de segundos, que suman 100 (método de los restos mayores). Una fila sin segundos da ceros.
+export function porcentajesDeFila(segs) {
+  const total = segs.reduce((a, s) => a + s, 0)
+  if (!total) return segs.map(() => 0)
+  const exactos = segs.map((s) => (100 * s) / total)
+  const base = exactos.map(Math.floor)
+  const resto = 100 - base.reduce((a, b) => a + b, 0)
+  exactos.map((x, i) => [x - base[i], i]).sort((a, b) => b[0] - a[0]).slice(0, resto).forEach(([, i]) => { base[i] += 1 })
+  return base
+}
+
 // Porcentaje propio de una etapa de un análisis en curso: hecha 100; en curso, el que informa el backend
 // (stage_pct) o, si no lo trae, el de la etapa; pendiente 0.
 export function pctDeEtapa(j, etapa, etapas) {

@@ -120,6 +120,17 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
     } catch { /* sin almacenamiento: el avance dura hasta salir */ }
   }, [BORRADOR, ESP])
 
+  // Al cerrar o esconder la pestaña se guarda el borrador en ese momento: lo visto desde la última escritura (cada 5 s) no se pierde.
+  useEffect(() => {
+    const alOcultar = () => { if (document.visibilityState === 'hidden') guardarBorrador() }
+    window.addEventListener('pagehide', guardarBorrador)
+    document.addEventListener('visibilitychange', alOcultar)
+    return () => {
+      window.removeEventListener('pagehide', guardarBorrador)
+      document.removeEventListener('visibilitychange', alOcultar)
+    }
+  }, [guardarBorrador])
+
   async function renovarVideo() {
     if (!datos.videoRuta || Date.now() - ultimaRenovacion.current < 10000) return
     ultimaRenovacion.current = Date.now()

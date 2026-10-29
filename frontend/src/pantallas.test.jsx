@@ -11,6 +11,13 @@ import App from './App'
 import { reiniciarDatos, experiments, users, canceledJobs } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
 
+// Solo en la prueba del primer acceso: el cambio de contraseña responde lo que diga fallarCambio (si hay); si no, el mock real.
+let fallarCambio = null
+vi.mock('./services/auth', async (importOriginal) => {
+  const real = await importOriginal()
+  return { ...real, changePassword: (...args) => (fallarCambio ? fallarCambio() : real.changePassword(...args)) }
+})
+
 // Lo que jsdom no trae: desplazar la ventana, URLs de archivos y canvas.
 window.scrollTo = vi.fn()
 URL.createObjectURL = vi.fn(() => 'blob:prueba')
@@ -566,5 +573,96 @@ describe('experimentos (dashboard)', () => {
     expect(await screen.findByText('Ningún experimento coincide con los filtros.')).toBeTruthy()
     expect(screen.queryByText('Aún no hay experimentos')).toBeNull()
     expect(screen.getByRole('option', { name: 'Todos · 5' })).toBeTruthy()
+  })
+})
+
+describe('mensajes de formulario (encargo M11)', () => {
+  it('primer acceso: una temporal que no coincide marca su campo', async () => {
+    users.push({ idInstitucional: '2030000001', nombre: 'Nueva', apellidos: 'Cuenta', correo: 'nueva.cuenta@ipn.mx', rol: 'Investigador',
+      activo: true, cambioRequerido: true, password: 'temporal-1' }) // la temporal que el mock compara
+    const user = abrir('/login')
+    await entrar(user, 'nueva.cuenta@ipn.mx', 'temporal-1')
+    await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+    await user.type(screen.getByLabelText('Contraseña temporal'), 'otra-temporal')
+    await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
+    await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+    await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
+    expect(await screen.findByText('La contraseña temporal no es correcta.')).toBeTruthy()
+    expect(screen.getByLabelText('Contraseña temporal').className).toMatch(/error/)
+  })
+
+  it('primer acceso: un error del servidor distinto de «actual» muestra su texto, no el de la temporal', async () => {
+    users.push({ idInstitucional: '2030000002', nombre: 'Nueva', apellidos: 'Cuenta', correo: 'nueva2@ipn.mx', rol: 'Investigador',
+      activo: true, cambioRequerido: true, password: 'temporal-2' })
+    fallarCambio = () => Promise.reject({ response: { status: 400, data: { error: 'La contraseña nueva no puede pasar de 72 bytes.' } } })
+    try {
+      const user = abrir('/login')
+      await entrar(user, 'nueva2@ipn.mx', 'temporal-2')
+      await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+      await user.type(screen.getByLabelText('Contraseña temporal'), 'temporal-2')
+      await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
+      await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+      await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
+      expect(await screen.findByText('La contraseña nueva no puede pasar de 72 bytes.')).toBeTruthy()
+      expect(screen.queryByText('La contraseña temporal no es correcta.')).toBeNull()
+    } finally {
+      fallarCambio = null
+    }
+  })
+
+  it('primer acceso: una contraseña nueva de más de 72 bytes se rechaza antes de enviarla', async () => {
+    const user = abrir('/login')
+    await entrar(user, 'nueva.cuenta@ipn.mx', 'temporal-1')
+    await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+    const larga = 'a'.repeat(73)
+    await user.type(screen.getByLabelText('Contraseña temporal'), 'temporal-1')
+    await user.type(screen.getByLabelText('Nueva contraseña'), larga)
+    await user.type(screen.getByLabelText('Confirmar nueva contraseña'), larga)
+    await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
+    expect(await screen.findByText('La nueva contraseña no puede pasar de 72 bytes.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Cambiar contraseña' })).toBeTruthy()
+  })
+
+  it('crear cuenta: un identificador repetido marca el campo del identificador, no el del correo', async () => {
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }))
+    const id = screen.getByLabelText(/Identificador institucional/)
+    await user.type(screen.getByLabelText('Nombre'), 'Andrea')
+    await user.type(screen.getByLabelText('Apellidos'), 'Barrera Solís')
+    await user.type(screen.getByLabelText('Correo electrónico'), 'nuevo.id@ipn.mx')
+    await user.type(id, '2019630871') // ya es la de mrivera
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByText('Ya existe una cuenta con ese identificador.')).toBeTruthy()
+    expect(id.className).toMatch(/error/)
+    expect(screen.getByLabelText('Correo electrónico').className).not.toMatch(/error/)
+  })
+
+  it('crear cuenta: el identificador admite como máximo 10 caracteres', async () => {
+    const user = await conSesion('/admin', 'creyesl@ipn.mx')
+    await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }))
+    const id = screen.getByLabelText(/Identificador institucional/)
+    expect(id.getAttribute('maxlength')).toBe('10')
+    await user.type(id, '12345678901')
+    expect(id.value).toBe('1234567890')
+  })
+
+  it('perfil: nombre, apellidos y correo se guardan sin espacios de sobra', async () => {
+    const user = await conSesion('/perfil')
+    const nombre = await screen.findByLabelText('Nombre')
+    await user.clear(nombre)
+    await user.type(nombre, '  Ana  ')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(users.find((u) => u.idInstitucional === '2019630871').nombre).toBe('Ana'))
+  })
+
+  it('grupo: «Revisar segundo a segundo» no aparece a quien no subió el video ni es Administrador', async () => {
+    await conSesion('/experimentos/7/grupos/1', 'jdominguez@ipn.mx')
+    expect(await screen.findByRole('link', { name: 'Ver resultados de esta tanda' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull()
+  })
+
+  it('grupo: quien subió el video ve «Revisar segundo a segundo»', async () => {
+    await conSesion('/experimentos/7/grupos/1')
+    expect(await screen.findByRole('link', { name: 'Revisar segundo a segundo' })).toBeTruthy()
   })
 })

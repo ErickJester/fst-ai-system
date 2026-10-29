@@ -23,15 +23,17 @@ export default function PrimerAccesoPage() {
     if (v.nw.length < 8) return fail('nw', 'La nueva contraseña debe tener mínimo 8 caracteres.')
     if (v.nw === v.tmp) return fail('nw', 'La nueva contraseña debe ser distinta de la temporal.')
     if (v.nw !== v.rep) return fail('rep', 'Las contraseñas no coinciden.')
+    if (new TextEncoder().encode(v.nw).length > 72) return fail('nw', 'La nueva contraseña no puede pasar de 72 bytes.')
     fail(null, '')
     setGuardando(true)
     try {
       await cambiarPassword(v.tmp, v.nw)
       navigate('/experimentos')
     } catch (e) {
-      // 400: la contraseña «actual» que revisa el servidor aquí es la temporal.
-      if (e.response?.status === 400) fail('tmp', 'La contraseña temporal no es correcta.')
-      else fail(null, mensajeError(e, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'))
+      // El servidor dice «La contraseña actual no es correcta.» cuando la temporal no coincide; ese caso marca el campo.
+      const texto = mensajeError(e, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.')
+      if (texto === 'La contraseña actual no es correcta.') fail('tmp', 'La contraseña temporal no es correcta.')
+      else fail(null, texto)
       setGuardando(false)
     }
   }

@@ -12,13 +12,15 @@ public interface AdminService {
 	// ("activa" o "inactiva") son filtros opcionales; 400 si traen otro valor.
 	List<Map<String, Object>> listar(String rol, String estado);
 
-	// Crea la cuenta con una contraseña temporal (cambioRequerido = true), la manda por correo y la devuelve UNA vez en
-	// passwordTemporal. 409 si el identificador o el correo ya existen.
+	// Crea la cuenta como Investigador con una contraseña temporal (cambioRequerido = true), la manda por correo y la devuelve
+	// UNA vez en passwordTemporal. Toda alta nace como Investigador: el rol no se pide aquí. 409 si el identificador o el
+	// correo ya existen; 400 si el identificador no son solo dígitos (1 a 10).
 	Map<String, Object> crear(CrearCuentaPeticion peticion);
 
-	// Cambia datos, rol o activo de la cuenta. 404 si no existe, 409 si el correo es de otra cuenta o si deja al sistema sin
-	// Administradores activos (R-16), 400 si intenta cambiar el identificador. Nunca borra.
-	Map<String, Object> modificar(String id, ModificarCuentaPeticion peticion);
+	// Cambia datos, rol o activo de la cuenta. idSesion es el idInstitucional del Administrador que lo pide. 404 si no existe;
+	// 409 si el correo es de otra cuenta, si deja al sistema sin Administradores activos (R-16) o si el Administrador se
+	// desactiva o se quita el rol a sí mismo («usa Mi perfil»); 400 si intenta cambiar el identificador. Nunca borra.
+	Map<String, Object> modificar(String id, ModificarCuentaPeticion peticion, String idSesion);
 
 	// Otra contraseña temporal para la cuenta: mismas reglas que al crearla (una vez, por correo, cambioRequerido = true). La
 	// anterior y cualquier enlace de restablecer pendiente dejan de servir. idSesion es el idInstitucional del Administrador que

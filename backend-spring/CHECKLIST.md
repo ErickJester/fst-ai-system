@@ -10,7 +10,7 @@ propuso después (18-oct-2026) está en la sección 12.
 **Cómo leerlo:** `[x]` = hecho y verificado en el código. `[ ]` = pendiente. Si una casilla vacía trae una nota
 "hecho:", ya existe una parte y la nota dice qué falta.
 
-**Última revisión del estado (28-oct-2026, versión 0.92.1):** el backend compila y corre en Docker junto con la base,
+**Última revisión del estado (29-oct-2026, versión 0.93.0):** el backend compila y corre en Docker junto con la base,
 el worker real (modelo `fst_cnn_seg.pt`) y el frontend de Vanesa; el compose definitivo está en la raíz (proyecto
 `fst-portable`, se levanta con `portable\iniciar.bat`). Probado con un video real (`AcuBN1.MOV`, 18-oct) y por Vanesa
 en el navegador contra nuestro backend (20-oct, `e66ce40`). **Hecho el 25-oct:** la pausa de R-15 (§6 y §10, encargo 32),
@@ -293,6 +293,14 @@ terminar.
   que manda hoy el backend (`motivoCancelacion` = null, D-112), dice «El análisis se canceló.». Prueba con los 3 casos; frontend
   178/178.
 
+- [x] 29-oct: revisión de los 14 diagramas de secuencia del documento contra el sistema. Arreglos aprobados por el
+  usuario: alta siempre como Investigador (sin `rol`), identificador de 1 a 10 dígitos recortado antes de validar, tanda de
+  A a Z, etiqueta del grupo de 100 caracteres como máximo, el Administrador no se desactiva ni se quita el rol a sí mismo
+  (409), «Sin ver» en el PDF, el PDF «Sin resultados» no se guarda, `GET /notifications/unread-count` para la campanita,
+  porcentajes de resultados sobre los 300 s analizados (cada fila suma 100 %), tope al reintento del diagnóstico, sin
+  sondeo con la pestaña oculta, borrador de la revisión al cerrar la pestaña, mensajes de error del primer acceso, la pausa
+  y el alta en su campo, y 72 bytes revisados en la interfaz. JUnit 162/162, frontend 202/202, worker 71 OK.
+
 **Lo que falta**
 - [ ] Revisión del encargo 49 (R49), cosas sin arreglar:
   - [ ] El PDF y `GET /results/groups` siguen con 4 conductas, sin «sin ver».
@@ -306,7 +314,8 @@ terminar.
 - [ ] Regenerar `CHECKLIST.pdf` y volver a publicar el checklist en línea.
 - [ ] Rama `tailscale` sin juntar a propósito: el encargo 42 ya cubre lo de `ORIGENES_EXTRA` y juntarla choca en
   `docker-compose.yml`.
-- [ ] Decisiones abiertas: si el token de video vuelve a revisar la cuenta, y si cambiar la contraseña cierra las otras sesiones.
+- [ ] Decisiones abiertas: si el token de video vuelve a revisar la cuenta, si cambiar la contraseña cierra las otras sesiones,
+  y la duración de la sesión (168 h) junto con el aviso de `POST /auth/logout` al cerrar sesión (diagrama seq_logout, en espera).
 - [ ] Si se instala en una VPS: solo se publica `PUERTO_WEB` (8088; mejor 80/443 con un proxy con HTTPS); el SMTP de salida
   (587) suele venir bloqueado en VPS nuevas; el enlace del correo de recuperación debe apuntar al dominio público.
 - [ ] Limpieza: el `.gitignore` ignora `/tools/` aunque `tools/version.py` está en git (un archivo nuevo ahí necesita `-f`), y el

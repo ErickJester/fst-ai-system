@@ -78,8 +78,11 @@ public class ExperimentoController {
 	// guarda. 404 con envoltorio si el experimento no existe; si la generación falla, sube a ManejadorErrores (500).
 	@GetMapping("/{id}/report/pdf")
 	public ResponseEntity<byte[]> generarPdf(@PathVariable Integer id) throws IOException {
-		byte[] pdf = reportes.obtener(id, FormatoReporte.PDF, "experimento",
-				() -> experimentoService.generarReporte(id).readAllBytes());
+		// Sin análisis completados el PDF dice «Sin resultados» y no se guarda: el siguiente análisis completado no lo invalidaría.
+		byte[] pdf = reportes.obtenerSiCorresponde(id, FormatoReporte.PDF, "experimento", () -> {
+			ExperimentoService.ReporteDeResultados resultado = experimentoService.generarReporteDeResultados(id);
+			return new ReporteAlmacen.Generado(resultado.pdf(), resultado.conResultados());
+		});
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.add("Content-Disposition", "inline; filename=reporte_experimento_" + id + ".pdf");

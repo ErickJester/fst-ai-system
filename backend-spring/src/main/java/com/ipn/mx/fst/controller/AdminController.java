@@ -37,6 +37,14 @@ public class AdminController {
 	}
 
 	// 201 con la cuenta y passwordTemporal, que solo se devuelve aquí.
+	@Operation(summary = "Crear cuenta de Investigador", description = """
+			Alta con una contraseña temporal, que se manda por correo y se devuelve UNA vez en `passwordTemporal`. \
+			Toda alta nace como Investigador: no hay campo `rol` (un `rol` en el cuerpo se ignora). El ascenso a \
+			Administrador es solo por `PATCH /admin/users/{id}`. `idInstitucional` son solo dígitos, de 1 a 10; los espacios de \
+			los lados se quitan antes de validar.""")
+	@ApiResponse(responseCode = "201", description = "{idInstitucional, nombre, apellidos, correo, rol, activo, cambioRequerido, passwordTemporal}")
+	@ApiResponse(responseCode = "400", description = "Datos inválidos: el identificador no son solo dígitos de 1 a 10")
+	@ApiResponse(responseCode = "409", description = "Ya existe una cuenta con ese identificador o correo")
 	@PostMapping("/users")
 	public ResponseEntity<Map<String, Object>> crear(@Valid @RequestBody CrearCuentaPeticion peticion) {
 		return Respuesta.ok(adminService.crear(peticion), HttpStatus.CREATED);
@@ -44,8 +52,8 @@ public class AdminController {
 
 	@PatchMapping("/users/{id}")
 	public ResponseEntity<Map<String, Object>> modificar(@PathVariable String id,
-			@Valid @RequestBody ModificarCuentaPeticion peticion) {
-		return Respuesta.ok(adminService.modificar(id, peticion), HttpStatus.OK);
+			@Valid @RequestBody ModificarCuentaPeticion peticion, Authentication authentication) {
+		return Respuesta.ok(adminService.modificar(id, peticion, authentication.getName()), HttpStatus.OK);
 	}
 
 	// Ruta oficial (la guía no la trae; Erick la aceptó el 28-oct-2026). Responde {passwordTemporal}, que solo se devuelve aquí.

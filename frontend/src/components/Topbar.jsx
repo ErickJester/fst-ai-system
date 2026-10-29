@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { listNotifications, setRead, markAllRead } from '../services/notifications'
+import { listNotifications, unreadCount, setRead, markAllRead } from '../services/notifications'
 import { fechaCorta } from '../lib/fst'
 import { version } from '../../package.json'
 import { MUT60, MUT70 } from '../lib/estilos'
 
 // 2k · Barra superior: lo que cada pantalla pone a la izquierda (children),
 // más la campana de notificaciones y el menú de usuario.
-// Las notificaciones se vuelven a consultar cada 30 s.
+// Las notificaciones se vuelven a consultar cada 30 s, solo mientras la pestaña está visible. Al volver a verla, se consultan
+// de inmediato.
 const CADA_MS = 30000
 
 // Texto del enlace de cada tipo de notificación (los seis del documento).
@@ -45,27 +46,41 @@ export default function Topbar({ children }) {
   const [list, setList] = useState([])
   const ref = useRef(null)
 
-  const unread = list.filter((n) => !n.is_read).length
+  // El número de la campana es el total de la cuenta (unreadCount), no el de las cien de la lista.
+  const [unread, setUnread] = useState(0)
+
+  const contar = useCallback(() => {
+    unreadCount().then(setUnread).catch(() => { /* se reintenta en la siguiente consulta */ })
+  }, [])
 
   const cargar = useCallback(() => {
     listNotifications().then(setList).catch(() => { /* se reintenta en la siguiente consulta */ })
-  }, [])
+    contar()
+  }, [contar])
 
   useEffect(() => {
     cargar()
-    const id = setInterval(cargar, CADA_MS)
-    return () => clearInterval(id)
+    // Con la pestaña oculta no se consulta; al volver a verla, se consulta en seguida.
+    const id = setInterval(() => { if (document.visibilityState === 'visible') cargar() }, CADA_MS)
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', alVolver)
+    }
   }, [cargar])
 
   // Se marca en pantalla de inmediato; si el servidor falla, se vuelve a consultar.
   function marcar(id, isRead) {
     setList((l) => l.map((n) => (n.id === id ? { ...n, is_read: isRead } : n)))
-    setRead(id, isRead).catch(cargar)
+    setUnread((u) => Math.max(0, isRead ? u - 1 : u + 1))
+    setRead(id, isRead).then(contar).catch(cargar)
   }
 
   function marcarTodas() {
     setList((l) => l.map((n) => ({ ...n, is_read: true })))
-    markAllRead().catch(cargar)
+    setUnread(0)
+    markAllRead().then(contar).catch(cargar)
   }
 
   useEffect(() => {

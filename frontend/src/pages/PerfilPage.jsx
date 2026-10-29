@@ -33,12 +33,13 @@ export default function PerfilPage() {
     if (guardandoD) return
     if (!datos.nombre.trim()) return d.fail('nombre', 'Escribe el nombre.')
     if (!datos.apellidos.trim()) return d.fail('apellidos', 'Escribe los apellidos.')
-    if (!esCorreo(datos.correo)) return d.fail('correo', 'Escribe un correo electrónico válido.')
+    if (!esCorreo(datos.correo.trim())) return d.fail('correo', 'Escribe un correo electrónico válido.')
+    const limpio = { nombre: datos.nombre.trim(), apellidos: datos.apellidos.trim(), correo: datos.correo.trim() }
     d.fail(null, '')
     setGuardandoD(true)
     try {
-      await actualizarPerfil(datos)
-      setOriginal(datos)
+      await actualizarPerfil(limpio)
+      setOriginal(limpio)
     } catch (e) {
       // El correo repetido lo detecta el servidor.
       d.fail(e.response?.status === 409 ? 'correo' : null, mensajeError(e, 'No se pudieron guardar los cambios.'))
@@ -52,6 +53,7 @@ export default function PerfilPage() {
     if (guardandoP) return
     if (!pass.act) return p.fail('act', 'Escribe tu contraseña actual.')
     if (pass.nw.length < 8) return p.fail('nw', 'La nueva contraseña debe tener mínimo 8 caracteres.')
+    if (new TextEncoder().encode(pass.nw).length > 72) return p.fail('nw', 'La nueva contraseña no puede pasar de 72 bytes.')
     if (pass.nw === pass.act) return p.fail('nw', 'La nueva contraseña debe ser distinta de la actual.')
     if (pass.nw !== pass.rep) return p.fail('rep', 'Las contraseñas no coinciden.')
     p.fail(null, '')

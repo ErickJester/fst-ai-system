@@ -65,6 +65,12 @@ export async function setRead(id, leido) {
   return (await api.patch(`/notifications/${id}`, { leido })).data
 }
 
+// GET /notifications/unread-count → { noLeidas }: el total de la cuenta, sin el tope de la lista. Es lo que muestra la campana.
+export async function unreadCount() {
+  if (USE_MOCKS) return mias().filter((n) => !n.leido).length
+  return (await api.get('/notifications/unread-count')).data.noLeidas
+}
+
 // «Marcar todas como leídas»: un PATCH por cada no leída. La guía no tiene una ruta para
 // todas a la vez, así que no se inventa una (antes se proponía POST /notifications/read-all).
 export async function markAllRead() {

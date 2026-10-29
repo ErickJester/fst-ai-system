@@ -21,12 +21,30 @@ export function usePolling(fetchFn, interval = 2000, enabled = true) {
     }
   }, [])
 
+  // Con la pestaña oculta no se consulta; al volver a verla, se consulta en seguida y se retoma el intervalo.
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) return undefined
+    let id = null
+    const arrancar = () => { if (id == null) id = setInterval(poll, interval) }
+    const parar = () => { clearInterval(id); id = null }
+    const alCambiarVisibilidad = () => {
+      if (document.visibilityState === 'hidden') {
+        parar()
+      } else {
+        poll()
+        arrancar()
+      }
+    }
 
-    poll()
-    const id = setInterval(poll, interval)
-    return () => clearInterval(id)
+    if (document.visibilityState !== 'hidden') {
+      poll()
+      arrancar()
+    }
+    document.addEventListener('visibilitychange', alCambiarVisibilidad)
+    return () => {
+      parar()
+      document.removeEventListener('visibilitychange', alCambiarVisibilidad)
+    }
   }, [enabled, interval, poll])
 
   return { data, error }

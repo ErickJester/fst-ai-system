@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import Topbar, { Brand } from '../components/Topbar'
 import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperimento'
 import { listExperiments, POR_PAGINA } from '../services/experiments'
+import { getReporte } from '../services/results'
 import { useAsync } from '../hooks/useAsync'
 import { useAviso } from '../hooks/useAviso'
-import { fechaCorta, ESTADO_EXPERIMENTO } from '../lib/fst'
+import { fechaCorta, ESTADO_EXPERIMENTO, download } from '../lib/fst'
 import { btnLeft } from '../lib/estilos'
 
 // Apariencia de cada estado calculado del experimento (ESTADO_EXPERIMENTO).
@@ -51,6 +52,7 @@ export default function ExperimentosPage() {
   const { user } = useAuth()
   const [params] = useSearchParams()
   const sinPermiso = useAviso('sin-permiso')
+  const [avisoPdf, setAvisoPdf] = useState('')
   const [filtro, setFiltro] = useState({ estado: '', anio: '', tratamiento: '' })
   const [q, setQ] = useState('')            // lo que hay en la caja de búsqueda
   const [busqueda, setBusqueda] = useState('') // lo que ya se pidió al servidor (q, 300 ms después de la última tecla)
@@ -91,6 +93,17 @@ export default function ExperimentosPage() {
     reload()
   }
 
+  // El PDF del experimento completo, con la sesión (services/results.js); el nombre lo manda el servidor.
+  async function descargarPdf(e) {
+    setAvisoPdf('')
+    try {
+      const pdf = await getReporte(e.clave, 'pdf')
+      if (pdf) download(pdf.nombre || 'reporte_' + e.clave + '.pdf', pdf.archivo, 'application/pdf')
+    } catch {
+      setAvisoPdf('No se pudo descargar el PDF del experimento. Inténtalo de nuevo.')
+    }
+  }
+
   return (
     <div className="app">
       <Topbar>
@@ -102,6 +115,7 @@ export default function ExperimentosPage() {
 
       <div className="page" style={{ paddingBottom: 34 }}>
         {sinPermiso && <div className="note-bar" style={{ marginBottom: 18 }}>No tienes permiso para esa sección.</div>}
+        {avisoPdf && <div className="note-bar" style={{ marginBottom: 18 }}>{avisoPdf}</div>}
         {eliminados.map((t) => <div key={t} className="note-bar" role="status" style={{ marginBottom: 18 }}>Se eliminó «{t}».</div>)}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28, marginBottom: 22 }}>
           <div style={{ flex: 1 }}>
@@ -183,10 +197,15 @@ export default function ExperimentosPage() {
                   <td style={{ fontSize: 13 }}>{e.responsable}</td>
                   <td className="num" style={{ fontSize: 12, color: ret.color }} title={ret.motivo}>{ret.texto}</td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {['CSV', 'XLSX', 'PDF'].map((x) => conReportes(e)
-                        ? <Link key={x} className="chip" to={`/experimentos/${e.clave}/resultados`}>{x}</Link>
-                        : <span key={x} className="chip" style={chipInactivo} aria-disabled="true" title={e.con_detalle ? 'Todavía no hay resultados' : 'Sin detalle en el modo demo'}>{x}</span>)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {conReportes(e)
+                        ? (
+                          <>
+                            <Link className="chip" to={`/experimentos/${e.clave}/resultados`}>Ver resultados →</Link>
+                            <button type="button" className="chip" onClick={() => descargarPdf(e)}>PDF</button>
+                          </>
+                        )
+                        : <span className="chip" style={chipInactivo} aria-disabled="true" title={e.con_detalle ? 'Todavía no hay resultados' : 'Sin detalle en el modo demo'}>Ver resultados →</span>}
                       {puedeEliminar(user, e) && (
                         <button type="button" className="linkbtn" style={{ fontSize: 12, marginLeft: 6, whiteSpace: 'nowrap' }}
                           aria-label={'Eliminar ' + e.titulo} onClick={() => setBorrar(e)}>Eliminar…</button>

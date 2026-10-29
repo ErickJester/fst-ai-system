@@ -100,6 +100,10 @@ class AdministracionYRecuperacionTest {
 	@BeforeEach
 	void base_limpia() {
 		reset(emailService);
+		// Las observaciones y los segundos de otras pruebas no se borran solos: sin ellos, video no se puede borrar.
+		jdbc.update("DELETE FROM segundo");
+		jdbc.update("DELETE FROM observacion");
+		jdbc.update("DELETE FROM especimen");
 		jdbc.update("DELETE FROM reporte");
 		jdbc.update("DELETE FROM analisis");
 		jdbc.update("DELETE FROM video");
@@ -445,9 +449,10 @@ class AdministracionYRecuperacionTest {
 
 		// Con otro Administrador activo sí se puede, y entonces el que queda es el último.
 		jdbc.update("UPDATE usuario SET activo = true WHERE idinstitucional = '3'");
-		mvc.perform(conToken(patch("/admin/users/1"), admin).contentType(MediaType.APPLICATION_JSON)
-				.content("{\"rol\":\"Investigador\"}")).andExpect(status().isOk());
+		// (Lo hace el otro Administrador: quitarse el rol a sí mismo da 409, como en PATCH propio.)
 		String otro = login("tres@fst.mx", CLAVE);
+		mvc.perform(conToken(patch("/admin/users/1"), otro).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"rol\":\"Investigador\"}")).andExpect(status().isOk());
 		mvc.perform(conToken(patch("/admin/users/3"), otro).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"activo\":false}")).andExpect(status().isConflict());
 	}
@@ -462,8 +467,8 @@ class AdministracionYRecuperacionTest {
 			baja.setActivo(false);
 
 			List<Integer> codigos = enParalelo(
-					() -> codigoDe(() -> adminService.modificar("1", baja)),
-					() -> codigoDe(() -> adminService.modificar("2", baja)));
+					() -> codigoDe(() -> adminService.modificar("1", baja, "2")),
+					() -> codigoDe(() -> adminService.modificar("2", baja, "1")));
 
 			assertEquals(1, administradoresActivos(), "vuelta " + vuelta + ": " + codigos);
 			assertTrue(codigos.contains(200) && codigos.contains(409), "vuelta " + vuelta + ": " + codigos);
@@ -480,8 +485,8 @@ class AdministracionYRecuperacionTest {
 			quitar.setRol("Investigador");
 
 			List<Integer> codigos = enParalelo(
-					() -> codigoDe(() -> adminService.modificar("1", quitar)),
-					() -> codigoDe(() -> adminService.modificar("2", quitar)));
+					() -> codigoDe(() -> adminService.modificar("1", quitar, "2")),
+					() -> codigoDe(() -> adminService.modificar("2", quitar, "1")));
 
 			assertEquals(1, administradoresActivos(), "vuelta " + vuelta + ": " + codigos);
 			assertTrue(codigos.contains(200) && codigos.contains(409), "vuelta " + vuelta + ": " + codigos);
@@ -540,7 +545,7 @@ class AdministracionYRecuperacionTest {
 			cambio.setNombre("Nombre " + vuelta);
 			cambio.setCorreo("inv" + vuelta + "@fst.mx");
 			List<Integer> codigos = enParalelo(
-					() -> codigoDe(() -> adminService.modificar("2", cambio)),
+					() -> codigoDe(() -> adminService.modificar("2", cambio, "1")),
 					() -> {
 						// Lo que hace el worker: el experimento primero y la notificación después.
 						try (Connection c = dataSource.getConnection()) {

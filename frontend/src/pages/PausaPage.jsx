@@ -15,7 +15,7 @@ const CAMPOS = [['x0', 'Izquierda'], ['y0', 'Arriba'], ['x1', 'Derecha'], ['y1',
 // 2e′ · Pantalla de pausa (R-15, D-89): el pipeline dejó de ver a un espécimen 3 s seguidos.
 // Muestra la imagen fija de ese instante y el recuadro de su cilindro para corregirlo.
 // «Ajustar y continuar» devuelve el análisis a la cola; «Cancelar análisis» lo termina. Sin
-// respuesta en 5 minutos, el sistema lo cancela. Solo quien subió el video o un Administrador.
+// respuesta en 72 horas, el sistema lo cancela. Solo quien subió el video o un Administrador.
 export default function PausaPage() {
   const { clave, id } = useParams()
   const navigate = useNavigate()
@@ -67,7 +67,7 @@ export default function PausaPage() {
       navigate('/analisis?experimento=' + clave, { state: { aviso: 'Recuadro del cilindro ' + cilindro + ' ajustado. El análisis volvió a la cola, por delante de los que llegaron después, y sigue desde el segundo ' + p.desdeSegundo + '.' } })
     } catch (e) {
       // 422: el recuadro casi no cambió; el mensaje lo dice el backend. Se queda en la pantalla con los tres botones.
-      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron las 72 horas y se canceló.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
+      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa.' : mensajeError(e, 'No se pudo ajustar el recuadro. Inténtalo de nuevo.'))
       setEnviando(false)
     }
   }
@@ -80,7 +80,7 @@ export default function PausaPage() {
       await continuarRecuadro(clave, id)
       navigate('/analisis?experimento=' + clave, { state: { aviso: 'El análisis volvió a la cola y sigue desde el segundo ' + p.desdeSegundo + '. No se volverá a pausar en ese mismo tramo.' } })
     } catch (e) {
-      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa: pasaron las 72 horas y se canceló.' : mensajeError(e, 'No se pudo continuar el análisis. Inténtalo de nuevo.'))
+      setErrAccion(e.response?.status === 409 ? 'El análisis ya no está en pausa.' : mensajeError(e, 'No se pudo continuar el análisis. Inténtalo de nuevo.'))
       setEnviando(false)
     }
   }
