@@ -1,0 +1,828 @@
+"""Nucleo compartido del etiquetador automatico de FST.
+
+Diferencias clave contra el pipeline de un solo video:
+
+  1. La geometria NO esta escrita a mano. Se deduce de cada video:
+     paredes de los tubos desde el mapa de ocupacion, linea de agua y fondo
+     desde los bordes horizontales del aparato vacio.
+
+  2. Todas las medidas de distancia se dividen por el LARGO DEL CUERPO del
+     animal en ese video. Asi "se movio 3 veces su largo" significa lo mismo
+     con la camara cerca o lejos. Sin esto los rasgos no son comparables
+     entre videos y el clasificador aprende el encuadre, no la conducta.
+
+  3. El tiempo se normaliza por segundo, no por fotograma, porque los videos
+     no vienen todos a la misma tasa.
+"""
+import cv2
+import numpy as np
+
+DIFF_THR   = 45    # diferencia minima contra el fondo
+BRIGHT_THR = 80    # brillo absoluto minimo (rata clara sobre agua oscura)
+ERODE_TAIL = 21    # borra la cola antes de medir la postura
+BLOCK_S    = 5.0   # duracion del bloque de puntuacion
+
+# Separacion temporal fija, en segundos, para las medidas que comparan dos
+# instantes (energia de movimiento, IoU, Dice). Se fija en TIEMPO y no en
+# fotogramas para que --paso no altere los valores: con paso 12 hay 0.40 s
+# entre mediciones y con paso 2 solo 0.067 s, asi que comparar contra "el
+# anterior" daria numeros tres veces menores y el modelo lo leeria como
+# quietud. El valor 0.40 es el que se uso al medir el rendimiento.
+DT_REF     = 0.40
+DWELL_S    = 0.20  # permanencia minima en un cuadrante para contarlo
+
+K5  = np.ones((5, 5), np.uint8)
+K9  = np.ones((9, 9), np.uint8)
+K15 = np.ones((15, 15), np.uint8)
+ER  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ERODE_TAIL, ERODE_TAIL))
+
+RASGOS = ['nq', 'rng', 'path', 'spanx', 'spany', 'me', 'me_max',
+          'vert', 'elong', 'hrise', 'hmean', 'above', 'area', 'iou', 'dice']
+
+
+# --------------------------- utilidades ---------------------------
+
+def mayor_componente(mask):
+    n, lab, st, cen = cv2.connectedComponentsWithStats(mask, 8)
+    if n <= 1:
+        return None, None, None
+    k = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+    return (lab == k).astype(np.uint8), st[k], cen[k]
+
+
+def medfilt1(x, k=5):
+    """Mediana movil. El centroide crudo salta varios px por fotograma solo
+    por ruido de segmentacion; sin suavizar, 'path' mide ese ruido."""
+    x = np.asarray(x, float)
+    if len(x) < k:
+        return x
+    p = k // 2
+    xp = np.pad(x, p, mode='edge')
+    return np.median(np.stack([xp[i:i + len(x)] for i in range(k)]), axis=0)
+
+
+# --------------------------- rotacion ---------------------------
+#
+# Todo el analisis supone cilindros DE PIE: superficie del agua horizontal y
+# tubos uno junto a otro. Si la camara grabo girada, cada fotograma se endereza
+# al leerlo y el resto del codigo no se entera. ROT lo fija etiquetar.py con
+# --rotar antes de procesar; vale 0, 90 (horario), 180 o 270 (antihorario).
+ROT = 0
+_GIRO = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180,
+         270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+
+
+class _Video:
+    """cv2.VideoCapture que devuelve los fotogramas ya enderezados."""
+
+    def __init__(self, ruta):
+        self.cap = cv2.VideoCapture(ruta)
+        self.rot = ROT
+
+    def read(self):
+        ok, fr = self.cap.read()
+        if ok and self.rot:
+            fr = cv2.rotate(fr, _GIRO[self.rot])
+        return ok, fr
+
+    def cuadros(self, quiero):
+        """Recorre el video y devuelve (indice, fotograma) solo de los que
+        `quiero(indice)` acepta. Los demas se saltan con grab(), sin pasarlos
+        a imagen: cuesta la mitad por fotograma y los que se quedan son los
+        mismos pixeles que con read()."""
+        cur = -1
+        while self.cap.grab():
+            cur += 1
+            if not quiero(cur):
+                continue
+            ok, fr = self.cap.retrieve()
+            if not ok:
+                break
+            if self.rot:
+                fr = cv2.rotate(fr, _GIRO[self.rot])
+            yield cur, fr
+
+    def __getattr__(self, nombre):          # set, get, release, isOpened...
+        return getattr(self.cap, nombre)
+
+
+def abrir(ruta):
+    return _Video(ruta)
+
+
+def sin_girar(pts, W, H, rot=None):
+    """Lleva puntos del fotograma enderezado (W x H) al video tal como esta
+    guardado, que es como lo muestra el navegador."""
+    rot = ROT if rot is None else rot
+    x, y = pts[:, 0], pts[:, 1]
+    if rot == 90:      # se giro a la derecha: el original medía H de ancho
+        return np.stack([y, W - 1 - x], axis=1)
+    if rot == 270:     # se giro a la izquierda
+        return np.stack([H - 1 - y, x], axis=1)
+    if rot == 180:
+        return np.stack([W - 1 - x, H - 1 - y], axis=1)
+    return pts
+
+
+def girar(pts, W, H, rot=None):
+    """Lo inverso de sin_girar: lleva puntos del video tal como esta guardado
+    (y como lo muestra el navegador) al fotograma enderezado (W x H)."""
+    rot = ROT if rot is None else rot
+    x, y = pts[:, 0], pts[:, 1]
+    if rot == 90:
+        return np.stack([W - 1 - y, x], axis=1)
+    if rot == 270:
+        return np.stack([y, H - 1 - x], axis=1)
+    if rot == 180:
+        return np.stack([W - 1 - x, H - 1 - y], axis=1)
+    return pts
+
+
+def info_video(ruta):
+    cap = abrir(ruta)
+    if not cap.isOpened():
+        raise IOError('no se pudo abrir: %s' % ruta)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    n   = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # El tamano se toma de un fotograma real y no de las propiedades: asi
+    # refleja la rotacion aplicada y la que el propio archivo trae declarada.
+    ok, fr = cap.read()
+    cap.release()
+    if not ok:
+        raise IOError('no se pudo leer ningun fotograma de %s' % ruta)
+    h, w = fr.shape[:2]
+    if not (1 < fps < 200):
+        raise ValueError('fps ilegible (%r); pasa --fps a mano' % fps)
+    return fps, n, w, h
+
+
+# ----------------------- 1. registro de camara -----------------------
+
+def registrar(ruta, paso=2, ref_frac=0.5, log=print):
+    """Alinea cada fotograma contra uno de referencia (similitud: traslacion,
+    rotacion y escala). Devuelve {indice: matriz 2x3}, el tamano y los fps.
+
+    Sin esto, una camara de mano hace que cualquier medida en coordenadas
+    fijas siga a la camara en vez del animal."""
+    fps, n, W, H = info_video(ruta)
+    # Un archivo truncado o mal copiado declara mas fotogramas de los que
+    # tiene. Se prueban varias posiciones antes de rendirse, empezando por la
+    # pedida y retrocediendo hacia el principio.
+    cap = abrir(ruta)
+    fr = None
+    for frac in [ref_frac, 0.35, 0.2, 0.1, 0.02]:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(n * frac))
+        ok, f = cap.read()
+        if ok:
+            fr, ref_frac = f, frac
+            break
+    if fr is None:
+        raise IOError('el video no se deja leer en ninguna posicion; '
+                      'lo mas probable es que este incompleto o dañado')
+    if ref_frac != 0.5:
+        log('    AVISO: referencia tomada al %.0f%% del video; el archivo '
+            'puede estar incompleto' % (100 * ref_frac))
+    SC = 0.5
+
+    def prep(f):
+        g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+        return cv2.resize(g, None, fx=SC, fy=SC, interpolation=cv2.INTER_AREA)
+
+    orb = cv2.ORB_create(2000, fastThreshold=7)
+    bf  = cv2.BFMatcher(cv2.NORM_HAMMING)
+    kr, dr = orb.detectAndCompute(prep(fr), None)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+    lut, fallos = {}, 0
+    for cur, f in cap.cuadros(lambda c: c % paso == 0):
+        kq, dq = orb.detectAndCompute(prep(f), None)
+        M = None
+        if dq is not None and len(kq) > 12:
+            pares = bf.knnMatch(dq, dr, k=2)
+            buenos = [a for a, b in pares if a.distance < 0.75 * b.distance]
+            if len(buenos) >= 12:
+                src = np.float32([kq[m.queryIdx].pt for m in buenos]) / SC
+                dst = np.float32([kr[m.trainIdx].pt for m in buenos]) / SC
+                M, _ = cv2.estimateAffinePartial2D(
+                    src, dst, method=cv2.RANSAC, ransacReprojThreshold=2.5,
+                    maxIters=3000)
+        if M is None:
+            fallos += 1
+            M = np.float32([[1, 0, 0], [0, 1, 0]])
+        lut[cur] = M
+        if cur % 3000 == 0:
+            log('    registro t=%.0fs' % (cur / fps))
+    cap.release()
+    log('    %d fotogramas alineados, %d sin puntos de apoyo' % (len(lut), fallos))
+    return lut, (W, H), fps
+
+
+def _alineados(ruta, lut, WH, cada):
+    W, H = WH
+    cap = abrir(ruta)
+    for cur, fr in cap.cuadros(lambda c: c in lut and c % cada == 0):
+        g = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
+        yield cur, cv2.warpAffine(g, lut[cur], (W, H),
+                                  flags=cv2.INTER_LINEAR, borderValue=0)
+    cap.release()
+
+
+# ----------------- 2. fondo y mapa de ocupacion -----------------
+
+def fondo_y_ocupacion(ruta, lut, WH, fps, log=print):
+    """El fondo es el percentil 10 temporal: como la rata es clara, el
+    percentil bajo la borra y deja el aparato vacio. La mediana NO sirve,
+    un animal quieto se queda incrustado dentro del fondo."""
+    cada = max(1, int(round(fps)))
+    guardados = dict(_alineados(ruta, lut, WH, cada))
+    pila = list(guardados.values())
+    if len(pila) < 10:
+        raise RuntimeError('video demasiado corto para modelar el fondo')
+    fondo = np.percentile(np.stack(pila), 10, axis=0).astype(np.uint8)
+    log('    fondo con %d fotogramas' % len(pila))
+
+    # Con --paso 12 y 30 o 60 fps, la ocupacion pide justo los mismos
+    # fotogramas que el fondo: se reusan en vez de leer el video otra vez.
+    # Mismo orden, asi que la suma sale identica. Si faltan (p. ej. 25 fps),
+    # se lee el video como antes.
+    cada_occ = max(1, cada // 3)
+    pedidos = [c for c in sorted(lut) if c % cada_occ == 0]
+    if all(c in guardados for c in pedidos):
+        fuente = ((c, guardados[c]) for c in pedidos)
+    else:
+        fuente = _alineados(ruta, lut, WH, cada_occ)
+
+    bg = fondo.astype(np.int16)
+    acc, n = np.zeros(fondo.shape, np.float32), 0
+    for _, w in fuente:
+        wi = w.astype(np.int16)
+        acc += ((wi - bg) > DIFF_THR) & (wi > BRIGHT_THR)
+        n += 1
+    log('    ocupacion con %d fotogramas' % n)
+    return fondo, acc / max(n, 1)
+
+
+# ----------------- 3. geometria automatica -----------------
+
+def detectar_geometria(fondo, occ, n_tubos=None, log=print):
+    """Devuelve dict con tubos, y_agua, y_fondo, roi_arriba, roi_abajo.
+
+    El orden importa y no es el obvio:
+
+    1. Las FILAS se sacan primero, del fotograma completo del aparato vacio.
+       Los dos bordes horizontales mas fuertes son los rebordes del recipiente.
+    2. Las COLUMNAS se sacan despues, midiendo la ocupacion SOLO dentro de la
+       franja de agua. Fuera de ella mandan el estante, la puerta y la gente
+       que pasa: en un video de prueba el borde del encuadre tenia el triple de
+       movimiento que las propias ratas y se tragaba todos los tubos en uno.
+    3. Se tiran las rachas pegadas al borde del encuadre. Un aparato nunca esta
+       al filo de la pantalla; lo que aparece ahi es el laboratorio.
+    4. Las filas se recalculan con las bandas estrechas ya conocidas, que dan
+       el suelo mas fino que el fotograma entero.
+
+    Un cilindro vacio no produce racha, asi que se numeran los tubos CON
+    animal, de izquierda a derecha."""
+    H, W = occ.shape
+
+    def bordes_horizontales(cols=None):
+        b = fondo if cols is None else np.concatenate(
+            [fondo[:, a:b_] for a, b_ in cols], axis=1)
+        b = cv2.GaussianBlur(b.astype(np.float32), (0, 0), 3)
+        return np.convolve(np.abs(cv2.Sobel(b, cv2.CV_32F, 0, 1, ksize=5)).mean(1),
+                           np.ones(5) / 5, mode='same')
+
+    def rebordes(gy):
+        def picos(y0, y1, sep=25, n=1):
+            y0, y1 = max(0, y0), min(H, y1)
+            orden = np.argsort(gy[y0:y1])[::-1] + y0
+            sel = []
+            for p in orden:
+                if all(abs(p - q) > sep for q in sel):
+                    sel.append(int(p))
+                if len(sel) == n:
+                    break
+            return sel
+        f = sorted(picos(int(0.2 * H), int(0.95 * H), sep=int(0.15 * H), n=2))
+        if len(f) < 2:
+            raise RuntimeError('no se encontraron los bordes del aparato')
+        ar, ab = f
+        alto = ab - ar
+        ya = picos(ar + int(0.10 * alto), ar + int(0.55 * alto), n=1)[0]
+        yf = picos(ar + int(0.70 * alto), ab - int(0.10 * alto), n=1)[0]
+        if yf - ya < 0.25 * alto:
+            ya, yf = ar + int(0.22 * alto), ar + int(0.84 * alto)
+            log('    AVISO: bordes internos poco claros, se usaron proporciones tipicas')
+        return ya, yf
+
+    # --- 1. filas aproximadas, del fotograma entero ---
+    ya0, yf0 = rebordes(bordes_horizontales())
+
+    # --- 2. columnas, midiendo solo dentro de la franja de agua ---
+    cp = np.convolve(occ[ya0:yf0, :].sum(0), np.ones(15) / 15, mode='same')
+    on = cp > 0.12 * cp.max()
+    crudas, i = [], 0
+    while i < W:
+        if on[i]:
+            j = i
+            while j + 1 < W and on[j + 1]:
+                j += 1
+            if j - i > 0.03 * W:
+                crudas.append((i, j))
+            i = j + 1
+        else:
+            i += 1
+
+    # --- 3. fuera lo que toca el borde del encuadre ---
+    margen = max(3, int(0.01 * W))
+    rachas = [(a, b) for a, b in crudas if a > margen and b < W - 1 - margen]
+    if len(rachas) < len(crudas):
+        log('    descartadas %d zonas pegadas al borde del encuadre '
+            '(estanteria, puerta, gente)' % (len(crudas) - len(rachas)))
+    if n_tubos and len(rachas) > n_tubos:
+        # se queda con las de mas actividad, no con las mas anchas: una racha
+        # ancha puede ser una sombra que se arrastra.
+        rachas = sorted(rachas, key=lambda r: cp[r[0]:r[1]].sum(),
+                        reverse=True)[:n_tubos]
+        rachas.sort()
+    if not rachas:
+        raise RuntimeError('no se distinguio ningun tubo; revisa el video')
+    if n_tubos and len(rachas) != n_tubos:
+        log('    AVISO: se pidieron %d tubos y se hallaron %d. Puede que algun '
+            'cilindro este vacio o que el animal no se distinga del fondo.'
+            % (n_tubos, len(rachas)))
+
+    # Ensanchar cada racha hasta la mitad del hueco con el vecino: ahi esta la
+    # pared. Los dos tubos de los extremos no tienen vecino por fuera, asi que
+    # se les da el ancho tipico de los de en medio; si no, quedan recortados y
+    # se pierde al animal cuando se pega al borde exterior.
+    cortes = [(rachas[k][0] + rachas[k - 1][1]) // 2 for k in range(1, len(rachas))]
+    tubos = {}
+    for k, (a, b) in enumerate(rachas, 1):
+        izq = cortes[k - 2] if k > 1 else None
+        der = cortes[k - 1] if k < len(rachas) else None
+        tubos[k] = [izq, der]
+    anchos = [d - i for i, d in tubos.values() if i is not None and d is not None]
+    tipico = int(np.median(anchos)) if anchos else int(np.median([b - a for a, b in rachas]) * 1.2)
+    for k, (i, d) in tubos.items():
+        if i is None:
+            i = max(0, d - tipico) if d is not None else rachas[k - 1][0]
+        if d is None:
+            d = min(W - 1, i + tipico)
+        tubos[k] = (int(i), int(d))
+
+    # --- 4. filas otra vez, ya con las bandas estrechas de cada tubo ---
+    # Afinan el suelo: el fotograma entero lo dejaba 45 px desviado y estas
+    # bandas lo dejan en 16. Se usan las rachas SIN ensanchar, porque las
+    # paredes meten bordes propios que tapan el del suelo.
+    y_agua, y_fondo = rebordes(bordes_horizontales(rachas))
+
+    col = y_fondo - y_agua
+    g = dict(tubos=tubos, y_agua=int(y_agua), y_fondo=int(y_fondo),
+             roi_arriba=int(max(0, y_agua - 0.45 * col)),
+             roi_abajo=int(min(H - 1, y_fondo + 0.05 * col)))
+    log('    tubos: ' + '  '.join('%d:%d-%d' % (k, a, b)
+                                  for k, (a, b) in tubos.items()))
+    log('    agua y=%d   fondo y=%d   zona medida %d-%d'
+        % (g['y_agua'], g['y_fondo'], g['roi_arriba'], g['roi_abajo']))
+    return g
+
+
+def dibujar_geometria(ruta, lut, WH, g, destino):
+    """Imagen de control. Mirala 5 segundos por video: si las lineas no caen
+    sobre el agua y el suelo, la deteccion fallo y no sirve seguir."""
+    W, H = WH
+    i = sorted(lut)[len(lut) // 2]
+    cap = abrir(ruta)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+    ok, fr = cap.read()
+    cap.release()
+    if not ok:
+        return
+    im = cv2.warpAffine(fr, lut[i], (W, H), flags=cv2.INTER_LINEAR)
+    for s, (x0, x1) in g['tubos'].items():
+        cv2.rectangle(im, (x0, g['roi_arriba']), (x1, g['roi_abajo']),
+                      (0, 255, 255), 2)
+        cv2.line(im, (x0, g['y_agua']), (x1, g['y_agua']), (255, 40, 40), 3)
+        cv2.line(im, (x0, g['y_fondo']), (x1, g['y_fondo']), (40, 220, 40), 2)
+        cv2.putText(im, 'tubo %d' % s, (x0 + 5, max(20, g['roi_arriba'] - 8)),
+                    cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
+    cv2.putText(im, 'azul = linea de agua   verde = fondo   amarillo = zona medida',
+                (20, H - 25), cv2.FONT_HERSHEY_SIMPLEX, .85, (255, 255, 255), 2)
+    cv2.imwrite(destino, im, [cv2.IMWRITE_JPEG_QUALITY, 90])
+
+
+# ----------------- correcciones de recuadro (--correccion) -----------------
+#
+# Un recuadro corregido por una persona llega en coordenadas del video TAL COMO
+# SE VE (como bx0..by1 de cajas_crudas), y toda la geometria vive en el marco
+# estabilizado. Aqui esta el camino inverso. Una correccion cambia la geometria
+# de UN tubo (columnas y filas) desde un instante; antes y en los demas tubos
+# no cambia nada. 'linea' es {tubo: [(t_desde, geo), ...]} ordenada por t_desde.
+
+def geo_base(g, s):
+    """La geometria automatica del tubo s, con las mismas claves que una correccion."""
+    x0, x1 = g['tubos'][s]
+    return dict(x0=int(x0), x1=int(x1), y_agua=g['y_agua'], y_fondo=g['y_fondo'],
+                roi_arriba=g['roi_arriba'], roi_abajo=g['roi_abajo'])
+
+
+def geo_en(g, linea, s, t):
+    """La geometria del tubo s en el instante t (s): la automatica, o la de la
+    ultima correccion que ya empezo."""
+    geo = geo_base(g, s)
+    for t0, c in linea.get(s, ()):
+        if t >= t0:
+            geo = c
+        else:
+            break
+    return geo
+
+
+def filas_de_recuadro(y_agua, y_fondo):
+    """(arriba, abajo) del recuadro de un tubo a partir de su linea de agua y su
+    fondo: las proporciones de detectar_geometria() y cajas_crudas()."""
+    col = y_fondo - y_agua
+    return max(0.0, y_agua - 0.45 * col), y_fondo + 0.05 * col
+
+
+def recuadro_a_marco(caja, lut, fps, desde_s, WH):
+    """Pasa un recuadro (x0, y0, x1, y1) del video TAL COMO SE VE al marco
+    estabilizado, con la matriz del fotograma mas cercano a desde_s. Es lo
+    inverso de cajas_crudas(): primero se deshace el giro de --rotar (girar) y
+    luego se aplica la matriz del registro. Devuelve la geometria de un tubo:
+    las columnas x0/x1 y las filas (agua, fondo y bordes de la zona medida),
+    con las mismas proporciones que usa detectar_geometria()."""
+    W, H = WH
+    idx = np.array(sorted(lut))
+    i = int(idx[np.argmin(np.abs(idx / fps - desde_s))])
+    M = np.asarray(lut[i], np.float64)
+    x0, y0, x1, y1 = (float(v) for v in caja)
+    esq = np.array([[x0, y0], [x1, y0], [x0, y1], [x1, y1]], np.float64)
+    if ROT:
+        esq = girar(esq, W, H)
+    # cajas_crudas() guarda el rectangulo MINIMO que envuelve al tubo ya girado por
+    # el registro, que es un poco mas grande que el tubo. Aqui se deshace eso: el
+    # centro se lleva con la matriz y el tamano verdadero (w, h) se despeja de
+    #   ancho = k (w |cos| + h |sen|)    alto = k (w |sen| + h |cos|)
+    # donde k = 1/escala del registro y el angulo es el de la matriz. Con giros de
+    # fracciones de grado el efecto es de unos pocos pixeles, pero asi una
+    # correccion igual al recuadro automatico vuelve a dar la geometria automatica.
+    cx_, cy_ = (esq[:, 0].min() + esq[:, 0].max()) / 2, (esq[:, 1].min() + esq[:, 1].max()) / 2
+    ancho_o, alto_o = float(esq[:, 0].max() - esq[:, 0].min()), float(esq[:, 1].max() - esq[:, 1].min())
+    c = M[:, :2] @ np.array([cx_, cy_]) + M[:, 2]
+    s = float(np.sqrt(abs(np.linalg.det(M[:, :2]))))
+    th = float(np.arctan2(M[1, 0], M[0, 0]))
+    ca, sa = abs(np.cos(th)), abs(np.sin(th))
+    det = ca * ca - sa * sa
+    if abs(det) > 0.2:
+        w = s * (ca * ancho_o - sa * alto_o) / det
+        h = s * (ca * alto_o - sa * ancho_o) / det
+        q = np.array([[c[0] - w / 2, c[1] - h / 2], [c[0] + w / 2, c[1] + h / 2]])
+    else:                                   # giro enorme (no pasa): solo se mapean las esquinas
+        q = esq @ M[:, :2].T + M[:, 2]
+    arriba, abajo = float(q[:, 1].min()), float(q[:, 1].max())
+    # arriba = agua - 0.45 col  y  abajo = fondo + 0.05 col = agua + 1.05 col
+    col = (abajo - arriba) / 1.5
+    y_agua = arriba + 0.45 * col
+    xa = int(round(max(0.0, float(q[:, 0].min()))))
+    xb = int(round(min(W - 1.0, float(q[:, 0].max()))))
+    if xb - xa < 10 or col < 20:
+        raise ValueError('el recuadro corregido es demasiado chico o queda fuera de la imagen: %s' % (tuple(caja),))
+    return dict(x0=xa, x1=xb, y_agua=y_agua, y_fondo=y_agua + col,
+                roi_arriba=int(round(max(0.0, arriba))), roi_abajo=int(round(min(H - 1.0, abajo))))
+
+
+def leer_correcciones(ruta):
+    """Lee el JSON de --correccion: [{"cilindro", "desde_segundo", "x0", "y0", "x1", "y1"}, ...]
+    con las coordenadas del video tal como se ve. Revisa la forma antes de gastar
+    minutos en el video."""
+    import json
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            lista = json.load(f)
+    except (OSError, ValueError) as e:
+        raise SystemExit('--correccion: no se pudo leer %s: %s' % (ruta, e))
+    if not isinstance(lista, list):
+        raise SystemExit('--correccion: %s debe ser una lista de correcciones' % ruta)
+    out = []
+    for n, c in enumerate(lista, 1):
+        try:
+            c = dict(cilindro=int(c['cilindro']), desde_segundo=float(c['desde_segundo']),
+                     x0=float(c['x0']), y0=float(c['y0']), x1=float(c['x1']), y1=float(c['y1']))
+        except (KeyError, TypeError, ValueError) as e:
+            raise SystemExit('--correccion: la correccion %d no trae cilindro, desde_segundo, x0, y0, x1 y y1 '
+                             'numericos (%s)' % (n, e))
+        if not (c['x0'] < c['x1'] and c['y0'] < c['y1'] and c['desde_segundo'] >= 0):
+            raise SystemExit('--correccion: la correccion %d tiene un recuadro vacio o un instante negativo' % n)
+        out.append(c)
+    return out
+
+
+def linea_de_correcciones(correcciones, g, lut, fps, WH, log=print):
+    """Arma {tubo: [(t_desde, geo), ...]} con las correcciones en orden de
+    desde_segundo (varias del mismo tubo se aplican una tras otra)."""
+    linea = {}
+    for c in sorted(correcciones, key=lambda c: c['desde_segundo']):
+        s = c['cilindro']
+        if s not in g['tubos']:
+            raise SystemExit('--correccion: el cilindro %d no existe (hay %s)' % (s, sorted(g['tubos'])))
+        geo = recuadro_a_marco((c['x0'], c['y0'], c['x1'], c['y1']), lut, fps, c['desde_segundo'], WH)
+        linea.setdefault(s, []).append((c['desde_segundo'], geo))
+        log('      correccion: tubo %d desde %.1f s -> columnas %d-%d, agua y=%.0f, fondo y=%.0f'
+            % (s, c['desde_segundo'], geo['x0'], geo['x1'], geo['y_agua'], geo['y_fondo']))
+    return linea
+
+
+# ----------------- 4. extraccion por fotograma -----------------
+
+def _forma(wi, dif, t, s, x0, x1, ya, ra, rb):
+    """Segmenta al animal dentro del recuadro de un tubo en un fotograma y mide
+    su forma. Devuelve (fila, recorte, mascara)."""
+    roi = wi[ra:rb, x0:x1]
+    m = ((dif[ra:rb, x0:x1] > DIFF_THR) & (roi > BRIGHT_THR)).astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, K5)
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, K9)
+    blob, st, cen = mayor_componente(m)
+
+    r = dict(t=t, s=s, cx=np.nan, cy=np.nan, area=np.nan, above=np.nan,
+             largo=np.nan, vert=np.nan, elong=np.nan, cabeza=np.nan,
+             me=np.nan, iou=np.nan, dice=np.nan)
+    if blob is not None:
+        r['cx'] = cen[0] + x0
+        r['cy'] = cen[1] + ra
+        r['area'] = float(st[cv2.CC_STAT_AREA])
+        r['above'] = float(blob[:int(max(0, ya - ra)), :].sum())
+        nucleo, _, _ = mayor_componente(cv2.erode(blob, ER))
+        if nucleo is not None:
+            bm = cv2.dilate(nucleo, ER) & blob
+            M = cv2.moments(bm, binaryImage=True)
+            if M['m00'] > 200:
+                u20, u02 = M['mu20'] / M['m00'], M['mu02'] / M['m00']
+                u11 = M['mu11'] / M['m00']
+                th = 0.5 * np.arctan2(2 * u11, u20 - u02)
+                d = np.sqrt(max((u20 - u02) ** 2 + 4 * u11 ** 2, 0))
+                l1 = (u20 + u02 + d) / 2
+                l2 = max((u20 + u02 - d) / 2, 1e-6)
+                ys, _ = np.nonzero(bm)
+                r['vert']   = float(abs(np.sin(th)))
+                r['elong']  = float(np.sqrt(l1 / l2))
+                r['cabeza'] = float(ys.min() + ra)
+                # largo del cuerpo = 4 sigma del eje mayor
+                r['largo']  = float(4 * np.sqrt(max(l1, 1e-6)))
+    return r, roi, blob
+
+
+def extraer(ruta, lut, WH, fondo, g, fps, log=print, linea=None, largos_auto=None):
+    """Una fila por fotograma y tubo. Todo en px todavia; la normalizacion
+    por largo de cuerpo se hace al agregar en bloques.
+
+    linea: correcciones de recuadro (linea_de_correcciones). Desde su instante,
+    el tubo corregido se mide con la geometria nueva; sin ella todo es igual.
+    largos_auto: si es una lista, se llena (un valor por fila de la salida) con
+    el largo del cuerpo medido SIEMPRE con la geometria automatica. Con eso la
+    escala del video (la mediana) no cambia por una correccion y los demas
+    tubos salen identicos."""
+    W, H = WH
+    bg = fondo.astype(np.int16)
+    ya, ra, rb = g['y_agua'], g['roi_arriba'], g['roi_abajo']
+    # Por cada tubo se guarda un historial corto de (instante, recorte,
+    # mascara). Las medidas dinamicas no se toman contra el fotograma anterior
+    # sino contra el mas cercano a DT_REF segundos atras, de modo que --paso
+    # cambia el coste de calculo pero no los valores.
+    from collections import deque
+    filas, hist, firmas = [], {}, {}
+    cap = abrir(ruta)
+    for cur, fr in cap.cuadros(lambda c: c in lut):
+        gr = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
+        w = cv2.warpAffine(gr, lut[cur], (W, H), flags=cv2.INTER_LINEAR,
+                           borderValue=0)
+        wi = w.astype(np.int16)
+        dif = wi - bg
+        t = cur / fps
+
+        for s, (x0, x1) in g['tubos'].items():
+            ya_s, ra_s, rb_s = ya, ra, rb
+            corregido = False
+            if linea and s in linea:
+                geo = geo_en(g, linea, s, t)        # antes de la correccion es la automatica
+                x0, x1 = geo['x0'], geo['x1']
+                ya_s, ra_s, rb_s = geo['y_agua'], geo['roi_arriba'], geo['roi_abajo']
+                corregido = t >= linea[s][0][0]
+                firma = (x0, x1, ra_s, rb_s)
+                if firmas.get(s, firma) != firma:
+                    # el recorte cambio de lugar o de tamano: el historial de este tubo ya no es comparable
+                    hist.pop(s, None)
+                firmas[s] = firma
+            r, roi, blob = _forma(wi, dif, t, s, x0, x1, ya_s, ra_s, rb_s)
+            if largos_auto is not None:
+                if corregido:
+                    ax0, ax1 = g['tubos'][s]
+                    largos_auto.append(_forma(wi, dif, t, s, ax0, ax1, ya, ra, rb)[0]['largo'])
+                else:
+                    largos_auto.append(r['largo'])
+            h = hist.setdefault(s, deque())
+            # el fotograma mas reciente que quede al menos DT_REF atras; si el
+            # historial aun no llega tan lejos, el mas antiguo disponible
+            ref = None
+            for reg in reversed(h):
+                if t - reg[0] >= DT_REF:
+                    ref = reg
+                    break
+            if ref is None and h:
+                ref = h[0]
+            if ref is not None:
+                _, proi, pm = ref
+                if blob is not None and pm is not None:
+                    sel = cv2.dilate(((blob | pm) > 0).astype(np.uint8), K15) > 0
+                    if sel.sum() > 50:
+                        # energia de movimiento SOLO dentro del animal: el
+                        # oleaje del agua satura la medida si se toma la ROI
+                        r['me'] = float(np.abs(roi - proi)[sel].mean())
+                    inter = float((blob & pm).sum())
+                    union = float((blob | pm).sum())
+                    a1, a2 = float(blob.sum()), float(pm.sum())
+                    r['iou']  = inter / union if union else np.nan
+                    r['dice'] = 2 * inter / (a1 + a2) if (a1 + a2) else np.nan
+            h.append((t, roi.copy(), blob))
+            while len(h) > 2 and t - h[0][0] > 2 * DT_REF:
+                h.popleft()
+            filas.append(r)
+        if cur % 3000 == 0:
+            log('    extraccion t=%.0fs' % t)
+    cap.release()
+    return filas
+
+
+def cajas_crudas(bl, lut, g, fps, WH=None, linea=None):
+    """Anade bx0, by0, bx1, by1: el recuadro de cada tubo en coordenadas del
+    video TAL COMO SE VE, en el instante medio de cada bloque. Con 'linea'
+    (correcciones), un tubo corregido da el recuadro corregido desde su instante.
+
+    Toda la geometria vive en el marco de referencia estabilizado. Eso sirve
+    para medir, pero no para dibujar sobre el video original: si la camara se
+    movio, el recuadro cae fuera de la rata. En IMG_0840 la camara se desplaza
+    unos 200 px entre el segundo 55 y el 184. Se deshace el registro con la
+    inversa de la matriz del fotograma mas cercano a la mitad del bloque."""
+    idx = np.array(sorted(lut))
+    tiempos = idx / fps
+    col = g['y_fondo'] - g['y_agua']
+    arriba = max(0.0, g['y_agua'] - 0.45 * col)
+    abajo = g['y_fondo'] + 0.05 * col
+    cajas = []
+    for b, s in zip(bl['bloque'], bl['especimen']):
+        medio = (int(b) - 0.5) * BLOCK_S
+        i = int(idx[np.argmin(np.abs(tiempos - medio))])
+        inv = cv2.invertAffineTransform(np.asarray(lut[i], np.float64))
+        x0, x1 = g['tubos'][int(s)]
+        arr, abj = arriba, abajo
+        if linea and int(s) in linea:
+            geo = geo_en(g, linea, int(s), medio)
+            x0, x1 = geo['x0'], geo['x1']
+            arr, abj = filas_de_recuadro(geo['y_agua'], geo['y_fondo'])
+        esq = np.array([[x0, arr], [x1, arr], [x0, abj], [x1, abj]], np.float64)
+        q = esq @ inv[:, :2].T + inv[:, 2]
+        if ROT:
+            # y ademas deshacer el enderezado: el navegador muestra el video
+            # tal como esta guardado, girado
+            q = sin_girar(q, WH[0], WH[1])
+        cajas.append((int(q[:, 0].min()), int(q[:, 1].min()),
+                      int(q[:, 0].max()), int(q[:, 1].max())))
+    bl = bl.copy()
+    for j, c in enumerate(('bx0', 'by0', 'bx1', 'by1')):
+        bl[c] = [k[j] for k in cajas]
+    return bl
+
+
+# ----------------- 5. rasgos por bloque, normalizados -----------------
+
+def rasgos_tramo(d, tubo, ya, yf, escala):
+    """Los 15 rasgos de un tramo de tiempo de un tubo (filas de extraer,
+    ordenadas por t). Sirve igual para un bloque de 5 s que para una ventana
+    de 3 s alrededor de un segundo. Sin al menos 5 mediciones con el animal
+    visible, todo sale vacio."""
+    cx, cy = d['cx'].to_numpy(), d['cy'].to_numpy()
+    ok = ~np.isnan(cx)
+    r = {k: np.nan for k in RASGOS}
+    if ok.sum() < 5:
+        return r
+    col = float(yf - ya)
+    y_medio = (ya + yf) / 2
+    xs, ys = medfilt1(cx[ok], 5), medfilt1(cy[ok], 5)
+    dur = max(float(d['t'].iloc[-1] - d['t'].iloc[0]), 1e-3)
+    r['rng']   = float(np.hypot(xs.max() - xs.min(), ys.max() - ys.min())) / escala
+    r['spanx'] = float(xs.max() - xs.min()) / escala
+    r['spany'] = float(ys.max() - ys.min()) / escala
+    r['path']  = float(np.hypot(np.diff(xs), np.diff(ys)).sum()) / escala / dur
+    x0, x1 = tubo
+    qx = (xs >= (x0 + x1) / 2).astype(int)
+    qy = (np.clip(ys, ya, yf) >= y_medio).astype(int)
+    q = qy * 2 + qx
+    # Permanencia minima en TIEMPO, no en fotogramas: con paso 2 hay
+    # 75 mediciones por bloque y con paso 12 solo 12, asi que exigir
+    # "3 fotogramas" significaria 0.2 s en un caso y 1.2 s en el otro.
+    minimo = max(2, int(round(DWELL_S * len(xs) / max(dur, 1e-3))))
+    r['nq'] = int(sum(1 for k in range(4) if (q == k).sum() >= minimo))
+    cab = d['cabeza'].to_numpy()[ok]
+    if np.isfinite(cab).any():
+        r['hrise'] = float(np.nanmax(ya - cab)) / col
+        r['hmean'] = float(np.nanmean(ya - cab)) / col
+    r['above'] = float(np.nanmean(d['above'].to_numpy()[ok])) / escala ** 2
+    r['area']  = float(np.nanmean(d['area'].to_numpy()[ok])) / escala ** 2
+    r['vert']  = float(np.nanmean(d['vert']))
+    r['elong'] = float(np.nanmean(d['elong']))
+    me = d['me'].to_numpy()
+    if np.isfinite(me).any():
+        r['me'] = float(np.nanmean(me))
+        r['me_max'] = float(np.nanmax(me))
+    r['iou']  = float(np.nanmean(d['iou']))
+    r['dice'] = float(np.nanmean(d['dice']))
+    return r
+
+
+VENTANA_S = 4.0   # segundos que se miran alrededor de cada segundo (ver segundos.py)
+
+
+def segundos(cuadros, ventana=VENTANA_S):
+    """Rasgos de una ventana centrada en CADA segundo, por tubo.
+
+    'cuadros' es la tabla que guarda etiquetar.py (_cuadros.csv): una fila por
+    fotograma medido y tubo, con la geometria y la escala del video. Un
+    segundo k (de k a k+1 s) se describe con lo que paso entre
+    k + 0.5 - ventana/2 y k + 0.5 + ventana/2: un segundo solo es muy poco
+    para distinguir flotar de nadar despacio.
+
+    La geometria (columnas del tubo, agua y fondo) se toma de las propias filas
+    de _cuadros.csv, la del fotograma central de cada ventana: si un tubo se
+    corrigio con --correccion, sus segundos posteriores usan la geometria nueva.
+    Sin correcciones esas columnas son constantes y sale lo mismo de siempre."""
+    import pandas as pd
+    escala = float(cuadros['escala'].iloc[0])
+    n_seg = int(np.floor(cuadros['t'].max() + 1e-6)) + 1
+    out = []
+    for s, d in cuadros.groupby('s'):
+        d = d.sort_values('t').reset_index(drop=True)
+        t = d['t'].to_numpy()
+        gx0, gx1 = d['gx0'].to_numpy(), d['gx1'].to_numpy()
+        gya, gyf = d['g_agua'].to_numpy(), d['g_fondo'].to_numpy()
+        for k in range(n_seg):
+            c = k + 0.5
+            i0, i1 = np.searchsorted(t, [c - ventana / 2, c + ventana / 2])
+            m = min((i0 + i1) // 2, len(d) - 1)
+            tubo = (float(gx0[m]), float(gx1[m]))
+            ya, yf = float(gya[m]), float(gyf[m])
+            r = dict(especimen=int(s), segundo=k + 1, inicio_s=k, n=int(i1 - i0))
+            r.update(rasgos_tramo(d.iloc[i0:i1], tubo, ya, yf, escala))
+            out.append(r)
+    return pd.DataFrame(out)
+
+
+def bloques(filas, g, fps, escala=None, log=print, linea=None):
+    """Agrega a bloques de 5 s y normaliza:
+       distancias  -> en largos de cuerpo
+       velocidades -> por segundo
+       alturas     -> en alturas de columna de agua
+
+    'escala' es el largo tipico del cuerpo en px. Se calcula como la mediana
+    de TODO el video, no de cada bloque, para que el ruido de un bloque no
+    altere su propia normalizacion. Con 'linea' (correcciones de recuadro) un
+    bloque de un tubo corregido se mide con la geometria que tiene en su
+    instante medio."""
+    import pandas as pd
+    df = pd.DataFrame(filas)
+    if escala is None:
+        escala = float(np.nanmedian(df['largo']))
+    if not (escala > 5):
+        raise RuntimeError('no se pudo medir el largo del cuerpo')
+    ya, yf = g['y_agua'], g['y_fondo']
+
+    df['bloque'] = (df['t'] // BLOCK_S).astype(int) + 1
+    out = []
+    for (s, b), d in df.groupby(['s', 'bloque']):
+        d = d.sort_values('t')
+        cx, cy = d['cx'].to_numpy(), d['cy'].to_numpy()
+        ok = ~np.isnan(cx)
+        n_ok = int(ok.sum())
+        tubo_b, ya_b, yf_b = g['tubos'][s], ya, yf
+        if linea and s in linea:
+            geo = geo_en(g, linea, s, (b - 0.5) * BLOCK_S)
+            tubo_b, ya_b, yf_b = (geo['x0'], geo['x1']), geo['y_agua'], geo['y_fondo']
+        r = dict(bloque=int(b), especimen=int(s),
+                 t0=round((b - 1) * BLOCK_S, 2), t1=round(b * BLOCK_S, 2),
+                 n=len(d), n_visto=n_ok, escala_px=round(escala, 1),
+                 # Geometria detectada. Se guarda para que revisar.py pueda
+                 # recortar y marcar el tubo sin reprocesar el video entero.
+                 gx0=int(tubo_b[0]), gx1=int(tubo_b[1]),
+                 g_agua=int(ya_b), g_fondo=int(yf_b))
+        r.update(rasgos_tramo(d, tubo_b, ya_b, yf_b, escala))
+        out.append(r)
+    res = pd.DataFrame(out).sort_values(['especimen', 'bloque']).reset_index(drop=True)
+    # El ultimo bloque casi nunca cabe completo (un video de 301 s deja 1 s
+    # suelto). Un bloque a medias no es comparable con los demas: fuera.
+    completo = res['n'] >= 0.6 * res['n'].median()
+    if (~completo).any():
+        log('    descartados %d bloques incompletos (bloque %s)'
+            % (int((~completo).sum()),
+               ', '.join(str(b) for b in sorted(set(res.loc[~completo, 'bloque'])))))
+        res = res[completo].reset_index(drop=True)
+    log('    %d bloques  (largo de cuerpo = %.0f px)' % (len(res), escala))
+    return res

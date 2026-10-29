@@ -34,7 +34,7 @@
       <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="field"><label for="cNombre">Nombre</label><input class="input" id="cNombre" placeholder="Andrea"></div>
         <div class="field"><label for="cApe">Apellidos</label><input class="input" id="cApe" placeholder="Barrera Solís"></div>
-        <div class="field"><label for="cCorreo">Correo institucional (@ipn.mx)</label><input class="input num" id="cCorreo" type="email" placeholder="abarrera@ipn.mx"></div>
+        <div class="field"><label for="cCorreo">Correo electrónico</label><input class="input num" id="cCorreo" type="email" placeholder="abarrera@ejemplo.com"></div>
         <div class="field"><label for="cId">Identificador institucional (boleta o número de empleado)</label><input class="input num" id="cId" inputmode="numeric" placeholder="2021630154"></div>
         <div style="display:flex;align-items:flex-end;font-size:11.5px;line-height:1.5;color:color-mix(in srgb,var(--color-text) 60%,transparent)">La cuenta se crea como Investigador.</div>
         <div style="display:flex;align-items:flex-end;gap:8px"><button type="submit" class="btn btn-primary" style="justify-content:flex-start">Guardar</button><button type="button" class="btn btn-secondary" id="btnCancel" style="justify-content:flex-start">Cancelar</button></div>
@@ -42,6 +42,23 @@
       <div class="field-error hidden" id="cErr" style="padding:0 16px 14px;margin:0"></div>
     </form>
     <div id="okCrear" class="ok-bar hidden" style="margin-top:18px;border:2px solid var(--color-text);border-left:4px solid var(--color-text)"><strong>Cuenta creada · se envió la contraseña temporal al correo</strong></div>
+
+    <form id="fEditar" class="hidden" novalidate style="margin-top:18px;border:2px solid var(--color-text)">
+      <div class="nd" style="padding:12px 16px;border-bottom:1px solid var(--color-divider);font-size:14px" id="eTitulo">Editar cuenta</div>
+      <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="field"><label for="eNombre">Nombre</label><input class="input" id="eNombre"></div>
+        <div class="field"><label for="eApe">Apellidos</label><input class="input" id="eApe"></div>
+        <div class="field"><label for="eCorreo">Correo electrónico</label><input class="input num" id="eCorreo" type="email"></div>
+        <div class="field"><label for="eId">Identificador institucional · solo lectura</label><input class="input num" id="eId" readonly style="background:var(--color-surface);color:var(--muted-2)"></div>
+        <div class="field"><label>Estado de la cuenta</label>
+          <span class="seg" id="eEstado" style="display:inline-flex"><span class="seg-opt on" data-v="activa">Activa</span><span class="seg-opt" data-v="inactiva">Inactiva</span></span>
+          <div class="hint" style="margin-top:6px" id="eEstadoNota"></div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px"><button type="submit" class="btn btn-primary" style="justify-content:flex-start">Guardar cambios</button><button type="button" class="btn btn-secondary" id="btnCancelE" style="justify-content:flex-start">Cancelar</button></div>
+      </div>
+      <div class="field-error hidden" id="eErr" style="padding:0 16px 14px;margin:0"></div>
+    </form>
+    <div id="okEditar" class="ok-bar hidden" style="margin-top:18px;border:2px solid var(--color-text);border-left:4px solid var(--color-text)"></div>
 
     <hr class="hr">
 
@@ -57,13 +74,13 @@
         <div class="k" style="margin-bottom:12px">Almacenamiento</div>
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:11px"><span class="num nd" style="font-size:32px;line-height:1;color:var(--color-accent-700)">412</span><span class="num" style="font-size:12px;color:var(--muted-2)">GB de 500 · 82 %</span></div>
         <div style="height:10px;background:color-mix(in srgb,var(--color-text) 12%,transparent);margin-bottom:13px"><div style="height:10px;background:var(--color-accent);width:82%"></div></div>
-        <div style="padding:12px 13px;border:1px solid var(--color-accent);font-size:11.5px;line-height:1.6"><strong>Aviso activo.</strong> Al llegar al 80 % el sistema avisa al administrador. Nunca borra videos por su cuenta: la retención de 30 días es el único mecanismo automático, y avisa antes.</div>
+        <div style="padding:12px 13px;border:1px solid var(--color-accent);font-size:11.5px;line-height:1.6"><strong>Aviso activo.</strong> Al llegar al 80 % el sistema avisa al administrador. Al llegar al 90 % borra primero los videos más antiguos, aunque no hayan cumplido 30 días, y avisa al investigador de cada experimento afectado.</div>
         <div style="margin-top:13px;border-top:1px solid var(--color-divider)" id="disco"></div>
       </div>
 
       <div style="background:var(--color-bg);padding:18px 20px;grid-column:1 / -1;border-top:1px solid var(--color-divider)">
-        <div class="k" style="margin-bottom:14px">Conductas y modelo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider)" id="catalogos"></div>
+        <div class="k" style="margin-bottom:14px">Conductas</div>
+        <div style="display:grid;grid-template-columns:1fr" id="catalogos"></div>
       </div>
     </div>
   </div>
@@ -73,22 +90,26 @@
   const $ = id => document.getElementById(id);
   const ACC = 'var(--color-accent)';
   const usuarios = [
-    { nombre: 'M. Rivera Alcántara', correo: 'mrivera@ipn.mx', rol: 'Investigador', activa: true, yo: false },
-    { nombre: 'C. S. Reyes López', correo: 'creyesl@ipn.mx', rol: 'Administrador', activa: true, yo: true },
-    { nombre: 'J. Domínguez Vera', correo: 'jdominguez@ipn.mx', rol: 'Investigador', activa: true, yo: false },
-    { nombre: 'L. Ortega Camacho', correo: 'lortega@ipn.mx', rol: 'Investigador', activa: true, yo: false }
+    { id: '2019630871', nom: 'Mariana', ape: 'Rivera Alcántara', correo: 'mrivera@ipn.mx', rol: 'Investigador', activa: true, yo: false },
+    { id: '1987045', nom: 'C. S.', ape: 'Reyes López', correo: 'creyesl@ipn.mx', rol: 'Administrador', activa: true, yo: true },
+    { id: '2020630412', nom: 'Jorge', ape: 'Domínguez Vera', correo: 'jdominguez@ipn.mx', rol: 'Investigador', activa: true, yo: false },
+    { id: '2018630255', nom: 'Lucía', ape: 'Ortega Camacho', correo: 'lortega@ipn.mx', rol: 'Investigador', activa: true, yo: false }
   ];
+  // En la tabla, el nombre va abreviado: «M. Rivera Alcántara».
+  const nombreCorto = u => (/\.$/.test(u.nom) ? u.nom : u.nom.split(/\s+/).map(p => p[0] + '.').join(' ')) + ' ' + u.ape;
+  const setSeg = (seg, v) => seg.querySelectorAll('.seg-opt').forEach(o => o.classList.toggle('on', o.dataset.v === v));
 
   function renderUsuarios() {
     const adminsActivos = usuarios.filter(u => u.rol === 'Administrador' && u.activa).length;
     $('cuentasK').textContent = 'Cuentas · ' + usuarios.filter(u => u.activa).length + ' activas';
     $('usuarios').innerHTML = usuarios.map((u, i) => {
       const ultimoAdmin = u.rol === 'Administrador' && u.activa && adminsActivos <= 1;
-      let accion = '';
-      if (u.activa && ultimoAdmin) accion = '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><button class="btn btn-ghost" disabled>Desactivar</button><span style="font-size:11px;color:var(--color-accent-700);white-space:nowrap">Debe existir al menos un Administrador activo</span></div>';
-      else if (u.activa) accion = '<button type="button" class="btn btn-ghost" data-off="' + i + '">Desactivar</button>';
-      return '<tr>' +
-        '<td class="nd" style="font-size:13px">' + FST.esc(u.nombre) + '</td>' +
+      const editar = '<button type="button" class="btn btn-ghost" data-edit="' + i + '">Editar</button>';
+      let accion = editar;
+      if (u.activa && ultimoAdmin) accion = '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><div style="display:flex;gap:4px">' + editar + '<button class="btn btn-ghost" disabled>Desactivar</button></div><span style="font-size:11px;color:var(--color-accent-700);white-space:nowrap">Debe existir al menos un Administrador activo</span></div>';
+      else if (u.activa) accion = '<div style="display:flex;gap:4px;justify-content:flex-end">' + editar + '<button type="button" class="btn btn-ghost" data-off="' + i + '">Desactivar</button></div>';
+      return '<tr' + (editando === i ? ' style="background:var(--color-accent-100)"' : '') + '>' +
+        '<td class="nd" style="font-size:13px">' + FST.esc(nombreCorto(u)) + '</td>' +
         '<td class="num" style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 70%,transparent)">' + FST.esc(u.correo) + '</td>' +
         '<td style="font-size:12.5px">' + u.rol + '</td>' +
         '<td><span class="tag tag-neutral">' + (u.activa ? 'Activa' : 'Inactiva') + (u.yo ? ' · tú' : '') + '</span></td>' +
@@ -96,17 +117,60 @@
       '</tr>';
     }).join('');
   }
+  let editando = null;
   $('usuarios').addEventListener('click', e => {
+    const ed = e.target.closest('[data-edit]');
+    if (ed) { abrirEdicion(+ed.dataset.edit); return; }
     const b = e.target.closest('[data-off]'); if (!b) return;
     const u = usuarios[+b.dataset.off];
-    if (!confirm('¿Desactivar la cuenta de ' + u.nombre + '?')) return;
+    if (!confirm('¿Desactivar la cuenta de ' + nombreCorto(u) + '?')) return;
     u.activa = false; renderUsuarios();
   });
   renderUsuarios();
 
+  // ── editar cuenta ───────────────────────────────────────────────────────
+  // El identificador institucional es la llave de la cuenta: no se edita.
+  const camposE = ['eNombre', 'eApe', 'eCorreo'];
+  function abrirEdicion(i) {
+    const u = usuarios[i];
+    editando = i;
+    $('fCrear').classList.add('hidden'); $('okCrear').classList.add('hidden'); $('okEditar').classList.add('hidden');
+    $('eId').value = u.id; $('eNombre').value = u.nom; $('eApe').value = u.ape; $('eCorreo').value = u.correo;
+    setSeg($('eEstado'), u.activa ? 'activa' : 'inactiva');
+    const ultimoAdmin = u.rol === 'Administrador' && u.activa && usuarios.filter(x => x.rol === 'Administrador' && x.activa).length <= 1;
+    $('eEstado').querySelector('[data-v="inactiva"]').classList.toggle('hidden', ultimoAdmin);
+    $('eEstadoNota').textContent = ultimoAdmin ? 'Es el único Administrador activo: no se puede desactivar.' : 'Desactivar no borra la cuenta ni sus experimentos; la persona deja de poder entrar.';
+    $('eTitulo').textContent = 'Editar cuenta · ' + nombreCorto(u) + ' (' + u.rol + ')';
+    failE(null, '');
+    $('fEditar').classList.remove('hidden'); renderUsuarios(); $('eNombre').focus();
+  }
+  function cerrarEdicion() { editando = null; $('fEditar').classList.add('hidden'); failE(null, ''); renderUsuarios(); }
+  function failE(id, msg) {
+    camposE.forEach(c => $(c).classList.remove('error'));
+    if (id) { $(id).classList.add('error'); $(id).focus(); }
+    $('eErr').textContent = msg; $('eErr').classList.toggle('hidden', !msg);
+  }
+  FST.bindSeg($('eEstado'));
+  $('btnCancelE').onclick = cerrarEdicion;
+  $('fEditar').onsubmit = e => {
+    e.preventDefault();
+    const u = usuarios[editando];
+    const v = Object.fromEntries(camposE.map(c => [c, $(c).value.trim()]));
+    if (!v.eNombre) return failE('eNombre', 'Escribe el nombre.');
+    if (!v.eApe) return failE('eApe', 'Escribe los apellidos.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.eCorreo)) return failE('eCorreo', 'Escribe un correo válido.');
+    if (usuarios.some((x, k) => k !== editando && x.correo.toLowerCase() === v.eCorreo.toLowerCase())) return failE('eCorreo', 'Ya existe otra cuenta con ese correo.');
+    u.nom = v.eNombre; u.ape = v.eApe; u.correo = v.eCorreo.toLowerCase();
+    u.activa = FST.segValue($('eEstado')) === 'activa';
+    const nombre = nombreCorto(u);
+    cerrarEdicion();
+    $('okEditar').innerHTML = '<strong>Cambios guardados · ' + FST.esc(nombre) + '</strong>' + (u.activa ? '' : ' · la cuenta quedó inactiva');
+    $('okEditar').classList.remove('hidden');
+  };
+
   // ── crear cuenta ────────────────────────────────────────────────────────
   const campos = ['cNombre', 'cApe', 'cCorreo', 'cId'];
-  $('btnCrear').onclick = () => { $('okCrear').classList.add('hidden'); $('fCrear').classList.remove('hidden'); $('cNombre').focus(); };
+  $('btnCrear').onclick = () => { if (editando !== null) cerrarEdicion(); $('okCrear').classList.add('hidden'); $('okEditar').classList.add('hidden'); $('fCrear').classList.remove('hidden'); $('cNombre').focus(); };
   $('btnCancel').onclick = () => { $('fCrear').reset(); $('fCrear').classList.add('hidden'); fail(null, ''); };
   function fail(id, msg) {
     campos.forEach(c => $(c).classList.remove('error'));
@@ -118,13 +182,23 @@
     const v = Object.fromEntries(campos.map(c => [c, $(c).value.trim()]));
     if (!v.cNombre) return fail('cNombre', 'Escribe el nombre.');
     if (!v.cApe) return fail('cApe', 'Escribe los apellidos.');
-    if (!/^[^\s@]+@ipn\.mx$/i.test(v.cCorreo)) return fail('cCorreo', 'El correo debe ser institucional (@ipn.mx).');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.cCorreo)) return fail('cCorreo', 'Escribe un correo válido.');
     if (usuarios.some(u => u.correo.toLowerCase() === v.cCorreo.toLowerCase())) return fail('cCorreo', 'Ya existe una cuenta con ese correo.');
-    if (!/^\d+$/.test(v.cId)) return fail('cId', 'El identificador institucional es numérico (boleta o número de empleado).');
+    if (!/^\d{1,10}$/.test(v.cId)) return fail('cId', 'El identificador institucional es numérico, de hasta 10 dígitos (boleta o número de empleado).');
+    if (usuarios.some(u => u.id === v.cId)) return fail('cId', 'Ya existe una cuenta con ese identificador.');
     fail(null, '');
-    const ini = v.cNombre.split(/\s+/).map(p => p[0] + '.').join(' ');
-    usuarios.push({ nombre: ini + ' ' + v.cApe, correo: v.cCorreo.toLowerCase(), rol: 'Investigador', activa: true, yo: false });
+    usuarios.push({ id: v.cId, nom: v.cNombre, ape: v.cApe, correo: v.cCorreo.toLowerCase(), rol: 'Investigador', activa: true, yo: false });
     renderUsuarios();
+    // La genera el sistema (D-38); se envía por correo y se muestra una sola vez aquí como respaldo (D-45).
+    const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const temporal = Array.from({ length: 10 }, () => abc[Math.floor(Math.random() * abc.length)]).join('');
+    $('okCrear').innerHTML =
+      '<strong>Cuenta creada.</strong> Se envió la contraseña temporal a <span class="num">' + FST.esc(v.cCorreo.toLowerCase()) + '</span>.' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap">' +
+        '<span>Contraseña temporal:</span>' +
+        '<span class="num nd" style="font-size:16px;letter-spacing:.06em;padding:4px 10px;border:2px solid var(--color-text);background:var(--color-bg)">' + temporal + '</span>' +
+      '</div>' +
+      '<div class="hint" style="margin-top:8px">Solo se muestra esta vez. Entrégala a la persona si el correo no le llega; al entrar deberá cambiarla.</div>';
     $('fCrear').reset(); $('fCrear').classList.add('hidden');
     $('okCrear').classList.remove('hidden');
   };
@@ -149,8 +223,7 @@
     '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--color-divider);font-size:11.5px"><span style="color:color-mix(in srgb,var(--color-text) 70%,transparent)">' + d.k + '</span><span class="num">' + d.v + '</span></div>').join('');
 
   $('catalogos').innerHTML = [
-    { titulo: 'Conductas', items: [{ n: 'Nado activo', m: '≥ 3 s' }, { n: 'Inmovilidad', m: '≥ 3 s' }, { n: 'Escalamiento', m: '≥ 3 s' }] },
-    { titulo: 'Modelo del clasificador', items: [{ n: 'Modelo en uso: clf-cascada v2.1', m: '' }] }
+    { titulo: 'Conductas', items: [{ n: 'Nado activo', m: '' }, { n: 'Inmovilidad', m: '' }, { n: 'Escalamiento', m: '' }, { n: 'Conducta activa', m: '' }] }
   ].map(c =>
     '<div style="background:var(--color-bg);padding-right:18px">' +
       '<div class="nd" style="font-size:13px;margin-bottom:10px">' + c.titulo + '</div>' +

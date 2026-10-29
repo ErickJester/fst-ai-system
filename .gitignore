@@ -15,6 +15,16 @@ CLAUDE.md
 # restos locales de la herramienta de etiquetado (ahora en su propio repo)
 /tools/
 
+# modelos entrenados (fst_cnn_seg.pt pesa ~125 MB): se copian a mano desde fst_auto, ver pipeline/README.md
+/modelos/
+
+# versión portable: el paquete que arma portable/empaquetar.ps1 y la configuración (con contraseñas) de quien la usa
+/dist/
+/portable/.env
+
+# respaldos diarios de la base (pg_dump, D-18): datos de quien usa el sistema, no van en git (ni en el paquete)
+respaldos/
+
 # frontend: dependencias (se reinstalan con npm install) y salida del build
 node_modules/
 /frontend/dist/

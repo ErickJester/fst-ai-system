@@ -7,6 +7,7 @@
   const TIPO_TAG = { control: 'tag-neutral', referencia: 'tag-outline', 'tratamiento experimental': 'tag-accent' };
 
   const ESTADO = {
+    'En espera del Día 2': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'repeating-linear-gradient(90deg, var(--color-accent-200) 0 3px, var(--color-bg) 3px 6px)' },
     'En cola': { cls: 'tag-outline', bg: 'transparent', fg: INK, fill: 'var(--color-accent-200)' },
     'Procesando': { cls: 'tag-accent', bg: 'var(--color-accent-100)', fg: 'var(--color-accent-700)', fill: ACC },
     'Completado': { cls: 'tag-neutral', bg: 'var(--color-neutral-200)', fg: INK, fill: INK },
@@ -17,7 +18,7 @@
     { id: 'G-01', nombre: 'Control', tipo: 'control', trat: 'Placebo (solución salina)', n: 8, porCuadro: 4, estados: ['Completado', 'En cola'] },
     { id: 'G-02', nombre: 'Referencia', tipo: 'referencia', trat: 'Fluoxetina 10 mg/kg', n: 8, porCuadro: 4, estados: ['Completado', 'Completado'] },
     { id: 'G-03', nombre: 'Experimental A', tipo: 'tratamiento experimental', trat: 'Compuesto CSR-14, 5 mg/kg', n: 8, porCuadro: 4, estados: ['Completado', 'Procesando'] },
-    { id: 'G-04', nombre: 'Experimental B', tipo: 'tratamiento experimental', trat: 'Compuesto CSR-14, 15 mg/kg', n: 8, porCuadro: 4, estados: ['En cola', 'Error'] }
+    { id: 'G-04', nombre: 'Experimental B', tipo: 'tratamiento experimental', trat: 'Compuesto CSR-14, 15 mg/kg', n: 8, porCuadro: 4, estados: ['En espera del Día 2', 'Error'] }
   ];
 
   const groups = RAW.map(g => {
@@ -31,7 +32,7 @@
         letra: String.fromCharCode(65 + i),
         nombre: 'Tanda ' + String.fromCharCode(65 + i),
         desde: desde, cuantos: cuantos,
-        posiciones: 'Ratas ' + desde + '–' + (desde + cuantos - 1) + ' · cilindros P1–P' + cuantos,
+        posiciones: 'Especímenes ' + desde + '–' + (desde + cuantos - 1) + ' · cilindros P1–P' + cuantos,
         estado: est, e: ESTADO[est]
       };
     });

@@ -6,18 +6,23 @@ resultados por animal.
 
 | Servicio | Tecnología | Puerto |
 |---|---|---|
-| `frontend` | React + Vite | 5173 |
-| `api` | Flask + SQLAlchemy | 8000 |
-| `db` | PostgreSQL 16 | 5432 |
-| `worker` | Python (placeholder del pipeline) | — |
+| `web` | React (Vite) servido por nginx | 8088 (el único que se publica) |
+| `api` | Spring Boot (`backend-spring/`) | solo dentro de Docker |
+| `db` | PostgreSQL 16 | solo dentro de Docker |
+| `worker` | Python, analiza los videos con el modelo (`worker/`) | — |
 
-```bash
-docker-compose up --build
-```
+El `docker-compose.yml` de esta carpeta es el compose **definitivo** del sistema (producción: una PC del laboratorio con
+Windows y Docker Desktop, a la que entran las demás PCs de la red). Corre con **imágenes ya construidas** y con versión
+(`fst-api`, `fst-worker`, `fst-web`): `portable\empaquetar.ps1` las construye y las guarda en un `.tar` junto a un zip chico, y
+en la PC de destino `portable\iniciar.bat` (doble clic; ver [portable/LEEME.md](portable/LEEME.md)) las carga con
+`docker load` y prende todo con `docker compose ... up -d --no-build`, sin internet ni construir nada. El compose de
+desarrollo es otro: `backend-spring/docker-compose.yml`.
 
-**El pipeline de análisis de video todavía no está implementado.** El
-`worker` solo muestra en su log que ahí irá; los videos subidos quedan en cola.
-Lo que el pipeline debe escribir está descrito en `backend/worker/worker.py`,
-y el esquema de la base de datos en `db_schema.puml`.
+El análisis de video lo hace el `worker` (`worker/`) con el pipeline de `pipeline/`; el esquema de la base de
+datos está en `backend-spring/db/init/001_esquema.sql` y su diagrama en `db_schema.puml`.
+
+## Cómo se decide la conducta
+
+La red (`pipeline/cnn/fst_cnn.py:66`) clasifica cada segundo en 3 conductas: nado, inmovilidad y escalamiento. «Conducta activa» no es una salida de la red: es una regla. Si la conducta más probable de la red no llega al umbral de 0.80, pero nado + escalamiento sí, el segundo queda como conducta activa (`pipeline/segundos.py:54-66`; `pipeline/cnn/probar_seg.py:86`). «No se ve» se guarda como segundo sin conducta (NULL); en los resultados y en los reportes CSV/XLSX aparece como «sin ver», una quinta columna, para que todo sume el 100 % y los 60 s de cada minuto.
 
 Manual completo: [MANUAL.md](MANUAL.md).

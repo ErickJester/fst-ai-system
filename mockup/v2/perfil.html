@@ -21,7 +21,7 @@
         <div class="k">Datos de la cuenta</div>
         <div class="field"><label for="pNombre">Nombre</label><input class="input" id="pNombre" value="Mariana"></div>
         <div class="field"><label for="pApe">Apellidos</label><input class="input" id="pApe" value="Rivera Alcántara"></div>
-        <div class="field"><label for="pCorreo">Correo institucional</label><input class="input num" id="pCorreo" type="email" value="mrivera@ipn.mx"></div>
+        <div class="field"><label for="pCorreo">Correo electrónico</label><input class="input num" id="pCorreo" type="email" value="mrivera@ipn.mx"></div>
         <div class="field"><label for="pId">Identificador institucional · solo lectura</label><input class="input num" id="pId" value="2019630871" readonly style="background:var(--color-surface);color:color-mix(in srgb,var(--color-text) 60%,transparent)"></div>
         <div class="field-error hidden" id="dErr" style="margin:0"></div>
         <button type="submit" class="btn btn-primary" id="btnDatos" disabled style="align-self:flex-start;justify-content:flex-start">Guardar cambios</button>
@@ -55,7 +55,7 @@
     e.preventDefault();
     if (!$('pNombre').value.trim()) return fail('dErr', datos, 'pNombre', 'Escribe el nombre.');
     if (!$('pApe').value.trim()) return fail('dErr', datos, 'pApe', 'Escribe los apellidos.');
-    if (!/^[^\s@]+@ipn\.mx$/i.test($('pCorreo').value.trim())) return fail('dErr', datos, 'pCorreo', 'El correo debe ser institucional (@ipn.mx).');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('pCorreo').value.trim())) return fail('dErr', datos, 'pCorreo', 'Escribe un correo válido.');
     fail('dErr', datos, null, '');
     original = datos.map(i => $(i).value);
     $('btnDatos').disabled = true;

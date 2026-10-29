@@ -57,7 +57,7 @@
           <div>
             <div style="display:flex;align-items:flex-end;gap:16px">
               <div class="field" style="width:120px"><label for="tanda">Tanda</label><input class="input num" id="tanda" maxlength="1" style="font-family:var(--font-heading);font-weight:800;font-size:16px;text-transform:uppercase"></div>
-              <div class="field"><label>Cilindros en el cuadro</label><span class="seg" id="cil" style="display:inline-flex"><span class="seg-opt" data-v="3">3</span><span class="seg-opt on" data-v="4">4</span></span></div>
+              <div class="field"><label>Cilindros en el cuadro</label><span class="seg" id="cil" style="display:inline-flex"><span class="seg-opt" data-v="2">2</span><span class="seg-opt" data-v="3">3</span><span class="seg-opt on" data-v="4">4</span></span></div>
               <p style="margin:0 0 10px;font-size:12px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
             </div>
             <div id="confirmBox" class="hidden" style="margin-top:14px;border:2px solid var(--color-accent);padding:14px 16px">
@@ -90,11 +90,11 @@
             <div class="k" style="margin-bottom:8px">Archivo de video</div>
             <div class="drop" id="drop">
               <div style="flex:1">
-                <div class="nd" id="dropTitle" style="font-size:15px">Suelta aquí el archivo .mp4</div>
+                <div class="nd" id="dropTitle" style="font-size:15px">Suelta aquí el archivo .mp4 o .mov</div>
                 <div style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">Un solo archivo por tanda y sesión. Se valida el formato y que el video se pueda reproducir.</div>
               </div>
               <button type="button" class="btn btn-secondary" id="btnFile" style="justify-content:flex-start">Elegir archivo</button>
-              <input type="file" id="file" accept="video/mp4,.mp4" class="hidden">
+              <input type="file" id="file" accept="video/mp4,video/quicktime,.mp4,.mov" class="hidden">
             </div>
             <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:18px">
               <button type="button" class="btn btn-primary" id="btnSave" disabled style="justify-content:flex-start">Guardar y encolar análisis</button>
@@ -239,7 +239,7 @@
 
   function clearFile() {
     st.archivo = null; $('file').value = '';
-    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4 o .mov';
     $('cardRechazo').classList.add('hidden');
     update();
   }
@@ -251,12 +251,12 @@
     $('rechazoTanda').textContent = t ? 'La tanda ' + t + ' no avanza.' : '';
     $('cardRechazo').classList.remove('hidden');
     $('cardOk').classList.add('hidden');
-    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4 o .mov';
     update();
   }
   function takeFile(f) {
     $('cardRechazo').classList.add('hidden');
-    if (!/\.mp4$/i.test(f.name)) return reject('El archivo no es .mp4', f.name + ' · solo se aceptan archivos .mp4 (RF-08).');
+    if (!/\.(mp4|mov)$/i.test(f.name)) return reject('El archivo no es .mp4 ni .mov', f.name + ' · solo se aceptan archivos .mp4 o .mov (RF-08).');
     const v = document.createElement('video');
     const url = URL.createObjectURL(f);
     v.preload = 'metadata';
@@ -284,7 +284,7 @@
     $('cardOk').classList.remove('hidden');
     if (st.grupo && !st.grupo.cargadas.includes(t)) st.grupo.cargadas.push(t);
     st.archivo = null; $('file').value = '';
-    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4';
+    $('dropTitle').textContent = 'Suelta aquí el archivo .mp4 o .mov';
     update();
   };
 </script>
