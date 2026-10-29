@@ -145,7 +145,7 @@ CREATE TABLE segundo (
   idobservacion  integer        NOT NULL
     REFERENCES observacion (idobservacion) ON UPDATE NO ACTION ON DELETE NO ACTION,
   segundo        smallint       NOT NULL CHECK (segundo BETWEEN 1 AND 300),
-  conducta       tipo_conducta,                           -- nula = no decidio o "no se ve"
+  conducta       tipo_conducta,                           -- nula = no se vio al animal (maquina) o la revision la marco como no visible
   origen         origen_segundo NOT NULL DEFAULT 'maquina',
   PRIMARY KEY (idobservacion, segundo)
 );

@@ -21,4 +21,8 @@ desarrollo es otro: `backend-spring/docker-compose.yml`.
 El análisis de video lo hace el `worker` (`worker/`) con el pipeline de `pipeline/`; el esquema de la base de
 datos está en `backend-spring/db/init/001_esquema.sql` y su diagrama en `db_schema.puml`.
 
+## Cómo se decide la conducta
+
+La red (`pipeline/cnn/fst_cnn.py:66`) clasifica cada segundo en 3 conductas: nado, inmovilidad y escalamiento. «Conducta activa» no es una salida de la red: es una regla. Si la conducta más probable de la red no llega al umbral de 0.80, pero nado + escalamiento sí, el segundo queda como conducta activa (`pipeline/segundos.py:54-66`; `pipeline/cnn/probar_seg.py:86`). «No se ve» se guarda como segundo sin conducta (NULL); en los resultados y en los reportes CSV/XLSX aparece como «sin ver», una quinta columna, para que todo sume el 100 % y los 60 s de cada minuto.
+
 Manual completo: [MANUAL.md](MANUAL.md).

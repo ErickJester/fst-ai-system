@@ -24,7 +24,8 @@ import lombok.ToString;
 
 // Tabla analisis: uno por video del Día 2 (idvideo es UNIQUE). Es también la cola del worker: el worker
 // toma el análisis 'en cola' más antiguo. El backend solo escribe estado, etapa y nivelClasif al encolar,
-// al reiniciar y en la pausa (sección 4.7 de la guía); todo lo demás lo escribe el worker.
+// al reiniciar y en la pausa (sección 4.7 de la guía), y nivelClasif también al corregir segundos en la
+// revisión; todo lo demás lo escribe el worker.
 @Data
 @NoArgsConstructor
 @Entity

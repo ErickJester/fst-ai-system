@@ -273,8 +273,8 @@ public class RevisionServiceImpl implements RevisionService {
 
 		List<Cambio> cambios = validar(cuerpo, a);
 
-		// Todo o nada: si algo falla después de empezar, la transacción deshace lo escrito. Solo se toca SEGUNDO:
-		// el estado, la etapa y el nivel del análisis los escribe el worker, no el backend (4.7).
+		// Todo o nada: si algo falla después de empezar, la transacción deshace lo escrito. Se toca SEGUNDO y, al final,
+		// el nivel del análisis (abajo): el estado y la etapa los escribe el worker, no el backend (4.7).
 		for (Cambio c : cambios) {
 			int filas = jdbc.update("UPDATE segundo SET conducta = ?, origen = ? WHERE idobservacion = ? AND segundo = ?",
 					c.conducta(), c.origen(), c.idObservacion(), c.segundo());
@@ -282,6 +282,14 @@ public class RevisionServiceImpl implements RevisionService {
 				throw malaPeticion("El segundo " + c.segundo() + " no existe en este análisis.");
 			}
 		}
+		// El nivel sigue a los segundos: 'agrupado' si queda alguno como «conducta activa» (del worker o de la revisión) y
+		// 'preciso' si no. Lo fijó el worker al completar; una corrección puede quitar o poner esas conductas.
+		jdbc.update("""
+				UPDATE analisis SET nivelclasif = (CASE WHEN EXISTS (
+				    SELECT 1 FROM segundo s JOIN observacion o ON o.idobservacion = s.idobservacion
+				    WHERE o.idvideo = ? AND s.conducta = 'conducta activa') THEN 'agrupado' ELSE 'preciso' END)::nivel_clasif_analisis
+				WHERE idanalisis = ?
+				""", a.idVideo(), idAnalisis);
 		// Las correcciones cambian los resultados: el reporte guardado (filas y carpeta reportes/{id}/) ya no los refleja.
 		// Se regenera en la próxima descarga del PDF.
 		reportes.invalidar(idExperimento);

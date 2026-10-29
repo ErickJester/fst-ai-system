@@ -544,7 +544,7 @@ describe('comparación entre grupos calculada', () => {
   it('cada espécimen trae las cuatro conductas; con conducta activa el nivel es agrupado (R-12)', async () => {
     const r = await getBatchResults('7', '2', 'B')
     expect(r.nivel).toBe('AGRUPADO')
-    expect(r.especimenes[0]).toEqual({ numeroCilindro: 1, nado_s: 40, inmovilidad_s: 83, escalamiento_s: 12, activa_s: 165 })
+    expect(r.especimenes[0]).toEqual({ numeroCilindro: 1, nado_s: 40, inmovilidad_s: 83, escalamiento_s: 12, activa_s: 165, sin_ver_s: 0 })
     const preciso = await getBatchResults('7', '1', 'A')
     expect(preciso.nivel).toBe('PRECISO')
     expect(preciso.especimenes.every((e) => e.activa_s === 0)).toBe(true)

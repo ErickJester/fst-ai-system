@@ -88,10 +88,14 @@ function pedir(clave, ruta) {
 const deLaTanda = (g, letra) => (e) =>
   (e.idGrupo != null ? String(e.idGrupo) === String(g.id) : e.tanda === g.nombre + ' · ' + letra) && (e.ordinal == null || e.ordinal === ordinalDeLetra(letra))
 
-const segundosPorConducta = (totales) => Object.fromEntries(CONDUCTAS.map((c) => [c + '_s', totales?.[CONDUCTA.aGuia[c]]?.segundos ?? 0]))
+// «sin ver» (los segundos con conducta NULL) viene como quinta clave de los totales; sin backend o en un backend anterior no está (0).
+const segundosPorConducta = (totales) => ({
+  ...Object.fromEntries(CONDUCTAS.map((c) => [c + '_s', totales?.[CONDUCTA.aGuia[c]]?.segundos ?? 0])),
+  sin_ver_s: totales?.['sin ver']?.segundos ?? 0,
+})
 
 // Un minuto de /results/byminute → tramos [conducta, segundos] (forma de las pantallas).
-const tramosDe = (m) => CONDUCTAS.filter((c) => m[CONDUCTA.aGuia[c]] > 0).map((c) => [c, m[CONDUCTA.aGuia[c]]])
+const tramosDe = (m) => [...CONDUCTAS.filter((c) => m[CONDUCTA.aGuia[c]] > 0).map((c) => [c, m[CONDUCTA.aGuia[c]]]), ...(m['sin ver'] > 0 ? [['sin_ver', m['sin ver']]] : [])]
 
 // Resultados de una tanda (2f): por espécimen (s), desglose por minuto, nivel, si se revisó, y
 // lo que la revisión necesita (id_analisis, subido_por, video_disponible). Junta el detalle,

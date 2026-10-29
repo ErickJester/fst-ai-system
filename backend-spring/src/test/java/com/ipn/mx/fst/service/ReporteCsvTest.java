@@ -15,15 +15,15 @@ import org.junit.jupiter.api.Test;
 // Encargo 39: el CSV (D-99) armado desde una TablaDeReporte, sin base de datos.
 class ReporteCsvTest {
 
-	private static final String ENCABEZADO = "Grupo,Tanda,Espécimen,Tiempo (min:seg),Nado,Escalamiento,Inmovilidad,Conducta activa";
+	private static final String ENCABEZADO = "Grupo,Tanda,Espécimen,Tiempo (min:seg),Nado,Escalamiento,Inmovilidad,Conducta activa,Sin ver";
 
 	static TablaDeReporte tabla(String grupo, boolean mixto, List<Revisado> revisados) {
 		return new TablaDeReporte(grupo,
-				List.of(new FilaDeReporte("A", 1, 1, List.of(10L, 20L, 30L, 0L)),
-						new FilaDeReporte("A", 1, 2, List.of(5L, 0L, 40L, 1L)),
-						new FilaDeReporte("B", 2, 1, List.of(0L, 0L, 60L, 0L))),
+				List.of(new FilaDeReporte("A", 1, 1, List.of(10L, 20L, 30L, 0L, 0L)),
+						new FilaDeReporte("A", 1, 2, List.of(5L, 0L, 40L, 1L, 14L)),
+						new FilaDeReporte("B", 2, 1, List.of(0L, 0L, 60L, 0L, 0L))),
 				List.of(new Estadistico(35.5, 7.1, 50.0), new Estadistico(0.0, 0.0, 0.0), new Estadistico(12.3, 3.0, 9.0),
-						new Estadistico(0.5, 0.7, 0.5)),
+						new Estadistico(0.5, 0.7, 0.5), new Estadistico(4.7, 8.1, 65.3)),
 				mixto, revisados);
 	}
 
@@ -52,19 +52,27 @@ class ReporteCsvTest {
 	}
 
 	@Test
+	void sin_ver_es_la_ultima_columna_despues_de_conducta_activa() {
+		List<String> lineas = lineas(ReporteCsv.armar(tabla("Control", false, List.of())));
+		assertTrue(lineas.get(0).endsWith("Conducta activa,Sin ver"));
+		assertTrue(lineas.get(2).endsWith(",14"));
+		assertTrue(lineas.get(6).endsWith(",65.3"));
+	}
+
+	@Test
 	void una_fila_por_especimen_y_minuto_con_segundos_enteros() {
 		List<String> lineas = lineas(ReporteCsv.armar(tabla("Control", false, List.of())));
-		assertEquals("Control,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas.get(1));
-		assertEquals("Control,A,Espécimen 1,1:00-2:00,5,0,40,1", lineas.get(2));
-		assertEquals("Control,B,Espécimen 2,0:00-1:00,0,0,60,0", lineas.get(3));
+		assertEquals("Control,A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas.get(1));
+		assertEquals("Control,A,Espécimen 1,1:00-2:00,5,0,40,1,14", lineas.get(2));
+		assertEquals("Control,B,Espécimen 2,0:00-1:00,0,0,60,0,0", lineas.get(3));
 	}
 
 	@Test
 	void despues_de_las_filas_van_media_desviacion_y_varianza_con_un_decimal_y_punto() {
 		List<String> lineas = lineas(ReporteCsv.armar(tabla("Control", false, List.of())));
-		assertEquals(",,Media,,35.5,0.0,12.3,0.5", lineas.get(4));
-		assertEquals(",,Desviación estándar,,7.1,0.0,3.0,0.7", lineas.get(5));
-		assertEquals(",,Varianza,,50.0,0.0,9.0,0.5", lineas.get(6));
+		assertEquals(",,Media,,35.5,0.0,12.3,0.5,4.7", lineas.get(4));
+		assertEquals(",,Desviación estándar,,7.1,0.0,3.0,0.7,8.1", lineas.get(5));
+		assertEquals(",,Varianza,,50.0,0.0,9.0,0.5,65.3", lineas.get(6));
 	}
 
 	@Test
@@ -97,7 +105,7 @@ class ReporteCsvTest {
 		assertEquals("\"dos\nlineas\"", ReporteCsv.celda("dos\nlineas"));
 
 		List<String> lineas = lineas(ReporteCsv.armar(tabla("Grupo, \"uno\"", false, List.of())));
-		assertEquals("\"Grupo, \"\"uno\"\"\",A,Espécimen 1,0:00-1:00,10,20,30,0", lineas.get(1));
+		assertEquals("\"Grupo, \"\"uno\"\"\",A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas.get(1));
 	}
 
 	// ----------------------------------------------------------------- fórmulas (encargo 40)
@@ -112,8 +120,8 @@ class ReporteCsvTest {
 		// El retorno obliga además a las comillas de RFC 4180.
 		assertEquals("\"'\rx\"", ReporteCsv.texto("\rx"));
 
-		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("=Control", false, List.of()))).get(1));
-		assertEquals("'@SUMA,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("@SUMA", false, List.of()))).get(1));
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas(ReporteCsv.armar(tabla("=Control", false, List.of()))).get(1));
+		assertEquals("'@SUMA,A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas(ReporteCsv.armar(tabla("@SUMA", false, List.of()))).get(1));
 	}
 
 	@Test
@@ -122,23 +130,23 @@ class ReporteCsvTest {
 		assertEquals("a=b", ReporteCsv.texto("a=b"));
 		assertEquals("x+y-z@w", ReporteCsv.texto("x+y-z@w"));
 		assertEquals("", ReporteCsv.texto(""));
-		assertEquals("a=b,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("a=b", false, List.of()))).get(1));
+		assertEquals("a=b,A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas(ReporteCsv.armar(tabla("a=b", false, List.of()))).get(1));
 	}
 
 	@Test
 	void el_apostrofo_va_antes_de_las_comillas() {
 		assertEquals("\"'=A,1\"", ReporteCsv.texto("=A,1"));
 		assertEquals("\"'=\"\"x\"\",1\"", ReporteCsv.texto("=\"x\",1"));
-		assertEquals("\"'=A,1\",A,Espécimen 1,0:00-1:00,10,20,30,0", lineas(ReporteCsv.armar(tabla("=A,1", false, List.of()))).get(1));
+		assertEquals("\"'=A,1\",A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas(ReporteCsv.armar(tabla("=A,1", false, List.of()))).get(1));
 	}
 
 	@Test
 	void los_numeros_nunca_llevan_apostrofo() {
 		List<String> lineas = lineas(ReporteCsv.armar(tabla("=Control", true, List.of(new Revisado("A", 2)))));
 		// Segundos y estadísticos sin apóstrofo, y las etiquetas de la columna Espécimen (texto) intactas porque no empiezan así.
-		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0", lineas.get(1));
-		assertEquals(",,Media,,35.5,0.0,12.3,0.5", lineas.get(4));
-		assertEquals(",,Varianza,,50.0,0.0,9.0,0.5", lineas.get(6));
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,10,20,30,0,0", lineas.get(1));
+		assertEquals(",,Media,,35.5,0.0,12.3,0.5,4.7", lineas.get(4));
+		assertEquals(",,Varianza,,50.0,0.0,9.0,0.5,65.3", lineas.get(6));
 		for (int i = 1; i <= 6; i++) {
 			String[] celdas = lineas.get(i).split(",");
 			for (int c = 4; c < celdas.length; c++) {

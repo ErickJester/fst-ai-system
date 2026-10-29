@@ -15,8 +15,8 @@ import java.util.Map;
 //    (nado, escalamiento o la propia "conducta activa") o dos activas entre sí;
 //  - si ningún segundo se vio, "conducta activa";
 //  - matiz = true cuando algún segundo del bloque no se vio (también si ninguno se vio).
-// "Conducta activa" en un segundo (el nivel agrupado del clasificador) cuenta como una conducta más: no se suma a nado ni a
-// escalamiento.
+// "Conducta activa" en un segundo (el nivel agrupado: sale de la regla de 0.80 o de la revisión humana) cuenta como una conducta
+// más: no se suma a nado ni a escalamiento.
 final class BloquesDeCinco {
 
 	static final int SEGUNDOS_POR_BLOQUE = 5;

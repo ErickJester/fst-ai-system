@@ -272,6 +272,9 @@ describe('resultados', () => {
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
+    // «Sin ver» va aparte, al final, en los totales y en el desglose por minuto, con su explicación.
+    expect(screen.getAllByRole('columnheader', { name: 'Sin ver' }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(/los segundos en los que no se vio al animal o que la revisión marcó como no visibles/)).toBeTruthy()
   })
 
   it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {

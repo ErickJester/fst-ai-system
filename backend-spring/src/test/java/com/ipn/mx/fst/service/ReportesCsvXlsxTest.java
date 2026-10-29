@@ -57,7 +57,7 @@ class ReportesCsvXlsxTest {
 	private static final String E = "escalamiento";
 	private static final Path RAIZ = Path.of(System.getProperty("java.io.tmpdir"), "fst-pruebas-reportes");
 
-	private static final String ENCABEZADO = "Grupo,Tanda,Espécimen,Tiempo (min:seg),Nado,Escalamiento,Inmovilidad,Conducta activa";
+	private static final String ENCABEZADO = "Grupo,Tanda,Espécimen,Tiempo (min:seg),Nado,Escalamiento,Inmovilidad,Conducta activa,Sin ver";
 
 	@Autowired
 	private MockMvc mvc;
@@ -121,13 +121,13 @@ class ReportesCsvXlsxTest {
 		List<String> lineas = lineas(cuerpo);
 		assertEquals(ENCABEZADO, lineas.get(0));
 		// N, escalamiento, inmovilidad, conducta activa; un minuto cada espécimen (duran menos de 60 s).
-		assertEquals("Control,A,Espécimen 1,0:00-1:00,5,2,4,0", lineas.get(1));
-		assertEquals("Control,A,Espécimen 2,0:00-1:00,0,0,5,0", lineas.get(2));
-		assertEquals("Control,B,Espécimen 1,0:00-1:00,4,0,0,0", lineas.get(3));
+		assertEquals("Control,A,Espécimen 1,0:00-1:00,5,2,4,0,1", lineas.get(1));
+		assertEquals("Control,A,Espécimen 2,0:00-1:00,0,0,5,0,0", lineas.get(2));
+		assertEquals("Control,B,Espécimen 1,0:00-1:00,4,0,0,0,0", lineas.get(3));
 		// Totales por espécimen: nado 5, 0, 4; escalamiento 2, 0, 0; inmovilidad 4, 5, 0; conducta activa 0, 0, 0.
-		assertEquals(",,Media,,3.0,0.7,3.0,0.0", lineas.get(4));
-		assertEquals(",,Desviación estándar,,2.6,1.2,2.6,0.0", lineas.get(5));
-		assertEquals(",,Varianza,,7.0,1.3,7.0,0.0", lineas.get(6));
+		assertEquals(",,Media,,3.0,0.7,3.0,0.0,0.3", lineas.get(4));
+		assertEquals(",,Desviación estándar,,2.6,1.2,2.6,0.0,0.6", lineas.get(5));
+		assertEquals(",,Varianza,,7.0,1.3,7.0,0.0,0.3", lineas.get(6));
 		assertEquals(",,Revisión humana,No", lineas.get(7));
 		assertEquals(9, lineas.size());      // y el vacío que queda tras el último \r\n
 	}
@@ -141,11 +141,11 @@ class ReportesCsvXlsxTest {
 				.andReturn();
 
 		List<String> lineas = lineas(r.getResponse().getContentAsByteArray());
-		assertEquals("Control,B,Espécimen 1,0:00-1:00,4,0,0,0", lineas.get(1));
+		assertEquals("Control,B,Espécimen 1,0:00-1:00,4,0,0,0,0", lineas.get(1));
 		// Un solo espécimen: la desviación y la varianza son 0.
-		assertEquals(",,Media,,4.0,0.0,0.0,0.0", lineas.get(2));
-		assertEquals(",,Desviación estándar,,0.0,0.0,0.0,0.0", lineas.get(3));
-		assertEquals(",,Varianza,,0.0,0.0,0.0,0.0", lineas.get(4));
+		assertEquals(",,Media,,4.0,0.0,0.0,0.0,0.0", lineas.get(2));
+		assertEquals(",,Desviación estándar,,0.0,0.0,0.0,0.0,0.0", lineas.get(3));
+		assertEquals(",,Varianza,,0.0,0.0,0.0,0.0,0.0", lineas.get(4));
 		assertEquals(",,Revisión humana,No", lineas.get(5));
 		assertEquals(7, lineas.size());
 	}
@@ -165,8 +165,8 @@ class ReportesCsvXlsxTest {
 
 		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
-		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,5,2,4,0", lineas.get(1));
-		assertEquals(",,Media,,3.0,0.7,3.0,0.0", lineas.get(4));
+		assertEquals("'=Control,A,Espécimen 1,0:00-1:00,5,2,4,0,1", lineas.get(1));
+		assertEquals(",,Media,,3.0,0.7,3.0,0.0,0.3", lineas.get(4));
 
 		// El XLSX guarda el nombre tal cual, como texto y no como fórmula.
 		byte[] xlsx = mvc.perform(get(ruta("xlsx", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
@@ -292,7 +292,7 @@ class ReportesCsvXlsxTest {
 
 		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
-		assertEquals("Control,A,Espécimen 1,0:00-1:00,6,2,4,0", lineas.get(1));
+		assertEquals("Control,A,Espécimen 1,0:00-1:00,6,2,4,0,0", lineas.get(1));
 		assertEquals(",,Revisión humana,Sí: Tanda A · Espécimen 1", lineas.get(7));
 		assertEquals(1, filasDeReporte());
 

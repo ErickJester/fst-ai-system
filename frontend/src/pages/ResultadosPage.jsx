@@ -28,8 +28,12 @@ const CONDUCTAS = [
   { id: 'activa', label: 'Conducta activa', color: ACTIVA, nota: 'El espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.' },
 ]
 const KEYS = CONDUCTAS.map((c) => c.id)
-const CMAP = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.color]))
-const LBL = Object.fromEntries(CONDUCTAS.map((c) => [c.id, c.label]))
+// «Sin ver»: los segundos sin conducta (no se vio al animal o la revisión los marcó como no visibles). No es una conducta: va
+// aparte, discreta, al final de los totales y de cada minuto; con las cuatro suma el total de segundos.
+const SIN_VER = { id: 'sin_ver', label: 'Sin ver', color: 'var(--color-divider)' }
+const TODAS = [...KEYS, SIN_VER.id]
+const CMAP = Object.fromEntries([...CONDUCTAS, SIN_VER].map((c) => [c.id, c.color]))
+const LBL = Object.fromEntries([...CONDUCTAS, SIN_VER].map((c) => [c.id, c.label]))
 
 // El espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
 const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
@@ -213,7 +217,7 @@ function ResultadosTanda({ clave, gid, letra }) {
   // Los especímenes que se ven, cada uno con su tanda; los estadísticos (RF-31) se calculan
   // sobre ellos: los de la tanda o los del grupo completo.
   const especimenes = rs.flatMap((x) => x.especimenes.map((e) => ({ ...e, letra: x.letra })))
-  const col = (k) => especimenes.map((e) => e[k + '_s'])
+  const col = (k) => especimenes.map((e) => e[k + '_s'] ?? 0)
   const stats = estadisticos(r.duracion_s)
   const completadas = g.tandas.filter((t) => t.estado === 'DONE')
   const faltan = g.tandas.filter((t) => t.estado !== 'DONE')
@@ -375,6 +379,7 @@ function ResultadosTanda({ clave, gid, letra }) {
                 <tr>
                   <th style={{ width: '27%' }}>Espécimen</th>
                   {conductas.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
+                  <th style={{ textAlign: 'right', fontWeight: 400, color: MUT }}>{SIN_VER.label}</th>
                   <th style={{ width: '30%' }}>Distribución</th>
                 </tr>
               </thead>
@@ -387,14 +392,14 @@ function ResultadosTanda({ clave, gid, letra }) {
                         <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{etiqueta(e, e.letra)}</span>
                       </div>
                     </td>
-                    {KEYS.map((k) => (
-                      <td key={k} className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        {fmt(e[k + '_s'])} <span style={{ fontSize: 11, color: MUT }}>{Math.round((e[k + '_s'] / r.duracion_s) * 100)} %</span>
+                    {TODAS.map((k) => (
+                      <td key={k} className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap', ...(k === SIN_VER.id && { color: MUT }) }}>
+                        {fmt(e[k + '_s'] ?? 0)} <span style={{ fontSize: 11, color: MUT }}>{Math.round(((e[k + '_s'] ?? 0) / r.duracion_s) * 100)} %</span>
                       </td>
                     ))}
                     <td>
                       <div style={{ display: 'flex', height: 16, border: '1px solid var(--color-divider)' }}>
-                        {KEYS.map((k) => <div key={k} title={LBL[k]} style={{ background: CMAP[k], width: (e[k + '_s'] / r.duracion_s) * 100 + '%' }} />)}
+                        {TODAS.map((k) => <div key={k} title={LBL[k]} style={{ background: CMAP[k], width: ((e[k + '_s'] ?? 0) / r.duracion_s) * 100 + '%' }} />)}
                       </div>
                     </td>
                   </tr>
@@ -402,7 +407,7 @@ function ResultadosTanda({ clave, gid, letra }) {
                 {stats.map((s) => (
                   <tr key={s.nombre} style={{ background: 'var(--color-surface)' }}>
                     <td className="k" style={{ color: MUT70 }}>{s.nombre}</td>
-                    {KEYS.map((k) => <td key={k} className="num nd" style={{ textAlign: 'right' }}>{s.f(col(k))}</td>)}
+                    {TODAS.map((k) => <td key={k} className="num nd" style={{ textAlign: 'right', ...(k === SIN_VER.id && { color: MUT }) }}>{s.f(col(k))}</td>)}
                     <td style={{ fontSize: 11.5, color: MUT }}>{s.nota}</td>
                   </tr>
                 ))}
@@ -411,7 +416,7 @@ function ResultadosTanda({ clave, gid, letra }) {
             </div>
 
             <p className="hint" style={{ margin: '14px 0 0' }}>
-              Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+              Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. <strong>Sin ver</strong> son los segundos en los que no se vio al animal o que la revisión marcó como no visibles: no cuentan en ninguna conducta, y con las cuatro suman el total de segundos. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
             </p>
 
             <div ref={refs.timeline} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '26px 0 12px' }}>
@@ -434,12 +439,12 @@ function ResultadosTanda({ clave, gid, letra }) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="table" style={{ marginTop: 10, fontSize: 12 }}>
-                <thead><tr><th>Minuto</th>{CONDUCTAS.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}</tr></thead>
+                <thead><tr><th>Minuto</th>{CONDUCTAS.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}<th style={{ textAlign: 'right', fontWeight: 400, color: MUT }}>{SIN_VER.label}</th></tr></thead>
                 <tbody>
                   {linea.minutos.map((segs, i) => (
                     <tr key={i}>
                       <td className="num">{fmt(i * 60)}–{fmt(i * 60 + 60)}</td>
-                      {KEYS.map((k) => <td key={k} className="num" style={{ textAlign: 'right' }}>{enMinuto(segs, k)} s</td>)}
+                      {TODAS.map((k) => <td key={k} className="num" style={{ textAlign: 'right', ...(k === SIN_VER.id && { color: MUT }) }}>{enMinuto(segs, k)} s</td>)}
                     </tr>
                   ))}
                 </tbody>

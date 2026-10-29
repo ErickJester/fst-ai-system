@@ -65,6 +65,12 @@ class ReporteXlsxTest {
 			assertEquals(CellType.NUMERIC, hoja.getRow(6).getCell(4).getCellType());
 			assertEquals(50.0, hoja.getRow(6).getCell(4).getNumericCellValue());
 			assertEquals(0.5, hoja.getRow(6).getCell(7).getNumericCellValue());
+			// «Sin ver», la quinta columna de segundos, con sus segundos y su media, DE y varianza.
+			assertEquals("Sin ver", hoja.getRow(0).getCell(8).getStringCellValue());
+			assertEquals(14.0, hoja.getRow(2).getCell(8).getNumericCellValue());
+			assertEquals(4.7, hoja.getRow(4).getCell(8).getNumericCellValue());
+			assertEquals(8.1, hoja.getRow(5).getCell(8).getNumericCellValue());
+			assertEquals(65.3, hoja.getRow(6).getCell(8).getNumericCellValue());
 			for (int fila = 4; fila <= 6; fila++) {
 				assertEquals(FillPatternType.SOLID_FOREGROUND, hoja.getRow(fila).getCell(4).getCellStyle().getFillPattern());
 			}

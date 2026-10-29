@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,10 @@ public class ResultadosServiceImpl implements ResultadosService {
 
 	// Las cuatro conductas, con su nombre de la base y en este orden en todas las respuestas.
 	private static final List<String> CONDUCTAS = Arrays.stream(TipoConducta.values()).map(TipoConducta::valor).toList();
+
+	// Las cuatro conductas más «sin ver», que son los segundos con conducta NULL (no se vio al animal o la revisión los marcó como
+	// no visibles). Se agregan al final de totales y minutos para que las cinco sumen el 100 % y los 60 s.
+	private static final List<String> CONDUCTAS_Y_SIN_VER = Stream.concat(CONDUCTAS.stream(), Stream.of(TablaDeReporte.SIN_VER)).toList();
 
 	// Raíz del volumen videos_reportes: de ahí salen pausa.json y los PDF de diagnóstico.
 	@Value("${app.archivos.raiz}")
@@ -78,8 +83,8 @@ public class ResultadosServiceImpl implements ResultadosService {
 			String nombreVideo, int minuto, String conducta, long segundos, boolean revisado) {
 	}
 
-	// Un espécimen con sus conteos ya sumados. filas incluye los segundos sin conducta (NULL): cuentan en el
-	// denominador del porcentaje pero en ninguna conducta.
+	// Un espécimen con sus conteos ya sumados. filas incluye los segundos sin conducta (NULL), que van bajo la clave
+	// «sin ver» en total y porMinuto: cuentan en el denominador del porcentaje y son la quinta columna.
 	private static class Espec {
 		int idGrupo;
 		String etiqueta;
@@ -400,11 +405,11 @@ public class ResultadosServiceImpl implements ResultadosService {
 		return datos;
 	}
 
-	// Las CUATRO conductas siempre: segundos y porcentaje (con un decimal) sobre todos los segundos del
-	// espécimen.
+	// Las CUATRO conductas y «sin ver» siempre: segundos y porcentaje (con un decimal) sobre todos los segundos del
+	// espécimen; las cinco suman el 100 %.
 	private Map<String, Object> totales(Espec e) {
 		Map<String, Object> totales = new LinkedHashMap<>();
-		for (String conducta : CONDUCTAS) {
+		for (String conducta : CONDUCTAS_Y_SIN_VER) {
 			long segundos = e.total.getOrDefault(conducta, 0L);
 			Map<String, Object> par = new LinkedHashMap<>();
 			par.put("segundos", segundos);
@@ -414,7 +419,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		return totales;
 	}
 
-	// minuto = ceil(segundo / 60), del 1 al último; las cuatro conductas siempre, con 0 si no hay.
+	// minuto = ceil(segundo / 60), del 1 al último; las cuatro conductas y «sin ver» siempre, con 0 si no hay.
 	private List<Map<String, Object>> minutos(Espec e) {
 		int ultimo = (int) Math.ceil(e.filas / 60.0);
 		List<Map<String, Object>> minutos = new ArrayList<>();
@@ -422,7 +427,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			Map<String, Long> delMinuto = e.porMinuto.getOrDefault(minuto, Map.of());
 			Map<String, Object> fila = new LinkedHashMap<>();
 			fila.put("minuto", minuto);
-			for (String conducta : CONDUCTAS) {
+			for (String conducta : CONDUCTAS_Y_SIN_VER) {
 				fila.put(conducta, delMinuto.getOrDefault(conducta, 0L));
 			}
 			minutos.add(fila);
@@ -473,8 +478,9 @@ public class ResultadosServiceImpl implements ResultadosService {
 			});
 			e.filas += f.segundos();
 			e.revisado |= f.revisado();
-			e.total.merge(f.conducta(), f.segundos(), Long::sum);
-			e.porMinuto.computeIfAbsent(f.minuto(), k -> new HashMap<>()).merge(f.conducta(), f.segundos(), Long::sum);
+			String clave = f.conducta() == null ? TablaDeReporte.SIN_VER : f.conducta();
+			e.total.merge(clave, f.segundos(), Long::sum);
+			e.porMinuto.computeIfAbsent(f.minuto(), k -> new HashMap<>()).merge(clave, f.segundos(), Long::sum);
 		}
 		return new ArrayList<>(porEspecimen.values());
 	}
@@ -684,7 +690,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 			int ultimo = (int) Math.ceil(e.filas / 60.0);
 			for (int minuto = 1; minuto <= ultimo; minuto++) {
 				Map<String, Long> delMinuto = e.porMinuto.getOrDefault(minuto, Map.of());
-				List<Long> segundos = TablaDeReporte.CONDUCTAS.stream().map(c -> delMinuto.getOrDefault(c, 0L)).toList();
+				List<Long> segundos = TablaDeReporte.COLUMNAS.stream().map(c -> delMinuto.getOrDefault(c, 0L)).toList();
 				filas.add(new TablaDeReporte.FilaDeReporte(letra(e.ordinal), e.cilindro, minuto, segundos));
 			}
 			if (e.revisado) {
@@ -693,7 +699,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		}
 
 		List<TablaDeReporte.Estadistico> estadisticos = new ArrayList<>();
-		for (String conducta : TablaDeReporte.CONDUCTAS) {
+		for (String conducta : TablaDeReporte.COLUMNAS) {
 			List<Long> totales = totalesDe(especimenes, conducta);
 			estadisticos.add(new TablaDeReporte.Estadistico(Estadisticos.redondear(Estadisticos.media(totales)),
 					Estadisticos.redondear(Estadisticos.desviacion(totales)), Estadisticos.redondear(Estadisticos.varianza(totales))));

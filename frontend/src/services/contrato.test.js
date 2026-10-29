@@ -14,13 +14,13 @@ const DETALLE = {
       videos: [{ idVideo: 1, sesion: 'Dia 2', duracion: 300.0, videoDisponible: true, idAnalisis: 1, subidoPor: '2019630871' }] }] }],
 }
 const STATUS = { analisis: [{ idAnalisis: 1, tanda: 'Control · A', sesion: 'Dia 2', estado: 'completado', etapa: 'clasificacion', porcentaje: 100, pausa: null, diagnosticoDisponible: false, fechaAnalisis: '2026-10-02T10:00:00' }] }
-const totales = (n, i, e, a) => ({ 'nado activo': { segundos: n, porcentaje: n / 3 }, inmovilidad: { segundos: i, porcentaje: i / 3 }, escalamiento: { segundos: e, porcentaje: e / 3 }, 'conducta activa': { segundos: a, porcentaje: a / 3 } })
+const totales = (n, i, e, a, v = 0) => ({ 'nado activo': { segundos: n, porcentaje: n / 3 }, inmovilidad: { segundos: i, porcentaje: i / 3 }, escalamiento: { segundos: e, porcentaje: e / 3 }, 'conducta activa': { segundos: a, porcentaje: a / 3 }, 'sin ver': { segundos: v, porcentaje: v / 3 } })
 const RESULTADOS = { especimenes: [
   { tanda: 'Control · A', ordinal: 1, numeroCilindro: 2, nivelClasif: 'preciso', revisado: false, totales: totales(60, 180, 60, 0) },
-  { tanda: 'Control · A', ordinal: 1, numeroCilindro: 1, nivelClasif: 'preciso', revisado: true, totales: totales(100, 150, 50, 0) },
+  { tanda: 'Control · A', ordinal: 1, numeroCilindro: 1, nivelClasif: 'preciso', revisado: true, totales: totales(100, 150, 40, 0, 10) },
   { tanda: 'Otro · A', ordinal: 1, numeroCilindro: 1, nivelClasif: 'preciso', revisado: false, totales: totales(1, 1, 1, 0) },
 ] }
-const POR_MINUTO = { especimenes: RESULTADOS.especimenes.map((e) => ({ ...e, minutos: [1, 2, 3, 4, 5].map((minuto) => ({ minuto, 'nado activo': 20, inmovilidad: 40, escalamiento: 0, 'conducta activa': 0 })) })) }
+const POR_MINUTO = { especimenes: RESULTADOS.especimenes.map((e) => ({ ...e, minutos: [1, 2, 3, 4, 5].map((minuto) => ({ minuto, 'nado activo': 20, inmovilidad: 40, escalamiento: 0, 'conducta activa': 0, 'sin ver': minuto === 2 ? 15 : 0 })) })) }
 
 let api, auth, experiments, results, revision, notifications, groups
 const llamadas = []
@@ -101,11 +101,13 @@ describe('servicios contra un backend que responde como la guía', () => {
   it('resultados de una tanda: filtra por «etiqueta · letra» y ordena los especímenes', async () => {
     const r = await results.getBatchResults('7', '1', 'A')
     expect(r.especimenes).toEqual([
-      { numeroCilindro: 1, nado_s: 100, inmovilidad_s: 150, escalamiento_s: 50, activa_s: 0 },
-      { numeroCilindro: 2, nado_s: 60, inmovilidad_s: 180, escalamiento_s: 60, activa_s: 0 },
+      { numeroCilindro: 1, nado_s: 100, inmovilidad_s: 150, escalamiento_s: 40, activa_s: 0, sin_ver_s: 10 },
+      { numeroCilindro: 2, nado_s: 60, inmovilidad_s: 180, escalamiento_s: 60, activa_s: 0, sin_ver_s: 0 },
     ])
     expect(r).toMatchObject({ nivel: 'PRECISO', revisado: true, id_analisis: 1 })
     expect(r.lineas_tiempo[0].minutos[0]).toEqual([['nado', 20], ['inmovilidad', 40]])
+    // «sin ver» (la quinta clave del servidor) sale como un tramo más del minuto, solo si hay segundos.
+    expect(r.lineas_tiempo[0].minutos[1]).toEqual([['nado', 20], ['inmovilidad', 40], ['sin_ver', 15]])
   })
 
   it('revisión: completa lo que la guía no trae y pone el token del video', async () => {
