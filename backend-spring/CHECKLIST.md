@@ -303,8 +303,10 @@ terminar.
 
 **Lo que falta**
 - [ ] Revisión del encargo 49 (R49), cosas sin arreglar:
-  - [ ] El PDF y `GET /results/groups` siguen con 4 conductas, sin «sin ver».
-  - [ ] El % del frontend usa `r.duracion_s` y el backend `e.filas`, y el redondeo puede no sumar 100.
+  - [x] El PDF y `GET /results/groups` siguen con 4 conductas, sin «sin ver». Resuelto el 29-oct (v0.93.0): el PDF trae
+    «Sin ver»; la comparación entre grupos se queda con las 4 conductas por decisión del usuario.
+  - [x] El % del frontend usa `r.duracion_s` y el backend `e.filas`, y el redondeo puede no sumar 100. Resuelto el 29-oct
+    (v0.93.0): el % se calcula sobre los segundos guardados (300) y cada fila suma 100 % (restos mayores).
   - [ ] El UPDATE de `nivelclasif` al corregir no toma candado frente a un reinicio al mismo tiempo.
   - [ ] Al corregir se acepta conducta null con cualquier `origen`.
   - [ ] Pruebas: comentarios viejos, valores a mano en `ReporteCsvTest`, `SinVerYNivelTest` supone `MIN(idobservacion)`.
