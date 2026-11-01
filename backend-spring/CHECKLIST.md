@@ -333,3 +333,9 @@ terminar.
   Las dudas del documento sobre el sistema las resuelve este repositorio, con los programadores revisando el código.
 - [ ] Sin decidir: «No se encontraron los tubos en el video.» o «cilindros» (`frontend/src/lib/fst.js:175`) y si la interfaz
   llama a `POST /auth/logout` al cerrar sesión.
+- [x] 1-nov: documento LaTeX revisado contra el sistema hasta el capítulo 6 (caps. 1-6, diagramas de secuencia, casos de uso,
+  clases, arquitectura y esquema). Sin Flask, «dashboard», TT-II como futuro, D-xx en el texto ni versiones previas;
+  compila sin errores. El commit del repositorio del documento queda para cuando el usuario lo ordene.
+- [ ] Comentarios del código que ya no dicen lo que hace: `ExperimentoController.java:173-174` («Por ahora solo los que no
+  tienen grupos»; el borrado sí incluye grupos), `ExperimentoServiceImpl.java:471` («todavía no implementado»; ya está en
+  `VideoServiceImpl`) y `Notificacion.java:23` («Todavía no se usa»; el worker sí inserta).
