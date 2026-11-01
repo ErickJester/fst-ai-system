@@ -322,3 +322,14 @@ terminar.
   (587) suele venir bloqueado en VPS nuevas; el enlace del correo de recuperación debe apuntar al dominio público.
 - [ ] Limpieza: el `.gitignore` ignora `/tools/` aunque `tools/version.py` está en git (un archivo nuevo ahí necesita `-f`), y el
   archivo vacío `1.2` de la raíz (viene de `b4e84b8`).
+
+## 15. Estado del 1-nov-2026: el documento LaTeX es la prioridad
+- [x] Verificación de los cambios del documento a los 14 diagramas: 58 de 62 puntos aplicados y 4 a medias (#17, #22, #44, #69).
+  Las cinco correcciones se mandaron al documento: los dos textos de «Ya existe una cuenta…» en `guia_web/seq_crear_cuenta`, la
+  confirmación de la tanda que solo pide la interfaz, los campos de `pausa.json` en `guia_web/seq_pausa_y_ajuste`, el origen de
+  CSV/XLSX (vista) frente al PDF (experimento) en `seq_consulta_resultados` y D-21 por eventos en `MIGRACION-DIAGRAMAS.md`.
+- [x] La sesión se queda en 168 h (aprobado por el usuario); el diagrama `seq_logout` del documento se ajusta a eso.
+- [ ] El documento debe quedar limpio hasta el capítulo 6: describe el sistema final, sin arreglos futuros ni versiones previas.
+  Las dudas del documento sobre el sistema las resuelve este repositorio, con los programadores revisando el código.
+- [ ] Sin decidir: «No se encontraron los tubos en el video.» o «cilindros» (`frontend/src/lib/fst.js:175`) y si la interfaz
+  llama a `POST /auth/logout` al cerrar sesión.
