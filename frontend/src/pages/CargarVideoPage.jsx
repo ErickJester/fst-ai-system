@@ -229,8 +229,8 @@ export default function CargarVideoPage() {
             <div className="step">
               <span className="step-n num">1</span>
               <div>
-                <Campo id="grupo" label="Grupo o tratamiento">
-                  <input className="input" id="grupo" autoComplete="off" placeholder="Escribe el grupo o el tratamiento"
+                <Campo id="grupo" label="Nombre del grupo">
+                  <input className="input" id="grupo" autoComplete="off" placeholder="Escribe el nombre del grupo"
                     role="combobox" aria-autocomplete="list" aria-controls="sugGrupos" aria-expanded={sugOpen}
                     aria-activedescendant={sugOpen && activa >= 0 ? 'sug-' + activa : undefined}
                     style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
@@ -353,14 +353,14 @@ export default function CargarVideoPage() {
             <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)' }}>
               <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Grupo nuevo · el nombre no coincide</div>
               <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <Campo label="Grupo o tratamiento"><div className="input">{qt}</div></Campo>
+                <Campo label="Grupo"><div className="input">{qt}</div></Campo>
                 <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Sin coincidencias en este experimento. Completa los datos del grupo nuevo:</div>
                 <Campo label="Tipo">
                   <Seg
                     options={[{ v: 'CONTROL', label: 'control' }, { v: 'REFERENCIA', label: 'referencia' }, { v: 'EXPERIMENTAL', label: 'tratamiento exp.' }]}
                     value={tipo} onChange={setTipo} />
                 </Campo>
-                <Campo id="trat" label="Tratamiento"><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></Campo>
+                <Campo id="trat" label="Tratamiento (sustancia y dosis)"><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></Campo>
                 <div className="note-bar">La primera tanda de un grupo nuevo siempre es A.</div>
               </div>
             </div>
