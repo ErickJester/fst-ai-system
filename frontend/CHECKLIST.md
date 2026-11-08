@@ -158,7 +158,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 
 ## 9. Revisión segundo a segundo (§9.7, R-14)
 - [x] Solo se abre con el análisis `completado`, y muestra una pantalla propia en 403 y 409
-- [x] Tema oscuro, un espécimen a la vez y el recuadro del tubo destacado con `cajas.json`
+- [x] Tema claro como el resto del sistema (el oscuro se retiró), un espécimen a la vez y el recuadro del tubo destacado con `cajas.json`
 - [x] Botones y teclas: 1 nado, 2 inmovilidad, 3 escalamiento, 4 activa, 0 dudosa
 - [x] Espacio, flechas (Shift para 5 s), R, Tab, Ctrl+Z, Ctrl+S, velocidades de 0.5× a 2× y clic en la línea para ir a ese segundo
 - [x] Lupa de 40 s y línea de 300 s por espécimen

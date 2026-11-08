@@ -28,7 +28,7 @@ function Muestra({ c }) {
 }
 
 // 2l · Revisión segundo a segundo (R-14, §9.7). Solo de un análisis completado y para quien
-// subió el video o un Administrador. Tema oscuro; un espécimen a la vez, con el video
+// subió el video o un Administrador. Un espécimen a la vez, con el video
 // corriendo. Las correcciones viven en un borrador del navegador hasta «Guardar».
 export default function RevisionPage() {
   const { clave, id } = useParams()
@@ -37,7 +37,7 @@ export default function RevisionPage() {
   const { data, error } = useAsync(() => getRevision(clave, id), [clave, id, version])
 
   if (error) return <SinRevision error={error} clave={clave} />
-  if (!data) return <div className="tema-oscuro"><Cargando /></div>
+  if (!data) return <Cargando />
   return (
     <Revisor key={version} datos={data} clave={clave} id={id} guardado={guardado}
       onGuardado={() => { setGuardado(true); setVersion((v) => v + 1) }} />
@@ -396,7 +396,7 @@ function Revisor({ datos, clave, id, guardado, onGuardado }) {
   const origenAhora = c !== E.p[s] ? 'Corregido · antes: ' + nombre(E.p[s]).toLowerCase() : ORIGEN[E.o[s]] || 'Conducta del sistema'
 
   return (
-    <div ref={raizRef} className="app tema-oscuro">
+    <div ref={raizRef} className="app pantalla-revision">
       <Topbar>
         <Brand inline />
         <Migas items={[
@@ -606,7 +606,7 @@ function Resumen({ especimenes, L, N, tanda, onCerrar }) {
 function SinRevision({ error, clave }) {
   const st = error.response?.status
   return (
-    <div className="app tema-oscuro">
+    <div className="app">
       <Topbar><Brand sub="Revisión segundo a segundo" /></Topbar>
       <div className="page">
         <h3 style={{ margin: '0 0 8px' }}>{st === 403 ? 'No puedes revisar este análisis' : st === 409 ? 'Este análisis todavía no se puede revisar' : 'No existe ese análisis'}</h3>
