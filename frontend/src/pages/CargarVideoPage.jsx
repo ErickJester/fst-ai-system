@@ -37,6 +37,9 @@ function letraLibre(desde, grupoKey, sesion, otras) {
   return String.fromCharCode(c)
 }
 
+// La letra que sigue a la de la tanda anterior ('' si no hay o ya es la Z).
+const letraSiguiente = (t) => (/^[A-Y]$/.test(t) ? String.fromCharCode(t.charCodeAt(0) + 1) : '')
+
 // Avisos con los que se llega a Progreso (Día 2: en cola) o al experimento (Día 1: guardado sin analizar).
 const avisoCola = (lista) => (lista.length > 1 ? 'Videos almacenados. Los análisis están en cola: ' : 'Video almacenado. El análisis está en cola: ')
   + lista.map((g) => g.donde + ' · Día 2').join('; ') + '.'
@@ -45,19 +48,27 @@ const avisoDia1 = (lista) => (lista.length > 1 ? 'Videos del Día 1 almacenados 
 
 // Un formulario por tanda: autocompletado de grupo, confirmación de tanda y validación del archivo. La página puede
 // tener varios a la vez (§9.3): cada uno conserva su propio avance y su propia subida.
-function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco, onResumen, onGuardada, onQuitar }) {
+//
+// plantilla: con «Agregar otra tanda» el formulario nace con lo que ya se sabe: el mismo grupo, la tanda que sigue y
+// la tanda ya confirmada (agregar otra tanda es seguir en el mismo grupo). Solo queda el archivo y, si hace falta,
+// la sesión y los especímenes. Si el usuario cambia el grupo, deja de heredar y se comporta como siempre.
+function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla, autoFoco, onResumen, onGuardada, onQuitar }) {
   const navigate = useNavigate()
-  const [q, setQ] = useState('')
-  const [elegido, setElegido] = useState(null) // sugerencia elegida (grupo existente)
+  const [q, setQ] = useState(plantilla?.q ?? '')
+  const [elegido, setElegido] = useState(plantilla?.elegido ?? null) // sugerencia elegida (grupo existente)
   const [sug, setSug] = useState({ q: '', lista: [] }) // sugerencias del servidor para q
   const [sugOpen, setSugOpen] = useState(false)
   const [activa, setActiva] = useState(-1) // sugerencia resaltada con el teclado
-  const [tanda, setTanda] = useState('')
+  const [tanda, setTanda] = useState(() => {
+    if (!plantilla?.tanda) return ''
+    const key = norm(plantilla.elegido ? plantilla.elegido.nombre : plantilla.q.trim())
+    return letraLibre(plantilla.tanda, key, '2', Object.values(resumenes).filter((r) => r.id !== id))
+  })
   const [cil, setCil] = useState('4')
   const [sesion, setSesion] = useState('2')
   const [tipo, setTipo] = useState('EXPERIMENTAL')
   const [trat, setTrat] = useState('')
-  const [confirmada, setConfirmada] = useState(false)
+  const [confirmada, setConfirmada] = useState(!!plantilla?.tanda)
   const [archivo, setArchivo] = useState(null)
   const [rechazo, setRechazo] = useState(null)
   const [subiendo, setSubiendo] = useState(null) // avance en % mientras se sube
@@ -69,6 +80,7 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco,
   const fileRef = useRef(null)
   const tandaRef = useRef(null)
   const filaRef = useRef(null)
+  const heredada = useRef(!!plantilla) // la tanda y su confirmación vienen de la plantilla, no de la respuesta del servidor
   const qt = q.trim()
 
   // Lo que dicen los demás formularios de la página (grupo, tanda, sesión y si ya se guardaron). Los ref guardan
@@ -97,8 +109,24 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco,
       (lista) => {
         if (!vigente) return
         setSug({ q: qt, lista })
-        setSugOpen(lista.length > 0)
-        setTanda(lista.length ? '' : letraLibre('A', norm(qt), sesionRef.current, otrasRef.current))
+        if (heredada.current) {
+          // El grupo heredado ya existe en el servidor (la tanda anterior se guardó): se elige solo, con su tanda.
+          const igual = lista.find((g) => norm(g.nombre) === norm(qt))
+          if (igual) {
+            setElegido(igual)
+            setQ(etiqueta(igual))
+            return
+          }
+          // Sin coincidencia exacta pero con sugerencias: se comporta como siempre.
+          if (lista.length) {
+            heredada.current = false
+            setConfirmada(false)
+          }
+        }
+        if (!heredada.current) {
+          setSugOpen(lista.length > 0)
+          setTanda(lista.length ? '' : letraLibre('A', norm(qt), sesionRef.current, otrasRef.current))
+        }
       },
       () => vigente && setSug({ q: qt, lista: [] }),
     )
@@ -127,11 +155,12 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco,
   const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null && !yaTiene && !choque && !espera
 
   // La página necesita saber esto de cada formulario para no repetir tandas ni crear dos veces un grupo nuevo.
-  const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null })
+  const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null, q, elegido })
   useEffect(() => { onResumen(id, JSON.parse(firma)) }, [id, firma, onResumen])
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
   function onGrupo(v) {
+    heredada.current = false
     setQ(v)
     setElegido(null)
     setSugOpen(false)
@@ -141,6 +170,7 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco,
   }
 
   function pick(g) {
+    heredada.current = false
     setElegido(g)
     setQ(etiqueta(g))
     setSugOpen(false)
@@ -278,7 +308,7 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco,
             <span className="step-n num">1</span>
             <div>
               <Campo id={idGrupo} label="Nombre del grupo">
-                <input className="input" id={idGrupo} autoComplete="off" autoFocus={autoFoco} placeholder="Escribe el nombre del grupo"
+                <input className="input" id={idGrupo} autoComplete="off" autoFocus={autoFoco && !plantilla} placeholder="Escribe el nombre del grupo"
                   role="combobox" aria-autocomplete="list" aria-controls={idSug} aria-expanded={sugOpen}
                   aria-activedescendant={sugOpen && activa >= 0 ? 'sug-' + id + '-' + activa : undefined}
                   style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
@@ -450,7 +480,7 @@ export default function CargarVideoPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
-  const [formularios, setFormularios] = useState([1]) // ids, en el orden en que se agregaron
+  const [formularios, setFormularios] = useState([{ id: 1, plantilla: null }]) // en el orden en que se agregaron
   const [resumenes, setResumenes] = useState({}) // id → lo que cada formulario cuenta de sí mismo
   const [guardadas, setGuardadas] = useState({}) // id → { donde, dia } de las tandas ya almacenadas
   const [foco, setFoco] = useState(null) // formulario recién agregado
@@ -461,7 +491,7 @@ export default function CargarVideoPage() {
   )), [])
   const onGuardada = useCallback((id, info) => setGuardadas((prev) => ({ ...prev, [id]: info })), [])
   const quitar = useCallback((id) => {
-    setFormularios((f) => f.filter((x) => x !== id))
+    setFormularios((f) => f.filter((x) => x.id !== id))
     setResumenes((prev) => {
       const resto = { ...prev }
       delete resto[id]
@@ -469,10 +499,14 @@ export default function CargarVideoPage() {
     })
   }, [])
 
+  // Otra tanda es seguir en el mismo grupo: el formulario nuevo hereda el grupo del último, con la tanda que sigue ya
+  // confirmada. Si el último no tiene grupo todavía, nace vacío.
   function agregar() {
     const id = siguienteId.current
     siguienteId.current += 1
-    setFormularios((f) => [...f, id])
+    const ultima = resumenes[formularios[formularios.length - 1].id]
+    const plantilla = ultima?.grupoKey ? { q: ultima.q, elegido: ultima.elegido, tanda: letraSiguiente(ultima.tanda) } : null
+    setFormularios((f) => [...f, { id, plantilla }])
     setFoco(id)
   }
 
@@ -520,9 +554,9 @@ export default function CargarVideoPage() {
         <p className="lead" style={{ margin: 0, maxWidth: 620 }}>Un video corresponde a una tanda de un solo grupo. Indica el grupo, confirma qué tanda es y suelta el archivo. Con «Agregar otra tanda» puedes preparar varias en esta misma página.</p>
       </div>
 
-      {formularios.map((id, i) => (
+      {formularios.map(({ id, plantilla }, i) => (
         <FormularioTanda key={id} clave={clave} exp={exp} id={id} posicion={i + 1} unico={unico} resumenes={resumenes}
-          autoFoco={id === foco} onResumen={onResumen} onGuardada={onGuardada} onQuitar={quitar} />
+          plantilla={plantilla} autoFoco={id === foco} onResumen={onResumen} onGuardada={onGuardada} onQuitar={quitar} />
       ))}
 
       {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}

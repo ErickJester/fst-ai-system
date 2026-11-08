@@ -280,10 +280,73 @@ describe('cargar video', () => {
     expect(screen.getAllByLabelText('Tanda')[0].value).toBe('C')
     expect(screen.getByText('primera.mp4')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Sí, es la C' }).disabled).toBe(true)
-    // El segundo es nuevo y viene debajo.
-    expect(grupos[1].value).toBe('')
-    expect(screen.getAllByLabelText('Tanda')[1].value).toBe('')
+    // El segundo viene debajo.
     expect(grupos[0].compareDocumentPosition(grupos[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('«Agregar otra tanda» sigue en el mismo grupo: el formulario nuevo trae el grupo, la tanda que sigue y ya confirmada', async () => {
+    const user = await conSesion('/experimentos/7/cargar')
+    await user.type(await screen.findByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+
+    const [, segundo] = screen.getAllByRole('combobox')
+    expect(segundo.value).toBe('Referencia · Fluoxetina 10 mg/kg')
+    expect(screen.getAllByLabelText('Tanda')[1].value).toBe('D')
+    // La D ya viene confirmada: solo falta el archivo.
+    expect(screen.getByRole('button', { name: 'Sí, es la D' }).disabled).toBe(true)
+    expect(screen.getByText(/¿Esta es la tanda D de Referencia/)).toBeTruthy()
+    await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'tanda_D.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_D.mp4')
+    expect(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })[1].disabled).toBe(false)
+  })
+
+  it('si el formulario anterior aún no tiene grupo, el nuevo nace vacío', async () => {
+    const user = await conSesion('/experimentos/7/cargar')
+    await screen.findByRole('combobox')
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+    const [uno, dos] = screen.getAllByRole('combobox')
+    expect(uno.value).toBe('')
+    expect(dos.value).toBe('')
+    expect(screen.getAllByLabelText('Tanda').map((c) => c.value)).toEqual(['', ''])
+    expect(screen.queryByRole('button', { name: /^Sí, es la/ })).toBeNull()
+  })
+
+  it('con un grupo nuevo, la otra tanda hereda el nombre y la B ya confirmada, sin pedir otra vez el tratamiento', async () => {
+    const user = await conSesion('/experimentos/7/cargar')
+    await user.type(await screen.findByRole('combobox'), 'Acu-YBN')
+    await screen.findByText('Grupo nuevo · el nombre no coincide')
+    await user.type(screen.getByLabelText('Tratamiento (sustancia y dosis)'), 'prueba')
+
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+
+    const [, segundo] = screen.getAllByRole('combobox')
+    expect(segundo.value).toBe('Acu-YBN')
+    await waitFor(() => expect(screen.getAllByLabelText('Tanda')[1].value).toBe('B'))
+    expect(screen.getByRole('button', { name: 'Sí, es la B' }).disabled).toBe(true)
+    expect(screen.getAllByLabelText('Tratamiento (sustancia y dosis)')).toHaveLength(1)
+    expect(screen.getByText(/se toman del otro formulario/)).toBeTruthy()
+  })
+
+  it('si en el formulario heredado se cambia el grupo, deja de heredar la tanda y su confirmación', async () => {
+    const user = await conSesion('/experimentos/7/cargar')
+    await user.type(await screen.findByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+
+    const segundo = screen.getAllByRole('combobox')[1]
+    await user.clear(segundo)
+    await user.type(segundo, 'contr')
+    await user.keyboard('{ArrowDown}{Enter}')
+    // Otro grupo: la tanda es la suya y hay que confirmarla; la del primer formulario sigue confirmada.
+    expect(screen.getAllByLabelText('Tanda')[1].value).toBe('C')
+    const botones = screen.getAllByRole('button', { name: 'Sí, es la C' })
+    expect(botones).toHaveLength(2)
+    expect(botones[0].disabled).toBe(true)
+    expect(botones[1].disabled).toBe(false)
   })
 
   it('«Quitar este formulario» deja solo el otro, y con uno solo ya no se ofrece', async () => {
