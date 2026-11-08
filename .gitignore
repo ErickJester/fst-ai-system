@@ -28,3 +28,6 @@ respaldos/
 # frontend: dependencias (se reinstalan con npm install) y salida del build
 node_modules/
 /frontend/dist/
+
+# worktrees de las herramientas de trabajo: locales, no van al repo
+/.claude/worktrees/
