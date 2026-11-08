@@ -95,7 +95,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Aviso y bloqueo del botón cuando la tanda ya tiene el video de esa sesión
 - [x] Barra de progreso de la subida y botón para cancelarla
 - [x] Día 2: redirige a Progreso con el aviso de que el análisis está en cola. Día 1: vuelve al experimento con el aviso de que no se analiza
-- [x] Botones «+ Agregar otra tanda» y «Terminar» en el paso 2 (§9.3)
+- [x] Botones «+ Agregar otra tanda» y «Terminar» (§9.3). Hecho (v1.1.0): «+ Agregar otra tanda» suma otro formulario DEBAJO de los que ya están, sin tocarlos (antes limpiaba el formulario y se perdía lo que llevaba: grupo, tanda confirmada y archivo). Cada formulario guarda su propio avance y su propia subida, y tiene «Quitar este formulario» cuando hay más de uno. Con un solo formulario todo sigue igual: al guardar sale a Progreso (Día 2) o al experimento (Día 1) y la siguiente carga empieza vacía. Con varios, guardar uno no saca de la página: queda como «✓ grupo · Tanda · Día» y «Terminar» lleva a Progreso con todos los avisos (o al experimento si solo hubo Día 1). Entre formularios del mismo grupo: la tanda propuesta es la primera letra libre (C y D, no C y C), la misma tanda y sesión se avisa y no deja guardar, y un grupo nuevo en dos formularios toma el tipo y el tratamiento del primero y no se puede guardar antes que él (el servidor crea el grupo al terminar la subida: dos a la vez darían 409 después de subir 1 GB)
 - [x] Confirmación del paso 3 (§9.3): Día 2 lleva a Progreso de ese experimento con «Video almacenado. El análisis está en cola»; Día 1 vuelve al experimento con «Video del Día 1 almacenado. No se analiza»
 
 ## 5. Detalle de experimento y de grupo (§9.2, maquetas `experimento` y `grupo`)

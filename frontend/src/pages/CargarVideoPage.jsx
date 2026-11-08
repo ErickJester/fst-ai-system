@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Topbar, { Brand } from '../components/Topbar'
 import { Seg, FieldError, Campo, TipoTag, Pasos, Cargando, NoEncontrado } from '../components/ui'
@@ -27,13 +27,26 @@ function Hi({ label, q }) {
   )
 }
 
-// 2b · Cargar video por tanda: autocompletado de grupo, confirmación de tanda
-// y validación del archivo.
-export default function CargarVideoPage() {
-  const { clave } = useParams()
+// Letra libre a partir de `desde`: la primera que ningún otro formulario de la página usa ya en ese grupo y esa
+// sesión. Así dos formularios del mismo grupo no proponen la misma tanda.
+function letraLibre(desde, grupoKey, sesion, otras) {
+  if (!/^[A-Z]$/.test(desde)) return desde
+  const usadas = new Set(otras.filter((o) => o.grupoKey === grupoKey && o.sesion === sesion && o.tanda).map((o) => o.tanda))
+  let c = desde.charCodeAt(0)
+  while (usadas.has(String.fromCharCode(c)) && c < 90) c += 1
+  return String.fromCharCode(c)
+}
+
+// Avisos con los que se llega a Progreso (Día 2: en cola) o al experimento (Día 1: guardado sin analizar).
+const avisoCola = (lista) => (lista.length > 1 ? 'Videos almacenados. Los análisis están en cola: ' : 'Video almacenado. El análisis está en cola: ')
+  + lista.map((g) => g.donde + ' · Día 2').join('; ') + '.'
+const avisoDia1 = (lista) => (lista.length > 1 ? 'Videos del Día 1 almacenados (' : 'Video del Día 1 almacenado (')
+  + lista.map((g) => g.donde).join('; ') + '). No se ' + (lista.length > 1 ? 'analizan.' : 'analiza.')
+
+// Un formulario por tanda: autocompletado de grupo, confirmación de tanda y validación del archivo. La página puede
+// tener varios a la vez (§9.3): cada uno conserva su propio avance y su propia subida.
+function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, autoFoco, onResumen, onGuardada, onQuitar }) {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
   const [q, setQ] = useState('')
   const [elegido, setElegido] = useState(null) // sugerencia elegida (grupo existente)
   const [sug, setSug] = useState({ q: '', lista: [] }) // sugerencias del servidor para q
@@ -50,11 +63,30 @@ export default function CargarVideoPage() {
   const [subiendo, setSubiendo] = useState(null) // avance en % mientras se sube
   const [errGuardar, setErrGuardar] = useState('')
   const [cancelada, setCancelada] = useState(false)
+  const [guardada, setGuardada] = useState(null) // { donde, dia, nombre } cuando el video ya se almacenó (con varios formularios)
   const subidaRef = useRef(null) // AbortController de la subida en curso
   const [over, setOver] = useState(false)
   const fileRef = useRef(null)
   const tandaRef = useRef(null)
+  const filaRef = useRef(null)
   const qt = q.trim()
+
+  // Lo que dicen los demás formularios de la página (grupo, tanda, sesión y si ya se guardaron). Los ref guardan
+  // el valor más reciente para las respuestas del servidor y para el final de la subida, que llegan tarde.
+  const otras = Object.values(resumenes).filter((r) => r.id !== id)
+  const otrasRef = useRef(otras)
+  const unicoRef = useRef(unico)
+  const sesionRef = useRef(sesion)
+  useEffect(() => {
+    otrasRef.current = otras
+    unicoRef.current = unico
+    sesionRef.current = sesion
+  })
+
+  // Un formulario agregado después se muestra y recibe el foco, sin mover los anteriores.
+  useEffect(() => {
+    if (autoFoco) filaRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }, [autoFoco])
 
   // Sugerencias del servidor (GET .../groups?q=) mientras se escribe un grupo que no se ha
   // elegido. Si no hay ninguna, es un grupo nuevo y su primera tanda es la A.
@@ -66,39 +98,37 @@ export default function CargarVideoPage() {
         if (!vigente) return
         setSug({ q: qt, lista })
         setSugOpen(lista.length > 0)
-        setTanda(lista.length ? '' : 'A')
+        setTanda(lista.length ? '' : letraLibre('A', norm(qt), sesionRef.current, otrasRef.current))
       },
       () => vigente && setSug({ q: qt, lista: [] }),
     )
     return () => { vigente = false }
   }, [clave, qt, elegido])
 
-  if (error) return <NoEncontrado />
-  if (!exp) return <Cargando />
-  if (!puedeSubirVideo(user, exp)) {
-    return (
-      <div className="app narrow">
-        <Topbar><Brand sub={exp.titulo} /></Topbar>
-        <div className="page">
-          <h3 style={{ margin: '0 0 10px' }}>Cargar video por tanda</h3>
-          <p className="lead" style={{ margin: '0 0 18px', maxWidth: 560 }}>{SOLO_CREADOR_SUBE} Este lo creó {exp.responsable || 'otra cuenta'}.</p>
-          <Link className="btn btn-secondary" style={btnLeft} to={`/experimentos/${exp.clave}`}>Volver al experimento</Link>
-        </div>
-      </div>
-    )
-  }
-
   const grupo = elegido
   const respondido = !!qt && sug.q === qt
   const matches = respondido && !grupo ? sug.lista : []
   const nuevo = !grupo && respondido && sug.lista.length === 0
   const grupoNombre = grupo ? etiqueta(grupo) : qt
+  // Mismo grupo en otro formulario de esta página: la tanda y la sesión no pueden repetirse, y un grupo nuevo
+  // solo lo crea el primero que se guarda (el servidor lo crea al terminar la subida: dos a la vez chocarían).
+  const grupoKey = grupo || nuevo ? norm(grupo ? grupo.nombre : qt) : ''
+  const hermanas = grupoKey ? otras.filter((o) => o.grupoKey === grupoKey) : []
+  const hermanaNueva = nuevo && hermanas.some((o) => o.nuevo && o.id < id) // solo el posterior toma los datos del anterior
+  // El choque lo lleva el formulario posterior (o cualquiera si el otro ya se guardó): el primero no se bloquea.
+  const choque = !!grupoKey && /^[A-Z]$/.test(tanda) && hermanas.some((o) => o.tanda === tanda && o.sesion === sesion && (o.id < id || o.guardada))
+  const espera = nuevo ? hermanas.find((o) => o.nuevo && !o.guardada && o.id < id) : null
   const showConfirm = (grupo || nuevo) && /^[A-Z]$/.test(tanda)
-  const grupoOk = grupo || (nuevo && trat.trim())
+  // Si otro formulario ya trae los datos del mismo grupo nuevo, aquí no se piden otra vez.
+  const grupoOk = grupo || (nuevo && (trat.trim() || hermanaNueva))
   // Una tanda lleva un solo video por sesión: si ya tiene el de ese día, no se puede subir otro.
   const tandaExistente = grupo ? exp.grupos.find((x) => x.id === grupo.id)?.tandas.find((t) => t.letra === tanda) : null
   const yaTiene = !!tandaExistente && (sesion === '1' ? !!tandaExistente.dia1 : tandaExistente.estado !== 'SIN_VIDEO')
-  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null && !yaTiene
+  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null && !yaTiene && !choque && !espera
+
+  // La página necesita saber esto de cada formulario para no repetir tandas ni crear dos veces un grupo nuevo.
+  const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null })
+  useEffect(() => { onResumen(id, JSON.parse(firma)) }, [id, firma, onResumen])
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
   function onGrupo(v) {
@@ -115,7 +145,7 @@ export default function CargarVideoPage() {
     setQ(etiqueta(g))
     setSugOpen(false)
     setActiva(-1)
-    setTanda(g.siguiente)
+    setTanda(letraLibre(g.siguiente, norm(g.nombre), sesion, otras))
     setConfirmada(false)
   }
 
@@ -181,20 +211,6 @@ export default function CargarVideoPage() {
   }
 
   // ── guardar ───────────────────────────────────────────────────────────────
-  // Deja el formulario listo para otra tanda (otro grupo o la siguiente letra).
-  function otraTanda() {
-    setQ('')
-    setElegido(null)
-    setSugOpen(false)
-    setTanda('')
-    setConfirmada(false)
-    setTrat('')
-    clearFile()
-    setErrGuardar('')
-    setCancelada(false)
-    window.scrollTo(0, 0)
-  }
-
   async function guardar() {
     setErrGuardar('')
     setCancelada(false)
@@ -208,10 +224,18 @@ export default function CargarVideoPage() {
         grupo: grupo ? grupo.nombre : qt, nuevo: !grupo, tipo, tratamiento: trat.trim(),
         letra: tanda, sesion: dia, nCilindros: tandaExistente ? undefined : Number(cil), file: archivo, signal: control.signal,
       }, setSubiendo)
-      // Día 2: a Progreso. Día 1: se guarda sin analizar y se vuelve al experimento (§9.3).
       const donde = grupoNombre + ' · Tanda ' + tanda
-      if (dia === 'DAY2') navigate('/analisis?experimento=' + clave, { state: { aviso: 'Video almacenado. El análisis está en cola: ' + donde + ' · Día 2.' } })
-      else navigate(`/experimentos/${clave}`, { state: { aviso: 'Video del Día 1 almacenado (' + donde + '). No se analiza.' } })
+      // Un solo formulario: Día 2 a Progreso, Día 1 se guarda sin analizar y se vuelve al experimento (§9.3).
+      if (unicoRef.current) {
+        if (dia === 'DAY2') navigate('/analisis?experimento=' + clave, { state: { aviso: avisoCola([{ donde }]) } })
+        else navigate(`/experimentos/${clave}`, { state: { aviso: avisoDia1([{ donde }]) } })
+        return
+      }
+      // Varios formularios: no se sale, para que los demás conserven lo que llevan. «Terminar» cierra.
+      setSubiendo(null)
+      subidaRef.current = null
+      setGuardada({ donde, dia, nombre: archivo.name })
+      onGuardada(id, { donde, dia })
     } catch (err) {
       // Cancelar no es un error: el archivo queda elegido para volver a intentarlo.
       if (esCancelacion(err)) setCancelada(true)
@@ -224,6 +248,264 @@ export default function CargarVideoPage() {
     }
   }
 
+  if (guardada) {
+    return (
+      <div ref={filaRef} role="status" style={{ padding: '18px 32px', borderTop: '2px solid var(--color-divider)' }}>
+        <div className="k" style={{ marginBottom: 6 }}>Formulario {posicion}</div>
+        <div className="nd" style={{ fontSize: 15 }}>✓ {guardada.donde} · {guardada.dia === 'DAY2' ? 'Día 2' : 'Día 1'}</div>
+        <div style={{ marginTop: 4, ...mutedSub }}>{guardada.nombre} · almacenado. {guardada.dia === 'DAY2' ? 'El análisis está en cola.' : 'No se analiza.'}</div>
+      </div>
+    )
+  }
+
+  const idGrupo = 'grupo-' + id
+  const idTanda = 'tanda-' + id
+  const idSug = 'sugGrupos-' + id
+
+  return (
+    <div ref={filaRef} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 430px', borderTop: '2px solid var(--color-divider)' }}>
+      <div style={{ padding: '24px 32px 28px', borderRight: '2px solid var(--color-divider)' }}>
+        {!unico && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="k">Formulario {posicion}</span>
+            <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendo != null} onClick={() => onQuitar(id)}>Quitar este formulario</button>
+          </div>
+        )}
+
+        <div>
+          {/* 1 · grupo */}
+          <div className="step">
+            <span className="step-n num">1</span>
+            <div>
+              <Campo id={idGrupo} label="Nombre del grupo">
+                <input className="input" id={idGrupo} autoComplete="off" autoFocus={autoFoco} placeholder="Escribe el nombre del grupo"
+                  role="combobox" aria-autocomplete="list" aria-controls={idSug} aria-expanded={sugOpen}
+                  aria-activedescendant={sugOpen && activa >= 0 ? 'sug-' + id + '-' + activa : undefined}
+                  style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
+                  value={q} onChange={(e) => onGrupo(e.target.value)} onKeyDown={onTeclaGrupo} />
+              </Campo>
+              {sugOpen && (
+                <div style={{ border: '2px solid var(--color-text)', borderTop: 0, background: 'var(--color-bg)' }}>
+                  <div id={idSug} role="listbox" aria-label="Grupos de este experimento">
+                  {matches.map((g, i) => (
+                    <div key={g.nombre} id={'sug-' + id + '-' + i} role="option" aria-selected={i === activa}
+                      className={'sug' + (i === activa ? ' active' : '')}
+                      onMouseEnter={() => setActiva(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(g)}>
+                      <span className="nd" style={{ fontSize: 13 }}><Hi label={etiqueta(g)} q={qt} /></span>
+                      <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
+                      <div style={{ flex: 1 }} />
+                      <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: MUT60 }}>
+                        tandas cargadas: {exp.grupos.find((x) => x.id === g.id)?.tandas.map((t) => t.letra).join(', ') || '—'}
+                      </span>
+                    </div>
+                  ))}
+                  </div>
+                  <div style={{ padding: '8px 12px', fontSize: 11.5, color: 'var(--muted)' }}>Solo se sugieren los {exp.grupos.length} grupos de este experimento, nunca los de otros experimentos.</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2 · tanda */}
+          <div className="step">
+            <span className="step-n num">2</span>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+                <Campo id={idTanda} label="Tanda" style={{ width: 120 }}>
+                  <input ref={tandaRef} className="input num" id={idTanda} maxLength={1}
+                    style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 16, textTransform: 'uppercase' }}
+                    value={tanda} onChange={(e) => onTanda(e.target.value)} />
+                </Campo>
+                <Campo label="Especímenes en esta tanda">
+                  <Seg options={[{ v: '2', label: '2' }, { v: '3', label: '3' }, { v: '4', label: '4' }]} value={cil} onChange={setCil} />
+                </Campo>
+                <p style={{ margin: '0 0 10px', ...mutedSub }}>Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
+              </div>
+              {showConfirm && (
+                <div style={{ marginTop: 14, border: '2px solid ' + (confirmada ? 'var(--color-text)' : 'var(--color-accent)'), padding: '14px 16px' }}>
+                  <div className="nd" style={{ fontSize: 15, marginBottom: 12 }}>¿Esta es la tanda {tanda} de {grupoNombre}?</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-primary" style={btnLeft} disabled={confirmada} onClick={() => setConfirmada(true)}>Sí, es la {tanda}</button>
+                    <button type="button" className="btn btn-secondary" style={btnLeft} onClick={corregir}>Corregir</button>
+                  </div>
+                  {!confirmada && <div style={{ marginTop: 11, fontSize: 11.5, color: 'var(--color-accent-700)' }}>No se puede guardar sin confirmar la tanda.</div>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3 · sesión */}
+          <div className="step">
+            <span className="step-n num">3</span>
+            <div>
+              <Campo label="Sesión">
+                <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
+              </Campo>
+              <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
+              {yaTiene && (
+                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
+                  La Tanda {tanda} de {grupoNombre} ya tiene su video de {sesion === '1' ? 'Día 1' : 'Día 2'}. Cada tanda lleva un solo video por sesión: elige la otra sesión o una tanda nueva.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4 · archivo */}
+          <div className="step" style={{ borderBottom: 0, paddingBottom: 0 }}>
+            <span className="step-n num">4</span>
+            <div>
+              <div className="k" style={{ marginBottom: 8 }}>Archivo de video</div>
+              <div className={'drop' + (over ? ' over' : '')}
+                onDragEnter={(e) => { e.preventDefault(); setOver(true) }}
+                onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+                onDragLeave={(e) => { e.preventDefault(); setOver(false) }}
+                onDrop={onDrop}>
+                <div style={{ flex: 1 }}>
+                  <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4 o .mov'}</div>
+                  <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión, de hasta {MAX_UPLOAD_MB} MB. Aquí se revisan el formato y el tamaño; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
+                </div>
+                <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
+                <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden" aria-label="Archivo de video"
+                  onChange={(e) => { if (e.target.files[0]) takeFile(e.target.files[0]) }} />
+              </div>
+              {subiendo != null && (
+                <div style={{ marginTop: 18 }}>
+                  <div className="num" style={{ fontSize: 12, marginBottom: 5 }}>Subiendo {archivo?.name} · {subiendo} %</div>
+                  <div className="meter" role="progressbar" aria-label="Avance de la subida" aria-valuenow={subiendo} aria-valuemin={0} aria-valuemax={100}>
+                    <div style={{ width: subiendo + '%' }} />
+                  </div>
+                  <button type="button" className="btn btn-ghost" style={{ ...btnLeft, marginTop: 8 }} onClick={() => subidaRef.current?.abort()}>Cancelar subida</button>
+                </div>
+              )}
+              {cancelada && <div className="hint" style={{ marginTop: 10 }}>Subida cancelada: el video no se guardó. Puedes volver a intentarlo con el mismo archivo o elegir otro.</div>}
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
+                <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
+                  {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
+                </button>
+                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
+              </div>
+              {choque && (
+                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
+                  Otro formulario de esta página ya usa la Tanda {tanda} de {grupoNombre} en el {sesion === '1' ? 'Día 1' : 'Día 2'}. Cambia la tanda o la sesión.
+                </div>
+              )}
+              {espera && (
+                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
+                  {grupoNombre} es un grupo nuevo y se crea con la primera tanda que se guarda. Guarda antes la Tanda {espera.tanda || 'del otro formulario'}: así el grupo no se crea dos veces.
+                </div>
+              )}
+              <FieldError msg={errGuardar} style={{ marginTop: 10 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* estados del flujo */}
+      <div style={{ background: 'var(--color-surface)', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {nuevo && (
+          <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)' }}>
+            <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Grupo nuevo · el nombre no coincide</div>
+            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Campo label="Grupo"><div className="input">{qt}</div></Campo>
+              {hermanaNueva ? (
+                <div className="note-bar">El tipo y el tratamiento de este grupo nuevo se toman del otro formulario que lo trae.</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Sin coincidencias en este experimento. Completa los datos del grupo nuevo:</div>
+                  <Campo label="Tipo">
+                    <Seg
+                      options={[{ v: 'CONTROL', label: 'control' }, { v: 'REFERENCIA', label: 'referencia' }, { v: 'EXPERIMENTAL', label: 'tratamiento exp.' }]}
+                      value={tipo} onChange={setTipo} />
+                  </Campo>
+                  <Campo id={'trat-' + id} label="Tratamiento (sustancia y dosis)"><input className="input" id={'trat-' + id} placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></Campo>
+                </>
+              )}
+              <div className="note-bar">La primera tanda de un grupo nuevo siempre es A.</div>
+            </div>
+          </div>
+        )}
+
+        {rechazo && (
+          <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-accent)' }}>
+            <div className="nd" style={{ padding: '10px 14px', background: 'var(--color-accent)', color: 'var(--color-bg)', fontSize: 14 }}>Video rechazado</div>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-divider)' }}>
+              <div className="nd" style={{ fontSize: 13 }}>{rechazo.titulo}</div>
+              <div className="num" style={{ fontSize: 11.5, marginTop: 3, color: 'var(--muted-2)' }}>{rechazo.detalle}</div>
+            </div>
+            <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => { clearFile(); fileRef.current.click() }}>Reintentar</button>
+              {tanda && <span style={{ fontSize: 11.5, color: 'var(--color-accent-700)' }}>La tanda {tanda} no avanza.</span>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// 2b · Cargar video por tanda. «Agregar otra tanda» suma un formulario debajo de los que ya están, sin tocarlos:
+// se pueden llenar y subir varias tandas desde la misma página.
+export default function CargarVideoPage() {
+  const { clave } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
+  const [formularios, setFormularios] = useState([1]) // ids, en el orden en que se agregaron
+  const [resumenes, setResumenes] = useState({}) // id → lo que cada formulario cuenta de sí mismo
+  const [guardadas, setGuardadas] = useState({}) // id → { donde, dia } de las tandas ya almacenadas
+  const [foco, setFoco] = useState(null) // formulario recién agregado
+  const siguienteId = useRef(2)
+
+  const onResumen = useCallback((id, r) => setResumenes((prev) => (
+    prev[id] && JSON.stringify(prev[id]) === JSON.stringify(r) ? prev : { ...prev, [id]: r }
+  )), [])
+  const onGuardada = useCallback((id, info) => setGuardadas((prev) => ({ ...prev, [id]: info })), [])
+  const quitar = useCallback((id) => {
+    setFormularios((f) => f.filter((x) => x !== id))
+    setResumenes((prev) => {
+      const resto = { ...prev }
+      delete resto[id]
+      return resto
+    })
+  }, [])
+
+  function agregar() {
+    const id = siguienteId.current
+    siguienteId.current += 1
+    setFormularios((f) => [...f, id])
+    setFoco(id)
+  }
+
+  // Cierra la carga: a Progreso si quedó alguna tanda de Día 2 en la cola; si no, de vuelta al experimento.
+  function terminar() {
+    const lista = Object.values(guardadas)
+    const dia2 = lista.filter((g) => g.dia === 'DAY2')
+    const dia1 = lista.filter((g) => g.dia === 'DAY1')
+    if (dia2.length) {
+      const extra = dia1.length ? ' ' + avisoDia1(dia1) : ''
+      navigate('/analisis?experimento=' + clave, { state: { aviso: avisoCola(dia2) + extra } })
+    } else if (dia1.length) navigate(`/experimentos/${clave}`, { state: { aviso: avisoDia1(dia1) } })
+    else navigate(`/experimentos/${clave}`)
+  }
+
+  if (error) return <NoEncontrado />
+  if (!exp) return <Cargando />
+  if (!puedeSubirVideo(user, exp)) {
+    return (
+      <div className="app narrow">
+        <Topbar><Brand sub={exp.titulo} /></Topbar>
+        <div className="page">
+          <h3 style={{ margin: '0 0 10px' }}>Cargar video por tanda</h3>
+          <p className="lead" style={{ margin: '0 0 18px', maxWidth: 560 }}>{SOLO_CREADOR_SUBE} Este lo creó {exp.responsable || 'otra cuenta'}.</p>
+          <Link className="btn btn-secondary" style={btnLeft} to={`/experimentos/${exp.clave}`}>Volver al experimento</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const subiendoAlguna = Object.values(resumenes).some((r) => r.subiendo)
+  const unico = formularios.length === 1
+
   return (
     <div className="app">
       <Topbar>
@@ -231,170 +513,23 @@ export default function CargarVideoPage() {
         <Link to="/experimentos">Salir</Link>
       </Topbar>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 430px' }}>
-        <div style={{ padding: '28px 32px 36px', borderRight: '2px solid var(--color-divider)' }}>
-          <Pasos actual={2} />
+      <div style={{ padding: '28px 32px 24px' }}>
+        <Pasos actual={2} />
 
-          <h3 style={{ margin: '0 0 8px' }}>Cargar video por tanda</h3>
-          <p className="lead" style={{ margin: '0 0 24px', maxWidth: 620 }}>Un video corresponde a una tanda de un solo grupo. Indica el grupo, confirma qué tanda es y suelta el archivo.</p>
+        <h3 style={{ margin: '0 0 8px' }}>Cargar video por tanda</h3>
+        <p className="lead" style={{ margin: 0, maxWidth: 620 }}>Un video corresponde a una tanda de un solo grupo. Indica el grupo, confirma qué tanda es y suelta el archivo. Con «Agregar otra tanda» puedes preparar varias en esta misma página.</p>
+      </div>
 
-          <div style={{ borderTop: '2px solid var(--color-divider)' }}>
-            {/* 1 · grupo */}
-            <div className="step">
-              <span className="step-n num">1</span>
-              <div>
-                <Campo id="grupo" label="Nombre del grupo">
-                  <input className="input" id="grupo" autoComplete="off" placeholder="Escribe el nombre del grupo"
-                    role="combobox" aria-autocomplete="list" aria-controls="sugGrupos" aria-expanded={sugOpen}
-                    aria-activedescendant={sugOpen && activa >= 0 ? 'sug-' + activa : undefined}
-                    style={qt ? { borderColor: 'var(--color-accent)' } : undefined}
-                    value={q} onChange={(e) => onGrupo(e.target.value)} onKeyDown={onTeclaGrupo} />
-                </Campo>
-                {sugOpen && (
-                  <div style={{ border: '2px solid var(--color-text)', borderTop: 0, background: 'var(--color-bg)' }}>
-                    <div id="sugGrupos" role="listbox" aria-label="Grupos de este experimento">
-                    {matches.map((g, i) => (
-                      <div key={g.nombre} id={'sug-' + i} role="option" aria-selected={i === activa}
-                        className={'sug' + (i === activa ? ' active' : '')}
-                        onMouseEnter={() => setActiva(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(g)}>
-                        <span className="nd" style={{ fontSize: 13 }}><Hi label={etiqueta(g)} q={qt} /></span>
-                        <TipoTag tipo={g.tipo} style={{ whiteSpace: 'nowrap', flex: 'none' }} />
-                        <div style={{ flex: 1 }} />
-                        <span className="num" style={{ whiteSpace: 'nowrap', flex: 'none', fontSize: 11.5, color: MUT60 }}>
-                          tandas cargadas: {exp.grupos.find((x) => x.id === g.id)?.tandas.map((t) => t.letra).join(', ') || '—'}
-                        </span>
-                      </div>
-                    ))}
-                    </div>
-                    <div style={{ padding: '8px 12px', fontSize: 11.5, color: 'var(--muted)' }}>Solo se sugieren los {exp.grupos.length} grupos de este experimento, nunca los de otros experimentos.</div>
-                  </div>
-                )}
-              </div>
-            </div>
+      {formularios.map((id, i) => (
+        <FormularioTanda key={id} clave={clave} exp={exp} id={id} posicion={i + 1} unico={unico} resumenes={resumenes}
+          autoFoco={id === foco} onResumen={onResumen} onGuardada={onGuardada} onQuitar={quitar} />
+      ))}
 
-            {/* 2 · tanda */}
-            <div className="step">
-              <span className="step-n num">2</span>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
-                  <Campo id="tanda" label="Tanda" style={{ width: 120 }}>
-                    <input ref={tandaRef} className="input num" id="tanda" maxLength={1}
-                      style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 16, textTransform: 'uppercase' }}
-                      value={tanda} onChange={(e) => onTanda(e.target.value)} />
-                  </Campo>
-                  <Campo label="Especímenes en esta tanda">
-                    <Seg options={[{ v: '2', label: '2' }, { v: '3', label: '3' }, { v: '4', label: '4' }]} value={cil} onChange={setCil} />
-                  </Campo>
-                  <p style={{ margin: '0 0 10px', ...mutedSub }}>Precargada: siguiente letra después de la última tanda del grupo. Editable.</p>
-                </div>
-                {showConfirm && (
-                  <div style={{ marginTop: 14, border: '2px solid ' + (confirmada ? 'var(--color-text)' : 'var(--color-accent)'), padding: '14px 16px' }}>
-                    <div className="nd" style={{ fontSize: 15, marginBottom: 12 }}>¿Esta es la tanda {tanda} de {grupoNombre}?</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" className="btn btn-primary" style={btnLeft} disabled={confirmada} onClick={() => setConfirmada(true)}>Sí, es la {tanda}</button>
-                      <button type="button" className="btn btn-secondary" style={btnLeft} onClick={corregir}>Corregir</button>
-                    </div>
-                    {!confirmada && <div style={{ marginTop: 11, fontSize: 11.5, color: 'var(--color-accent-700)' }}>No se puede guardar sin confirmar la tanda.</div>}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 3 · sesión */}
-            <div className="step">
-              <span className="step-n num">3</span>
-              <div>
-                <Campo label="Sesión">
-                  <Seg options={[{ v: '1', label: 'Día 1 (20 min)' }, { v: '2', label: 'Día 2 (5 min)' }]} value={sesion} onChange={setSesion} />
-                </Campo>
-                <div className="hint" style={{ marginTop: 8 }}>Solo el Día 2 se analiza. El Día 1 se guarda para dejar constancia de la sesión de habituación.</div>
-                {yaTiene && (
-                  <div className="note-bar" role="status" style={{ marginTop: 10 }}>
-                    La Tanda {tanda} de {grupoNombre} ya tiene su video de {sesion === '1' ? 'Día 1' : 'Día 2'}. Cada tanda lleva un solo video por sesión: elige la otra sesión o una tanda nueva.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 4 · archivo */}
-            <div className="step" style={{ borderBottom: 0, paddingBottom: 0 }}>
-              <span className="step-n num">4</span>
-              <div>
-                <div className="k" style={{ marginBottom: 8 }}>Archivo de video</div>
-                <div className={'drop' + (over ? ' over' : '')}
-                  onDragEnter={(e) => { e.preventDefault(); setOver(true) }}
-                  onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-                  onDragLeave={(e) => { e.preventDefault(); setOver(false) }}
-                  onDrop={onDrop}>
-                  <div style={{ flex: 1 }}>
-                    <div className="nd" style={{ fontSize: 15 }}>{archivo ? archivo.name : 'Suelta aquí el archivo .mp4 o .mov'}</div>
-                    <div style={{ marginTop: 4, ...mutedSub }}>Un solo archivo por tanda y sesión, de hasta {MAX_UPLOAD_MB} MB. Aquí se revisan el formato y el tamaño; al recibirlo, el servidor comprueba que se pueda reproducir y que sea horizontal.</div>
-                  </div>
-                  <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => fileRef.current.click()}>Elegir archivo</button>
-                  <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="hidden" aria-label="Archivo de video"
-                    onChange={(e) => { if (e.target.files[0]) takeFile(e.target.files[0]) }} />
-                </div>
-                {subiendo != null && (
-                  <div style={{ marginTop: 18 }}>
-                    <div className="num" style={{ fontSize: 12, marginBottom: 5 }}>Subiendo {archivo?.name} · {subiendo} %</div>
-                    <div className="meter" role="progressbar" aria-label="Avance de la subida" aria-valuenow={subiendo} aria-valuemin={0} aria-valuemax={100}>
-                      <div style={{ width: subiendo + '%' }} />
-                    </div>
-                    <button type="button" className="btn btn-ghost" style={{ ...btnLeft, marginTop: 8 }} onClick={() => subidaRef.current?.abort()}>Cancelar subida</button>
-                  </div>
-                )}
-                {cancelada && <div className="hint" style={{ marginTop: 10 }}>Subida cancelada: el video no se guardó. Puedes volver a intentarlo con el mismo archivo o elegir otro.</div>}
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
-                  <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
-                    {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
-                  </button>
-                  <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
-                </div>
-                {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
-                  <button type="button" className="btn btn-secondary" style={btnLeft} disabled={subiendo != null} onClick={otraTanda}>+ Agregar otra tanda</button>
-                  <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendo != null} onClick={() => navigate(`/experimentos/${clave}`)}>Terminar</button>
-                </div>
-                <FieldError msg={errGuardar} style={{ marginTop: 10 }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* estados del flujo */}
-        <div style={{ background: 'var(--color-surface)', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {nuevo && (
-            <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-text)' }}>
-              <div className="k" style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-divider)' }}>Grupo nuevo · el nombre no coincide</div>
-              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <Campo label="Grupo"><div className="input">{qt}</div></Campo>
-                <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Sin coincidencias en este experimento. Completa los datos del grupo nuevo:</div>
-                <Campo label="Tipo">
-                  <Seg
-                    options={[{ v: 'CONTROL', label: 'control' }, { v: 'REFERENCIA', label: 'referencia' }, { v: 'EXPERIMENTAL', label: 'tratamiento exp.' }]}
-                    value={tipo} onChange={setTipo} />
-                </Campo>
-                <Campo id="trat" label="Tratamiento (sustancia y dosis)"><input className="input" id="trat" placeholder="Compuesto CSR-14, 30 mg/kg" value={trat} onChange={(e) => setTrat(e.target.value)} /></Campo>
-                <div className="note-bar">La primera tanda de un grupo nuevo siempre es A.</div>
-              </div>
-            </div>
-          )}
-
-          {rechazo && (
-            <div style={{ background: 'var(--color-bg)', border: '2px solid var(--color-accent)' }}>
-              <div className="nd" style={{ padding: '10px 14px', background: 'var(--color-accent)', color: 'var(--color-bg)', fontSize: 14 }}>Video rechazado</div>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-divider)' }}>
-                <div className="nd" style={{ fontSize: 13 }}>{rechazo.titulo}</div>
-                <div className="num" style={{ fontSize: 11.5, marginTop: 3, color: 'var(--muted-2)' }}>{rechazo.detalle}</div>
-              </div>
-              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button type="button" className="btn btn-secondary" style={btnLeft} onClick={() => { clearFile(); fileRef.current.click() }}>Reintentar</button>
-                {tanda && <span style={{ fontSize: 11.5, color: 'var(--color-accent-700)' }}>La tanda {tanda} no avanza.</span>}
-              </div>
-            </div>
-          )}
-
-        </div>
+      {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}
+      <div style={{ borderTop: '2px solid var(--color-divider)', padding: '18px 32px 36px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <button type="button" className="btn btn-secondary" style={btnLeft} onClick={agregar}>+ Agregar otra tanda</button>
+        <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendoAlguna} onClick={terminar}>Terminar</button>
+        {subiendoAlguna && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Hay subidas en curso: espera a que terminen.</span>}
       </div>
     </div>
   )

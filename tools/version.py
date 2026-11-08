@@ -6,13 +6,14 @@
     python tools/version.py --siguiente feat --escribir    y la escribe: se corre ANTES de hacer ese commit
 
 Reglas (solo cuenta el primer renglón de cada commit, del más viejo al más nuevo):
-  - Se empieza en 0.0.0.
+  - Se empieza en la línea base (BASE_VERSION, abajo) y se cuentan solo los commits posteriores a BASE_COMMIT.
   - "feat" (feat: ..., feat(algo): ...) sube el segundo número y pone el tercero en 0.
   - "fix" sube el tercero.
   - Todo lo demás (docs, chore, wip, refactor, mensajes sueltos) no cuenta.
 
-1.0.0 NO sale de aquí: se pone a mano cuando el checklist esté completo (el sistema cumple la tesis). Mientras tanto
-la versión es 0.x.y.
+1.0.0 es la versión que se instaló en producción (la VPS), el commit BASE_COMMIT; ahí se decidió que la versión 1 es
+la de producción. Todo lo que se haga después sube desde ahí: 1.0.1, 1.1.0, etc. Antes de eso la cuenta empezaba en
+0.0.0 y llegó a 0.93.0.
 
 Dónde escribe la versión (solo con --escribir):
   - VERSION (raíz): una línea, para quien la necesite leer.
@@ -30,6 +31,10 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 COMMIT = re.compile(r"^(feat|fix)(\([^)]*\))?!?:", re.IGNORECASE)
 
+# Línea base de producción: este commit es la versión 1.0.0. Los commits anteriores ya no cuentan.
+BASE_COMMIT = "15489f4d72513f4b61a1f95792bdce69622d2110"
+BASE_VERSION = (1, 0, 0)
+
 
 def asuntos():
     """Primer renglón de cada commit, del más viejo al más nuevo.
@@ -37,8 +42,11 @@ def asuntos():
     El merge de poc/backend-spring a main trae dos copias (con otro hash) de los commits de main anteriores a la
     reescritura de historia; un asunto feat/fix repetido se cuenta una sola vez para que la versión no suba de más.
     """
-    salida = subprocess.run(["git", "log", "--reverse", "--format=%s"], cwd=RAIZ, capture_output=True, text=True,
-                            encoding="utf-8", check=True).stdout
+    # La base debe estar en el historial de esta rama; si no, la versión que saldría no tendría sentido.
+    if subprocess.run(["git", "merge-base", "--is-ancestor", BASE_COMMIT, "HEAD"], cwd=RAIZ).returncode != 0:
+        sys.exit("Esta rama no contiene el commit de la versión 1.0.0 (" + BASE_COMMIT[:7] + "): trae main antes de calcular la versión.")
+    salida = subprocess.run(["git", "log", "--reverse", "--format=%s", BASE_COMMIT + "..HEAD"], cwd=RAIZ,
+                            capture_output=True, text=True, encoding="utf-8", check=True).stdout
     vistos, lineas = set(), []
     for linea in salida.splitlines():
         if COMMIT.match(linea.strip()):
@@ -59,7 +67,7 @@ def subir(version, tipo):
 
 
 def calcular(lineas):
-    version = (0, 0, 0)
+    version = BASE_VERSION
     for linea in lineas:
         m = COMMIT.match(linea.strip())
         if m:
