@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from comun import ahora, carpeta_analisis, log
+from tiempos import modelo_del_analisis, texto_del_modelo
 
 FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ANCHO_PAGINA, ALTO_PAGINA, MARGEN = 1275, 1650, 100
@@ -65,6 +66,10 @@ def paginas_de_diagnostico(d, etapa, mensaje):
     ]
     renglones += textwrap.wrap(mensaje, 68)[:22]
     renglones += ["", "Generado por el worker (pipeline fst_auto, modelo fst_cnn_seg)."]
+    # En modo desarrollador, con qué archivo de modelo se hizo este análisis (sin él, modelo_del_analisis es None).
+    modelo = modelo_del_analisis(d["idanalisis"])
+    if modelo:
+        renglones += textwrap.wrap("Modelo del análisis: " + texto_del_modelo(modelo), 68)
     texto = fuente(26)
     for i, renglon in enumerate(renglones):
         dibujo.text((100, 200 + i * 45), renglon, font=texto, fill="black")

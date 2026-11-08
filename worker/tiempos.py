@@ -6,8 +6,13 @@ guía y no se toca), con el mismo patrón que progreso.json y pausa.json: el wor
      "etapas": [{"etapa": "preprocesamiento", "inicio": "...", "fin": "...", "segundos": 1}, ...],
      "subpasos": {"cilindros": {"1/5 alineando la camara": 54.0, ...}, "clasificacion": {"prediciendo": 903.0, ...}},
      "equipo": {"nombre": "Laptop Erick", "cpu": "...", "nucleos": 8, "memoriaGB": 7.6, "dockerCPU": 8},
+     "modelo": {"archivo": "fst_cnn_seg.pt", "version": "5.0.0", "sha256": "...", "tamanoMB": 119.8,
+                "modificado": "2026-10-18T13:59:00-06:00", "videosDeEntrenamiento": 12, "clips": 5400},
      "video": {"duracionSegundos": 120.0, "ancho": 1920, "alto": 1080, "tamanoMB": 77.6}}
 
+  - modelo: con qué modelo se hizo el análisis (el archivo, no solo su nombre: el SHA-256 lo identifica aunque
+    alguien lo reemplace por otro con el mismo nombre). Para los PDF y los reportes en modo desarrollador. Es null si
+    no se pasó la ruta o el archivo no existe.
   - El tiempo que el análisis espera en la cola NO cuenta: inicio es cuando el worker lo toma.
   - Se reescribe al entrar y al salir de cada etapa. Si el análisis termina en error o cancelado (o se pausa), se
     cierran fin y totalSegundos hasta donde llegó (cerrar_archivo). Al reencolar o reiniciar se empieza de cero.
@@ -15,10 +20,14 @@ guía y no se toca), con el mismo patrón que progreso.json y pausa.json: el wor
     log y no detiene el análisis.
 """
 
+import hashlib
 import json
 import os
+import subprocess
+import sys
 import time
 from datetime import datetime
+from pathlib import Path
 
 from comun import ahora, carpeta_analisis, log
 
@@ -80,6 +89,90 @@ def datos_del_equipo():
     }
 
 
+# Lo que trae el .pt por dentro (la versión de la red y con cuántos videos y clips se entrenó). Lo lee OTRO proceso:
+# torch pesa y no se quiere dentro del worker. Es el mismo paquete que abre probar_seg.py (un diccionario con los pesos).
+_LEER_PAQUETE = (
+    "import json, sys, torch\n"
+    "p = torch.load(sys.argv[1], map_location='cpu', weights_only=False)\n"
+    "print(json.dumps({'version': p.get('version'), 'videosDeEntrenamiento': len(p.get('videos', [])) or None,"
+    " 'clips': p.get('n_clips')}))\n"
+)
+
+# (ruta, tamaño, fecha del archivo) → identidad ya calculada. El archivo no cambia de un análisis a otro: el hash y
+# la lectura del .pt se hacen una sola vez por proceso y otra vez solo si el archivo cambió.
+_MODELOS = {}
+
+
+def _sha256(ruta):
+    resumen = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(1024 * 1024), b""):
+            resumen.update(bloque)
+    return resumen.hexdigest()
+
+
+def _leer_paquete(ruta):
+    """La versión de la red y los datos de entrenamiento que trae el .pt; {} si no se pudo leer (el análisis sigue:
+    el SHA-256 ya identifica al modelo)."""
+    try:
+        salida = subprocess.run([sys.executable, "-c", _LEER_PAQUETE, str(ruta)], capture_output=True, text=True,
+                                timeout=120, check=True).stdout
+        return json.loads(salida.strip().splitlines()[-1])
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError) as e:
+        log.warning("No se pudo leer la versión del modelo %s: %s (se registra solo su SHA-256)", ruta, e)
+        return {}
+
+
+def identidad_del_modelo(ruta):
+    """Con qué modelo se analiza: el archivo, su tamaño y fecha, su SHA-256 y lo que trae por dentro. None si el
+    archivo no existe."""
+    ruta = Path(ruta)
+    try:
+        estado = ruta.stat()
+    except OSError:
+        return None
+    clave = (str(ruta), estado.st_size, estado.st_mtime_ns)
+    if clave not in _MODELOS:
+        datos = {
+            "archivo": ruta.name,
+            "version": None,
+            "sha256": _sha256(ruta),
+            "tamanoMB": round(estado.st_size / (1024 * 1024), 1),
+            "modificado": datetime.fromtimestamp(estado.st_mtime).astimezone().isoformat(timespec="seconds"),
+            "videosDeEntrenamiento": None,
+            "clips": None,
+        }
+        datos.update(_leer_paquete(ruta))
+        _MODELOS[clave] = datos
+    return dict(_MODELOS[clave])
+
+
+def texto_del_modelo(modelo):
+    """«fst_cnn_seg.pt · red 5.0.0 · SHA-256 3fa9c1d2e4b5a6f7 · 119.8 MB · archivo del 2026-10-18»."""
+    partes = [modelo.get("archivo") or "modelo desconocido"]
+    if modelo.get("version"):
+        partes.append("red " + str(modelo["version"]))
+    if modelo.get("sha256"):
+        partes.append("SHA-256 " + modelo["sha256"][:16])
+    if modelo.get("tamanoMB") is not None:
+        partes.append(f"{modelo['tamanoMB']} MB")
+    if modelo.get("modificado"):
+        partes.append("archivo del " + str(modelo["modificado"])[:10])
+    return " · ".join(partes)
+
+
+def modelo_del_analisis(id_analisis, carpeta=None):
+    """El bloque «modelo» del tiempos.json de un análisis, o None: sin modo desarrollador, sin archivo o de antes de
+    que se anotara el modelo."""
+    if not modo_desarrollador():
+        return None
+    archivo = (carpeta or carpeta_analisis(id_analisis)) / "tiempos.json"
+    try:
+        return json.loads(archivo.read_text(encoding="utf-8")).get("modelo")
+    except (OSError, ValueError):
+        return None
+
+
 def _iso(momento):
     return momento.isoformat(timespec="seconds")
 
@@ -101,8 +194,9 @@ def _escribir_archivo(archivo, datos):
 
 
 class RegistroTiempos:
-    def __init__(self, id_analisis, carpeta=None, video=None):
-        """Empieza un análisis NUEVO: reescribe el archivo desde cero (carpeta solo se cambia en las pruebas)."""
+    def __init__(self, id_analisis, carpeta=None, video=None, modelo=None):
+        """Empieza un análisis NUEVO: reescribe el archivo desde cero (carpeta solo se cambia en las pruebas). modelo es
+        la ruta del .pt con el que se va a analizar; solo se le calcula la identidad en modo desarrollador."""
         self.archivo = (carpeta or carpeta_analisis(id_analisis)) / "tiempos.json"
         self._avisado = False
         self._activo = modo_desarrollador()
@@ -113,6 +207,7 @@ class RegistroTiempos:
             "etapas": [],
             "subpasos": {},
             "equipo": datos_del_equipo(),
+            "modelo": identidad_del_modelo(modelo) if (self._activo and modelo) else None,
             "video": video,
         }
         self._inicio_monotonico = time.monotonic()

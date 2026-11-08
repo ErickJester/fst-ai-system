@@ -168,4 +168,35 @@ class ReporteCsvTest {
 		}
 	}
 
+	// Modo desarrollador: con qué modelo se hizo cada análisis, una fila por análisis al final.
+	private static TablaDeReporte conModelos(List<String> modelos) {
+		TablaDeReporte base = tabla("Control", false, List.of());
+		return new TablaDeReporte(base.grupo(), base.filas(), base.estadisticos(), false, base.revisados(), modelos);
+	}
+
+	@Test
+	void sin_modelos_el_archivo_no_trae_filas_de_modelo() {
+		List<String> lineas = lineas(ReporteCsv.armar(tabla("Control", false, List.of())));
+		assertFalse(lineas.stream().anyMatch(linea -> linea.startsWith(",,Modelo,")));
+	}
+
+	@Test
+	void en_modo_desarrollador_cada_modelo_va_en_su_fila_despues_de_la_revision() {
+		List<String> lineas = lineas(ReporteCsv.armar(conModelos(
+				List.of("Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5", "Tanda B: sin registro"))));
+		int revision = lineas.indexOf(",,Revisión humana,No");
+		assertEquals(",,Modelo,Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5", lineas.get(revision + 1));
+		assertEquals(",,Modelo,Tanda B: sin registro", lineas.get(revision + 2));
+		assertEquals("", lineas.get(revision + 3));      // lo último es el vacío que deja el CRLF final
+	}
+
+	@Test
+	void el_aviso_de_niveles_mixtos_va_antes_que_los_modelos() {
+		TablaDeReporte base = tabla("Control", true, List.of());
+		List<String> lineas = lineas(ReporteCsv.armar(new TablaDeReporte(base.grupo(), base.filas(), base.estadisticos(), true,
+				base.revisados(), List.of("Tanda A: sin registro"))));
+		int aviso = lineas.indexOf(",,Aviso," + TablaDeReporte.TEXTO_AVISO);
+		assertEquals(",,Modelo,Tanda A: sin registro", lineas.get(aviso + 1));
+	}
+
 }

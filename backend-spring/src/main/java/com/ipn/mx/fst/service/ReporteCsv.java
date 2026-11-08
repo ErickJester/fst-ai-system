@@ -48,6 +48,10 @@ public final class ReporteCsv {
 		if (tabla.nivelMixto()) {
 			textoFinal(texto, TablaDeReporte.ETIQUETA_AVISO, TablaDeReporte.TEXTO_AVISO);
 		}
+		// Modo desarrollador: con qué modelo se hizo cada análisis (la lista viene vacía fuera de él).
+		for (String modelo : tabla.modelos()) {
+			textoFinal(texto, TablaDeReporte.ETIQUETA_MODELO, modelo);
+		}
 
 		byte[] contenido = texto.toString().getBytes(StandardCharsets.UTF_8);
 		byte[] salida = new byte[BOM.length + contenido.length];
@@ -66,7 +70,7 @@ public final class ReporteCsv {
 		linea(texto, celdas);
 	}
 
-	// Revisión humana y Aviso: la etiqueta en la columna Espécimen y su texto en la de Tiempo.
+	// Revisión humana, Aviso y Modelo: la etiqueta en la columna Espécimen y su texto en la de Tiempo.
 	private static void textoFinal(StringBuilder texto, String etiqueta, String contenido) {
 		linea(texto, List.of(texto(""), texto(""), texto(etiqueta), texto(contenido)));
 	}

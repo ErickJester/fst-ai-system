@@ -151,7 +151,7 @@ def procesar_real(conn, id_analisis):
     progreso = RegistroProgreso(id_analisis)
     # Cronómetro del análisis (analisis/{id}/tiempos.json): arranca aquí, cuando el worker lo toma; la espera en la
     # cola no cuenta. Un análisis reiniciado o reencolado empieza de cero.
-    tiempos = RegistroTiempos(id_analisis)
+    tiempos = RegistroTiempos(id_analisis, modelo=MODELO)
 
     # a. preprocesamiento: el video existe y se puede leer
     poner_etapa(conn, id_analisis, "preprocesamiento")

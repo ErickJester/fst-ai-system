@@ -238,6 +238,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 		datos.put("totalSegundos", valor(t.path("totalSegundos")));
 		datos.put("etapas", etapas);
 		datos.put("equipo", equipo(t));
+		datos.put("modelo", modelo(t));
 		return datos;
 	}
 
@@ -247,6 +248,37 @@ public class ResultadosServiceImpl implements ResultadosService {
 			equipo.put(campo, valor(t.path("equipo").path(campo)));
 		}
 		return equipo;
+	}
+
+	// Con qué modelo se hizo el análisis: el bloque «modelo» de tiempos.json (el archivo, la versión de la red, su SHA-256, el
+	// tamaño y la fecha del archivo y con cuántos videos se entrenó). null si no lo trae: un análisis de antes de que el
+	// worker lo anotara.
+	private Map<String, Object> modelo(JsonNode t) {
+		JsonNode m = t.path("modelo");
+		if (m.isMissingNode() || m.isNull()) {
+			return null;
+		}
+		Map<String, Object> modelo = new LinkedHashMap<>();
+		for (String campo : List.of("archivo", "version", "sha256", "tamanoMB", "modificado", "videosDeEntrenamiento", "clips")) {
+			modelo.put(campo, valor(m.path(campo)));
+		}
+		return modelo;
+	}
+
+	// Una línea por análisis del reporte, «Tanda A: fst_cnn_seg.pt · red 5.0.0 · …», con el modelo con el que se hizo. Solo
+	// en modo desarrollador: sin él, la lista va vacía y el CSV y el XLSX salen como siempre.
+	private List<String> modelosDelReporte(List<Espec> especimenes) {
+		if (!modoDesarrollador) {
+			return List.of();
+		}
+		Map<Integer, String> porAnalisis = new LinkedHashMap<>();
+		for (Espec e : especimenes) {
+			porAnalisis.computeIfAbsent(e.idAnalisis, id -> {
+				JsonNode t = leerTiempos(id);
+				return "Tanda " + letra(e.ordinal) + ": " + ModeloDelAnalisis.texto(t == null ? null : modelo(t));
+			});
+		}
+		return new ArrayList<>(porAnalisis.values());
 	}
 
 	// El valor de un campo de tiempos.json como número o texto, o null si falta o es null.
@@ -705,7 +737,7 @@ public class ResultadosServiceImpl implements ResultadosService {
 					Estadisticos.redondear(Estadisticos.desviacion(totales)), Estadisticos.redondear(Estadisticos.varianza(totales))));
 		}
 		boolean mixto = especimenes.stream().map(e -> e.nivel).distinct().count() > 1;
-		return new TablaDeReporte(alcance.etiqueta(), filas, estadisticos, mixto, revisados);
+		return new TablaDeReporte(alcance.etiqueta(), filas, estadisticos, mixto, revisados, modelosDelReporte(especimenes));
 	}
 
 	// ---------------------------------------------------------------------------

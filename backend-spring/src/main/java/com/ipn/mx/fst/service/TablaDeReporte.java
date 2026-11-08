@@ -6,9 +6,16 @@ import java.util.stream.Stream;
 
 // Lo que llevan los reportes CSV y XLSX de un grupo completo o de una tanda: una fila por espécimen y minuto, la media, la
 // desviación estándar y la varianza de cada conducta (sobre los totales por espécimen) y qué especímenes tuvieron revisión
-// humana. ResultadosService la arma; ReporteCsv y ReporteXlsx solo la escriben, con los mismos textos.
+// humana. ResultadosService la arma; ReporteCsv y ReporteXlsx solo la escriben, con los mismos textos. En modo desarrollador
+// trae además, en modelos, con qué modelo se hizo cada análisis (vacío si no).
 public record TablaDeReporte(String grupo, List<FilaDeReporte> filas, List<Estadistico> estadisticos, boolean nivelMixto,
-		List<Revisado> revisados) {
+		List<Revisado> revisados, List<String> modelos) {
+
+	// Sin modelos: lo normal, fuera del modo desarrollador.
+	public TablaDeReporte(String grupo, List<FilaDeReporte> filas, List<Estadistico> estadisticos, boolean nivelMixto,
+			List<Revisado> revisados) {
+		this(grupo, filas, estadisticos, nivelMixto, revisados, List.of());
+	}
 
 	// D-99: las columnas del reporte, en este orden («Sin ver» al final).
 	public static final List<String> ENCABEZADO = List.of("Grupo", "Tanda", "Espécimen", "Tiempo (min:seg)", "Nado",
@@ -28,6 +35,8 @@ public record TablaDeReporte(String grupo, List<FilaDeReporte> filas, List<Estad
 	public static final String ETIQUETA_VARIANZA = "Varianza";
 	public static final String ETIQUETA_REVISION = "Revisión humana";
 	public static final String ETIQUETA_AVISO = "Aviso";
+	// Solo en modo desarrollador: una línea por análisis con el modelo con el que se hizo («Tanda A: fst_cnn_seg.pt · red 5.0.0 · …»).
+	public static final String ETIQUETA_MODELO = "Modelo";
 	public static final String TEXTO_AVISO = "Mezcla tandas de clasificación precisa y agrupada";
 
 	// segundos va en el orden de COLUMNAS.

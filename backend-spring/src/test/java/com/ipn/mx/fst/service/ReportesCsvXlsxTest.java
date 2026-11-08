@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -32,6 +33,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -67,6 +70,12 @@ class ReportesCsvXlsxTest {
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private ResultadosService resultadosService;
+
+	@Autowired
+	private ReporteAlmacen reporteAlmacen;
 
 	private int experimento;
 	private int control;
@@ -339,6 +348,102 @@ class ReportesCsvXlsxTest {
 		assertEquals(null, vacio.get("media"));
 		assertEquals(null, vacio.get("de"));
 		assertEquals(null, vacio.get("varianza"));
+	}
+
+	// ------------------------------------------------- con qué modelo se hizo (modo desarrollador)
+
+	// El modo desarrollador se lee de la configuración al arrancar; aquí se prende solo para estas pruebas, en los dos
+	// servicios que lo consultan (el contexto de Spring es el mismo para toda la clase).
+	private void modoDesarrollador(boolean prendido) {
+		Object resultados = AopTestUtils.getUltimateTargetObject(resultadosService);
+		Object almacen = AopTestUtils.getUltimateTargetObject(reporteAlmacen);
+		ReflectionTestUtils.setField(resultados, "modoDesarrollador", prendido);
+		ReflectionTestUtils.setField(almacen, "modoDesarrollador", prendido);
+	}
+
+	@AfterEach
+	void apagar_el_modo_desarrollador() {
+		modoDesarrollador(false);
+	}
+
+	// Lo que el worker deja en analisis/{id}/tiempos.json: aquí, solo el equipo y el modelo.
+	private void tiemposConModelo(int idAnalisis) throws IOException {
+		Path carpeta = RAIZ.resolve("analisis").resolve(String.valueOf(idAnalisis));
+		Files.createDirectories(carpeta);
+		Files.writeString(carpeta.resolve("tiempos.json"), "{\"inicio\":\"2026-10-19T12:00:00-06:00\",\"fin\":null,\"totalSegundos\":null,"
+				+ "\"etapas\":[],\"equipo\":{\"nombre\":\"PC de prueba\",\"cpu\":null,\"nucleos\":4},"
+				+ "\"modelo\":{\"archivo\":\"fst_cnn_seg.pt\",\"version\":\"5.0.0\","
+				+ "\"sha256\":\"480c5803998562f59896c42925e965d3b87afbe5db888365988e20286ee769ae\",\"tamanoMB\":119.6,"
+				+ "\"modificado\":\"2026-10-19T21:27:32-06:00\",\"videosDeEntrenamiento\":4,\"clips\":3323}}");
+	}
+
+	private static final String MODELO_A = "Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5 · 119.6 MB · archivo del 2026-10-19";
+
+	@Test
+	void en_modo_desarrollador_el_csv_dice_con_que_modelo_se_hizo_cada_analisis() throws Exception {
+		modoDesarrollador(true);
+		tiemposConModelo(analisisA);     // la tanda B no tiene tiempos.json: es de antes de que se anotara el modelo
+		MvcResult r = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
+				.andExpect(status().isOk()).andReturn();
+		List<String> lineas = lineas(r.getResponse().getContentAsByteArray());
+		int revision = lineas.indexOf(",,Revisión humana,No");
+		assertEquals(",,Modelo," + MODELO_A, lineas.get(revision + 1));
+		assertEquals(",,Modelo,Tanda B: sin registro", lineas.get(revision + 2));
+		assertEquals(11, lineas.size());
+		assertEquals(0, filasDeReporte());      // con el modo desarrollador no se guarda nada
+	}
+
+	@Test
+	void el_csv_de_una_sola_tanda_solo_trae_el_modelo_de_esa_tanda() throws Exception {
+		modoDesarrollador(true);
+		tiemposConModelo(analisisA);
+		MvcResult r = mvc.perform(get(ruta("csv", experimento, "grupo=" + control + "&tanda=A")).header("Authorization", "Bearer " + login("creador@fst.mx")))
+				.andExpect(status().isOk()).andReturn();
+		List<String> modelos = lineas(r.getResponse().getContentAsByteArray()).stream().filter(l -> l.startsWith(",,Modelo,")).toList();
+		assertEquals(List.of(",,Modelo," + MODELO_A), modelos);
+	}
+
+	@Test
+	void el_xlsx_tambien_trae_los_modelos_en_modo_desarrollador() throws Exception {
+		modoDesarrollador(true);
+		tiemposConModelo(analisisA);
+		MvcResult r = mvc.perform(get(ruta("xlsx", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
+				.andExpect(status().isOk()).andReturn();
+		try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(r.getResponse().getContentAsByteArray()))) {
+			Sheet hoja = libro.getSheet("Resultados");
+			int ultima = hoja.getLastRowNum();
+			assertEquals("Modelo", hoja.getRow(ultima - 1).getCell(2).getStringCellValue());
+			assertEquals(MODELO_A, hoja.getRow(ultima - 1).getCell(3).getStringCellValue());
+			assertEquals("Tanda B: sin registro", hoja.getRow(ultima).getCell(3).getStringCellValue());
+		}
+	}
+
+	@Test
+	void sin_modo_desarrollador_los_reportes_no_dicen_el_modelo_aunque_exista_el_archivo() throws Exception {
+		tiemposConModelo(analisisA);
+		String sesion = login("creador@fst.mx");
+		byte[] csv = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + sesion))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+		assertFalse(new String(csv, StandardCharsets.UTF_8).contains("Modelo"));
+		byte[] pdf = mvc.perform(get(ruta("pdf", experimento, null)).header("Authorization", "Bearer " + sesion))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+		assertFalse(textoDelPdf(pdf).contains("Modelo con el que se hizo"));
+	}
+
+	@Test
+	void el_pdf_del_experimento_trae_una_tabla_con_el_modelo_en_modo_desarrollador() throws Exception {
+		modoDesarrollador(true);
+		tiemposConModelo(analisisA);
+		byte[] pdf = mvc.perform(get(ruta("pdf", experimento, null)).header("Authorization", "Bearer " + login("creador@fst.mx")))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+		String texto = textoDelPdf(pdf);
+		assertTrue(texto.contains("Modelo con el que se hizo cada análisis"), texto);
+		assertTrue(texto.contains("fst_cnn_seg.pt"), texto);
+		assertTrue(texto.contains("5.0.0"), texto);
+		assertTrue(texto.contains("480c5803998562f5"), texto);
+		assertTrue(texto.contains("119.6 MB"), texto);
+		assertTrue(texto.contains("2026-10-19"), texto);
+		assertTrue(texto.contains("sin registro"), texto);      // la tanda B
 	}
 
 	// ----------------------------------------------------------------- apoyo

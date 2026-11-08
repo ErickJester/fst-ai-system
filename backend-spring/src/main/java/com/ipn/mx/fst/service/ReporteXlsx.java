@@ -64,7 +64,11 @@ public final class ReporteXlsx {
 
 			numero = textoFinal(hoja, numero, TablaDeReporte.ETIQUETA_REVISION, tabla.textoDeRevision());
 			if (tabla.nivelMixto()) {
-				textoFinal(hoja, numero, TablaDeReporte.ETIQUETA_AVISO, TablaDeReporte.TEXTO_AVISO);
+				numero = textoFinal(hoja, numero, TablaDeReporte.ETIQUETA_AVISO, TablaDeReporte.TEXTO_AVISO);
+			}
+			// Modo desarrollador: con qué modelo se hizo cada análisis (la lista viene vacía fuera de él).
+			for (String modelo : tabla.modelos()) {
+				numero = textoFinal(hoja, numero, TablaDeReporte.ETIQUETA_MODELO, modelo);
 			}
 
 			// Solo las columnas de la tabla: el texto largo de la revisión no debe ensanchar la última.

@@ -788,6 +788,17 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 					documento.add(armarTablaTiempos(tiempos));
 					documento.add(new Paragraph("Tiempo que el worker trabajó en el análisis (no incluye la espera en la "
 							+ "cola). \"sin registro\": análisis de antes de que se midiera el tiempo.", letraNota));
+
+					// Con qué modelo se hizo cada análisis, también solo en modo desarrollador.
+					documento.add(Chunk.NEWLINE);
+					Paragraph subtituloModelo = new Paragraph("Modelo con el que se hizo cada análisis",
+							FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+					subtituloModelo.setSpacingAfter(6);
+					documento.add(subtituloModelo);
+					documento.add(armarTablaModelos(tiempos));
+					documento.add(new Paragraph("SHA-256: los primeros 16 caracteres de la huella del archivo del modelo; lo "
+							+ "identifica aunque cambie de nombre. \"sin registro\": análisis de antes de que se anotara el modelo.",
+							letraNota));
 				}
 			}
 
@@ -927,6 +938,48 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				tabla.addCell(celdaCentrada(mmss(porEtapa.get(etapa.valor())), letraTexto));
 			}
 			tabla.addCell(new PdfPCell(new Phrase(textoDelEquipo((Map<?, ?>) tiempos.get("equipo")), letraTexto)));
+		}
+		return tabla;
+	}
+
+	// Una fila por tanda analizada: grupo y tanda, y el modelo con el que se hizo (archivo, versión de la red, huella, tamaño
+	// y fecha del archivo). Las de antes de que se anotara el modelo dicen "sin registro".
+	private PdfPTable armarTablaModelos(List<Map<String, Object>> tandas) throws DocumentException {
+		PdfPTable tabla = new PdfPTable(6);
+		tabla.setWidthPercentage(100);
+		tabla.setWidths(new float[] {2.8f, 2.2f, 1.4f, 2.6f, 1.2f, 1.6f});
+
+		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
+		Stream.of("Grupo · Tanda", "Archivo del modelo", "Versión de la red", "SHA-256", "Tamaño", "Archivo del")
+				.forEach(textoEncabezado -> {
+					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
+					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
+					encabezado.setPadding(4);
+					tabla.addCell(encabezado);
+				});
+
+		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 8);
+		for (Map<String, Object> tanda : tandas) {
+			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
+					+ nombreDelVideo(tanda), letraTexto)));
+
+			@SuppressWarnings("unchecked")
+			Map<String, Object> tiempos = (Map<String, Object>) tanda.get("tiempos");
+			@SuppressWarnings("unchecked")
+			Map<String, Object> modelo = tiempos == null ? null : (Map<String, Object>) tiempos.get("modelo");
+			if (modelo == null) {
+				tabla.addCell(celdaCentrada(ModeloDelAnalisis.SIN_REGISTRO, letraTexto));
+				for (int i = 0; i < 4; i++) {
+					tabla.addCell(celdaCentrada("—", letraTexto));
+				}
+				continue;
+			}
+			tabla.addCell(new PdfPCell(new Phrase(String.valueOf(modelo.get("archivo")), letraTexto)));
+			tabla.addCell(celdaCentrada(modelo.get("version") != null ? modelo.get("version").toString() : "—", letraTexto));
+			tabla.addCell(celdaCentrada(ModeloDelAnalisis.huella(modelo) != null ? ModeloDelAnalisis.huella(modelo) : "—", letraTexto));
+			tabla.addCell(celdaCentrada(modelo.get("tamanoMB") != null ? modelo.get("tamanoMB") + " MB" : "—", letraTexto));
+			tabla.addCell(celdaCentrada(ModeloDelAnalisis.fecha(modelo) != null ? ModeloDelAnalisis.fecha(modelo) : "—", letraTexto));
 		}
 		return tabla;
 	}

@@ -202,6 +202,15 @@ y el porcentaje general, pesos medidos 1/9/90); **tiempos del análisis** (encar
 por etapa y el equipo, en Progreso, Resultados y el PDF); **`MODO_DESARROLLADOR`** (encargo 17: con `false` se
 apagan los tiempos y el banner rojo "vX.Y.Z"). Probado con pruebas automáticas y sin sesión; falta una corrida
 real con sesión (la hará el usuario en otra PC).
+Agregado en la versión 1.5.0: **con qué modelo se hizo cada análisis**, solo en modo desarrollador. El worker anota en
+`tiempos.json` el bloque `modelo` (archivo, versión de la red, SHA-256, tamaño y fecha del archivo y con cuántos videos y
+clips se entrenó; el hash y la lectura del `.pt` se hacen una vez por proceso y otra vez solo si el archivo cambió). El
+backend lo muestra en tres lugares: el PDF del experimento (tabla «Modelo con el que se hizo cada análisis», una fila por
+tanda), el CSV y el XLSX (una fila «Modelo» por análisis al final, después de «Revisión humana» y «Aviso») y el PDF de
+diagnóstico del worker. Los análisis de antes de esta versión dicen «sin registro». El SHA-256 se muestra con sus 16
+primeros caracteres. Fuera del modo desarrollador nada de esto aparece ni se calcula, y con el modo prendido los reportes no
+se guardan (igual que el PDF con tiempos). Probado con pruebas automáticas (178 del backend contra una PostgreSQL de verdad,
+87 del worker) y con el modelo real en esta PC; falta un análisis completo con un video real que muestre el bloque en un PDF.
 - [x] Toma un análisis a la vez, el más antiguo primero (`cola.py`: `tomar_siguiente`, `ORDER BY fechaanalisis, idanalisis` con `FOR UPDATE SKIP LOCKED`). Probado en desarrollo (23-oct): con dos análisis `en cola` de fechas del año 2000, `tomar_siguiente` toma el más antiguo aunque el otro tenga id menor; con ese bloqueado sin confirmar por otra conexión, la segunda conexión toma el otro y no el mismo; y dos vueltas reales de la cola (`cola.vuelta`) con un procesamiento simulado de 6 s muestran un solo análisis `procesando` a la vez
 - [x] Caso exitoso: pasa por las etapas (`preprocesamiento`, `cilindros`, `clasificacion`), escribe `OBSERVACION` y `SEGUNDO` (últimos 300 s, renumerados) y crea la notificación `analisis completado`. Probado con `AcuBN1.MOV` (18-oct); en el portable hay dos análisis completados (19-oct) con su notificación
 - [x] Caso de error (el video no se abre, un paso del pipeline falla o pasa de una hora, no coinciden los cilindros, o un fallo imprevisto, D-88): PDF de diagnóstico, estado `error` y notificación. Probado con el video que no se puede abrir; los demás motivos comparten `marcar_error` y no se provocaron a mano

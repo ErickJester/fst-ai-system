@@ -99,4 +99,27 @@ class ReporteXlsxTest {
 		}
 	}
 
+	@Test
+	void sin_modelos_la_hoja_termina_en_la_revision() throws IOException {
+		try (XSSFWorkbook libro = abrir(ReporteCsvTest.tabla("Control", false, List.of()))) {
+			assertEquals(7, hoja(libro).getLastRowNum());
+		}
+	}
+
+	@Test
+	void en_modo_desarrollador_los_modelos_van_despues_de_la_revision_y_del_aviso() throws IOException {
+		TablaDeReporte base = ReporteCsvTest.tabla("Control", true, List.of());
+		TablaDeReporte tabla = new TablaDeReporte(base.grupo(), base.filas(), base.estadisticos(), true, base.revisados(),
+				List.of("Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5", "Tanda B: sin registro"));
+		try (XSSFWorkbook libro = abrir(tabla)) {
+			Sheet hoja = hoja(libro);
+			assertEquals("Aviso", hoja.getRow(8).getCell(2).getStringCellValue());
+			assertEquals("Modelo", hoja.getRow(9).getCell(2).getStringCellValue());
+			assertEquals("Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5", hoja.getRow(9).getCell(3).getStringCellValue());
+			assertEquals("Modelo", hoja.getRow(10).getCell(2).getStringCellValue());
+			assertEquals("Tanda B: sin registro", hoja.getRow(10).getCell(3).getStringCellValue());
+			assertEquals(10, hoja.getLastRowNum());
+		}
+	}
+
 }
