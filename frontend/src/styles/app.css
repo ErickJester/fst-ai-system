@@ -8,6 +8,9 @@
 /* franja con la versión (modo desarrollador): arriba de todo; si también está la de demo, esa va justo debajo */
 .version-banner{position:sticky;top:0;z-index:101;height:var(--version-h);display:flex;align-items:center;justify-content:center;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:13px;letter-spacing:.12em}
 @media print{.version-banner{display:none}}
+/* versión del sistema, siempre visible abajo a la derecha; sin clics, para no tapar nada */
+.version-esquina{position:fixed;right:10px;bottom:8px;z-index:90;padding:2px 7px;background:var(--color-bg);border:1px solid var(--color-divider);color:var(--muted-2);font-family:var(--font-heading);font-weight:800;font-size:11px;letter-spacing:.08em;line-height:1.4;pointer-events:none;user-select:text}
+@media print{.version-esquina{display:none}}
 .demo-banner{position:sticky;top:var(--version-h);z-index:100;height:var(--demo-h);display:flex;align-items:center;justify-content:center;gap:.6em;background:#e00000;color:#fff;font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
 @media print{.demo-banner{display:none}}
 

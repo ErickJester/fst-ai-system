@@ -6,6 +6,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { version as versionDelPaquete } from '../package.json'
 import { ModoContext } from './contexts/ModoContext'
 import BannerVersion from './components/BannerVersion'
+import VersionEsquina from './components/VersionEsquina'
 import BotonSalidaModelo from './components/BotonSalidaModelo'
 import { TrabajoActual } from './pages/ProgresoPage'
 
@@ -14,6 +15,29 @@ afterEach(cleanup)
 const conModo = (valor, hijo) => <ModoContext.Provider value={valor}>{hijo}</ModoContext.Provider>
 const PRENDIDO = { modoDesarrollador: true, version: '0.22.0' }
 const APAGADO = { modoDesarrollador: false, version: '0.22.0' }
+
+describe('versión en la esquina inferior derecha', () => {
+  it('se ve siempre, también sin modo desarrollador, con la versión del backend', () => {
+    const { container } = render(conModo(APAGADO, <VersionEsquina />))
+    const esquina = container.querySelector('.version-esquina')
+    expect(esquina.textContent).toBe('v0.22.0')
+    expect(esquina.getAttribute('aria-label')).toBe('Versión del sistema')
+  })
+
+  it('con modo desarrollador sale igual, una sola vez', () => {
+    const { container } = render(conModo(PRENDIDO, <VersionEsquina />))
+    expect(container.querySelectorAll('.version-esquina')).toHaveLength(1)
+    expect(screen.getByText('v0.22.0')).toBeTruthy()
+  })
+
+  it('sin versión del backend, o sin proveedor, usa la del paquete', () => {
+    render(<VersionEsquina />)
+    expect(screen.getByText('v' + versionDelPaquete)).toBeTruthy()
+    cleanup()
+    render(conModo({ modoDesarrollador: false, version: null }, <VersionEsquina />))
+    expect(screen.getByText('v' + versionDelPaquete)).toBeTruthy()
+  })
+})
 
 describe('banner con la versión', () => {
   it('con modo desarrollador: solo «v0.22.0», sin BETA', () => {

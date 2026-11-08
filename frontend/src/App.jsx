@@ -4,6 +4,7 @@ import AppRouter from './router'
 import BannerVersion from './components/BannerVersion'
 import DemoBanner from './components/DemoBanner'
 import ErrorBoundary from './components/ErrorBoundary'
+import VersionEsquina from './components/VersionEsquina'
 
 export default function App() {
   const { pathname } = useLocation()
@@ -17,6 +18,7 @@ export default function App() {
           <AppRouter />
         </ErrorBoundary>
       </main>
+      <VersionEsquina />
     </>
   )
 }
