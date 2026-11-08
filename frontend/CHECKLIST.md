@@ -140,6 +140,7 @@ Las pantallas no importan datos: piden todo a `src/services/`. Hoy esa capa resp
 - [x] Desglose por minuto de cualquier espécimen, con selector y tabla de segundos por minuto
 - [x] Descargas reales de PDF, CSV y XLSX. Hecho: el PDF de resultados (el backend responde `application/pdf`). El backend ya responde CSV y XLSX (encargo 39, v0.87.0: `GET /experiments/{id}/report/{csv|xlsx}?grupo=&tanda=`, probado con JUnit). Probado en Chrome el 27-oct (nginx de la v0.88.0, puerto 8099, inicio de sesión real): en Resultados · Tanda A, los botones CSV y XLSX bajan `reporte_1_tandaA.csv` (660 bytes) y `reporte_1_tandaA.xlsx` (4286 bytes); el nombre lo pone el frontend (el `Content-Disposition` del servidor trae otro: `reporte_experimento_1_grupo-1_tanda-A.csv`). Los dos archivos se abrieron antes en Excel 16 por COM; el PDF no se repitió en el navegador esta vez
 - [x] Bloques de 5 s reales. Hecho: la pantalla. Probado el 28-oct con el experimento completo sembrado (2 especímenes de 5 min): la pestaña dibuja 60 bloques por espécimen y `/results/blocks` trae 60 por espécimen
+- [x] M0 (PLAN_RESULTADOS.md): `ResultadosPage.jsx` dividida en `components/resultados/` (TablaEspecimenes, DesglosePorMinuto, Bloques, ComparacionGrupos, BarraReportes, CabeceraResultados, PanelLateral, SinResultados y `constantes.js`), sin cambios de comportamiento ni de textos. Lint limpio, 220/220 sin editar pruebas, build de Vite correcto
 
 ## 8. Administración (§9.6, R-16)
 - [x] Lista de cuentas con filtros de rol y estado, y la columna de experimentos
