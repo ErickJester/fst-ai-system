@@ -5,7 +5,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { version as versionDelPaquete } from '../package.json'
 import { ModoContext } from './contexts/ModoContext'
-import BannerVersion from './components/BannerVersion'
+import BannerModoDesarrollador from './components/BannerModoDesarrollador'
 import VersionEsquina from './components/VersionEsquina'
 import BotonSalidaModelo from './components/BotonSalidaModelo'
 import { TrabajoActual } from './pages/ProgresoPage'
@@ -39,27 +39,30 @@ describe('versión en la esquina inferior derecha', () => {
   })
 })
 
-describe('banner con la versión', () => {
-  it('con modo desarrollador: solo «v0.22.0», sin BETA', () => {
-    render(conModo(PRENDIDO, <BannerVersion />))
-    const banner = screen.getByText('v0.22.0')
-    expect(banner.className).toBe('version-banner')
+describe('franja «Modo desarrollador»', () => {
+  it('con modo desarrollador dice «Modo desarrollador», sin número de versión ni BETA', () => {
+    render(conModo(PRENDIDO, <BannerModoDesarrollador />))
+    const banner = screen.getByText('Modo desarrollador')
+    expect(banner.className).toBe('modo-banner')
     expect(banner.getAttribute('role')).toBe('status')
-    expect(banner.textContent).not.toMatch(/beta/i)
+    expect(banner.textContent).not.toMatch(/\d|beta/i)
   })
 
-  it('sin modo desarrollador no hay banner', () => {
-    const { container } = render(conModo(APAGADO, <BannerVersion />))
-    expect(container.querySelector('.version-banner')).toBeNull()
-    expect(screen.queryByText(/^v\d/)).toBeNull()
+  it('sin modo desarrollador no hay franja', () => {
+    const { container } = render(conModo(APAGADO, <BannerModoDesarrollador />))
+    expect(container.querySelector('.modo-banner')).toBeNull()
+    expect(screen.queryByText('Modo desarrollador')).toBeNull()
   })
 
-  it('sin proveedor (por omisión) tampoco, y sin versión del backend usa la del paquete', () => {
-    const { container } = render(<BannerVersion />)
-    expect(container.querySelector('.version-banner')).toBeNull()
-    cleanup()
-    render(conModo({ modoDesarrollador: true, version: null }, <BannerVersion />))
-    expect(screen.getByText('v' + versionDelPaquete)).toBeTruthy()
+  it('sin proveedor (por omisión) tampoco', () => {
+    const { container } = render(<BannerModoDesarrollador />)
+    expect(container.querySelector('.modo-banner')).toBeNull()
+  })
+
+  it('con las dos juntas, la franja no repite la versión que ya sale en la esquina', () => {
+    const { container } = render(conModo(PRENDIDO, <><BannerModoDesarrollador /><VersionEsquina /></>))
+    expect(container.querySelector('.modo-banner').textContent).toBe('Modo desarrollador')
+    expect(container.querySelector('.version-esquina').textContent).toBe('v0.22.0')
   })
 })
 
