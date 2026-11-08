@@ -52,7 +52,7 @@ const avisoDia1 = (lista) => (lista.length > 1 ? 'Videos del Día 1 almacenados 
 // plantilla: con «Agregar otra tanda» el formulario nace con lo que ya se sabe: el mismo grupo, la tanda que sigue y
 // la tanda ya confirmada (agregar otra tanda es seguir en el mismo grupo). Solo queda el archivo y, si hace falta,
 // la sesión y los especímenes. Si el usuario cambia el grupo, deja de heredar y se comporta como siempre.
-function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla, autoFoco, onResumen, onGuardada, onQuitar }) {
+function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla, autoFoco, guardando, registrar, onResumen, onGuardada, onQuitar }) {
   const navigate = useNavigate()
   const [q, setQ] = useState(plantilla?.q ?? '')
   const [elegido, setElegido] = useState(plantilla?.elegido ?? null) // sugerencia elegida (grupo existente)
@@ -138,24 +138,26 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
   const matches = respondido && !grupo ? sug.lista : []
   const nuevo = !grupo && respondido && sug.lista.length === 0
   const grupoNombre = grupo ? etiqueta(grupo) : qt
-  // Mismo grupo en otro formulario de esta página: la tanda y la sesión no pueden repetirse, y un grupo nuevo
-  // solo lo crea el primero que se guarda (el servidor lo crea al terminar la subida: dos a la vez chocarían).
+  // Mismo grupo en otro formulario de esta página: la tanda y la sesión no pueden repetirse. Un grupo nuevo lo crea
+  // el primero que se sube (el servidor lo crea al terminar la subida) y la página los sube en orden, uno por uno.
   const grupoKey = grupo || nuevo ? norm(grupo ? grupo.nombre : qt) : ''
   const hermanas = grupoKey ? otras.filter((o) => o.grupoKey === grupoKey) : []
   const hermanaNueva = nuevo && hermanas.some((o) => o.nuevo && o.id < id) // solo el posterior toma los datos del anterior
   // El choque lo lleva el formulario posterior (o cualquiera si el otro ya se guardó): el primero no se bloquea.
   const choque = !!grupoKey && /^[A-Z]$/.test(tanda) && hermanas.some((o) => o.tanda === tanda && o.sesion === sesion && (o.id < id || o.guardada))
-  const espera = nuevo ? hermanas.find((o) => o.nuevo && !o.guardada && o.id < id) : null
   const showConfirm = (grupo || nuevo) && /^[A-Z]$/.test(tanda)
   // Si otro formulario ya trae los datos del mismo grupo nuevo, aquí no se piden otra vez.
   const grupoOk = grupo || (nuevo && (trat.trim() || hermanaNueva))
   // Una tanda lleva un solo video por sesión: si ya tiene el de ese día, no se puede subir otro.
   const tandaExistente = grupo ? exp.grupos.find((x) => x.id === grupo.id)?.tandas.find((t) => t.letra === tanda) : null
   const yaTiene = !!tandaExistente && (sesion === '1' ? !!tandaExistente.dia1 : tandaExistente.estado !== 'SIN_VIDEO')
-  const canSave = !!(grupoOk && confirmada && archivo) && subiendo == null && !yaTiene && !choque && !espera
+  // lista: la tanda ya se puede subir (la página junta las de todos los formularios en un solo botón);
+  // canSave: además no se está subiendo ahora (el botón de un formulario único).
+  const lista = !!(grupoOk && confirmada && archivo) && !yaTiene && !choque
+  const canSave = lista && subiendo == null
 
   // La página necesita saber esto de cada formulario para no repetir tandas ni crear dos veces un grupo nuevo.
-  const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null, q, elegido })
+  const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null, q, elegido, lista })
   useEffect(() => { onResumen(id, JSON.parse(firma)) }, [id, firma, onResumen])
 
   // ── 1 · grupo ─────────────────────────────────────────────────────────────
@@ -259,13 +261,14 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
       if (unicoRef.current) {
         if (dia === 'DAY2') navigate('/analisis?experimento=' + clave, { state: { aviso: avisoCola([{ donde }]) } })
         else navigate(`/experimentos/${clave}`, { state: { aviso: avisoDia1([{ donde }]) } })
-        return
+        return true
       }
-      // Varios formularios: no se sale, para que los demás conserven lo que llevan. «Terminar» cierra.
+      // Varios formularios: no se sale; el botón de la página sigue con el siguiente y al final navega.
       setSubiendo(null)
       subidaRef.current = null
       setGuardada({ donde, dia, nombre: archivo.name })
       onGuardada(id, { donde, dia })
+      return true
     } catch (err) {
       // Cancelar no es un error: el archivo queda elegido para volver a intentarlo.
       if (esCancelacion(err)) setCancelada(true)
@@ -275,8 +278,12 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
       else setErrGuardar(mensajeError(err, 'No se pudo guardar el video. Inténtalo de nuevo.'))
       setSubiendo(null)
       subidaRef.current = null
+      return false
     }
   }
+
+  // La página llama a guardar() de cada formulario, en orden, desde su único botón (varios formularios).
+  useEffect(() => { registrar(id, guardar) })
 
   if (guardada) {
     return (
@@ -298,7 +305,7 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
         {!unico && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <span className="k">Formulario {posicion}</span>
-            <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendo != null} onClick={() => onQuitar(id)}>Quitar este formulario</button>
+            <button type="button" className="btn btn-ghost" style={btnLeft} disabled={guardando || subiendo != null} onClick={() => onQuitar(id)}>Quitar este formulario</button>
           </div>
         )}
 
@@ -408,20 +415,21 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
                 </div>
               )}
               {cancelada && <div className="hint" style={{ marginTop: 10 }}>Subida cancelada: el video no se guardó. Puedes volver a intentarlo con el mismo archivo o elegir otro.</div>}
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
-                <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
-                  {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
-                </button>
-                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
-              </div>
+              {/* Con un solo formulario, su propio botón. Con varios, un solo botón al final de la página las sube en orden. */}
+              {unico && (
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginTop: 18 }}>
+                  <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
+                    {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
+                  </button>
+                  <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
+                </div>
+              )}
+              {!unico && guardando && subiendo == null && (
+                <div className="hint" style={{ marginTop: 14 }}>En espera: esta tanda se sube después de las de arriba.</div>
+              )}
               {choque && (
                 <div className="note-bar" role="status" style={{ marginTop: 10 }}>
                   Otro formulario de esta página ya usa la Tanda {tanda} de {grupoNombre} en el {sesion === '1' ? 'Día 1' : 'Día 2'}. Cambia la tanda o la sesión.
-                </div>
-              )}
-              {espera && (
-                <div className="note-bar" role="status" style={{ marginTop: 10 }}>
-                  {grupoNombre} es un grupo nuevo y se crea con la primera tanda que se guarda. Guarda antes la Tanda {espera.tanda || 'del otro formulario'}: así el grupo no se crea dos veces.
                 </div>
               )}
               <FieldError msg={errGuardar} style={{ marginTop: 10 }} />
@@ -482,15 +490,19 @@ export default function CargarVideoPage() {
   const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
   const [formularios, setFormularios] = useState([{ id: 1, plantilla: null }]) // en el orden en que se agregaron
   const [resumenes, setResumenes] = useState({}) // id → lo que cada formulario cuenta de sí mismo
-  const [guardadas, setGuardadas] = useState({}) // id → { donde, dia } de las tandas ya almacenadas
   const [foco, setFoco] = useState(null) // formulario recién agregado
   const siguienteId = useRef(2)
+  const [guardando, setGuardando] = useState(false) // el botón único está subiendo las tandas en orden
+  const guardadores = useRef({}) // id → guardar() de cada formulario, siempre el más reciente
+  const guardadasRef = useRef({}) // id → { donde, dia } de las tandas ya almacenadas, al día dentro del ciclo de subida
 
   const onResumen = useCallback((id, r) => setResumenes((prev) => (
     prev[id] && JSON.stringify(prev[id]) === JSON.stringify(r) ? prev : { ...prev, [id]: r }
   )), [])
-  const onGuardada = useCallback((id, info) => setGuardadas((prev) => ({ ...prev, [id]: info })), [])
+  const onGuardada = useCallback((id, info) => { guardadasRef.current = { ...guardadasRef.current, [id]: info } }, [])
+  const registrar = useCallback((id, fn) => { guardadores.current[id] = fn }, [])
   const quitar = useCallback((id) => {
+    delete guardadores.current[id]
     setFormularios((f) => f.filter((x) => x.id !== id))
     setResumenes((prev) => {
       const resto = { ...prev }
@@ -510,9 +522,26 @@ export default function CargarVideoPage() {
     setFoco(id)
   }
 
+  // El botón único: sube las tandas en el orden en que están, una por una, así la primera crea el grupo y las
+  // siguientes caen ya en él. Si una falla (el servidor la rechaza, se cancela), se detiene ahí: las que ya se
+  // guardaron quedan guardadas y, al corregir, el mismo botón sigue con las que faltan.
+  async function guardarTodas() {
+    setGuardando(true)
+    let todas = true
+    for (const { id } of formularios) {
+      if (guardadasRef.current[id]) continue
+      if (!(await guardadores.current[id]?.())) {
+        todas = false
+        break
+      }
+    }
+    setGuardando(false)
+    if (todas) terminar()
+  }
+
   // Cierra la carga: a Progreso si quedó alguna tanda de Día 2 en la cola; si no, de vuelta al experimento.
   function terminar() {
-    const lista = Object.values(guardadas)
+    const lista = Object.values(guardadasRef.current)
     const dia2 = lista.filter((g) => g.dia === 'DAY2')
     const dia1 = lista.filter((g) => g.dia === 'DAY1')
     if (dia2.length) {
@@ -539,6 +568,10 @@ export default function CargarVideoPage() {
 
   const subiendoAlguna = Object.values(resumenes).some((r) => r.subiendo)
   const unico = formularios.length === 1
+  // Estado del botón único: cada formulario sin guardar debe estar listo (grupo, tanda confirmada y archivo).
+  const pendientes = formularios.map((f, i) => ({ ...f, posicion: i + 1, r: resumenes[f.id] })).filter((f) => !f.r?.guardada)
+  const faltan = pendientes.filter((f) => !f.r?.lista).map((f) => f.posicion)
+  const hayDia2 = pendientes.some((f) => f.r?.sesion !== '1')
 
   return (
     <div className="app">
@@ -556,14 +589,25 @@ export default function CargarVideoPage() {
 
       {formularios.map(({ id, plantilla }, i) => (
         <FormularioTanda key={id} clave={clave} exp={exp} id={id} posicion={i + 1} unico={unico} resumenes={resumenes}
-          plantilla={plantilla} autoFoco={id === foco} onResumen={onResumen} onGuardada={onGuardada} onQuitar={quitar} />
+          plantilla={plantilla} autoFoco={id === foco} guardando={guardando} registrar={registrar}
+          onResumen={onResumen} onGuardada={onGuardada} onQuitar={quitar} />
       ))}
 
       {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}
       <div style={{ borderTop: '2px solid var(--color-divider)', padding: '18px 32px 36px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <button type="button" className="btn btn-secondary" style={btnLeft} onClick={agregar}>+ Agregar otra tanda</button>
-        <button type="button" className="btn btn-ghost" style={btnLeft} disabled={subiendoAlguna} onClick={terminar}>Terminar</button>
-        {subiendoAlguna && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Hay subidas en curso: espera a que terminen.</span>}
+        {!unico && (
+          <button type="button" className="btn btn-primary" style={btnLeft} disabled={guardando || subiendoAlguna || pendientes.length === 0 || faltan.length > 0} onClick={guardarTodas}>
+            {guardando || subiendoAlguna ? 'Subiendo…' : hayDia2 ? 'Guardar y encolar análisis' : 'Guardar videos'}
+          </button>
+        )}
+        <button type="button" className="btn btn-secondary" style={btnLeft} disabled={guardando} onClick={agregar}>+ Agregar otra tanda</button>
+        <button type="button" className="btn btn-ghost" style={btnLeft} disabled={guardando || subiendoAlguna} onClick={terminar}>Terminar</button>
+        {!unico && !guardando && faltan.length > 0 && (
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            Se habilita cuando cada tanda tenga su grupo, la tanda confirmada y su archivo. Falta completar: {faltan.length > 1 ? 'los formularios ' : 'el formulario '}{faltan.join(', ')}.
+          </span>
+        )}
+        {!unico && (guardando || subiendoAlguna) && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se suben en orden, una por una: la primera crea el grupo.</span>}
       </div>
     </div>
   )

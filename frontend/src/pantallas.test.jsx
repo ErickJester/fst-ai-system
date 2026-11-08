@@ -298,11 +298,17 @@ describe('cargar video', () => {
     // La D ya viene confirmada: solo falta el archivo.
     expect(screen.getByRole('button', { name: 'Sí, es la D' }).disabled).toBe(true)
     expect(screen.getByText(/¿Esta es la tanda D de Referencia/)).toBeTruthy()
+    // Con dos formularios hay UN solo botón de guardar, y espera a que los dos tengan su archivo.
+    const guardar = screen.getByRole('button', { name: 'Guardar y encolar análisis' })
+    expect(guardar.disabled).toBe(true)
     await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'tanda_D.mp4', { type: 'video/mp4' }))
     await screen.findByText('tanda_D.mp4')
-    expect(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })[1].disabled).toBe(false)
+    expect(guardar.disabled).toBe(true)
+    expect(screen.getByText(/Falta completar: el formulario 1\./)).toBeTruthy()
+    await user.upload(document.querySelectorAll('input[type=file]')[0], new File(['video'], 'tanda_C.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_C.mp4')
+    expect(guardar.disabled).toBe(false)
   })
-
   it('si el formulario anterior aún no tiene grupo, el nuevo nace vacío', async () => {
     const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
@@ -372,30 +378,34 @@ describe('cargar video', () => {
     expect(letras).toEqual(['C', 'D'])
   })
 
-  it('dos tandas de un grupo nuevo: la segunda toma la B, espera a que se guarde la primera y no pide otra vez los datos del grupo', async () => {
+  it('dos tandas de un grupo nuevo: la segunda hereda el nombre y la B, no pide otra vez el tratamiento, y un solo botón las sube en orden', async () => {
     const user = await conSesion('/experimentos/7/cargar')
-    await screen.findByRole('combobox')
-    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
-    const [uno, dos] = screen.getAllByRole('combobox')
-    await user.type(uno, 'Acu-YBN')
+    await user.type(await screen.findByRole('combobox'), 'Acu-YBN')
     await screen.findByText('Grupo nuevo · el nombre no coincide')
     await user.type(screen.getByLabelText('Tratamiento (sustancia y dosis)'), 'prueba')
-    await user.type(dos, 'Acu-YBN')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la A' }))
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'Acu-YBN-1.mov', { type: 'video/quicktime' }))
+    await screen.findByText('Acu-YBN-1.mov')
+
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+
+    // El segundo trae el grupo, la B ya confirmada y no vuelve a pedir tipo ni tratamiento.
+    expect(screen.getAllByRole('combobox')[1].value).toBe('Acu-YBN')
     await waitFor(() => expect(screen.getAllByLabelText('Tanda')[1].value).toBe('B'))
-    expect(screen.getAllByLabelText('Tanda')[0].value).toBe('A')
-    // El segundo no vuelve a pedir tipo y tratamiento: los toma del primero.
+    expect(screen.getByRole('button', { name: 'Sí, es la B' }).disabled).toBe(true)
     expect(screen.getAllByLabelText('Tratamiento (sustancia y dosis)')).toHaveLength(1)
     expect(screen.getByText(/se toman del otro formulario/)).toBeTruthy()
+    await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'Acu-YBN-2.mov', { type: 'video/quicktime' }))
+    await screen.findByText('Acu-YBN-2.mov')
 
-    // Confirma la B y adjunta el archivo: aun así no se puede guardar antes que la A.
-    await user.click(screen.getByRole('button', { name: 'Sí, es la B' }))
-    await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'segunda.mp4', { type: 'video/mp4' }))
-    await screen.findByText('segunda.mp4')
-    expect(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })[1].disabled).toBe(true)
-    expect(screen.getByText(/Guarda antes la Tanda A/)).toBeTruthy()
+    // Un solo botón: la A crea el grupo y la B cae ya en él, en ese orden.
+    const botones = screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })
+    expect(botones).toHaveLength(1)
+    await user.click(botones[0])
+    expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
+    expect(screen.getByText(/Los análisis están en cola: Acu-YBN · Tanda A · Día 2; Acu-YBN · Tanda B · Día 2\./)).toBeTruthy()
   })
-
-  it('la misma tanda y sesión de un grupo en dos formularios se avisa y no deja guardar', async () => {
+  it('la misma tanda y sesión de un grupo en dos formularios se avisa y el botón no se habilita', async () => {
     const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
     await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
@@ -403,6 +413,8 @@ describe('cargar video', () => {
       await user.type(caja, 'fluox')
       await user.keyboard('{ArrowDown}{Enter}')
     }
+    await user.click(screen.getAllByRole('button', { name: 'Sí, es la C' })[0])
+    await user.upload(document.querySelectorAll('input[type=file]')[0], new File(['video'], 'uno.mp4', { type: 'video/mp4' }))
     // La segunda propone la D; se la cambia a la C, que ya usa la primera.
     const segunda = screen.getAllByLabelText('Tanda')[1]
     await user.clear(segunda)
@@ -411,42 +423,54 @@ describe('cargar video', () => {
     await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'repetida.mp4', { type: 'video/mp4' }))
     await screen.findByText('repetida.mp4')
     expect(screen.getByText(/Otro formulario de esta página ya usa la Tanda C/)).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })[1].disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Guardar y encolar análisis' }).disabled).toBe(true)
   })
-
-  it('con dos formularios, guardar uno no saca de la página: el otro conserva lo suyo y «Terminar» lleva a Progreso', async () => {
+  it('con dos formularios hay un solo botón: sube la C y luego la D, en ese orden, y lleva a Progreso', async () => {
     const user = await conSesion('/experimentos/7/cargar')
     await screen.findByRole('combobox')
+    await user.type(screen.getByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'tanda_C.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_C.mp4')
     await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
-    for (const caja of screen.getAllByRole('combobox')) {
-      await user.type(caja, 'fluox')
-      await user.keyboard('{ArrowDown}{Enter}')
-    }
-    // Primero llena la segunda tanda (D) por completo, sin guardarla.
-    await user.click(screen.getByRole('button', { name: 'Sí, es la D' }))
     await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'tanda_D.mp4', { type: 'video/mp4' }))
     await screen.findByText('tanda_D.mp4')
-    // Luego la primera (C), y la guarda.
-    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
-    await user.upload(document.querySelectorAll('input[type=file]')[0], new File(['video'], 'tanda_C.mp4', { type: 'video/mp4' }))
-    await screen.findByText('tanda_C.mp4')
-    await user.click(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })[0])
 
-    // Sigue en la página: la primera quedó almacenada y la segunda no perdió nada.
-    expect(await screen.findByText(/✓ Referencia · Fluoxetina 10 mg\/kg · Tanda C · Día 2/)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Análisis en curso' })).toBeNull()
-    expect(screen.getAllByRole('combobox')).toHaveLength(1)
-    expect(screen.getByText('tanda_D.mp4')).toBeTruthy()
-    expect(screen.getByLabelText('Tanda').value).toBe('D')
-
-    // Guarda la segunda y termina.
+    expect(screen.getAllByRole('button', { name: 'Guardar y encolar análisis' })).toHaveLength(1)
     await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
-    expect(await screen.findByText(/✓ Referencia · Fluoxetina 10 mg\/kg · Tanda D · Día 2/)).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Terminar' }))
+
     expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
-    expect(screen.getByText(/Los análisis están en cola: .*Tanda C · Día 2; .*Tanda D · Día 2\./)).toBeTruthy()
+    expect(screen.getByText(/Los análisis están en cola: Referencia · Fluoxetina 10 mg\/kg · Tanda C · Día 2; Referencia · Fluoxetina 10 mg\/kg · Tanda D · Día 2\./)).toBeTruthy()
   })
 
+  it('si la primera tanda falla, la segunda no se sube; al corregirla el mismo botón sigue y termina', async () => {
+    const user = await conSesion('/experimentos/7/cargar')
+    await screen.findByRole('combobox')
+    await user.type(screen.getByRole('combobox'), 'fluox')
+    await user.keyboard('{ArrowDown}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Sí, es la C' }))
+    await user.upload(document.querySelector('input[type=file]'), new File(['video'], 'celular_vertical.mp4', { type: 'video/mp4' }))
+    await screen.findByText('celular_vertical.mp4')
+    await user.click(screen.getByRole('button', { name: '+ Agregar otra tanda' }))
+    await user.upload(document.querySelectorAll('input[type=file]')[1], new File(['video'], 'tanda_D.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_D.mp4')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
+
+    // La C la rechazó el servidor: se queda en la página, la D no se subió y conserva su archivo.
+    expect(await screen.findByText('El servidor rechazó el video')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Análisis en curso' })).toBeNull()
+    expect(screen.queryByText(/✓/)).toBeNull()
+    expect(screen.getByText('tanda_D.mp4')).toBeTruthy()
+
+    // Se corrige la C con otro archivo y el mismo botón termina las dos.
+    await user.upload(document.querySelectorAll('input[type=file]')[0], new File(['video'], 'tanda_C_bien.mp4', { type: 'video/mp4' }))
+    await screen.findByText('tanda_C_bien.mp4')
+    await user.click(screen.getByRole('button', { name: 'Guardar y encolar análisis' }))
+    expect(await screen.findByRole('heading', { name: 'Análisis en curso' })).toBeTruthy()
+    expect(screen.getByText(/Tanda C · Día 2; .*Tanda D · Día 2\./)).toBeTruthy()
+  })
   it('un solo formulario se comporta como antes: al guardar sale a Progreso y la siguiente carga empieza vacía', async () => {
     const user = await conSesion('/experimentos/7/cargar')
     await user.type(await screen.findByRole('combobox'), 'fluox')
