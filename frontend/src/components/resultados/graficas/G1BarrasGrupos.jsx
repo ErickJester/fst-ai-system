@@ -2,9 +2,9 @@ import React, { useRef } from 'react'
 import PanelGrafica from './PanelGrafica'
 import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
-import { CONDUCTAS_BARRAS, CONDUCTAS_GRAFICA, ESCALA_SEGUNDOS, NOTA_MIXTO, estilosDeGrupos, numero, textoMediaDe, textoN } from './estilos'
+import { CONDUCTAS_BARRAS, CONDUCTAS_GRAFICA, ESCALA_SEGUNDOS, NOTA_MIXTO, estilosDeGrupos, numero, textoMediaDe, textoN, textoAnimales } from './estilos'
 
-// G1 · Barras agrupadas: la media de una conducta por grupo, con su ± DE y un punto por espécimen. Con «Las tres juntas»,
+// G1 · Barras agrupadas: la media de una conducta por grupo, con su ± desviación estándar y un punto por animal. Con «Las tres juntas»,
 // tres barras por grupo, una por conducta. La conducta activa no va en las barras: se dice aparte, con sus segundos.
 // Un grupo con niveles mezclados no lleva barra: su tabla trae una fila por tanda (porNivel).
 const W = 420
@@ -59,7 +59,7 @@ function Barra({ x, bw, valor, de, color, patron, prefijo, valoresS, puntos, eti
       )}
       {puntos && valoresS.map((v, i) => (
         <circle key={i} cx={cx + (((i * 7) % 5) - 2) * (bw * 0.12)} cy={y(v)} r="2.6" fill="var(--color-text)" stroke="var(--color-bg)" strokeWidth="0.8">
-          <title>{`${etiqueta}, espécimen ${i + 1}: ${numero(v)} s`}</title>
+          <title>{`${etiqueta}, animal ${i + 1}: ${numero(v)} s`}</title>
         </circle>
       ))}
     </g>
@@ -79,7 +79,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
   const dibujable = (g) => !g.nivelMixto && g.porConducta && g.n > 0
   const maxCar = Math.max(4, Math.floor((slot - 6) / CAR))
 
-  // La escala es de 300 s (la ventana del Día 2) y solo crece si algún grupo la rebasa con su media + DE o con un espécimen.
+  // La escala es de 300 s (la ventana del Día 2) y solo crece si algún grupo la rebasa con su media + DE o con un animal.
   const alturas = grupos.filter(dibujable).flatMap((g) => [
     ...mostradas.map((c) => (g.porConducta[c.clave].media ?? 0) + (g.porConducta[c.clave].de ?? 0)),
     ...mostradas.flatMap((c) => g.porConducta[c.clave].valoresS),
@@ -89,27 +89,28 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
   y.escala = escala
   const marcas = Array.from({ length: 6 }, (_, k) => (escala / 5) * k)
 
+  const avisos = []
   const notas = []
   for (const g of grupos) {
-    if (g.nivelMixto) notas.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
-    else if (g.n === 0) notas.push(`${g.etiqueta}: sin datos.`)
+    if (g.nivelMixto) avisos.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
+    else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      notas.push(`${g.etiqueta}: ${faltan} especímenes pendientes (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
   const conActiva = grupos.filter((g) => dibujable(g) && g.porConducta[activa.clave].media > 0)
   if (conActiva.length) {
-    notas.push(`Conducta activa, fuera de las barras (segundos medios por espécimen): ${conActiva.map((g) => `${g.etiqueta} ${numero(g.porConducta[activa.clave].media)} s`).join(' · ')}.`)
+    notas.push(`Conducta activa, fuera de las barras (segundos medios por animal): ${conActiva.map((g) => `${g.etiqueta} ${numero(g.porConducta[activa.clave].media)} s`).join(' · ')}.`)
   }
 
-  const titulo = 'Tiempo por conducta · Día 2'
-  const etiquetaSvg = 'Barras agrupadas: media ± DE del tiempo por conducta en cada grupo, en segundos del Día 2.'
+  const titulo = '¿Cuánto hizo cada grupo?'
+  const etiquetaSvg = 'Barras agrupadas: media ± desviación estándar del tiempo por conducta en cada grupo, en segundos del Día 2.'
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Media ± DE de los especímenes, en segundos analizados. El eje llega a 300 s, la ventana del Día 2."
+      subtitulo="Promedio ± desviación estándar de los animales, en segundos analizados. El eje llega a 300 s, la ventana del Día 2."
       nombre={`g1_${tres ? 'tres_conductas' : conducta.replace(' ', '_')}`}
       svgRef={svgRef}
       controles={(
@@ -121,7 +122,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
             <option value={TRES}>Las tres juntas</option>
           </select>
           <label style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={puntos} onChange={(e) => setPuntos(e.target.checked)} /> Mostrar especímenes
+            <input type="checkbox" checked={puntos} onChange={(e) => setPuntos(e.target.checked)} /> Mostrar animales
           </label>
         </>
       )}
@@ -136,10 +137,10 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
             <MuestraLeyenda color={estilos.get(g.idGrupo).color} patron={estilos.get(g.idGrupo).patron} />{g.etiqueta}
           </span>
         ))}
-      notas={notas}
+      avisos={avisos} notas={notas}
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
-          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Media ± DE por grupo, Día 2, en segundos.</caption>
+          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Promedio ± desviación estándar por grupo, Día 2, en segundos.</caption>
           <thead>
             <tr>
               <th>Grupo</th><th>n</th>
@@ -154,14 +155,14 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
                   <td className="num">{textoN(g)}</td>
                   {CONDUCTAS_GRAFICA.map((c) => (
                     <td key={c.clave} className="num" style={{ textAlign: 'right' }}>
-                      {g.nivelMixto ? 'por nivel' : g.porConducta ? textoMediaDe(g.porConducta[c.clave].media, g.porConducta[c.clave].de) : 'sin datos'}
+                      {g.nivelMixto ? 'por tanda' : g.porConducta ? textoMediaDe(g.porConducta[c.clave].media, g.porConducta[c.clave].de) : 'sin datos'}
                     </td>
                   ))}
                 </tr>
                 {g.nivelMixto && (g.porNivel || []).map((r) => (
                   <tr key={`${g.idGrupo}-${r.letra}`}>
                     <td style={{ paddingLeft: 18 }}>Tanda {r.letra} · {r.nivelClasif}</td>
-                    <td className="num">n = {r.n}</td>
+                    <td className="num">{textoAnimales(r.n)}</td>
                     {CONDUCTAS_GRAFICA.map((c) => (
                       <td key={c.clave} className="num" style={{ textAlign: 'right' }}>{textoMediaDe(r.porConducta[c.clave].media, r.porConducta[c.clave].de)}</td>
                     ))}
@@ -211,10 +212,10 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
                 )
               })()}
               {!dibujable(g) && (
-                <text x={cx} y={y(0) - 8} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{g.nivelMixto ? 'nivel mixto' : 'sin datos'}</text>
+                <text x={cx} y={y(0) - 8} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{g.nivelMixto ? 'tandas no comparables' : 'sin datos'}</text>
               )}
               {lineas.map((linea, k) => (
-                <text key={k} x={cx} y={yNombre + k * 13} textAnchor="middle" fontSize="11.5" fill="var(--color-text)">{linea}</text>
+                <text key={k} x={cx} y={yNombre + k * 13} textAnchor="middle" fontSize="11.5" fill="var(--color-text)" fontWeight={g.tipo === 'control' ? 700 : undefined}>{linea}</text>
               ))}
               <text x={cx} y={yN} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{textoN(g)}</text>
             </g>

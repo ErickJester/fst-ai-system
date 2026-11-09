@@ -15,7 +15,7 @@ export default function PanelLateral({ r, especimenes, g, grupoCompleto }) {
             <span className="num">{fmt(r.duracion_analizada_s)} / {fmt(r.duracion_s)}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 11.5 }}>
-            <span style={{ color: MUT70 }}>Especímenes analizados</span>
+            <span style={{ color: MUT70 }}>Animales analizados</span>
             <span className="num">{especimenes.length} de {grupoCompleto ? g.n_especimenes : especimenes.length}</span>
           </div>
         </div>

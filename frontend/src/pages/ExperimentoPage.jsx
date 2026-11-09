@@ -6,7 +6,7 @@ import EliminarExperimento, { puedeEliminar } from '../components/EliminarExperi
 import { useAuth } from '../contexts/AuthContext'
 import { getExperiment } from '../services/experiments'
 import { useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hooks/useAsync'
-import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultados, codigoGrupo, puedeSubirVideo, SOLO_CREADOR_SUBE } from '../lib/fst'
+import { fechaCorta, ESTADO_TANDA, estadoDeTanda, primeraTandaLista, enlaceResultadosExperimento, codigoGrupo, puedeSubirVideo, SOLO_CREADOR_SUBE } from '../lib/fst'
 
 // Hay análisis en cola, en curso o en pausa en alguna tanda (solo se analiza el Día 2).
 const ACTIVOS = ['QUEUED', 'RUNNING', 'PAUSED']
@@ -66,7 +66,7 @@ export default function ExperimentoPage() {
               ? <Link className="btn btn-secondary" to={`/experimentos/${exp.clave}/cargar`}>Cargar videos pendientes</Link>
               : <button type="button" className="btn btn-secondary" aria-disabled="true" title={SOLO_CREADOR_SUBE}>Cargar videos pendientes</button>}
             {lista
-              ? <Link className="btn btn-primary" to={enlaceResultados(exp.clave, lista.gid, lista.letra)}>Ver resultados</Link>
+              ? <Link className="btn btn-primary" to={enlaceResultadosExperimento(exp.clave)}>Ver resultados</Link>
               : <button type="button" className="btn btn-primary" disabled title="Todavía no hay tandas con el Día 2 analizado">Ver resultados</button>}
           </div>
         </div>

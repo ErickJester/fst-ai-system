@@ -227,3 +227,23 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [ ] Sin verificar: PNG descargado de G3 y G6, y minutos incompletos con datos reales
 - [x] Tres pruebas de `pantallas.test.jsx` abren su pestaña antes de la aserción (cambio de comportamiento por las pestañas reales)
 - [x] Correcciones antes de copiar G1 como patrón: `MuestraLeyenda` (color y patrón en las dos leyendas de G1); escala de 300 s que solo crece si un grupo la rebasa; tabla de G1 con una fila por tanda en nivel mixto; nombres de grupo en dos renglones o recortados con «…», nombre completo en `<title>`; flechas que dan la vuelta y botones deshabilitados solo con una gráfica; «Cómo agregar una gráfica» en `graficas/ESPECIFICACION.md` (§4 bis). Lint 0, 259/259, build correcto. Sin revisar en navegador después de estos cambios
+
+## Pantalla del experimento, paso 2: resumen, «¿Qué pasó?», descargas y detalle por tanda
+- [x] `/experimentos/:clave/resultados` sin tanda: el resumen del experimento. Título con su nombre, «Listos X de Y grupos · Falta: …», «¿Qué pasó? (comparado con el control)», la galería, «Descargar» (PDF y Excel) y «Ver el detalle»
+- [x] «Ver resultados» de la página del experimento abre el resumen (`enlaceResultadosExperimento`). Las rutas con `?grupo=&tanda=` siguen igual, con la vista en `?vista=`
+- [x] Detalle por tanda: pestañas Por animal, Segundo a segundo, Minuto a minuto, Cada 5 segundos y Comparación entre grupos. La galería ya no está en el detalle. Las migas llevan a «Resultados» del experimento
+- [x] «Segundo a segundo» con `getSegundos` (`results.js`, con mock de ejemplo que devuelve la misma forma que el backend). Con grupo completo pide elegir una tanda
+- [x] «Datos en Excel» llama a `report/excel` (`getExcelExperimento`). En demo no hay archivo, como con el PDF, y la pantalla lo dice
+- [x] «¿Qué pasó?»: selector de conducta (inicial inmovilidad); por grupo, sus segundos y la diferencia con el control en segundos y %. Sin control con datos, lo dice. Nunca usa la palabra «significativa»
+- [x] 390 px: el resumen mide 375 px de ancho (sin desplazamiento horizontal); el detalle y el segundo a segundo, igual
+- [x] Pruebas: `pantallas.test.jsx` (6 nuevas: resumen, «¿Qué pasó?», descargas en demo, enlaces del detalle, segundo a segundo por tanda, axe en el resumen), `services/segundos.test.js` (3 nuevas). Tres pruebas existentes cambiaron de nombre de botón: «Por espécimen» → «Por animal», «Línea de tiempo por minuto» → «Minuto a minuto», «Bloques de 5 s» → «Cada 5 segundos»
+- [x] Lint 0; `npm test` 326/326; navegador real en demo (vista principal, «Ver resultados», «Segundo a segundo», descargas y 390 px). Sin consola con errores
+
+## Revisión visual como usuario nuevo (pantalla del experimento)
+- [x] Detalle con selector de grupo (solo grupos con tandas listas) al lado de las tandas. Cambiar grupo, tanda o «Grupo completo» conserva `vista=`. «Segundo a segundo» con grupo completo se queda y pide elegir una tanda
+- [x] «¿Qué pasó?» nombra la conducta en cada renglón («Control: 168,5 s de inmovilidad en promedio.»), sin «(control)» repetido, sin signo y con el porcentaje en palabras («28 % menos»)
+- [x] «animales» en vez de «especímenes» y «espécimen» en las etiquetas visibles de la pantalla de resultados (`etiquetaAnimal` en `constantes.js`). Pendiente: la etiqueta de `SegundoASegundo.jsx` (archivo de m1) y la descripción de columnas del CSV en `constantes.js` (el archivo conserva el encabezado «Espécimen»)
+- [x] Nivel mixto con una sola frase: «Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.» (o «tandas no comparables» en la tabla)
+- [x] Glosas: «Día 2 (la prueba de 5 minutos).» en el resumen; «Tanda: un video con varios animales.» y la frase de «Nivel» (preciso / agrupado) en el detalle
+- [x] Pruebas actualizadas (`pantallas.test.jsx`): cuatro por textos (animales, nivel mixto, «¿Qué pasó?»); cinco nuevas del detalle (selector, vista conservada, grupo completo con segundo a segundo, glosas, glosa de Día 2)
+- [x] Lint 0; `npm test` 331/331; navegador real en demo: el selector cambia de grupo y conserva la vista; «Grupo completo» y los enlaces de tanda también; 390 px sin desplazamiento

@@ -8,12 +8,12 @@ import G6MapaPorMinuto from './G6MapaPorMinuto'
 
 // La galería de gráficas (M1A): una grande por defecto, selector, flechas (botones y teclado) y «Ver varias».
 const GRAFICAS = [
-  { id: 'g1', nombre: 'G1 · Barras por grupo', disponible: true },
-  { id: 'g2', nombre: 'G2 · Curva por minuto', disponible: true, Componente: G2CurvaPorMinuto },
-  { id: 'g3', nombre: 'G3 · Barras por minuto', disponible: true, Componente: G3BarrasPorMinuto },
-  { id: 'g4', nombre: 'G4 · Reparto de la duración', disponible: true, Componente: G4ApiladaPorGrupo },
-  { id: 'g5', nombre: 'G5 · Variabilidad entre animales', disponible: true, Componente: G5Variabilidad },
-  { id: 'g6', nombre: 'G6 · Mapa por minuto', disponible: true, Componente: G6MapaPorMinuto },
+  { id: 'g1', nombre: '¿Cuánto hizo cada grupo?', disponible: true },
+  { id: 'g2', nombre: '¿Cómo cambió minuto a minuto?', disponible: true, Componente: G2CurvaPorMinuto },
+  { id: 'g3', nombre: '¿Cómo se compara cada minuto?', disponible: true, Componente: G3BarrasPorMinuto },
+  { id: 'g4', nombre: '¿En qué se fue el tiempo?', disponible: true, Componente: G4ApiladaPorGrupo },
+  { id: 'g5', nombre: '¿Qué tan parecidos son los animales?', disponible: true, Componente: G5Variabilidad },
+  { id: 'g6', nombre: '¿En qué minuto cambia?', disponible: true, Componente: G6MapaPorMinuto },
 ]
 const HABILITADAS = GRAFICAS.filter((g) => g.disponible).map((g) => g.id)
 

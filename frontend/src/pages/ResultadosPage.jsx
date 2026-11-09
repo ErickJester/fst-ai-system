@@ -1,39 +1,31 @@
 import React, { useState } from 'react'
-import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getGroupComparison, getReporte, getSalidaModelo } from '../services/results'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
-import { download, primeraTandaLista, enlaceResultados } from '../lib/fst'
-import { Migas, Cargando, NoEncontrado } from '../components/ui'
+import { download, enlaceResultadosExperimento } from '../lib/fst'
+import { Migas, Cargando } from '../components/ui'
 import PanelLateral from '../components/resultados/PanelLateral'
 import CabeceraResultados from '../components/resultados/CabeceraResultados'
 import BarraReportes, { AvisoReporte } from '../components/resultados/BarraReportes'
 import SinResultados from '../components/resultados/SinResultados'
 import ContenidoResultados from '../components/resultados/ContenidoResultados'
+import ExperimentoResultados from '../components/resultados/ExperimentoResultados'
 import { REPORTES, TABS } from '../components/resultados/constantes'
 
-// 2f · Resultados, Día 2 (RF-19, D-93): de una tanda (?grupo=&tanda=) o del grupo completo
-// (?grupo= sin tanda). Sin grupo abre la primera tanda del experimento con el Día 2 analizado.
-// La pestaña activa va en ?vista= (M1A).
+// Resultados de un experimento (pantalla del experimento). Sin ?grupo: el resumen del experimento, con lo que se logró, las
+// gráficas, las descargas y el acceso al detalle. Con ?grupo= (y ?tanda=): el detalle de esa tanda o del grupo completo
+// (RF-19, D-93). La vista del detalle va en ?vista=.
 export default function ResultadosPage() {
   const { clave } = useParams()
   const [params] = useSearchParams()
   const gid = params.get('grupo')
   const letra = params.get('tanda')
   if (gid) return <ResultadosTanda key={gid + (letra || '*')} clave={clave} gid={gid} letra={letra} />
-  return <PrimeraTanda clave={clave} />
-}
-
-function PrimeraTanda({ clave }) {
-  const { data: exp, error, loading } = useAsync(() => getExperiment(clave), [clave])
-  if (loading) return <Cargando />
-  if (error) return <NoEncontrado />
-  const t = primeraTandaLista(exp)
-  if (!t) return <SinResultados clave={clave} />
-  return <Navigate replace to={enlaceResultados(clave, t.gid, t.letra)} />
+  return <ExperimentoResultados clave={clave} />
 }
 
 const VISTAS = TABS.map((t) => t.id)
@@ -54,14 +46,14 @@ function ResultadosTanda({ clave, gid, letra }) {
     if (!g) throw new Error('No existe ese grupo.')
     const listas = g.tandas.filter((t) => t.estado === 'DONE' && (!letra || t.letra === letra))
     if (!listas.length) throw new Error('Todavía no hay resultados.')
-    return { g, rs: await Promise.all(listas.map((t) => getBatchResults(clave, gid, t.letra))) }
+    return { g, grupos: e.grupos, rs: await Promise.all(listas.map((t) => getBatchResults(clave, gid, t.letra))) }
   }, [clave, gid, letra])
   const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
   if (loading) return <Cargando />
   if (error) return <SinResultados clave={clave} />
 
-  const { g, rs } = data
+  const { g, rs, grupos } = data
   const r = rs[0]
   const exp = r.experimento
   const grupoCompleto = !letra
@@ -118,6 +110,7 @@ function ResultadosTanda({ clave, gid, letra }) {
         <Migas items={[
           { to: '/experimentos', label: 'Experimentos' },
           { to: `/experimentos/${exp.clave}`, label: exp.titulo },
+          { to: enlaceResultadosExperimento(exp.clave), label: 'Resultados' },
           { to: `/experimentos/${exp.clave}/grupos/${r.grupo.id}`, label: r.grupo.nombre },
           { label: grupoCompleto ? 'Grupo completo · Día 2' : `Tanda ${r.letra} · Día 2` },
         ]} />
@@ -125,7 +118,7 @@ function ResultadosTanda({ clave, gid, letra }) {
 
       <div className="page">
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 24 }}>
-          <CabeceraResultados clave={clave} gid={gid} r={r} rs={rs} grupoCompleto={grupoCompleto} analizado={analizado} tiempos={tiempos}
+          <CabeceraResultados clave={clave} gid={gid} r={r} rs={rs} grupos={grupos} vista={vista} grupoCompleto={grupoCompleto} analizado={analizado} tiempos={tiempos}
             completadas={completadas} nCompletos={nCompletos} agrupado={agrupado} revisado={revisado} />
           <BarraReportes clave={clave} r={r} grupoCompleto={grupoCompleto} reporte={reporte} pedirReporte={pedirReporte} pedirSalidaModelo={pedirSalidaModelo} />
         </div>

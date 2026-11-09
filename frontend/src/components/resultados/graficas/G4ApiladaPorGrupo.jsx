@@ -3,9 +3,9 @@ import PanelGrafica from './PanelGrafica'
 import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
 import { renglonesDeEtiqueta } from './G1BarrasGrupos'
-import { CONDUCTAS_GRAFICA, NOTA_MIXTO, SIN_VER, numero, textoN } from './estilos'
+import { CONDUCTAS_GRAFICA, NOTA_MIXTO, SIN_VER, numero, textoN, textoAnimales } from './estilos'
 
-// G4 · Barra apilada por grupo: la media de cada categoría por espécimen, desde abajo, con las cinco categorías.
+// G4 · Barra apilada por grupo: la media de cada categoría por animal, desde abajo, con las cinco categorías.
 // La suma de los segmentos es la duración analizada (duracionMediaS). La escala no es fija: sigue a la duración real.
 const W = 420
 const H = 300
@@ -19,7 +19,7 @@ const CATEGORIAS = [...CONDUCTAS_GRAFICA, SIN_VER]
 
 const techo = (valor) => Math.ceil(valor / ESCALA_PASO) * ESCALA_PASO
 
-// Un grupo se dibuja solo si tiene datos y no mezcla niveles de clasificación.
+// Un grupo se dibuja solo si tiene datos y sus tandas son comparables.
 const dibujable = (g) => !g.nivelMixto && g.porConducta && g.n > 0
 
 // Un texto corto en el color que se lee sobre el relleno del segmento.
@@ -38,23 +38,24 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
   const y = (v) => M.t + PH - (Math.min(Math.max(v, 0), escala) / escala) * PH
   const marcas = Array.from({ length: 6 }, (_, k) => (escala / 5) * k)
 
+  const avisos = []
   const notas = []
   for (const g of grupos) {
-    if (g.nivelMixto) notas.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
-    else if (g.n === 0) notas.push(`${g.etiqueta}: sin datos.`)
+    if (g.nivelMixto) avisos.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
+    else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      notas.push(`${g.etiqueta}: ${faltan} especímenes pendientes (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
 
-  const titulo = 'Reparto de la duración analizada · Día 2'
-  const etiquetaSvg = 'Barras apiladas: media por espécimen de cada categoría de conducta y de la categoría sin ver, en segundos, por grupo.'
+  const titulo = '¿En qué se fue el tiempo?'
+  const etiquetaSvg = 'Barras apiladas: media por animal de cada categoría de conducta y de la categoría sin ver, en segundos, por grupo.'
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Media por espécimen de cada categoría; la suma es la duración analizada."
+      subtitulo="Promedio por animal de cada categoría; la suma es la duración analizada."
       nombre="g4_apilada"
       svgRef={svgRef}
       leyenda={categorias.map((c) => (
@@ -62,10 +63,10 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
           <MuestraLeyenda color={c.color} patron={c.patron} borde={c.clave === SIN_VER.clave ? 'var(--color-text)' : undefined} />{c.etiqueta}
         </span>
       ))}
-      notas={notas}
+      avisos={avisos} notas={notas}
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
-          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Media por espécimen de cada categoría, Día 2, en segundos.</caption>
+          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Promedio por animal de cada categoría, Día 2, en segundos.</caption>
           <thead>
             <tr>
               <th>Grupo</th><th>n</th>
@@ -81,17 +82,17 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
                   <td className="num">{textoN(g)}</td>
                   {categorias.map((c) => (
                     <td key={c.clave} className="num" style={{ textAlign: 'right' }}>
-                      {g.nivelMixto ? 'por nivel' : g.porConducta ? textoSegundos(g.porConducta[c.clave]?.media) : 'sin datos'}
+                      {g.nivelMixto ? 'por tanda' : g.porConducta ? textoSegundos(g.porConducta[c.clave]?.media) : 'sin datos'}
                     </td>
                   ))}
                   <td className="num" style={{ textAlign: 'right' }}>
-                    {g.nivelMixto ? 'por nivel' : textoSegundos(g.duracionMediaS)}
+                    {g.nivelMixto ? 'por tanda' : textoSegundos(g.duracionMediaS)}
                   </td>
                 </tr>
                 {g.nivelMixto && (g.porNivel || []).map((r) => (
                   <tr key={`${g.idGrupo}-${r.letra}`}>
                     <td style={{ paddingLeft: 18 }}>Tanda {r.letra} · {r.nivelClasif}</td>
-                    <td className="num">n = {r.n}</td>
+                    <td className="num">{textoAnimales(r.n)}</td>
                     {categorias.map((c) => (
                       <td key={c.clave} className="num" style={{ textAlign: 'right' }}>{textoSegundos(r.porConducta[c.clave]?.media)}</td>
                     ))}
@@ -151,10 +152,10 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
                 </text>
               )}
               {!dibujable(g) && (
-                <text x={cx} y={y(0) - 8} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{g.nivelMixto ? 'nivel mixto' : 'sin datos'}</text>
+                <text x={cx} y={y(0) - 8} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{g.nivelMixto ? 'tandas no comparables' : 'sin datos'}</text>
               )}
               {lineas.map((linea, k) => (
-                <text key={k} x={cx} y={yNombre + k * 13} textAnchor="middle" fontSize="11.5" fill="var(--color-text)">{linea}</text>
+                <text key={k} x={cx} y={yNombre + k * 13} textAnchor="middle" fontSize="11.5" fill="var(--color-text)" fontWeight={g.tipo === 'control' ? 700 : undefined}>{linea}</text>
               ))}
               <text x={cx} y={yN} textAnchor="middle" fontSize="10.5" fill="var(--muted-2)">{textoN(g)}</text>
             </g>

@@ -1,11 +1,24 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { textoVideo, mmss, enlaceResultados } from '../../lib/fst'
 import { fechaYHora, nombreGrupo } from './constantes'
 
-// Título de la vista, datos del análisis, el selector «Ver» (una tanda o el grupo completo) y las etiquetas de nivel.
-export default function CabeceraResultados({ clave, gid, r, rs, grupoCompleto, analizado, tiempos, completadas, nCompletos, agrupado, revisado }) {
-  const enlaceGrupo = `/experimentos/${clave}/resultados?grupo=${gid}`
+// Título de la vista, datos del análisis, el selector de grupo y de tanda (o el grupo completo), y las etiquetas de nivel.
+// Cambiar grupo, tanda o «Grupo completo» conserva la vista (?vista=). Solo ofrece los grupos con alguna tanda lista.
+export default function CabeceraResultados({ clave, gid, r, rs, grupos, vista, grupoCompleto, analizado, tiempos, completadas, nCompletos, agrupado, revisado }) {
+  const navegar = useNavigate()
+  const enlaceGrupo = `/experimentos/${clave}/resultados?grupo=${gid}&vista=${vista}`
+  const gruposConTandas = grupos.filter((g) => g.tandas.some((t) => t.estado === 'DONE'))
+
+  // Al cambiar de grupo: si se veía el grupo completo, se queda en el grupo completo; si no, abre su primera tanda lista.
+  function cambiarGrupo(nuevo) {
+    const g = gruposConTandas.find((x) => String(x.id) === nuevo)
+    if (!g) return
+    if (grupoCompleto) return navegar(`/experimentos/${clave}/resultados?grupo=${g.id}&vista=${vista}`)
+    const primera = g.tandas.find((t) => t.estado === 'DONE')
+    navegar(enlaceResultados(clave, g.id, primera.letra, vista))
+  }
+
   return (
     <div style={{ flex: 1 }}>
       <h2 style={{ margin: '0 0 9px' }}>Resultados · {nombreGrupo(r.grupo)}, {grupoCompleto ? 'grupo completo' : 'Tanda ' + r.letra}</h2>
@@ -19,33 +32,43 @@ export default function CabeceraResultados({ clave, gid, r, rs, grupoCompleto, a
           Tiempo de análisis: {tiempos.map((x) => (grupoCompleto ? 'Tanda ' + x.letra + ' ' : '') + mmss(x.tiempo_analisis.total_s) + (x.tiempo_analisis.equipo ? ' · ' + x.tiempo_analisis.equipo : '')).join('; ')}
         </div>
       )}
-      {/* Ver una tanda o el grupo completo (RF-19, D-93). */}
-      <nav aria-label="Ver" className="no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-        <span className="k" style={{ marginRight: 4 }}>Ver</span>
+      {/* Elegir grupo y tanda (o el grupo completo): solo dentro del detalle (RF-19, D-93). */}
+      <nav aria-label="Elegir grupo y tanda" className="no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+        <label htmlFor="selector-grupo" className="k" style={{ marginRight: 4 }}>Grupo</label>
+        <select id="selector-grupo" className="input" value={String(gid)} onChange={(e) => cambiarGrupo(e.target.value)}
+          style={{ width: 200, padding: '4px 6px', fontSize: 12 }}>
+          {gruposConTandas.map((g) => <option key={g.id} value={String(g.id)}>{nombreGrupo(g)}</option>)}
+        </select>
+        <span className="k" style={{ marginLeft: 6 }}>Tanda</span>
         {completadas.map((t) => {
           const on = !grupoCompleto && t.letra === r.letra
           return (
-            <Link key={t.letra} to={enlaceResultados(clave, gid, t.letra)} className={'tab' + (on ? ' on' : '')} aria-current={on ? 'page' : undefined}
+            <Link key={t.letra} to={enlaceResultados(clave, gid, t.letra, vista)} className={'tab' + (on ? ' on' : '')} aria-current={on ? 'page' : undefined}
               style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (on ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
-              Tanda {t.letra} · {t.n_cilindros} especímenes
+              Tanda {t.letra} · {t.n_cilindros} animales
             </Link>
           )
         })}
         <Link to={enlaceGrupo} className={'tab' + (grupoCompleto ? ' on' : '')} aria-current={grupoCompleto ? 'page' : undefined}
           style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (grupoCompleto ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
-          Grupo completo · {nCompletos} especímenes
+          Grupo completo · {nCompletos} animales
         </Link>
-        <span className="hint" style={{ maxWidth: 360 }}>El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.</span>
       </nav>
+      <p className="hint" style={{ margin: '8px 0 0', maxWidth: 680 }}>
+        Tanda: un video con varios animales. El grupo completo reúne sus tandas con análisis completado; cada animal lleva el nombre de su tanda.
+      </p>
       {/* D-78: el sistema solo entrega la conducta de cada segundo; conviene revisarla. */}
       <p className="hint" style={{ margin: '10px 0 0', maxWidth: 680 }}>
         La conducta de cada segundo la asigna el sistema de forma automática y no es 100 % exacta: conviene revisarla con «Revisar segundo a segundo».
       </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
         <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {agrupado ? 'agrupado' : 'preciso'}</span>
+        <span className="hint">
+          {agrupado ? 'agrupado: el sistema no siempre pudo distinguirlos.' : 'preciso: el sistema distinguió nado y escalamiento.'}
+        </span>
         {revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
         {agrupado
-          ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
+          ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el animal no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
           : <span className="hint">Ningún segundo quedó como conducta activa: cada uno se clasificó como nado activo, inmovilidad o escalamiento.</span>}
       </div>
     </div>

@@ -32,7 +32,7 @@ function rangoSegundos(e) {
   return e.segundosMin === e.segundosMax ? `${e.segundosMin}` : `${e.segundosMin}–${e.segundosMax}`
 }
 
-// La celda de un grupo en un minuto; null si no hay especímenes con segundos ahí o la media no existe.
+// La celda de un grupo en un minuto; null si no hay animales con segundos ahí o la media no existe.
 function celdaDe(g, minuto, clave) {
   const e = g.porMinuto?.find((x) => x.minuto === minuto)
   if (!e || e.n === 0) return null
@@ -42,7 +42,7 @@ function celdaDe(g, minuto, clave) {
 }
 
 function textoCelda(g, minuto, clave) {
-  if (g.nivelMixto) return 'por nivel'
+  if (g.nivelMixto) return 'por tanda'
   const c = celdaDe(g, minuto, clave)
   if (!c) return 'sin datos'
   const texto = `${numero(c.s.media)} s`
@@ -107,6 +107,11 @@ function MuestraRango({ k, sin }) {
   )
 }
 
+// Ancho aproximado de un texto corto, para el fondo que lo separa del patrón.
+function anchoTexto(texto, anchoCaracter) {
+  return texto.length * anchoCaracter + 6
+}
+
 export default function G6MapaPorMinuto({ datos, prefijo }) {
   const svgRef = useRef(null)
   const [clave, setClave] = useState('inmovilidad')
@@ -117,24 +122,25 @@ export default function G6MapaPorMinuto({ datos, prefijo }) {
   const H = TOP + grupos.length * RH + 4
   const incompletoEn = (m) => grupos.some((g) => dibujable(g) && g.porMinuto?.find((e) => e.minuto === m)?.incompleto)
 
+  const avisos = []
   const notas = []
   for (const g of grupos) {
-    if (g.nivelMixto) notas.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
-    else if (g.n === 0) notas.push(`${g.etiqueta}: sin datos.`)
+    if (g.nivelMixto) avisos.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
+    else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      notas.push(`${g.etiqueta}: ${faltan} especímenes pendientes (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
-  notas.push('Un minuto con menos de 60 s en algún espécimen es incompleto; sus segundos son los reales.')
+  notas.push('Un minuto con menos de 60 s en algún animal es incompleto; sus segundos son los reales.')
 
-  const titulo = 'Mapa por minuto · Día 2'
+  const titulo = '¿En qué minuto cambia?'
   const maxCar = Math.max(6, Math.floor((IZQ - 10) / 6.3))
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Media por minuto de la conducta elegida, en seis rangos de 10 s."
+      subtitulo="Promedio por minuto de la conducta elegida, en seis rangos de 10 s."
       nombre={`g6_mapa_${clave.replace(/ /g, '_')}`}
       svgRef={svgRef}
       controles={(
@@ -156,11 +162,11 @@ export default function G6MapaPorMinuto({ datos, prefijo }) {
           <MuestraRango sin />sin datos
         </span>,
       ]}
-      notas={notas}
+      avisos={avisos} notas={notas}
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
           <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>
-            {`Media por minuto, Día 2, en segundos. Conducta: ${conducta.etiqueta.toLowerCase()}.`}
+            {`Promedio por minuto, Día 2, en segundos. Conducta: ${conducta.etiqueta.toLowerCase()}.`}
           </caption>
           <thead>
             <tr>
@@ -207,7 +213,7 @@ export default function G6MapaPorMinuto({ datos, prefijo }) {
               <text x={IZQ - 6} y={yN} textAnchor="end" fontSize="10" fill="var(--muted-2)">{textoN(g)}</text>
               {g.nivelMixto && (
                 <text x={IZQ + (minutos.length * CW) / 2} y={mid + 4} textAnchor="middle" fontSize="11" fill="var(--muted-2)" data-mixto={g.etiqueta}>
-                  mezcla niveles
+                  tandas no comparables
                 </text>
               )}
               {!g.nivelMixto && minutos.map((m, c) => {
@@ -232,14 +238,17 @@ export default function G6MapaPorMinuto({ datos, prefijo }) {
                     <rect x={x0} y={ty} width={w} height={h} fill={r.fondo} fillOpacity={r.opacidad} />
                     <rect x={x0} y={ty} width={w} height={h} fill={`url(#${prefijo}-p${cel.k})`} />
                     {inc && <rect x={x0} y={ty} width={w} height={h} fill="none" stroke="var(--color-text)" strokeWidth="1.4" strokeDasharray="4 3" />}
+                    <rect x={x0 + w / 2 - anchoTexto(numero(cel.s.media), 7.2) / 2} y={ty + h / 2 + (inc ? -1 : 4) - 11}
+                      width={anchoTexto(numero(cel.s.media), 7.2)} height="15" rx="2" fill="var(--color-bg)" />
                     <text x={x0 + w / 2} y={ty + h / 2 + (inc ? -1 : 4)} textAnchor="middle" fontSize="11.5"
-                      fontStyle={inc ? 'italic' : undefined} fill={r.tinta} fontWeight="700" paintOrder="stroke" strokeWidth="3.5"
-                      stroke={r.tinta === 'var(--color-bg)' ? 'var(--color-text)' : 'var(--color-bg)'}>
+                      fontStyle={inc ? 'italic' : undefined} fill="var(--color-text)" fontWeight="700">
                       {numero(cel.s.media)}
                     </text>
                     {inc && (
-                      <text x={x0 + w / 2} y={ty + h - 3} textAnchor="middle" fontSize="8.5" fill={r.tinta} paintOrder="stroke" strokeWidth="2.5"
-                        stroke={r.tinta === 'var(--color-bg)' ? 'var(--color-text)' : 'var(--color-bg)'}>inc.</text>
+                      <>
+                        <rect x={x0 + w / 2 - anchoTexto('inc.', 4.6) / 2} y={ty + h - 11} width={anchoTexto('inc.', 4.6)} height="11" rx="2" fill="var(--color-bg)" />
+                        <text x={x0 + w / 2} y={ty + h - 3} textAnchor="middle" fontSize="8.5" fill="var(--color-text)">inc.</text>
+                      </>
                     )}
                   </g>
                 )

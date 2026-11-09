@@ -4,8 +4,8 @@ import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
 import { CONDUCTAS_GRAFICA, NOTA_MIXTO, SEGUNDOS_MINUTO, estilosDeGrupos, textoMediaDe, textoN } from './estilos'
 
-// G3 · Barras por minuto: en cada minuto, una barra por grupo, con su ± DE. Usa porMinuto tal cual lo manda el
-// backend: no recalcula medias ni desviaciones. Un minuto sin especímenes (n = 0) no tiene barra; un minuto
+// G3 · Barras por minuto: en cada minuto, una barra por grupo, con su ± desviación estándar. Usa porMinuto tal cual lo manda el
+// backend: no recalcula medias ni desviaciones. Un minuto sin animales (n = 0) no tiene barra; un minuto
 // incompleto va con rayado y su rango de segundos.
 const W = 420
 const H = 300
@@ -16,7 +16,7 @@ const MARCAS_Y = [0, 10, 20, 30, 40, 50, 60]
 
 const dibujable = (g) => !g.nivelMixto && !!g.porMinuto && g.n > 0
 
-// El valor de un grupo en un minuto, si hay especímenes con segundos en ese minuto y su media existe.
+// El valor de un grupo en un minuto, si hay animales con segundos en ese minuto y su media existe.
 function entradaDe(g, minuto, clave) {
   const e = g.porMinuto?.find((x) => x.minuto === minuto)
   if (!e || e.n === 0) return null
@@ -29,7 +29,7 @@ function rangoSegundos(e) {
 }
 
 function celda(g, m, clave) {
-  if (!dibujable(g)) return g.nivelMixto ? 'por nivel' : 'sin datos'
+  if (!dibujable(g)) return g.nivelMixto ? 'por tanda' : 'sin datos'
   const p = entradaDe(g, m, clave)
   if (!p) return 'sin datos'
   const texto = textoMediaDe(p.s.media, p.s.de)
@@ -49,23 +49,24 @@ export default function G3BarrasPorMinuto({ datos, prefijo }) {
   const y = (v) => M.t + PH - (Math.min(Math.max(v, 0), SEGUNDOS_MINUTO) / SEGUNDOS_MINUTO) * PH
   const incompletoEn = (m) => grupos.some((g) => dibujable(g) && g.porMinuto.find((e) => e.minuto === m)?.incompleto)
 
+  const avisos = []
   const notas = []
   for (const g of grupos) {
-    if (g.nivelMixto) notas.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
-    else if (g.n === 0) notas.push(`${g.etiqueta}: sin datos.`)
+    if (g.nivelMixto) avisos.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
+    else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      notas.push(`${g.etiqueta}: ${faltan} especímenes pendientes (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
-  notas.push('Un minuto con menos de 60 s en algún espécimen es incompleto; sus segundos son los reales.')
+  notas.push('Un minuto con menos de 60 s en algún animal es incompleto; sus segundos son los reales.')
 
-  const titulo = 'Barras por minuto · Día 2'
+  const titulo = '¿Cómo se compara cada minuto?'
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Media por minuto de la conducta elegida, con barra ± DE por grupo."
+      subtitulo="Promedio por minuto de la conducta elegida, con barra ± desviación estándar por grupo."
       nombre={`g3_${clave.replace(/ /g, '_')}`}
       svgRef={svgRef}
       controles={(
@@ -79,18 +80,18 @@ export default function G3BarrasPorMinuto({ datos, prefijo }) {
       )}
       leyenda={grupos.map((g) => {
         const est = estilos.get(g.idGrupo)
-        const estado = g.nivelMixto ? ' · nivel mixto' : g.n === 0 ? ' · sin datos' : ''
+        const estado = g.nivelMixto ? ' · tandas no comparables' : g.n === 0 ? ' · sin datos' : ''
         return (
-          <span key={g.idGrupo} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span key={g.idGrupo} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: g.tipo === 'control' ? 700 : 400 }}>
             <MuestraLeyenda color={est.color} patron={est.patron} />{g.etiqueta}{estado}
           </span>
         )
       })}
-      notas={notas}
+      avisos={avisos} notas={notas}
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
           <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>
-            {`Media ± DE por minuto, Día 2, en segundos. Conducta: ${conducta.etiqueta.toLowerCase()}.`}
+            {`Promedio ± desviación estándar por minuto, Día 2, en segundos. Conducta: ${conducta.etiqueta.toLowerCase()}.`}
           </caption>
           <thead>
             <tr>
@@ -113,7 +114,7 @@ export default function G3BarrasPorMinuto({ datos, prefijo }) {
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby={`${prefijo}-t ${prefijo}-d`}
         style={{ display: 'block', width: '100%', maxWidth: 560, height: 'auto', fontFamily: 'var(--font-body)' }}>
         <title id={`${prefijo}-t`}>{titulo}</title>
-        <desc id={`${prefijo}-d`}>Barras por minuto: media de la conducta elegida en cada grupo y minuto, con barra ± DE, en segundos del Día 2.</desc>
+        <desc id={`${prefijo}-d`}>Barras por minuto: media de la conducta elegida en cada grupo y minuto, con barra ± desviación estándar, en segundos del Día 2.</desc>
         <Patrones prefijo={prefijo} />
         {MARCAS_Y.map((v) => (
           <g key={v}>

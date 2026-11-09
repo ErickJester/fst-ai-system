@@ -373,3 +373,12 @@ cinco. Esta tabla sale de revisar el código, no de la memoria; la guía no se e
 - [x] Pruebas sin base: `GraficasDeResultadosTest` (10 casos: orden de grupos, varianza n − 1, null sin existencia, CV, minuto incompleto, niveles mezclados); verdes con `./mvnw -o test` (190 corridas, 119 omitidas por falta de base)
 - [x] Pruebas con PostgreSQL: `GraficasEndpointTest` y las existentes de `/results/groups` (`ArreglosE50Test`, `SinVerYNivelTest`, `ReportesCsvXlsxTest`, etc.), con `FST_TEST_DB_URL` en una base de pruebas vacía: 190/190, ninguna omitida
 - [x] `GraficasEndpointTest` comprueba que las cinco categorías (con «sin ver») suman `duracionS` en cada espécimen (G4). Compila; sin ejecutar: falta PostgreSQL
+
+## 19. Pantalla del experimento, paso 1: segundo a segundo y Excel de todo el experimento
+- [x] `GET /experiments/{id}/results/seconds?grupo=&tanda=` (`SegundosController`, `SegundosDeResultados`): los segundos de una tanda desde `segundo`, con correcciones. `conducta` null para «sin ver» y `origen` crudo. 400 sin tanda, 404 si el grupo o la tanda no existen (lo da `alcanceDeReporte`) o si la tanda no tiene análisis completado. Lectura para cualquier usuario con sesión
+- [x] `GET /experiments/{id}/report/excel` (`ExcelExperimentoController`, `ReporteExcelExperimento`, `ExcelDelExperimento`): XLSX con «Resultados» (una tabla por grupo, la misma que su XLSX, con medias, desviaciones, varianzas y revisión) y «Segundo a segundo» (una fila por espécimen y segundo; Conducta; una columna por conducta con 1 o 0; Origen). Se genera al momento: no pasa por `ReporteAlmacen` ni por REPORTE. 409 si no hay análisis completados
+- [x] No se tocaron `ExperimentoServiceImpl`, `ReporteAlmacen`, `ResultadosService` ni el esquema
+- [x] Pruebas sin base (`./mvnw -o test`: 213 corridas, 0 fallos, 123 omitidas): `ExcelDelExperimentoTest` (4, lee el XLSX con POI) y `SegundosDeResultadosTest` (4, consulta simulada)
+- [ ] Pruebas con PostgreSQL, no corridas: `SegundosYExcelTest` (3): forma de la respuesta, 404 y 400, y el Excel con sus dos hojas
+- [x] Corrección tras la revisión con PostgreSQL: `grupo` y `tanda` de `GET .../results/seconds` son opcionales en la firma del controlador; su falta la valida `deUnaTanda` (400 con mensaje). Antes, la ausencia de `tanda` daba 500 por el manejador general
+- [x] Base de pruebas con PostgreSQL: arrancarla con `postgres -c max_connections=300` (con el valor por defecto, las pruebas de integración se quedan sin conexiones: «too many clients»)

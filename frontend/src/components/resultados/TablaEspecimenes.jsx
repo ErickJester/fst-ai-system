@@ -40,7 +40,7 @@ export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto,
       <table className="table">
         <thead>
           <tr>
-            <th style={{ width: '27%' }}>Espécimen</th>
+            <th style={{ width: '27%' }}>Animal</th>
             {CONDUCTAS.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
             <th style={{ textAlign: 'right', fontWeight: 400, color: MUT }}>{SIN_VER.label}</th>
             <th style={{ width: '30%' }}>Distribución</th>

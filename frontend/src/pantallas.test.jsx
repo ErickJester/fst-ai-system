@@ -10,6 +10,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import { reiniciarDatos, experiments, users, canceledJobs } from './services/mocks/data'
 import { createExperiment } from './services/experiments'
+import axe from 'axe-core'
 
 // Solo en la prueba del primer acceso: el cambio de contraseña responde lo que diga fallarCambio (si hay); si no, el mock real.
 let fallarCambio = null
@@ -500,13 +501,13 @@ describe('cargar video', () => {
 })
 
 describe('resultados', () => {
-  it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
+  it('muestra los animales de la tanda y la comparación entre grupos', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
-    expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Tanda A · Animal 1').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Comparación entre grupos' }))
-    expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Por espécimen' }))
+    expect(await screen.findByText('Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Por animal' }))
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
     // «Sin ver» va aparte, al final, en los totales y en el desglose por minuto, con su explicación.
@@ -527,14 +528,14 @@ describe('resultados', () => {
 
   it('ver el grupo completo: todas sus tandas completadas, con los estadísticos recalculados (D-93)', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
-    const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Espécimen \d/.test(f.textContent))
+    const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Animal \d/.test(f.textContent))
     expect(await filas()).toHaveLength(4)
     const media = () => screen.getByRole('row', { name: /^Media/ }).textContent
     const mediaTanda = media()
-    await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 especímenes' }))
+    await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 animales' }))
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, grupo completo' })).toBeTruthy()
     expect(await filas()).toHaveLength(8)
-    expect(screen.getByRole('cell', { name: /Tanda B · Espécimen 4/ })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: /Tanda B · Animal 4/ })).toBeTruthy()
     expect(media()).not.toBe(mediaTanda)
     expect(screen.getByText('8 de 8')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull() // la revisión es por tanda
@@ -551,18 +552,18 @@ describe('resultados', () => {
 
   it('cada conducta con su porcentaje, y el desglose por minuto de cualquier espécimen', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
-    const fila = await screen.findByRole('row', { name: /^1 Tanda A · Espécimen 1/ })
+    const fila = await screen.findByRole('row', { name: /^1 Tanda A · Animal 1/ })
     expect(fila.textContent).toMatch(/2:51 57 %/) // 171 s de 300 de nado activo
-    await user.click(screen.getByRole('button', { name: 'Línea de tiempo por minuto' }))
+    await user.click(screen.getByRole('button', { name: 'Minuto a minuto' }))
     await user.selectOptions(screen.getByLabelText(/^Desglose por minuto/), 'A-3')
-    expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Espécimen 3/)
+    expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Animal 3/)
     const minutos = screen.getAllByRole('row').filter((f) => /^\d:\d\d–\d:\d\d/.test(f.textContent))
     expect(minutos).toHaveLength(5)
   })
 
   it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
-    await user.click(await screen.findByRole('button', { name: 'Bloques de 5 s' }))
+    await user.click(await screen.findByRole('button', { name: 'Cada 5 segundos' }))
     expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el sistema/)
   })
 })
@@ -896,5 +897,86 @@ describe('mensajes de formulario (encargo M11)', () => {
   it('grupo: quien subió el video ve «Revisar segundo a segundo»', async () => {
     await conSesion('/experimentos/7/grupos/1')
     expect(await screen.findByRole('link', { name: 'Revisar segundo a segundo' })).toBeTruthy()
+  })
+})
+
+describe('resultados del experimento (pantalla principal, segundo a segundo y descargas)', () => {
+  it('sin tanda, el resumen dice qué se logró y qué falta, con el nombre del experimento', async () => {
+    await conSesion('/experimentos/7/resultados')
+    expect(await screen.findByRole('heading', { name: 'Compuesto CSR-14 · curva de dosis' })).toBeTruthy()
+    expect(screen.getByText(/Listos 1 de 4 grupos/)).toBeTruthy()
+    expect(screen.getByText(/Falta: Control \(Tanda B en pausa\)/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Qué pasó? (comparado con el control)' })).toBeTruthy()
+  })
+
+  it('¿Qué pasó? compara con el control y dice en palabras comunes los casos de nivel mixto y sin datos', async () => {
+    await conSesion('/experimentos/7/resultados')
+    expect(await screen.findByText(/^Control: .* s de inmovilidad en promedio\.$/)).toBeTruthy()
+    expect(screen.getByText(/^Experimental A: .* que el control/)).toBeTruthy()
+    expect(screen.getByText(/^Referencia: sus tandas se analizaron con distinto detalle/)).toBeTruthy()
+    expect(screen.getByText(/^Experimental B: todavía no tiene datos del Día 2\.$/)).toBeTruthy()
+  })
+
+  it('las dos descargas: en demo no hay archivo y lo dice', async () => {
+    const user = await conSesion('/experimentos/7/resultados')
+    await user.click(await screen.findByRole('button', { name: 'Reporte completo (PDF), para leer o imprimir' }))
+    expect(await screen.findByText('Todavía no está disponible en el modo demo.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Datos en Excel, con el segundo a segundo, para hacer tu propia estadística' }))
+    expect(await screen.findByText('Todavía no está disponible en el modo demo.')).toBeTruthy()
+  })
+
+  it('«Ver el detalle» abre la primera tanda lista en la vista elegida', async () => {
+    const user = await conSesion('/experimentos/7/resultados')
+    const enlace = await screen.findByRole('link', { name: 'Segundo a segundo' })
+    expect(enlace.getAttribute('href')).toBe('/experimentos/7/resultados?grupo=1&tanda=A&vista=segundo')
+    await user.click(enlace)
+    expect(await screen.findByRole('heading', { name: 'Segundo a segundo · Control, Tanda A' }, { timeout: 5000 })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Segundo a segundo' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('el segundo a segundo se ve por tanda: con el grupo completo pide elegir una', async () => {
+    await conSesion('/experimentos/7/resultados?grupo=1&vista=segundo')
+    expect(await screen.findByText(/El segundo a segundo se ve tanda por tanda/)).toBeTruthy()
+  })
+
+  it('el resumen del experimento no tiene problemas de accesibilidad (axe)', async () => {
+    await conSesion('/experimentos/7/resultados')
+    await screen.findByRole('heading', { name: 'Compuesto CSR-14 · curva de dosis' })
+    const r = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } })
+    expect(r.violations.map((v) => v.id)).toEqual([])
+  })
+})
+
+
+describe('detalle de resultados: selector de grupo, vista conservada y glosas', () => {
+  it('el selector de grupo cambia de grupo y conserva la vista', async () => {
+    const user = await conSesion('/experimentos/7/resultados?grupo=1&tanda=A&vista=timeline')
+    await user.selectOptions(await screen.findByLabelText('Grupo'), '2')
+    expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' }, { timeout: 5000 })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Minuto a minuto' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('«Grupo completo» conserva la vista activa', async () => {
+    const user = await conSesion('/experimentos/7/resultados?grupo=1&tanda=A&vista=timeline')
+    await user.click(await screen.findByRole('link', { name: 'Grupo completo · 4 animales' }))
+    expect(await screen.findByRole('heading', { name: 'Resultados · Grupo control, grupo completo' }, { timeout: 5000 })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Minuto a minuto' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('segundo a segundo con grupo completo se queda en esa vista y pide elegir una tanda', async () => {
+    await conSesion('/experimentos/7/resultados?grupo=1&vista=segundo')
+    expect(await screen.findByText(/El segundo a segundo se ve tanda por tanda/, {}, { timeout: 5000 })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Segundo a segundo' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('el detalle explica qué es una tanda y qué significa el nivel preciso', async () => {
+    await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
+    expect(await screen.findByText('Tanda: un video con varios animales. El grupo completo reúne sus tandas con análisis completado; cada animal lleva el nombre de su tanda.')).toBeTruthy()
+    expect(screen.getByText('preciso: el sistema distinguió nado y escalamiento.')).toBeTruthy()
+  })
+
+  it('el resumen del experimento dice qué es el Día 2', async () => {
+    await conSesion('/experimentos/7/resultados')
+    expect(await screen.findByText('Día 2 (la prueba de 5 minutos).')).toBeTruthy()
   })
 })

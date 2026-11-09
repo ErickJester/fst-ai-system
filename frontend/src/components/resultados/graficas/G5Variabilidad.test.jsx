@@ -74,7 +74,7 @@ describe('G5 · ajuste por ancho de columna', () => {
     expect(within(screen.getByRole('table')).getAllByRole('cell', { name: 'CV 47 % · varianza 1234,5 s²' }).length).toBeGreaterThan(0)
   })
 
-  it('con cuatro grupos, un grupo sin datos se marca con «—» y uno con nivel mixto con «mixto»', () => {
+  it('con cuatro grupos, un grupo sin datos se marca con «—» y uno con nivel mixto con «no comp.»', () => {
     const mezcla = {
       ...cuatroGrupos,
       grupos: [
@@ -87,9 +87,9 @@ describe('G5 · ajuste por ancho de columna', () => {
     const { container } = render(<G5Variabilidad datos={mezcla} prefijo="t5" />)
     const textos = [...container.querySelectorAll('svg text')].map((t) => t.textContent)
     expect(textos).toContain('—')
-    expect(textos).toContain('mixto')
+    expect(textos).toContain('no comp.')
     expect(textos).not.toContain('sin datos')
-    expect(textos).not.toContain('nivel mixto')
+    expect(textos).not.toContain('tandas no comparables')
   })
 
   it('con seis grupos (columna de 21 px) no hay etiquetas sobre las barras, pero el dato queda en <title>', () => {
@@ -134,8 +134,8 @@ describe('G5 · variabilidad entre animales', () => {
 
   it('el título y la nota dicen que es variación entre animales, no entre analistas', () => {
     render(<G5Variabilidad datos={datos} prefijo="t5" />)
-    expect(screen.getByRole('heading', { name: 'Variabilidad entre animales · Día 2' })).toBeTruthy()
-    expect(screen.getByText('Mide la variación entre animales de cada grupo, no entre analistas.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Qué tan parecidos son los animales?' })).toBeTruthy()
+    expect(screen.getByText('La variación es el coeficiente de variación (desviación estándar ÷ promedio). Mide la variación entre animales de cada grupo, no entre analistas.')).toBeTruthy()
   })
 
   it('un grupo sin datos y uno con nivel mixto se señalan y no se dibujan', () => {
@@ -150,8 +150,8 @@ describe('G5 · variabilidad entre animales', () => {
     const { container } = render(<G5Variabilidad datos={mezcla} prefijo="t5" />)
     const textos = [...container.querySelectorAll('svg text')].map((t) => t.textContent)
     expect(textos).toContain('sin datos')
-    expect(textos).toContain('nivel mixto')
-    expect(screen.getByText(/Dosis 1: Mezcla niveles de clasificación; no se promedia junto\./)).toBeTruthy()
+    expect(textos).toContain('tandas no comparables')
+    expect(screen.getByText(/Dosis 1: Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle\./)).toBeTruthy()
   })
 
   it('con nivel mixto, la tabla trae una fila por tanda con su CV y su varianza', () => {
@@ -172,8 +172,8 @@ describe('G5 · variabilidad entre animales', () => {
   it('con tandas pendientes muestra n de cuántos y la nota', () => {
     const pendiente = { ...datos, grupos: [grupo({ n: 2, nTotal: 3, faltantes: [{ letra: 'B', nCilindros: 1, estado: 'en cola' }] })] }
     render(<G5Variabilidad datos={pendiente} prefijo="t5" />)
-    expect(screen.getAllByText('n = 2 de 3').length).toBeGreaterThan(0)
-    expect(screen.getByText('Control: 1 especímenes pendientes (Tanda B en cola).')).toBeTruthy()
+    expect(screen.getAllByText('2 de 3 animales').length).toBeGreaterThan(0)
+    expect(screen.getByText('Control: 1 animal pendiente (Tanda B en cola).')).toBeTruthy()
   })
 
   it('trae las dos notas obligatorias y la descarga con su nombre', () => {

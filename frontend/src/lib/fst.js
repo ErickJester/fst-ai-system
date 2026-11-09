@@ -192,8 +192,11 @@ export const codigoGrupo = (id) => (/^\d+$/.test(String(id)) ? 'G-' + String(id)
 export const puedeSubirVideo = (user, exp) => !!user && exp?.creador_id != null && String(exp.creador_id) === String(user.id)
 export const SOLO_CREADOR_SUBE = 'Solo quien creó el experimento sube sus videos.'
 
-// Enlace a los resultados de una tanda.
-export const enlaceResultados = (clave, gid, letra) => `/experimentos/${clave}/resultados?grupo=${gid}&tanda=${letra}`
+// Enlace al detalle de los resultados de una tanda; con vista, abre esa pestaña del detalle.
+export const enlaceResultados = (clave, gid, letra, vista) => `/experimentos/${clave}/resultados?grupo=${gid}&tanda=${letra}${vista ? '&vista=' + vista : ''}`
+
+// Enlace al resumen de resultados del experimento (sin tanda).
+export const enlaceResultadosExperimento = (clave) => `/experimentos/${clave}/resultados`
 
 // Búsqueda sin acentos ni mayúsculas.
 export const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

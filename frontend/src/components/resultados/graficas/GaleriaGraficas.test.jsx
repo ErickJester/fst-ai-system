@@ -30,12 +30,25 @@ afterEach(() => {
   localStorage.clear()
 })
 
+describe('GaleriaGraficas · detalles y avisos', () => {
+  it('las notas y la tabla van en «Ver números y detalles», cerrado; el aviso de un grupo sin datos queda visible', () => {
+    const datos = { ...datosDeUnGrupo, grupos: [grupo({}), grupo({ idGrupo: 2, etiqueta: 'Referencia', tipo: 'referencia', n: 0, nTotal: 2, porConducta: porConducta({}) })] }
+    const { container } = render(<GaleriaGraficas datos={datos} />)
+    const detalles = container.querySelector('details')
+    expect(detalles.open).toBe(false)
+    expect(detalles.querySelector('summary').textContent).toBe('Ver números y detalles')
+    expect(detalles.querySelector('table')).toBeTruthy()
+    const aviso = screen.getByText('Referencia: sin datos.')
+    expect(detalles.contains(aviso)).toBe(false)
+  })
+})
+
 describe('GaleriaGraficas · G1', () => {
   it('con un grupo dibuja su barra, su n y la media ± DE de la conducta elegida', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    expect(screen.getByRole('heading', { name: 'Tiempo por conducta · Día 2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
     expect(screen.getAllByText('120,0 ± 10,0 s').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('n = 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('2 animales').length).toBeGreaterThan(0)
   })
 
   it('con dos y con tres grupos dibuja una etiqueta por grupo, en el orden de la respuesta', () => {
@@ -61,8 +74,8 @@ describe('GaleriaGraficas · G1', () => {
     }
     render(<GaleriaGraficas datos={datos} />)
     expect(screen.getAllByText('sin datos').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('nivel mixto').length).toBeGreaterThan(0)
-    expect(screen.getByText(/Dosis 1: Mezcla niveles de clasificación; no se promedia junto\./)).toBeTruthy()
+    expect(screen.getAllByText('tandas no comparables').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Dosis 1: Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle\./)).toBeTruthy()
   })
 
   it('sin desviación no hay barra de error y el valor dice «± no aplica»', () => {
@@ -73,7 +86,7 @@ describe('GaleriaGraficas · G1', () => {
 
   it('la conducta activa va fuera de las barras, con su nota de segundos medios', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    expect(screen.getByText(/Conducta activa, fuera de las barras \(segundos medios por espécimen\): Control 4,0 s\./)).toBeTruthy()
+    expect(screen.getByText(/Conducta activa, fuera de las barras \(segundos medios por animal\): Control 4,0 s\./)).toBeTruthy()
   })
 
   it('cada gráfica trae las dos notas obligatorias y la tabla con los mismos números', () => {
@@ -88,15 +101,16 @@ describe('GaleriaGraficas · G1', () => {
 describe('GaleriaGraficas · selector y teclado', () => {
   it('las seis gráficas se pueden elegir y cada una abre la suya', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    const titulos = {
-      G2: 'Curva por minuto · Día 2',
-      G3: 'Barras por minuto · Día 2',
-      G4: 'Reparto de la duración analizada · Día 2',
-      G5: 'Variabilidad entre animales · Día 2',
-      G6: 'Mapa por minuto · Día 2',
-    }
-    for (const [nombre, titulo] of Object.entries(titulos)) {
-      const boton = screen.getByRole('button', { name: new RegExp(`^${nombre} · `) })
+    const titulos = [
+      '¿Cuánto hizo cada grupo?',
+      '¿Cómo cambió minuto a minuto?',
+      '¿Cómo se compara cada minuto?',
+      '¿En qué se fue el tiempo?',
+      '¿Qué tan parecidos son los animales?',
+      '¿En qué minuto cambia?',
+    ]
+    for (const titulo of titulos) {
+      const boton = screen.getByRole('button', { name: titulo })
       expect(boton.disabled).toBe(false)
       fireEvent.click(boton)
       expect(screen.getByRole('heading', { name: titulo })).toBeTruthy()
@@ -106,7 +120,9 @@ describe('GaleriaGraficas · selector y teclado', () => {
   it('«Ver varias» muestra hasta tres gráficas juntas, sin repetir ids', () => {
     const { container } = render(<GaleriaGraficas datos={datosDeUnGrupo} />)
     fireEvent.click(screen.getByRole('checkbox', { name: /Ver varias/ }))
-    for (const nombre of ['G2', 'G3', 'G4']) fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${nombre} · `) }))
+    for (const pregunta of ['¿Cómo cambió minuto a minuto?', '¿Cómo se compara cada minuto?', '¿En qué se fue el tiempo?']) {
+      fireEvent.click(screen.getByRole('button', { name: pregunta }))
+    }
     expect(screen.getAllByRole('heading', { level: 3 }).length).toBe(3)
     const ids = [...container.querySelectorAll('[id]')].map((e) => e.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -118,7 +134,7 @@ describe('GaleriaGraficas · selector y teclado', () => {
     document.body.appendChild(campo)
     campo.focus()
     fireEvent.keyDown(campo, { key: 'ArrowRight' })
-    expect(screen.getByRole('heading', { name: 'Tiempo por conducta · Día 2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
     campo.remove()
   })
 
@@ -134,7 +150,7 @@ describe('GaleriaGraficas · memoria y patrones', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('cuota llena') })
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('bloqueado') })
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    expect(screen.getByRole('heading', { name: 'Tiempo por conducta · Día 2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
   })
 
   it('la elección de conducta se recuerda en el navegador', () => {
@@ -228,9 +244,9 @@ describe('G1 · etiquetas largas, escala y nivel mixto', () => {
   it('las flechas dan la vuelta: antes de la primera está la última, y después de la última, la primera', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
     fireEvent.click(screen.getByRole('button', { name: 'Gráfica anterior' }))
-    expect(screen.getByRole('heading', { name: 'Mapa por minuto · Día 2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿En qué minuto cambia?' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Gráfica siguiente' }))
-    expect(screen.getByRole('heading', { name: 'Tiempo por conducta · Día 2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
   })
 
   it('la escala es de 300 s y solo crece si un grupo la rebasa', () => {

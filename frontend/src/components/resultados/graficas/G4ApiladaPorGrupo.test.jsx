@@ -88,8 +88,8 @@ describe('G4 · barra apilada por grupo', () => {
     }
     const { container } = render(<G4ApiladaPorGrupo datos={mezcla} prefijo="t4" />)
     expect(screen.getAllByText('sin datos').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('nivel mixto').length).toBeGreaterThan(0)
-    expect(screen.getByText(/Dosis 1: Mezcla niveles de clasificación; no se promedia junto\./)).toBeTruthy()
+    expect(screen.getAllByText('tandas no comparables').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Dosis 1: Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle\./)).toBeTruthy()
     expect(screen.getByText('Tanda A · preciso')).toBeTruthy()
     // Cinco segmentos del control (la conducta activa lleva además su rayado) y ninguna barra para los otros dos grupos.
     const rectangulos = container.querySelector('svg[role=img]').querySelectorAll('rect')
@@ -99,8 +99,8 @@ describe('G4 · barra apilada por grupo', () => {
   it('con pendientes muestra n de cuántos y la nota de la tanda pendiente', () => {
     const pendiente = { ...datos, grupos: [grupo({ n: 2, nTotal: 3, faltantes: [{ letra: 'B', nCilindros: 1, estado: 'procesando' }] })] }
     render(<G4ApiladaPorGrupo datos={pendiente} prefijo="t4" />)
-    expect(screen.getAllByText('n = 2 de 3').length).toBeGreaterThan(0)
-    expect(screen.getByText('Control: 1 especímenes pendientes (Tanda B procesando).')).toBeTruthy()
+    expect(screen.getAllByText('2 de 3 animales').length).toBeGreaterThan(0)
+    expect(screen.getByText('Control: 1 animal pendiente (Tanda B procesando).')).toBeTruthy()
   })
 
   it('trae las dos notas obligatorias y la descarga con su nombre', () => {

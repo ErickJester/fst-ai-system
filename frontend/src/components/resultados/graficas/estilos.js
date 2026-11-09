@@ -17,9 +17,9 @@ export const CONDUCTAS_BARRAS = CONDUCTAS_GRAFICA.filter((c) => c.clave !== 'con
 export const ESCALA_SEGUNDOS = 300   // la ventana del Día 2
 export const SEGUNDOS_MINUTO = 60    // el máximo de un minuto
 
-export const NOTA_DE = 'La barra ± DE muestra la dispersión entre especímenes; no indica si una diferencia es significativa.'
+export const NOTA_DE = 'La barra de error (promedio ± desviación estándar) muestra la dispersión entre animales; no indica si una diferencia es significativa.'
 export const NOTA_ORIGEN = 'Los datos son sobre la salida del modelo; su exactitud todavía no está medida.'
-export const NOTA_MIXTO = 'Mezcla niveles de clasificación; no se promedia junto.'
+export const NOTA_MIXTO = 'Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.'
 
 // Número en español: un decimal con coma. Lo que no existe no se escribe como cero.
 export function numero(valor) {
@@ -36,9 +36,17 @@ export function porcentaje(fraccion) {
   return fraccion == null ? 'no aplica' : `${Math.round(fraccion * 100)} %`
 }
 
-// «n = 3» o, con tandas pendientes, «n = 2 de 4».
+// «3 animales» o, con tandas pendientes, «2 de 4 animales».
+const palabraAnimales = (n) => (n === 1 ? 'animal' : 'animales')
 export function textoN(grupo) {
-  return grupo.n < grupo.nTotal ? `n = ${grupo.n} de ${grupo.nTotal}` : `n = ${grupo.n}`
+  return grupo.n < grupo.nTotal
+    ? `${grupo.n} de ${grupo.nTotal} ${palabraAnimales(grupo.nTotal)}`
+    : `${grupo.n} ${palabraAnimales(grupo.n)}`
+}
+
+// «1 animal» o «4 animales», para las filas por tanda.
+export function textoAnimales(n) {
+  return `${n} ${palabraAnimales(n)}`
 }
 
 // Forma y patrón de cada grupo. El control es sólido; la referencia lleva rayado; los experimentales

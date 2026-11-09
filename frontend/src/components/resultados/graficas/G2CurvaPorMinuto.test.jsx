@@ -14,7 +14,7 @@ function porConducta(base) {
   return Object.fromEntries(CONDUCTAS.map((c) => [c, base[c] ?? est(null, null, 0)]))
 }
 
-// Una fila de porMinuto: n especímenes con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
+// Una fila de porMinuto: n animales con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
 function fila(minuto, n, media, de, { incompleto = false, seg = 60 } = {}) {
   if (n === 0) {
     return { minuto, n: 0, segundosMin: null, segundosMax: null, incompleto: false, porConducta: porConducta({}) }
@@ -73,7 +73,7 @@ describe('G2 · curva por minuto', () => {
     expect(screen.getAllByText('Dosis 1').length).toBeGreaterThan(0)
   })
 
-  it('un minuto sin especímenes (n = 0) no tiene marcador y corta la línea', () => {
+  it('un minuto sin animales (n = 0) no tiene marcador y corta la línea', () => {
     const { container } = render(<G2CurvaPorMinuto datos={tresGrupos} prefijo="g2b" />)
     expect(container.querySelector('[data-punto="Referencia|3"]')).toBeNull()
     expect(container.querySelector('[data-punto="Referencia|2"]')).not.toBeNull()
@@ -102,7 +102,7 @@ describe('G2 · curva por minuto', () => {
     expect(container.querySelectorAll('[data-linea]').length).toBe(1)
     expect(container.querySelector('[data-linea="Control"]')).not.toBeNull()
     expect(screen.getByText('Experimental B: sin datos.')).toBeTruthy()
-    expect(screen.getByText('Dosis mixta: Mezcla niveles de clasificación; no se promedia junto.')).toBeTruthy()
+    expect(screen.getByText('Dosis mixta: Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.')).toBeTruthy()
   })
 
   it('el selector empieza en inmovilidad y cambia la conducta de la tabla', () => {

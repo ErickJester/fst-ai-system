@@ -340,3 +340,45 @@ export async function getReporte(clave, formato, alcance = null) {
   const res = await api.get(`/experiments/${clave}/report/${formato}`, { params: alcance || undefined, responseType: 'blob' })
   return { archivo: res.data, nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) }
 }
+
+// ── Segundo a segundo y Excel del experimento (pantalla del experimento) ───
+// GET /experiments/:clave/results/seconds?grupo=&tanda=: la conducta de cada segundo de los especímenes de una tanda, con
+// sus correcciones. «sin ver» es conducta null y el origen va crudo, como lo guarda la base.
+const CONDUCTA_DE_SEGUNDO = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
+
+function segundosDeEjemplo(clave, gid, letra) {
+  const exp = db.experimentDetail[clave]
+  const g = exp.grupos.find((x) => String(x.id) === String(gid))
+  const t = g?.tandas.find((x) => x.letra === letra)
+  if (!t || t.estado !== 'DONE') return null
+  const r = resultadosDeEjemplo(clave, g.id, letra)
+  const duracion = Math.min(SEGUNDOS_ANALIZADOS, t.duracion_s || DURACION_S)
+  return {
+    duracionS: duracion,
+    grupo: { id: g.id, etiqueta: g.nombre },
+    letra,
+    especimenes: r.especimenes.map((e) => ({
+      numeroCilindro: e.numeroCilindro,
+      segundos: segundosDe(t.id_analisis, e).slice(0, duracion).map(({ conducta, origen }, i) => ({
+        s: i + 1,
+        conducta: conducta ? CONDUCTA_DE_SEGUNDO[conducta] : null,
+        origen,
+      })),
+    })),
+  }
+}
+
+export async function getSegundos(clave, gid, letra) {
+  if (!USE_MOCKS) return (await api.get(`/experiments/${clave}/results/seconds`, { params: { grupo: gid, tanda: letra } })).data
+  if (!db.experimentDetail[clave]) return fail(404, 'No existe ese experimento.')
+  const datos = segundosDeEjemplo(clave, gid, letra)
+  return datos ? reply(datos) : fail(404, 'La tanda todavía no tiene análisis completado.')
+}
+
+// GET /experiments/:clave/report/excel: el Excel de todo el experimento (hojas «Resultados» y «Segundo a segundo»). En modo
+// demo no hay archivo, como con el PDF.
+export async function getExcelExperimento(clave) {
+  if (USE_MOCKS) return reply(null)
+  const res = await api.get(`/experiments/${clave}/report/excel`, { responseType: 'blob' })
+  return { archivo: res.data, nombre: nombreDeContentDisposition(res.headers?.['content-disposition']) }
+}

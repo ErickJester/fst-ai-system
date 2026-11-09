@@ -14,7 +14,7 @@ function porConducta(base) {
   return Object.fromEntries(CONDUCTAS.map((c) => [c, base[c] ?? est(null, null, 0)]))
 }
 
-// Una fila de porMinuto: n especímenes con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
+// Una fila de porMinuto: n animales con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
 function fila(minuto, n, media, { incompleto = false, seg = 60 } = {}) {
   if (n === 0) {
     return { minuto, n: 0, segundosMin: null, segundosMax: null, incompleto: false, porConducta: porConducta({}) }
@@ -71,18 +71,18 @@ describe('G6 · mapa por minuto', () => {
     expect(container.querySelector('[data-celda="Referencia|2"]').getAttribute('data-rango')).toBe('4')
   })
 
-  it('un minuto sin especímenes (n = 0) es un rayado gris sin número', () => {
+  it('un minuto sin animales (n = 0) es un rayado gris sin número', () => {
     const { container } = render(<G6MapaPorMinuto datos={tresGrupos} prefijo="g6b" />)
     const celda = container.querySelector('[data-celda="Referencia|3"]')
     expect(celda.getAttribute('data-estado')).toBe('sindatos')
     expect(celda.querySelectorAll('text').length).toBe(0)
   })
 
-  it('un grupo mixto no lleva celdas: su fila dice «mezcla niveles» y su nota', () => {
+  it('un grupo mixto no lleva celdas: su fila dice «tandas no comparables» y su nota', () => {
     const { container } = render(<G6MapaPorMinuto datos={conSinDatosYMixto} prefijo="g6c" />)
     expect(container.querySelector('[data-celda^="Dosis mixta"]')).toBeNull()
-    expect(container.querySelector('[data-mixto="Dosis mixta"]').textContent).toBe('mezcla niveles')
-    expect(screen.getByText('Dosis mixta: Mezcla niveles de clasificación; no se promedia junto.')).toBeTruthy()
+    expect(container.querySelector('[data-mixto="Dosis mixta"]').textContent).toBe('tandas no comparables')
+    expect(screen.getByText('Dosis mixta: Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.')).toBeTruthy()
   })
 
   it('un grupo sin datos aparece con su nota y todas sus celdas sin datos', () => {
@@ -114,10 +114,16 @@ describe('G6 · mapa por minuto', () => {
     expect(screen.getByText('60,0')).toBeTruthy()
   })
 
-  it('el número va en blanco sobre los rangos oscuros y en negro sobre los claros', () => {
+  it('el número va siempre en tinta sobre un fondo claro que lo separa del patrón, sin contorno', () => {
     const { container } = render(<G6MapaPorMinuto datos={tresGrupos} prefijo="g6g" />)
-    expect(container.querySelector('[data-celda="Control|1"] text').getAttribute('fill')).toBe('var(--color-text)')
-    expect(container.querySelector('[data-celda="Control|3"] text').getAttribute('fill')).toBe('var(--color-bg)')
+    for (const celda of ['Control|1', 'Control|3']) {
+      const texto = container.querySelector(`[data-celda="${celda}"] text`)
+      expect(texto.getAttribute('fill')).toBe('var(--color-text)')
+      expect(texto.getAttribute('stroke')).toBeNull()
+      expect(texto.getAttribute('paint-order')).toBeNull()
+      expect(texto.previousElementSibling.tagName.toLowerCase()).toBe('rect')
+      expect(texto.previousElementSibling.getAttribute('fill')).toBe('var(--color-bg)')
+    }
   })
 
   it('la leyenda muestra los seis rangos y «sin datos»', () => {

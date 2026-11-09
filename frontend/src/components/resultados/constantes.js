@@ -1,4 +1,4 @@
-import { especimen, enHoraLocal, fechaCorta } from '../../lib/fst'
+import { enHoraLocal, fechaCorta } from '../../lib/fst'
 
 export const INK = 'var(--color-text)'
 export const ACC = 'var(--color-accent)'
@@ -13,7 +13,7 @@ export const CONDUCTAS = [
   { id: 'nado', label: 'Nado activo', color: INK, nota: 'Desplazamiento horizontal sostenido; el buceo cuenta aquí.' },
   { id: 'inmovilidad', label: 'Inmovilidad', color: ACC, nota: 'Solo los movimientos mínimos para mantenerse a flote.' },
   { id: 'escalamiento', label: 'Escalamiento', color: N400, nota: 'Patas delanteras rompiendo la superficie contra la pared del cilindro.' },
-  { id: 'activa', label: 'Conducta activa', color: ACTIVA, nota: 'El espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.' },
+  { id: 'activa', label: 'Conducta activa', color: ACTIVA, nota: 'El animal no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.' },
 ]
 const KEYS = CONDUCTAS.map((c) => c.id)
 // «Sin ver»: los segundos sin conducta (no se vio al animal o la revisión los marcó como no visibles). No es una conducta: va
@@ -30,8 +30,9 @@ export const COLOR_AGRUPADO = 'var(--color-accent-300)'
 export const DIA2_S = 300
 export const PENDIENTE = { QUEUED: 'en cola', RUNNING: 'procesando', PAUSED: 'en pausa', FAILED: 'con error', CANCELED: 'cancelada' }
 
-// Etiquetas: el espécimen siempre con su tanda, porque su número se repite en cada tanda (D-55).
-export const etiqueta = (e, letra) => especimen(e.numeroCilindro, letra)
+// Etiquetas: el animal siempre con su tanda, porque su número se repite en cada tanda (D-55).
+export const etiquetaAnimal = (numero, letra) => (letra ? 'Tanda ' + letra + ' · ' : '') + 'Animal ' + numero
+export const etiqueta = (e, letra) => etiquetaAnimal(e.numeroCilindro, letra)
 export const nombreGrupo = (g) => (g.tipo === 'CONTROL' ? 'Grupo control' : 'Grupo ' + g.nombre[0].toLowerCase() + g.nombre.slice(1))
 export const hora = (iso) => enHoraLocal(iso).slice(11, 16)
 export const fechaYHora = (analizado) => fechaCorta(analizado.slice(0, 10)) + (analizado.length > 10 ? ', ' + hora(analizado) : '')
@@ -54,10 +55,11 @@ export const REPORTES = {
   },
 }
 
+// Las vistas del detalle de una tanda (?vista=). Las gráficas están en el resumen del experimento, no aquí.
 export const TABS = [
-  { id: 'especimen', label: 'Por espécimen' },
+  { id: 'especimen', label: 'Por animal' },
+  { id: 'segundo', label: 'Segundo a segundo' },
+  { id: 'timeline', label: 'Minuto a minuto' },
+  { id: 'bloques', label: 'Cada 5 segundos' },
   { id: 'comparacion', label: 'Comparación entre grupos' },
-  { id: 'timeline', label: 'Línea de tiempo por minuto' },
-  { id: 'bloques', label: 'Bloques de 5 s' },
-  { id: 'graficas', label: 'Gráficas' },
 ]
