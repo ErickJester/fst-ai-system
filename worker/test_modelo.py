@@ -166,5 +166,64 @@ class PruebasModeloEnElDiagnostico(unittest.TestCase):
         self.assertIn("Generado por el worker (pipeline fst_auto, modelo fst_cnn_seg).", textos)
 
 
+
+class PruebasModeloActual(unittest.TestCase):
+    """modelo-actual.json: lo que la API muestra al cargar un video en modo desarrollador."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.carpeta = Path(self._tmp.name) / "archivos"
+        self.carpeta.mkdir()
+        self.modelo = Path(self._tmp.name) / "fst_cnn_seg.pt"
+        self.modelo.write_bytes(b"pesos de prueba")
+        t._MODELOS.clear()
+        entorno = mock.patch.dict(os.environ, {"MODO_DESARROLLADOR": "true"})
+        entorno.start()
+        self.addCleanup(entorno.stop)
+        paquete = mock.patch.object(t, "_leer_paquete", return_value=dict(PAQUETE))
+        paquete.start()
+        self.addCleanup(paquete.stop)
+
+    def leer(self):
+        return json.loads((self.carpeta / "modelo-actual.json").read_text(encoding="utf-8"))
+
+    def test_con_modo_desarrollador_escribe_la_identidad_y_la_hora(self):
+        self.assertTrue(t.publicar_modelo_actual(self.modelo, self.carpeta))
+        datos = self.leer()
+        self.assertEqual(datos["archivo"], "fst_cnn_seg.pt")
+        self.assertEqual(datos["version"], "5.0.0")
+        self.assertEqual(datos["sha256"], hashlib.sha256(b"pesos de prueba").hexdigest())
+        self.assertRegex(datos["actualizado"], r"^\d{4}-\d{2}-\d{2}T")
+
+    def test_sin_modo_desarrollador_no_escribe_nada(self):
+        with mock.patch.dict(os.environ, {"MODO_DESARROLLADOR": "false"}):
+            self.assertFalse(t.publicar_modelo_actual(self.modelo, self.carpeta))
+        self.assertFalse((self.carpeta / "modelo-actual.json").exists())
+
+    def test_si_el_modelo_no_existe_escribe_archivo_null_y_la_ruta_esperada(self):
+        ausente = Path(self._tmp.name) / "no_existe.pt"
+        self.assertTrue(t.publicar_modelo_actual(ausente, self.carpeta))
+        datos = self.leer()
+        self.assertIsNone(datos["archivo"])
+        self.assertEqual(datos["ruta"], str(ausente))
+        self.assertIn("actualizado", datos)
+
+    def test_la_escritura_es_atomica_y_no_deja_temporales(self):
+        t.publicar_modelo_actual(self.modelo, self.carpeta)
+        t.publicar_modelo_actual(self.modelo, self.carpeta)
+        self.assertEqual(sorted(p.name for p in self.carpeta.iterdir()), ["modelo-actual.json"])
+
+    def test_un_fallo_al_escribir_no_lanza_y_devuelve_false(self):
+        estorbo = Path(self._tmp.name) / "estorbo"
+        estorbo.write_text("un archivo, no una carpeta")
+        self.assertFalse(t.publicar_modelo_actual(self.modelo, estorbo / "subcarpeta"))
+
+    def test_sin_ruta_usa_el_modelo_de_modelo_cnn(self):
+        with mock.patch.dict(os.environ, {"MODELO_CNN": str(self.modelo)}):
+            self.assertTrue(t.publicar_modelo_actual(carpeta=self.carpeta))
+        self.assertEqual(self.leer()["archivo"], "fst_cnn_seg.pt")
+
+
 if __name__ == "__main__":
     unittest.main()

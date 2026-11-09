@@ -6,6 +6,8 @@ import { getExperiment } from '../services/experiments'
 import { sugerirGrupos, subirVideo } from '../services/groups'
 import { mensajeError, esCancelacion } from '../services/api'
 import { MAX_UPLOAD_MB } from '../services/config'
+import { getModeloActual } from '../services/modo'
+import { useModo } from '../contexts/ModoContext'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../contexts/AuthContext'
 import { norm, puedeSubirVideo, SOLO_CREADOR_SUBE } from '../lib/fst'
@@ -488,6 +490,9 @@ export default function CargarVideoPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: exp, error } = useAsync(() => getExperiment(clave), [clave])
+  // Modo desarrollador: con qué modelo analiza el worker. Sin el modo no se pide nada.
+  const { modoDesarrollador } = useModo()
+  const modelo = useAsync(() => (modoDesarrollador ? getModeloActual() : Promise.resolve(null)), [modoDesarrollador])
   const [formularios, setFormularios] = useState([{ id: 1, plantilla: null }]) // en el orden en que se agregaron
   const [resumenes, setResumenes] = useState({}) // id → lo que cada formulario cuenta de sí mismo
   const [foco, setFoco] = useState(null) // formulario recién agregado
@@ -595,6 +600,7 @@ export default function CargarVideoPage() {
 
       {/* §9.3: otra tanda sin salir de aquí, o terminar y volver al experimento. */}
       <div style={{ borderTop: '2px solid var(--color-divider)', padding: '18px 32px 36px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        {modoDesarrollador && <RecuadroModelo modelo={modelo} />}
         {!unico && (
           <button type="button" className="btn btn-primary" style={btnLeft} disabled={guardando || subiendoAlguna || pendientes.length === 0 || faltan.length > 0} onClick={guardarTodas}>
             {guardando || subiendoAlguna ? 'Subiendo…' : hayDia2 ? 'Guardar y encolar análisis' : 'Guardar videos'}
@@ -612,3 +618,19 @@ export default function CargarVideoPage() {
     </div>
   )
 }
+
+// Modo desarrollador: el modelo que se usará. Un fallo de la petición solo se dice aquí; no impide subir el video.
+function RecuadroModelo({ modelo }) {
+  let texto
+  if (modelo.loading) texto = 'Consultando el modelo…'
+  else if (modelo.error) texto = 'No se pudo consultar el modelo; la carga sigue igual.'
+  else if (modelo.data?.archivo) texto = 'Modelo que se usará: ' + modelo.data.texto
+  else if (modelo.data?.ruta) texto = 'El modelo no se encontró: el análisis fallará hasta que exista.'
+  else texto = modelo.data?.motivo || 'El worker todavía no informó qué modelo usa.'
+  return (
+    <div role="status" style={{ flexBasis: '100%', border: '1px dashed var(--color-divider)', padding: '8px 12px', fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted-2)' }}>
+      {texto}
+    </div>
+  )
+}
+

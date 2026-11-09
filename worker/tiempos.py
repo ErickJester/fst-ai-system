@@ -29,7 +29,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from comun import ahora, carpeta_analisis, log
+from comun import ARCHIVOS, ahora, carpeta_analisis, log
 
 
 def modo_desarrollador():
@@ -278,3 +278,45 @@ def cerrar_archivo(id_analisis, carpeta=None):
     error = _escribir_archivo(archivo, datos)
     if error is not None:
         log.warning("No se pudo cerrar los tiempos en %s: %s", archivo, error)
+
+
+# ---------------------------------------------------------------------------
+#  Modelo actual (modo desarrollador): lo que usa el worker, para que la API lo muestre al cargar un video
+# ---------------------------------------------------------------------------
+
+# El archivo que la API lee en /dev/modelo-actual. Vive en el volumen de archivos, que comparten el worker y la API.
+NOMBRE_MODELO_ACTUAL = "modelo-actual.json"
+
+
+def ruta_del_modelo():
+    """El modelo que usa el análisis: el mismo valor que MODELO en worker.py (MODELO_CNN, o su ruta por defecto)."""
+    return Path(os.environ.get("MODELO_CNN", "/data/modelos/fst_cnn_seg.pt"))
+
+
+def _escribir_json_atomico(destino, datos):
+    """Escribe a un temporal en la misma carpeta y luego lo renombra: la API nunca lee un archivo a medias."""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporal = destino.with_name(destino.name + ".tmp")
+    temporal.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(temporal, destino)
+
+
+def publicar_modelo_actual(ruta=None, carpeta=None):
+    """Modo desarrollador: escribe modelo-actual.json con la identidad del modelo que usa el worker (archivo, versión,
+    SHA-256, tamaño, fecha y, de ser posible, lo que trae el .pt) y la hora de la escritura. Si el archivo del modelo no
+    existe, escribe archivo null y la ruta esperada, para que la pantalla avise. Sin modo desarrollador no escribe nada.
+    Nunca lanza: un fallo aquí no debe detener al worker. Devuelve True si escribió."""
+    if not modo_desarrollador():
+        return False
+    try:
+        ruta = Path(ruta) if ruta is not None else ruta_del_modelo()
+        destino = Path(carpeta if carpeta is not None else ARCHIVOS) / NOMBRE_MODELO_ACTUAL
+        identidad = identidad_del_modelo(ruta)
+        datos = dict(identidad) if identidad is not None else {"archivo": None, "ruta": str(ruta)}
+        datos["actualizado"] = ahora().isoformat(timespec="seconds")
+        _escribir_json_atomico(destino, datos)
+        return True
+    except Exception as e:  # noqa: BLE001 - nada de esto debe tumbar al worker
+        log.warning("No se pudo publicar el modelo actual: %s", e)
+        return False
+

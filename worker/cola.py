@@ -13,7 +13,7 @@ import psycopg2
 
 import tareas_programadas
 from diagnostico import generar_diagnostico
-from tiempos import cerrar_archivo
+from tiempos import cerrar_archivo, publicar_modelo_actual
 from comun import (
     DAILY_HOUR, PAUSE_TIMEOUT_HOURS, POLL_SECONDS,
     ahora, bloquear_experimento, borrar_reportes_del_disco, carpeta_analisis, configurar_log, conectar, datos_analisis,
@@ -159,6 +159,7 @@ def marcar_error_imprevisto(conn, id_analisis, error):
 # ---------------------------------------------------------------------------
 
 def vuelta(conn, procesar_analisis):
+    publicar_modelo_actual()  # modo desarrollador: el modelo que se usa, para la pantalla de carga (no detiene nada)
     revisar_pausas(conn)
     tareas_programadas.correr_si_toca(conn)
     if not hay_en_cola(conn):
@@ -182,6 +183,7 @@ def main(procesar_analisis):
     """procesar_analisis es lo que hace el análisis en sí (worker.procesar_real); la cola, las pausas, las tareas
     diarias y la reconexión viven aquí."""
     configurar_log()
+    publicar_modelo_actual()
     log.info("worker: cola cada %s s, tareas diarias a las %s h, pausa de %s h",
              POLL_SECONDS, DAILY_HOUR, PAUSE_TIMEOUT_HOURS)
     conn = None

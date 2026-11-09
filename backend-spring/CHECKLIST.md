@@ -382,3 +382,7 @@ cinco. Esta tabla sale de revisar el código, no de la memoria; la guía no se e
 - [ ] Pruebas con PostgreSQL, no corridas: `SegundosYExcelTest` (3): forma de la respuesta, 404 y 400, y el Excel con sus dos hojas
 - [x] Corrección tras la revisión con PostgreSQL: `grupo` y `tanda` de `GET .../results/seconds` son opcionales en la firma del controlador; su falta la valida `deUnaTanda` (400 con mensaje). Antes, la ausencia de `tanda` daba 500 por el manejador general
 - [x] Base de pruebas con PostgreSQL: arrancarla con `postgres -c max_connections=300` (con el valor por defecto, las pruebas de integración se quedan sin conexiones: «too many clients»)
+
+## 20. Modelo del worker en la pantalla de carga (modo desarrollador)
+- [x] `GET /dev/modelo-actual` (`DevModeloController`, `ModeloActualDeDesarrollo`): lee `modelo-actual.json` del volumen de archivos y añade `texto` (mismo texto que el PDF). Sin modo desarrollador, 404; si el worker no informó o el archivo no se lee, 200 con `archivo: null` y `motivo`
+- [x] Pruebas: `ModeloActualDeDesarrolloTest` (5), corridas antes de la instrucción de no probar más. Sin ejecutar la versión final de la pantalla

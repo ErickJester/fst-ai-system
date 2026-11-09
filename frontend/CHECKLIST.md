@@ -247,3 +247,7 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [x] Glosas: «Día 2 (la prueba de 5 minutos).» en el resumen; «Tanda: un video con varios animales.» y la frase de «Nivel» (preciso / agrupado) en el detalle
 - [x] Pruebas actualizadas (`pantallas.test.jsx`): cuatro por textos (animales, nivel mixto, «¿Qué pasó?»); cinco nuevas del detalle (selector, vista conservada, grupo completo con segundo a segundo, glosas, glosa de Día 2)
 - [x] Lint 0; `npm test` 331/331; navegador real en demo: el selector cambia de grupo y conserva la vista; «Grupo completo» y los enlaces de tanda también; 390 px sin desplazamiento
+
+## 21. Modelo del worker en la pantalla de carga (modo desarrollador)
+- [x] `services/modo.js`: `getModeloActual()` (real y de ejemplo). `CargarVideoPage.jsx`: recuadro «Modelo que se usará» solo con modo desarrollador, junto a los botones de guardar; sin modelo y con motivo; un fallo no bloquea la carga
+- [ ] Sin probar: lint, `npm test` y navegador (instrucción del orquestador: no correr pruebas en este encargo)
