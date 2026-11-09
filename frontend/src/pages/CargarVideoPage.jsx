@@ -157,6 +157,16 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
   // canSave: además no se está subiendo ahora (el botón de un formulario único).
   const lista = !!(grupoOk && confirmada && archivo) && !yaTiene && !choque
   const canSave = lista && subiendo == null
+  // Lo primero que falta para poder guardar, dicho tal cual ('' si ya no falta nada).
+  let falta = ''
+  if (!qt) falta = 'Falta escribir el nombre del grupo.'
+  else if (!grupo && !nuevo) falta = 'Falta elegir el grupo de la lista.'
+  else if (!grupoOk) falta = 'Falta escribir el tratamiento del grupo nuevo, en el recuadro de la derecha.'
+  else if (!/^[A-Z]$/.test(tanda)) falta = 'Falta la letra de la tanda.'
+  else if (!confirmada) falta = 'Falta confirmar la tanda.'
+  else if (!archivo) falta = 'Falta adjuntar el archivo.'
+  else if (yaTiene) falta = 'Esta tanda ya tiene su video de esa sesión: elige otra sesión o una tanda nueva.'
+  else if (choque) falta = 'Otro formulario ya usa esta tanda: cambia la tanda o la sesión.'
 
   // La página necesita saber esto de cada formulario para no repetir tandas ni crear dos veces un grupo nuevo.
   const firma = JSON.stringify({ id, grupoKey, nuevo: !!nuevo, tanda, sesion, guardada: !!guardada, subiendo: subiendo != null, q, elegido, lista })
@@ -423,7 +433,7 @@ function FormularioTanda({ clave, exp, id, posicion, unico, resumenes, plantilla
                   <button type="button" className="btn btn-primary" style={btnLeft} disabled={!canSave} onClick={guardar}>
                     {subiendo != null ? 'Subiendo…' : sesion === '1' ? 'Guardar video' : 'Guardar y encolar análisis'}
                   </button>
-                  <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Se habilita al confirmar la tanda y adjuntar el archivo.</span>
+                  {falta && <span role="status" style={{ fontSize: 11.5, color: 'var(--color-accent-700)' }}>{falta}</span>}
                 </div>
               )}
               {!unico && guardando && subiendo == null && (
