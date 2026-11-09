@@ -59,4 +59,5 @@ export const TABS = [
   { id: 'comparacion', label: 'Comparación entre grupos' },
   { id: 'timeline', label: 'Línea de tiempo por minuto' },
   { id: 'bloques', label: 'Bloques de 5 s' },
+  { id: 'graficas', label: 'Gráficas' },
 ]

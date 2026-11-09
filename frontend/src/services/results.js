@@ -192,7 +192,102 @@ export async function getGroupComparison(clave) {
   }))
 }
 
-// ── Bloques de 5 s (D-53) ───────────────────────────────────────────────────
+// ── Gráficas de resultados (M1A) ──────────────────────────────────────────
+// GET /experiments/:clave/results/charts: todos los grupos del Día 2 con sus estadísticos y sus
+// datos por minuto. La forma está en components/resultados/graficas/ESPECIFICACION.md. Con datos
+// de ejemplo, los mismos cálculos que en el backend (n − 1; null cuando no existe).
+const CLAVES_CONDUCTA = { nado: 'nado activo', inmovilidad: 'inmovilidad', escalamiento: 'escalamiento', activa: 'conducta activa' }
+const CLAVES_GRAFICA = [...Object.values(CLAVES_CONDUCTA), 'sin ver']
+const redondeo1 = (x) => (x == null ? null : Math.round(x * 10) / 10)
+
+function estadisticosDeEjemplo(valores) {
+  const n = valores.length
+  const media = n ? valores.reduce((a, v) => a + v, 0) / n : null
+  const varianza = n < 2 ? null : valores.reduce((a, v) => a + (v - media) ** 2, 0) / (n - 1)
+  const de = varianza == null ? null : Math.sqrt(varianza)
+  const cv = de == null || media === 0 ? null : Math.round((de / media) * 1000) / 1000
+  return { n, media: redondeo1(media), de: redondeo1(de), varianza: redondeo1(varianza), cv }
+}
+
+// Un espécimen con sus segundos por conducta («sin ver» = lo que no tiene conducta) y por minuto.
+function especimenGraficaDeEjemplo(r, e) {
+  const duracionS = Math.min(SEGUNDOS_ANALIZADOS, r.t.duracion_s || DURACION_S)
+  const total = { 'nado activo': e.nado_s ?? 0, inmovilidad: e.inmovilidad_s ?? 0, escalamiento: e.escalamiento_s ?? 0, 'conducta activa': e.activa_s ?? 0 }
+  total['sin ver'] = duracionS - Object.values(total).reduce((a, s) => a + s, 0)
+  const porMinuto = [1, 2, 3, 4, 5].map((m) => {
+    const segundos = Math.max(0, Math.min(60, duracionS - 60 * (m - 1)))
+    const delMinuto = Object.fromEntries(CLAVES_GRAFICA.map((c) => [c, 0]))
+    for (const [c, s] of e.minutos[m - 1] || []) delMinuto[CLAVES_CONDUCTA[c]] += s
+    delMinuto['sin ver'] = segundos - Object.values(delMinuto).reduce((a, s) => a + s, 0)
+    return { segundos, porConducta: delMinuto }
+  })
+  return { letra: r.t.letra, numeroCilindro: e.numeroCilindro, nivelClasif: NIVEL.aGuia[r.nivel], duracionS, total, porMinuto }
+}
+
+// Lo que el backend calcula por grupo: estadísticos por conducta, por minuto y por tanda si el nivel es mixto.
+function graficaDeGrupoDeEjemplo(g, esp, rs, nivelMixto) {
+  const porConducta = nivelMixto ? null : Object.fromEntries(CLAVES_GRAFICA.map((c) => {
+    const valores = esp.map((e) => e.total[c])
+    return [c, { ...estadisticosDeEjemplo(valores), valoresS: valores }]
+  }))
+  const porMinuto = nivelMixto ? null : [1, 2, 3, 4, 5].map((m, i) => {
+    const con = esp.filter((e) => e.porMinuto[i].segundos > 0)
+    const segs = con.map((e) => e.porMinuto[i].segundos)
+    return {
+      minuto: m,
+      n: con.length,
+      segundosMin: segs.length ? Math.min(...segs) : null,
+      segundosMax: segs.length ? Math.max(...segs) : null,
+      incompleto: segs.some((s) => s < 60),
+      porConducta: Object.fromEntries(CLAVES_GRAFICA.map((c) => [c, estadisticosDeEjemplo(con.map((e) => e.porMinuto[i].porConducta[c]))])),
+    }
+  })
+  const porNivel = nivelMixto ? rs.map((r) => ({
+    letra: r.t.letra,
+    nivelClasif: NIVEL.aGuia[r.nivel],
+    n: r.especimenes.length,
+    porConducta: Object.fromEntries(CLAVES_GRAFICA.map((c) => [c, estadisticosDeEjemplo(esp.filter((e) => e.letra === r.t.letra).map((e) => e.total[c]))])),
+  })) : null
+  const duraciones = esp.map((e) => e.duracionS)
+  return {
+    duracionMediaS: nivelMixto || !esp.length ? null : redondeo1(duraciones.reduce((a, s) => a + s, 0) / duraciones.length),
+    especimenes: esp.map(({ letra, numeroCilindro, nivelClasif, duracionS }) => ({ letra, numeroCilindro, nivelClasif, duracionS })),
+    porConducta, porMinuto, porNivel,
+  }
+}
+
+// Control, referencia y luego los experimentales; dentro de cada tipo, por id.
+const RANGO_TIPO = { control: 0, referencia: 1 }
+function graficasDeEjemplo(clave) {
+  const exp = db.experimentDetail[clave]
+  const rango = (g) => RANGO_TIPO[TIPO_GRUPO.aGuia[g.tipo]] ?? 2
+  const grupos = [...exp.grupos].sort((a, b) => rango(a) - rango(b) || a.id - b.id)
+  return {
+    dia: 2,
+    conductas: CLAVES_GRAFICA,
+    minutos: [1, 2, 3, 4, 5],
+    grupos: grupos.map((g) => {
+      const rs = g.tandas.map((t) => resultadosDeEjemplo(clave, g.id, t.letra)).filter(Boolean)
+      const esp = rs.flatMap((r) => r.especimenes.map((e) => especimenGraficaDeEjemplo(r, e)))
+      const nivelMixto = new Set(rs.map((r) => r.nivel)).size > 1
+      return {
+        idGrupo: g.id, etiqueta: g.nombre, tipo: TIPO_GRUPO.aGuia[g.tipo], tratamiento: g.tratamiento,
+        n: esp.length, nTotal: g.tandas.reduce((a, t) => a + t.n_cilindros, 0),
+        faltantes: g.tandas.filter((t) => t.estado !== 'DONE').map((t) => ({ letra: t.letra, nCilindros: t.n_cilindros, estado: t.estado === 'SIN_VIDEO' ? null : ESTADO.aGuia[t.estado] })),
+        nivelMixto,
+        ...graficaDeGrupoDeEjemplo(g, esp, rs, nivelMixto),
+      }
+    }),
+  }
+}
+
+// GET /experiments/:clave/results/charts: los datos de la galería de gráficas (M1A).
+export async function getGraficas(clave) {
+  if (USE_MOCKS) return db.experimentDetail[clave] ? await reply(graficasDeEjemplo(clave)) : await fail(404, 'No existe ese experimento.')
+  return (await api.get(`/experiments/${clave}/results/charts`)).data
+}
+
+// ── Bloques de 5 s (D-53)───────────────────────────────────────────────────
 // GET /experiments/:clave/results/blocks → por espécimen, sus 60 bloques con la conducta
 // mayoritaria y sus cinco segundos: { inicio (segundo, desde 1), conducta, matiz, segundos }
 // (conductas con el nombre de la base). Los calcula el backend al pedirlos, por mayoría sobre

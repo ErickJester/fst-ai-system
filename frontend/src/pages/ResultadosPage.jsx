@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
@@ -8,17 +8,16 @@ import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
 import { download, primeraTandaLista, enlaceResultados } from '../lib/fst'
 import { Migas, Cargando, NoEncontrado } from '../components/ui'
-import TablaEspecimenes from '../components/resultados/TablaEspecimenes'
-import DesglosePorMinuto from '../components/resultados/DesglosePorMinuto'
-import Bloques from '../components/resultados/Bloques'
 import PanelLateral from '../components/resultados/PanelLateral'
 import CabeceraResultados from '../components/resultados/CabeceraResultados'
 import BarraReportes, { AvisoReporte } from '../components/resultados/BarraReportes'
 import SinResultados from '../components/resultados/SinResultados'
+import ContenidoResultados from '../components/resultados/ContenidoResultados'
 import { REPORTES, TABS } from '../components/resultados/constantes'
 
 // 2f · Resultados, Día 2 (RF-19, D-93): de una tanda (?grupo=&tanda=) o del grupo completo
 // (?grupo= sin tanda). Sin grupo abre la primera tanda del experimento con el Día 2 analizado.
+// La pestaña activa va en ?vista= (M1A).
 export default function ResultadosPage() {
   const { clave } = useParams()
   const [params] = useSearchParams()
@@ -37,10 +36,13 @@ function PrimeraTanda({ clave }) {
   return <Navigate replace to={enlaceResultados(clave, t.gid, t.letra)} />
 }
 
+const VISTAS = TABS.map((t) => t.id)
+
 function ResultadosTanda({ clave, gid, letra }) {
   const { modoDesarrollador } = useModo()
-  const [tab, setTab] = useState('especimen')
-  const refs = { especimen: useRef(null), comparacion: useRef(null), timeline: useRef(null), bloques: useRef(null) }
+  const [params, setParams] = useSearchParams()
+  const vista = VISTAS.includes(params.get('vista')) ? params.get('vista') : 'especimen'
+  const cambiarVista = (id) => setParams((p) => { p.set('vista', id); return p }, { replace: true })
   const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
   const [reporte, setReporte] = useState(null) // { formato, error } del último botón de reporte
   const [lineaSel, setLineaSel] = useState('') // espécimen del desglose por minuto: «A-1»
@@ -109,12 +111,6 @@ function ResultadosTanda({ clave, gid, letra }) {
     }
   }
 
-  // Las pestañas llevan a su sección de la vista.
-  function irA(id) {
-    setTab(id)
-    refs[id].current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
     <div className="app">
       <Topbar>
@@ -128,7 +124,7 @@ function ResultadosTanda({ clave, gid, letra }) {
       </Topbar>
 
       <div className="page">
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 24 }}>
           <CabeceraResultados clave={clave} gid={gid} r={r} rs={rs} grupoCompleto={grupoCompleto} analizado={analizado} tiempos={tiempos}
             completadas={completadas} nCompletos={nCompletos} agrupado={agrupado} revisado={revisado} />
           <BarraReportes clave={clave} r={r} grupoCompleto={grupoCompleto} reporte={reporte} pedirReporte={pedirReporte} pedirSalidaModelo={pedirSalidaModelo} />
@@ -136,23 +132,22 @@ function ResultadosTanda({ clave, gid, letra }) {
 
         {reporte && !reporte.pidiendo && <AvisoReporte reporte={reporte} setReporte={setReporte} vistaTexto={vistaTexto} />}
 
-        {/* Saltos a secciones de esta misma vista (no cambian el contenido): navegación, no pestañas. */}
-        <nav aria-label="Secciones de los resultados" className="no-print" style={{ display: 'flex', borderBottom: '2px solid var(--color-divider)', margin: '22px 0 24px' }}>
+        {/* Las pestañas: cada una muestra solo su contenido; la activa va en ?vista= (M1A). */}
+        <nav aria-label="Secciones de los resultados" className="no-print" style={{ display: 'flex', overflowX: 'auto', borderBottom: '2px solid var(--color-divider)', margin: '22px 0 24px' }}>
           {TABS.map((t) => (
-            <button key={t.id} type="button" className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'true' : undefined} onClick={() => irA(t.id)}>{t.label}</button>
+            <button key={t.id} type="button" className={'tab' + (vista === t.id ? ' on' : '')} aria-current={vista === t.id ? 'true' : undefined}
+              onClick={() => cambiarVista(t.id)} style={{ whiteSpace: 'nowrap' }}>{t.label}</button>
           ))}
         </nav>
 
         <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 2, background: 'var(--color-divider)' }}>
-          <div style={{ background: 'var(--color-bg)', paddingRight: 26 }}>
-            <TablaEspecimenes innerRef={refs.especimen} especimenes={especimenes} duracion={r.duracion_analizada_s} grupoCompleto={grupoCompleto} faltan={faltan} />
-            <DesglosePorMinuto innerRef={refs.timeline} lineas={lineas} linea={linea} setLineaSel={setLineaSel} />
-            <div ref={refs.bloques} className="k" style={{ margin: '26px 0 12px' }}>Bloques de 5 s</div>
-            <Bloques clave={clave} gid={gid} letras={rs.map((x) => x.letra)} />
+          <div style={{ background: 'var(--color-bg)', paddingRight: 26, minWidth: 0 }}>
+            <ContenidoResultados vista={vista} clave={clave} gid={gid} rs={rs} r={r} especimenes={especimenes} grupoCompleto={grupoCompleto}
+              faltan={faltan} lineas={lineas} linea={linea} setLineaSel={setLineaSel} comparacion={comparacion}
+              conducta={conducta} setConducta={setConducta} />
           </div>
 
-          <PanelLateral r={r} especimenes={especimenes} g={g} grupoCompleto={grupoCompleto} comparacion={comparacion}
-            conducta={conducta} setConducta={setConducta} refComparacion={refs.comparacion} />
+          <PanelLateral r={r} especimenes={especimenes} g={g} grupoCompleto={grupoCompleto} />
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ function estadisticos(duracion) {
 }
 
 // Tiempo por conducta de cada espécimen que se ve, con su distribución y los tres renglones estadísticos.
-export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto, faltan, innerRef }) {
+export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto, faltan }) {
   const stats = estadisticos(duracion)
   const col = (k) => especimenes.map((e) => e[k + '_s'] ?? 0)
   // Cada fila suma 100 %: su denominador son los segundos guardados del espécimen (sus cinco columnas), no la duración del video.
@@ -25,10 +25,10 @@ export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto,
 
   return (
     <>
-      <div ref={innerRef} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 14 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px 18px', marginBottom: 14 }}>
         <div className="k">Tiempo por conducta · min:seg</div>
         <div style={{ flex: 1 }} />
-        <span style={{ display: 'flex', gap: 18 }}>
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
           {CONDUCTAS.map((b) => (
             <span key={b.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5 }}><span className="sw" style={{ background: b.color }} />{b.label}</span>
           ))}

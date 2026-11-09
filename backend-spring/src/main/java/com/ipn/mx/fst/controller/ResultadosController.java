@@ -60,6 +60,12 @@ public class ResultadosController {
 		return Respuesta.ok(resultadosService.resultadosPorGrupo(id), HttpStatus.OK);
 	}
 
+	// Datos de las gráficas de resultados (M1A/M1B): todos los grupos del Día 2 del experimento, sin importar la tanda.
+	@GetMapping("/{id}/results/charts")
+	public ResponseEntity<Map<String, Object>> resultsGraficas(@PathVariable Integer id) {
+		return Respuesta.ok(resultadosService.graficas(id), HttpStatus.OK);
+	}
+
 	// "Salida del modelo" (solo modo desarrollador, sin documentar): lo que decidió el modelo en cada segundo, TAL CUAL lo
 	// deja fst_auto, byte por byte, sin reescribirlo; sirve para reentrenar. Con grupo y tanda, el CSV de esa tanda; con
 	// solo grupo, un ZIP con el de cada tanda completada y su resumen. OJO: es la salida CRUDA del modelo (el video

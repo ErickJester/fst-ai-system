@@ -576,48 +576,17 @@ public class ResultadosServiceImpl implements ResultadosService {
 		existe(idExperimento);
 
 		List<Espec> especimenes = leerEspecimenes(idExperimento);
-		// Todas las tandas con el estado del análisis de su Día 2: de ahí salen nTotal y las faltantes.
-		List<FilaTanda> tandas = jdbc.query("""
-				SELECT t.idgrupo, t.ordinal, t.ncilindros, a.estado
-				FROM tanda t
-				JOIN grupo g ON g.idgrupo = t.idgrupo
-				LEFT JOIN video v    ON v.idtanda = t.idtanda AND v.sesion = 'Dia 2'
-				LEFT JOIN analisis a ON a.idvideo = v.idvideo
-				WHERE g.idexperimento = ?
-				ORDER BY t.idgrupo, t.ordinal
-				""", (rs, fila) -> new FilaTanda(rs.getInt("idgrupo"), rs.getInt("ordinal"), rs.getInt("ncilindros"),
-				rs.getString("estado")), idExperimento);
+		List<FilaTanda> tandas = tandasDelExperimento(idExperimento);
 
-		List<Map<String, Object>> grupos = jdbc.query(
-				"SELECT idgrupo, etiqueta, tipo, tratamiento FROM grupo WHERE idexperimento = ? ORDER BY idgrupo",
-				(rs, fila) -> {
-					Map<String, Object> g = new LinkedHashMap<>();
-					g.put("idGrupo", rs.getInt("idgrupo"));
-					g.put("etiqueta", rs.getString("etiqueta"));
-					g.put("tipo", rs.getString("tipo"));
-					g.put("tratamiento", rs.getString("tratamiento"));
-					return g;
-				}, idExperimento);
+		List<Map<String, Object>> grupos = gruposDelExperimento(idExperimento);
 
 		for (Map<String, Object> grupo : grupos) {
 			int idGrupo = (Integer) grupo.get("idGrupo");
 			List<Espec> delGrupo = especimenes.stream().filter(e -> e.idGrupo == idGrupo).toList();
 
-			int nTotal = 0;
-			List<Map<String, Object>> faltantes = new ArrayList<>();
-			for (FilaTanda t : tandas) {
-				if (t.idGrupo() != idGrupo) {
-					continue;
-				}
-				nTotal += t.cilindros();
-				if (!EstadoAnalisis.COMPLETADO.es(t.estado())) {
-					Map<String, Object> falta = new LinkedHashMap<>();
-					falta.put("letra", letra(t.ordinal()));
-					falta.put("nCilindros", t.cilindros());
-					falta.put("estado", t.estado());
-					faltantes.add(falta);
-				}
-			}
+			Faltan faltan = faltantesDelGrupo(idGrupo, tandas);
+			int nTotal = faltan.nTotal();
+			List<Map<String, Object>> faltantes = faltan.faltantes();
 
 			// Las tandas completadas con niveles de clasificación distintos no se promedian juntas.
 			boolean mixto = delGrupo.stream().map(e -> e.nivel).distinct().count() > 1;
@@ -647,6 +616,75 @@ public class ResultadosServiceImpl implements ResultadosService {
 			grupo.put("porNivel", porNivel);
 		}
 		return grupos;
+	}
+
+	// Todas las tandas con el estado del análisis de su Día 2: de ahí salen nTotal y las faltantes.
+	private List<FilaTanda> tandasDelExperimento(Integer idExperimento) {
+		return jdbc.query("""
+				SELECT t.idgrupo, t.ordinal, t.ncilindros, a.estado
+				FROM tanda t
+				JOIN grupo g ON g.idgrupo = t.idgrupo
+				LEFT JOIN video v    ON v.idtanda = t.idtanda AND v.sesion = 'Dia 2'
+				LEFT JOIN analisis a ON a.idvideo = v.idvideo
+				WHERE g.idexperimento = ?
+				ORDER BY t.idgrupo, t.ordinal
+				""", (rs, fila) -> new FilaTanda(rs.getInt("idgrupo"), rs.getInt("ordinal"), rs.getInt("ncilindros"),
+				rs.getString("estado")), idExperimento);
+	}
+
+	private List<Map<String, Object>> gruposDelExperimento(Integer idExperimento) {
+		return jdbc.query(
+				"SELECT idgrupo, etiqueta, tipo, tratamiento FROM grupo WHERE idexperimento = ? ORDER BY idgrupo",
+				(rs, fila) -> {
+					Map<String, Object> g = new LinkedHashMap<>();
+					g.put("idGrupo", rs.getInt("idgrupo"));
+					g.put("etiqueta", rs.getString("etiqueta"));
+					g.put("tipo", rs.getString("tipo"));
+					g.put("tratamiento", rs.getString("tratamiento"));
+					return g;
+				}, idExperimento);
+	}
+
+	// nTotal: los cilindros de todas las tandas del grupo; faltantes: las que no tienen su Día 2 completado.
+	private record Faltan(int nTotal, List<Map<String, Object>> faltantes) {
+	}
+
+	private static Faltan faltantesDelGrupo(int idGrupo, List<FilaTanda> tandas) {
+		int nTotal = 0;
+		List<Map<String, Object>> faltantes = new ArrayList<>();
+		for (FilaTanda t : tandas) {
+			if (t.idGrupo() != idGrupo) {
+				continue;
+			}
+			nTotal += t.cilindros();
+			if (!EstadoAnalisis.COMPLETADO.es(t.estado())) {
+				Map<String, Object> falta = new LinkedHashMap<>();
+				falta.put("letra", letra(t.ordinal()));
+				falta.put("nCilindros", t.cilindros());
+				falta.put("estado", t.estado());
+				faltantes.add(falta);
+			}
+		}
+		return new Faltan(nTotal, faltantes);
+	}
+
+	// Datos de las seis gráficas (M1A/M1B): todos los grupos del experimento y su Día 2 completado, sin importar la tanda
+	// que se vea. Un solo cálculo (GraficasDeResultados) para la pantalla y el PDF.
+	@Override
+	@Transactional(readOnly = true)
+	public Map<String, Object> graficas(Integer idExperimento) {
+		existe(idExperimento);
+		List<Espec> especimenes = leerEspecimenes(idExperimento);
+		List<FilaTanda> tandas = tandasDelExperimento(idExperimento);
+		List<GraficasDeResultados.Grupo> grupos = gruposDelExperimento(idExperimento).stream().map(g -> {
+			int idGrupo = (Integer) g.get("idGrupo");
+			Faltan faltan = faltantesDelGrupo(idGrupo, tandas);
+			return new GraficasDeResultados.Grupo(idGrupo, (String) g.get("etiqueta"), (String) g.get("tipo"),
+					(String) g.get("tratamiento"), faltan.nTotal(), faltan.faltantes());
+		}).toList();
+		List<GraficasDeResultados.Especimen> delExperimento = especimenes.stream().map(e -> new GraficasDeResultados.Especimen(
+				e.idGrupo, e.ordinal, letra(e.ordinal), e.cilindro, e.nivel, e.filas, e.total, e.porMinuto)).toList();
+		return GraficasDeResultados.armar(grupos, delExperimento);
 	}
 
 	// Promedio (no suma: el tamaño del grupo no distorsiona, guía 7), desviación estándar y varianza MUESTRALES (n − 1) de

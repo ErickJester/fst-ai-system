@@ -1,11 +1,10 @@
 import React from 'react'
 import { fmt } from '../../lib/fst'
 import { MUT60, MUT70 } from '../../lib/estilos'
-import ComparacionGrupos from './ComparacionGrupos'
 import { CONDUCTAS } from './constantes'
 
-// Columna de la derecha: duración y especímenes analizados, la comparación entre grupos y la leyenda de conductas.
-export default function PanelLateral({ r, especimenes, g, grupoCompleto, comparacion, conducta, setConducta, refComparacion }) {
+// Columna de la derecha, en todas las pestañas: duración y especímenes analizados, y la leyenda de conductas.
+export default function PanelLateral({ r, especimenes, g, grupoCompleto }) {
   return (
     <div style={{ background: 'var(--color-bg)', paddingLeft: 26, display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
@@ -21,8 +20,6 @@ export default function PanelLateral({ r, especimenes, g, grupoCompleto, compara
           </div>
         </div>
       </div>
-
-      <ComparacionGrupos comparacion={comparacion} conducta={conducta} setConducta={setConducta} innerRef={refComparacion} />
 
       <div>
         <div className="k" style={{ marginBottom: 12 }}>Leyenda de conductas</div>

@@ -213,3 +213,17 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 - [x] Eliminar un experimento con un análisis `procesando` o `en pausa` muestra el 409. Hecho: el mensaje. Probado el 28-oct contra el backend, con los dos estados puestos por SQL: el diálogo muestra «No se puede eliminar mientras un análisis está procesando o en pausa» (`DELETE` con 409) y el experimento sigue en la lista
 - [x] 4 sesiones simultáneas con un análisis en cola responden en 3 s o menos. Medido el 20-oct en local: 80 peticiones de 4 sesiones a la vez con un análisis procesando, p95 de 0.03 s y máximo de 0.07 s
 - [ ] Una persona sin conocimientos de programación crea un experimento, sube un video, espera y descarga el reporte sin ayuda: 9 de cada 10 (§9)
+
+## M1A paso 2: pestañas, 390 px, galería y G1 (PLAN_RESULTADOS.md, sección 7)
+- [x] Pestañas reales: la vista activa va en `?vista=` (especimen, comparacion, timeline, bloques, graficas); cada una muestra solo su contenido. El panel de la derecha queda con Análisis y Leyenda
+- [x] Ancho de 390 px sin desplazamiento horizontal en las cinco pestañas (medido en navegador con un marco de 390 px). La barra de acciones y la leyenda de la tabla ahora se ajustan a línea
+- [x] `GaleriaGraficas`: selector, flechas ← → (no capturadas en campos de texto), «Ver varias» con máximo 3 o 1 según `(max-width: 1100px)`, memoria en `localStorage` con `try/catch`. G2 a G6 deshabilitadas con «Disponible pronto»
+- [x] G1 barras agrupadas: una conducta o las tres juntas, puntos por espécimen, conducta activa fuera de las barras con su nota, nivel mixto y sin datos señalados, ± no aplica sin barra de error, patrones dentro del mismo `<svg>` con ids por gráfica
+- [x] `getGraficas` en `services/results.js` (real y de ejemplo con las mismas reglas que el backend)
+- [x] Descarga de PNG comprobada en navegador: el rectángulo con rayado conserva el patrón en la imagen
+- [x] Pruebas: `GaleriaGraficas.test.jsx` (18, incluye axe), `services/graficas.test.js` (7). Suite completa: 253/253; lint limpio
+- [ ] Pruebas de integración con PostgreSQL pendientes (backend, ver backend-spring/CHECKLIST.md 17)
+- [x] G2 a G6 registradas en la galería, con «Descargar imagen». Suite completa: 306/306, lint y build correctos. Vistas en navegador en modo demo; a 390 px no hay desplazamiento horizontal
+- [ ] Sin verificar: PNG descargado de G3 y G6, y minutos incompletos con datos reales
+- [x] Tres pruebas de `pantallas.test.jsx` abren su pestaña antes de la aserción (cambio de comportamiento por las pestañas reales)
+- [x] Correcciones antes de copiar G1 como patrón: `MuestraLeyenda` (color y patrón en las dos leyendas de G1); escala de 300 s que solo crece si un grupo la rebasa; tabla de G1 con una fila por tanda en nivel mixto; nombres de grupo en dos renglones o recortados con «…», nombre completo en `<title>`; flechas que dan la vuelta y botones deshabilitados solo con una gráfica; «Cómo agregar una gráfica» en `graficas/ESPECIFICACION.md` (§4 bis). Lint 0, 259/259, build correcto. Sin revisar en navegador después de estos cambios

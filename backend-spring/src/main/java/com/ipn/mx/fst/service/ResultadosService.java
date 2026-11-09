@@ -24,6 +24,11 @@ public interface ResultadosService {
 	// Un renglón por grupo con el promedio, la desviación estándar y la varianza de cada conducta (guía 7).
 	List<Map<String, Object>> resultadosPorGrupo(Integer idExperimento);
 
+	// Los datos de las gráficas de resultados: todos los grupos del Día 2 del experimento (control, referencia y luego
+	// experimentales) con media, DE, varianza, coeficiente de variación, n y valores por espécimen por conducta, y por
+	// minuto (1 a 5). Especificación en frontend/src/components/resultados/graficas/ESPECIFICACION.md.
+	Map<String, Object> graficas(Integer idExperimento);
+
 	// De qué grupo o tanda es un reporte CSV/XLSX: idTanda, ordinal y letra son null cuando es el grupo completo.
 	record AlcanceDeReporte(int idGrupo, String etiqueta, Integer idTanda, Integer ordinal, String letra) {
 

@@ -72,9 +72,9 @@ function Comparacion({ g, c }) {
 }
 
 // Promedio por espécimen de cada grupo, para una conducta que se elige; el selector va en el encabezado de la sección.
-export default function ComparacionGrupos({ comparacion, conducta, setConducta, innerRef }) {
+export default function ComparacionGrupos({ comparacion, conducta, setConducta }) {
   return (
-    <div ref={innerRef}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <label className="k" htmlFor="cConducta" style={{ flex: 1 }}>Comparación entre grupos · Día 2</label>
         <select className="input" id="cConducta" style={{ width: 150, padding: '4px 6px', fontSize: 12 }} value={conducta} onChange={(e) => setConducta(e.target.value)}>

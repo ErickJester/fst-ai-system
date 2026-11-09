@@ -11,7 +11,7 @@ import { REPORTES } from './constantes'
 export default function BarraReportes({ clave, r, grupoCompleto, reporte, pedirReporte, pedirSalidaModelo }) {
   const { user } = useAuth()
   return (
-    <div style={{ display: 'flex', gap: 8 }} className="no-print">
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }} className="no-print">
       {/* Corregir los segundos: solo quien subió el video o un Administrador (D-57). */}
       {/* Con el video ya borrado (30 días, R-05) el botón queda en gris con el motivo. */}
       {!grupoCompleto && r.id_analisis && (user.admin || r.subido_por === user.id) && (r.video_disponible === false

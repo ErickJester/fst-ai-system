@@ -501,14 +501,16 @@ describe('cargar video', () => {
 
 describe('resultados', () => {
   it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
-    await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
+    const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: 'Comparación entre grupos' }))
     expect(await screen.findByText('Este grupo mezcla niveles de clasificación; se muestran por separado.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Por espécimen' }))
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
     // «Sin ver» va aparte, al final, en los totales y en el desglose por minuto, con su explicación.
-    expect(screen.getAllByRole('columnheader', { name: 'Sin ver' }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByRole('columnheader', { name: 'Sin ver' }).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/los segundos en los que no se vio al animal o que la revisión marcó como no visibles/)).toBeTruthy()
   })
 
@@ -551,6 +553,7 @@ describe('resultados', () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     const fila = await screen.findByRole('row', { name: /^1 Tanda A · Espécimen 1/ })
     expect(fila.textContent).toMatch(/2:51 57 %/) // 171 s de 300 de nado activo
+    await user.click(screen.getByRole('button', { name: 'Línea de tiempo por minuto' }))
     await user.selectOptions(screen.getByLabelText(/^Desglose por minuto/), 'A-3')
     expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Espécimen 3/)
     const minutos = screen.getAllByRole('row').filter((f) => /^\d:\d\d–\d:\d\d/.test(f.textContent))
@@ -558,7 +561,8 @@ describe('resultados', () => {
   })
 
   it('los bloques de 5 s los calcula el backend: sin él, la sección lo explica', async () => {
-    await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
+    const user = await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
+    await user.click(await screen.findByRole('button', { name: 'Bloques de 5 s' }))
     expect((await screen.findByText(/^Bloques de 5 s\.$/)).parentElement.textContent).toMatch(/Los calcula el sistema/)
   })
 })

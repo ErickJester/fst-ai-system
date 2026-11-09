@@ -6,10 +6,10 @@ import { MUT, CONDUCTAS, SIN_VER, TODAS, CMAP, LBL, etiqueta } from './constante
 const enMinuto = (segs, k) => segs.filter((s) => s[0] === k).reduce((a, s) => a + s[1], 0)
 
 // Desglose por minuto de un espécimen: el selector, una barra por minuto y la tabla de segundos por conducta.
-export default function DesglosePorMinuto({ lineas, linea, setLineaSel, innerRef }) {
+export default function DesglosePorMinuto({ lineas, linea, setLineaSel }) {
   return (
     <>
-      <div ref={innerRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '26px 0 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 12px' }}>
         <label className="k" htmlFor="lineaSel" style={{ flex: 1 }}>Desglose por minuto · {etiqueta(linea, linea.letra)}</label>
         <select className="input" id="lineaSel" style={{ width: 210, padding: '4px 6px', fontSize: 12 }} value={linea.clave} onChange={(e) => setLineaSel(e.target.value)}>
           {lineas.map((l) => <option key={l.clave} value={l.clave}>{etiqueta(l, l.letra)}</option>)}
