@@ -99,8 +99,8 @@ describe('G4 · barra apilada por grupo', () => {
   it('con pendientes muestra n de cuántos y la nota de la tanda pendiente', () => {
     const pendiente = { ...datos, grupos: [grupo({ n: 2, nTotal: 3, faltantes: [{ letra: 'B', nCilindros: 1, estado: 'procesando' }] })] }
     render(<G4ApiladaPorGrupo datos={pendiente} prefijo="t4" />)
-    expect(screen.getAllByText('2 de 3 animales').length).toBeGreaterThan(0)
-    expect(screen.getByText('Control: 1 animal pendiente (Tanda B procesando).')).toBeTruthy()
+    expect(screen.getAllByText('2 de 3 especímenes').length).toBeGreaterThan(0)
+    expect(screen.getByText('Control: 1 espécimen pendiente (Tanda B procesando).')).toBeTruthy()
   })
 
   it('trae las dos notas obligatorias y la descarga con su nombre', () => {

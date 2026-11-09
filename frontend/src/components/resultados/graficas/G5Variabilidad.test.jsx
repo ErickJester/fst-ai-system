@@ -105,7 +105,7 @@ describe('G5 · ajuste por ancho de columna', () => {
   })
 })
 
-describe('G5 · variabilidad entre animales', () => {
+describe('G5 · variabilidad entre especímenes', () => {
   it('con tres grupos (columna de 42 px) pone el CV en la barra y no la varianza, que va en la tabla', () => {
     const { container } = render(<G5Variabilidad datos={tresGrupos} prefijo="t5" />)
     const textos = [...container.querySelectorAll('svg text')].map((t) => t.textContent)
@@ -132,10 +132,10 @@ describe('G5 · variabilidad entre animales', () => {
     expect(textos).not.toContain('0,1')
   })
 
-  it('el título y la nota dicen que es variación entre animales, no entre analistas', () => {
+  it('el título y la nota dicen que es variación entre especímenes, no entre analistas', () => {
     render(<G5Variabilidad datos={datos} prefijo="t5" />)
-    expect(screen.getByRole('heading', { name: '¿Qué tan parecidos son los animales?' })).toBeTruthy()
-    expect(screen.getByText('La variación es el coeficiente de variación (desviación estándar ÷ promedio). Mide la variación entre animales de cada grupo, no entre analistas.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Qué tan parecidos son los especímenes?' })).toBeTruthy()
+    expect(screen.getByText('La variación es el coeficiente de variación (desviación estándar ÷ promedio). Mide la variación entre especímenes de cada grupo, no entre analistas.')).toBeTruthy()
   })
 
   it('un grupo sin datos y uno con nivel mixto se señalan y no se dibujan', () => {
@@ -172,8 +172,8 @@ describe('G5 · variabilidad entre animales', () => {
   it('con tandas pendientes muestra n de cuántos y la nota', () => {
     const pendiente = { ...datos, grupos: [grupo({ n: 2, nTotal: 3, faltantes: [{ letra: 'B', nCilindros: 1, estado: 'en cola' }] })] }
     render(<G5Variabilidad datos={pendiente} prefijo="t5" />)
-    expect(screen.getAllByText('2 de 3 animales').length).toBeGreaterThan(0)
-    expect(screen.getByText('Control: 1 animal pendiente (Tanda B en cola).')).toBeTruthy()
+    expect(screen.getAllByText('2 de 3 especímenes').length).toBeGreaterThan(0)
+    expect(screen.getByText('Control: 1 espécimen pendiente (Tanda B en cola).')).toBeTruthy()
   })
 
   it('trae las dos notas obligatorias y la descarga con su nombre', () => {

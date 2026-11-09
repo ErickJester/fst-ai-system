@@ -22,7 +22,7 @@ function notaComparacion(g) {
   if (!g.pendientes.length) return n
   const faltan = g.pendientes.reduce((a, p) => a + p.n, 0)
   const causas = g.pendientes.map((p) => 'Tanda ' + p.tanda + ' ' + (PENDIENTE[p.estado] || 'sin subir')).join(', ')
-  const texto = (g.n === 0 ? faltan + ' de ' + g.n_total : faltan) + ' animales pendientes (' + causas + ')'
+  const texto = (g.n === 0 ? faltan + ' de ' + g.n_total : faltan) + ' especímenes pendientes (' + causas + ')'
   return g.n === 0 ? texto : n + ' · ' + texto
 }
 
@@ -85,7 +85,7 @@ export default function ComparacionGrupos({ comparacion, conducta, setConducta }
         {comparacion ? comparacion.map((g) => <Comparacion key={g.grupo} g={g} c={conducta} />) : <p className="hint">Cargando…</p>}
       </div>
       <p className="hint" style={{ margin: '12px 0 0' }}>
-        Promedio por animal de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los animales sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio. Cada grupo entra con todas sus tandas, no solo la que se ve arriba.
+        Promedio por espécimen de cada grupo (media ± DE), en segundos sobre los 300 s del Día 2. Las marcas verticales delimitan ± una DE. Los especímenes sin Día 2 analizado (en cola, procesando, con error o sin subir) se señalan y no entran al promedio. Cada grupo entra con todas sus tandas, no solo la que se ve arriba.
       </p>
     </div>
   )

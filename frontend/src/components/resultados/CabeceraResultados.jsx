@@ -45,17 +45,17 @@ export default function CabeceraResultados({ clave, gid, r, rs, grupos, vista, g
           return (
             <Link key={t.letra} to={enlaceResultados(clave, gid, t.letra, vista)} className={'tab' + (on ? ' on' : '')} aria-current={on ? 'page' : undefined}
               style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (on ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
-              Tanda {t.letra} · {t.n_cilindros} animales
+              Tanda {t.letra} · {t.n_cilindros} especímenes
             </Link>
           )
         })}
         <Link to={enlaceGrupo} className={'tab' + (grupoCompleto ? ' on' : '')} aria-current={grupoCompleto ? 'page' : undefined}
           style={{ whiteSpace: 'nowrap', marginBottom: 0, padding: '6px 13px', border: '1px solid ' + (grupoCompleto ? 'var(--color-accent)' : 'var(--color-divider)'), textDecoration: 'none' }}>
-          Grupo completo · {nCompletos} animales
+          Grupo completo · {nCompletos} especímenes
         </Link>
       </nav>
       <p className="hint" style={{ margin: '8px 0 0', maxWidth: 680 }}>
-        Tanda: un video con varios animales. El grupo completo reúne sus tandas con análisis completado; cada animal lleva el nombre de su tanda.
+        Tanda: un video con varios especímenes. El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.
       </p>
       {/* D-78: el sistema solo entrega la conducta de cada segundo; conviene revisarla. */}
       <p className="hint" style={{ margin: '10px 0 0', maxWidth: 680 }}>
@@ -68,7 +68,7 @@ export default function CabeceraResultados({ clave, gid, r, rs, grupos, vista, g
         </span>
         {revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
         {agrupado
-          ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el animal no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
+          ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>
           : <span className="hint">Ningún segundo quedó como conducta activa: cada uno se clasificó como nado activo, inmovilidad o escalamiento.</span>}
       </div>
     </div>

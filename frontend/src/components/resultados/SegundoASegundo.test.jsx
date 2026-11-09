@@ -5,7 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import axe from 'axe-core'
 import SegundoASegundo from './SegundoASegundo'
 
-// Datos fijos: un animal con siete segundos (uno sin ver, los cuatro orígenes conocidos, un origen
+// Datos fijos: un espécimen con siete segundos (uno sin ver, los cuatro orígenes conocidos, un origen
 // desconocido y uno sin origen; falta el 4) y otro con dos.
 const esp1 = {
   numeroCilindro: 1,
@@ -34,15 +34,15 @@ afterEach(() => {
 })
 
 describe('SegundoASegundo', () => {
-  it('cambio de animal: el selector muestra las filas del que se elige', () => {
+  it('cambio de espécimen: el selector muestra las filas del que se elige', () => {
     const { container } = render(<SegundoASegundo datos={datos} />)
     expect(container.querySelectorAll('tbody tr').length).toBe(7)
-    const selector = screen.getByRole('combobox', { name: 'Animal' })
+    const selector = screen.getByRole('combobox', { name: 'Espécimen' })
     expect(selector.value).toBe('0')
-    expect(screen.getByRole('option', { name: 'Tanda A · Animal 2' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Tanda A · Espécimen 2' })).toBeTruthy()
     fireEvent.change(selector, { target: { value: '1' } })
     expect(container.querySelectorAll('tbody tr').length).toBe(2)
-    expect(container.querySelector('caption').textContent).toContain('animal 2')
+    expect(container.querySelector('caption').textContent).toContain('espécimen 2')
   })
 
   it('un segundo con conducta null es «Sin ver»: en la tabla y con su borde en la franja', () => {

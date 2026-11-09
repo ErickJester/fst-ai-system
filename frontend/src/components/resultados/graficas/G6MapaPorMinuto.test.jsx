@@ -14,7 +14,7 @@ function porConducta(base) {
   return Object.fromEntries(CONDUCTAS.map((c) => [c, base[c] ?? est(null, null, 0)]))
 }
 
-// Una fila de porMinuto: n animales con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
+// Una fila de porMinuto: n especímenes con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
 function fila(minuto, n, media, { incompleto = false, seg = 60 } = {}) {
   if (n === 0) {
     return { minuto, n: 0, segundosMin: null, segundosMax: null, incompleto: false, porConducta: porConducta({}) }
@@ -71,7 +71,7 @@ describe('G6 · mapa por minuto', () => {
     expect(container.querySelector('[data-celda="Referencia|2"]').getAttribute('data-rango')).toBe('4')
   })
 
-  it('un minuto sin animales (n = 0) es un rayado gris sin número', () => {
+  it('un minuto sin especímenes (n = 0) es un rayado gris sin número', () => {
     const { container } = render(<G6MapaPorMinuto datos={tresGrupos} prefijo="g6b" />)
     const celda = container.querySelector('[data-celda="Referencia|3"]')
     expect(celda.getAttribute('data-estado')).toBe('sindatos')

@@ -5,7 +5,7 @@ import MuestraLeyenda from './MuestraLeyenda'
 import { renglonesDeEtiqueta } from './G1BarrasGrupos'
 import { CONDUCTAS_GRAFICA, NOTA_MIXTO, SIN_VER, numero, textoN, textoAnimales } from './estilos'
 
-// G4 · Barra apilada por grupo: la media de cada categoría por animal, desde abajo, con las cinco categorías.
+// G4 · Barra apilada por grupo: la media de cada categoría por espécimen, desde abajo, con las cinco categorías.
 // La suma de los segmentos es la duración analizada (duracionMediaS). La escala no es fija: sigue a la duración real.
 const W = 420
 const H = 300
@@ -45,17 +45,17 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
     else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'espécimen pendiente' : 'especímenes pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
 
   const titulo = '¿En qué se fue el tiempo?'
-  const etiquetaSvg = 'Barras apiladas: media por animal de cada categoría de conducta y de la categoría sin ver, en segundos, por grupo.'
+  const etiquetaSvg = 'Barras apiladas: media por espécimen de cada categoría de conducta y de la categoría sin ver, en segundos, por grupo.'
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Promedio por animal de cada categoría; la suma es la duración analizada."
+      subtitulo="Promedio por espécimen de cada categoría; la suma es la duración analizada."
       nombre="g4_apilada"
       svgRef={svgRef}
       leyenda={categorias.map((c) => (
@@ -66,7 +66,7 @@ export default function G4ApiladaPorGrupo({ datos, prefijo }) {
       avisos={avisos} notas={notas}
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
-          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Promedio por animal de cada categoría, Día 2, en segundos.</caption>
+          <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>Promedio por espécimen de cada categoría, Día 2, en segundos.</caption>
           <thead>
             <tr>
               <th>Grupo</th><th>n</th>

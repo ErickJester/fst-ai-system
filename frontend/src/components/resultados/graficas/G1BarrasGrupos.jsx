@@ -4,7 +4,7 @@ import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
 import { CONDUCTAS_BARRAS, CONDUCTAS_GRAFICA, ESCALA_SEGUNDOS, NOTA_MIXTO, estilosDeGrupos, numero, textoMediaDe, textoN, textoAnimales } from './estilos'
 
-// G1 · Barras agrupadas: la media de una conducta por grupo, con su ± desviación estándar y un punto por animal. Con «Las tres juntas»,
+// G1 · Barras agrupadas: la media de una conducta por grupo, con su ± desviación estándar y un punto por espécimen. Con «Las tres juntas»,
 // tres barras por grupo, una por conducta. La conducta activa no va en las barras: se dice aparte, con sus segundos.
 // Un grupo con niveles mezclados no lleva barra: su tabla trae una fila por tanda (porNivel).
 const W = 420
@@ -59,7 +59,7 @@ function Barra({ x, bw, valor, de, color, patron, prefijo, valoresS, puntos, eti
       )}
       {puntos && valoresS.map((v, i) => (
         <circle key={i} cx={cx + (((i * 7) % 5) - 2) * (bw * 0.12)} cy={y(v)} r="2.6" fill="var(--color-text)" stroke="var(--color-bg)" strokeWidth="0.8">
-          <title>{`${etiqueta}, animal ${i + 1}: ${numero(v)} s`}</title>
+          <title>{`${etiqueta}, espécimen ${i + 1}: ${numero(v)} s`}</title>
         </circle>
       ))}
     </g>
@@ -79,7 +79,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
   const dibujable = (g) => !g.nivelMixto && g.porConducta && g.n > 0
   const maxCar = Math.max(4, Math.floor((slot - 6) / CAR))
 
-  // La escala es de 300 s (la ventana del Día 2) y solo crece si algún grupo la rebasa con su media + DE o con un animal.
+  // La escala es de 300 s (la ventana del Día 2) y solo crece si algún grupo la rebasa con su media + DE o con un espécimen.
   const alturas = grupos.filter(dibujable).flatMap((g) => [
     ...mostradas.map((c) => (g.porConducta[c.clave].media ?? 0) + (g.porConducta[c.clave].de ?? 0)),
     ...mostradas.flatMap((c) => g.porConducta[c.clave].valoresS),
@@ -96,12 +96,12 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
     else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'espécimen pendiente' : 'especímenes pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
   const conActiva = grupos.filter((g) => dibujable(g) && g.porConducta[activa.clave].media > 0)
   if (conActiva.length) {
-    notas.push(`Conducta activa, fuera de las barras (segundos medios por animal): ${conActiva.map((g) => `${g.etiqueta} ${numero(g.porConducta[activa.clave].media)} s`).join(' · ')}.`)
+    notas.push(`Conducta activa, fuera de las barras (segundos medios por espécimen): ${conActiva.map((g) => `${g.etiqueta} ${numero(g.porConducta[activa.clave].media)} s`).join(' · ')}.`)
   }
 
   const titulo = '¿Cuánto hizo cada grupo?'
@@ -110,7 +110,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Promedio ± desviación estándar de los animales, en segundos analizados. El eje llega a 300 s, la ventana del Día 2."
+      subtitulo="Promedio ± desviación estándar de los especímenes, en segundos analizados. El eje llega a 300 s, la ventana del Día 2."
       nombre={`g1_${tres ? 'tres_conductas' : conducta.replace(' ', '_')}`}
       svgRef={svgRef}
       controles={(
@@ -122,7 +122,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
             <option value={TRES}>Las tres juntas</option>
           </select>
           <label style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={puntos} onChange={(e) => setPuntos(e.target.checked)} /> Mostrar animales
+            <input type="checkbox" checked={puntos} onChange={(e) => setPuntos(e.target.checked)} /> Mostrar especímenes
           </label>
         </>
       )}

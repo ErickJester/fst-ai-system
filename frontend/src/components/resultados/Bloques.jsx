@@ -8,7 +8,7 @@ import { CMAP, LBL, MATIZ, etiquetaAnimal } from './constantes'
 // Bloques de 5 s (D-53): cada bloque muestra la conducta con más segundos; al abrirlo, sus
 // cinco segundos, para notar las conductas breves. Se calculan al pedirlos.
 export default function Bloques({ clave, gid, letras }) {
-  // Los de cada tanda que se ve; en el grupo completo, una fila por animal de cada tanda.
+  // Los de cada tanda que se ve; en el grupo completo, una fila por espécimen de cada tanda.
   const { data, error, loading } = useAsync(async () => {
     const todos = await Promise.all(letras.map((l) => getBlocks(clave, gid, l)))
     if (todos.every((x) => !x)) return null
@@ -22,7 +22,7 @@ export default function Bloques({ clave, gid, letras }) {
   if (!data) {
     return (
       <div className="note-bar" role="status" style={{ lineHeight: 1.55 }}>
-        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada animal, bloques de cinco segundos con la conducta que ocupa más segundos (si hay empate arriba, conducta activa). Aquí se verá una fila por animal; al abrir un bloque, sus segundos, y rayados los bloques en los que algún segundo no se vio bien. Todavía no está disponible.
+        <strong>Bloques de 5 s.</strong> Los calcula el sistema con la conducta de cada segundo: por cada espécimen, bloques de cinco segundos con la conducta que ocupa más segundos (si hay empate arriba, conducta activa). Aquí se verá una fila por espécimen; al abrir un bloque, sus segundos, y rayados los bloques en los que algún segundo no se vio bien. Todavía no está disponible.
       </div>
     )
   }
@@ -66,7 +66,7 @@ export default function Bloques({ clave, gid, letras }) {
               </div>
             ))}
           </div>
-          {sel.matiz && <p className="hint" style={{ margin: '8px 0 0' }}>El modelo no pudo ver bien al animal en esta parte del video; el bloque se muestra como conducta activa con este matiz.</p>}
+          {sel.matiz && <p className="hint" style={{ margin: '8px 0 0' }}>El modelo no pudo ver bien al espécimen en esta parte del video; el bloque se muestra como conducta activa con este matiz.</p>}
         </div>
       ) : (
         <p className="hint" style={{ margin: '12px 0 0' }}>

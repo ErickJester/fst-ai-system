@@ -12,7 +12,7 @@ const GRAFICAS = [
   { id: 'g2', nombre: '¿Cómo cambió minuto a minuto?', disponible: true, Componente: G2CurvaPorMinuto },
   { id: 'g3', nombre: '¿Cómo se compara cada minuto?', disponible: true, Componente: G3BarrasPorMinuto },
   { id: 'g4', nombre: '¿En qué se fue el tiempo?', disponible: true, Componente: G4ApiladaPorGrupo },
-  { id: 'g5', nombre: '¿Qué tan parecidos son los animales?', disponible: true, Componente: G5Variabilidad },
+  { id: 'g5', nombre: '¿Qué tan parecidos son los especímenes?', disponible: true, Componente: G5Variabilidad },
   { id: 'g6', nombre: '¿En qué minuto cambia?', disponible: true, Componente: G6MapaPorMinuto },
 ]
 const HABILITADAS = GRAFICAS.filter((g) => g.disponible).map((g) => g.id)

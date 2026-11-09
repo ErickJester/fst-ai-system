@@ -4,8 +4,8 @@ import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
 import { CONDUCTAS_GRAFICA, NOTA_MIXTO, estilosDeGrupos, numero, porcentaje, textoAnimales, textoN } from './estilos'
 
-// G5 · Variabilidad entre animales de un grupo: el coeficiente de variación (DE ÷ media) por conducta y grupo, con
-// la varianza debajo de cada barra. Mide la variación entre animales, no entre analistas. No recalcula nada: usa cv y varianza.
+// G5 · Variabilidad entre especímenes de un grupo: el coeficiente de variación (DE ÷ media) por conducta y grupo, con
+// la varianza debajo de cada barra. Mide la variación entre especímenes, no entre analistas. No recalcula nada: usa cv y varianza.
 const W = 560
 const H = 300
 const M = { l: 46, r: 8, t: 14, b: 66 }
@@ -57,26 +57,26 @@ export default function G5Variabilidad({ datos, prefijo }) {
   const marcas = Array.from({ length: 6 }, (_, k) => (escala / 5) * k)
 
   const avisos = []
-  const notas = ['La variación es el coeficiente de variación (desviación estándar ÷ promedio). Mide la variación entre animales de cada grupo, no entre analistas.']
+  const notas = ['La variación es el coeficiente de variación (desviación estándar ÷ promedio). Mide la variación entre especímenes de cada grupo, no entre analistas.']
   for (const g of grupos) {
     if (g.nivelMixto) avisos.push(`${g.etiqueta}: ${NOTA_MIXTO}`)
     else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'espécimen pendiente' : 'especímenes pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
 
   if (!mostrarVarianza && grupos.length) notas.push('La varianza de cada grupo está en la tabla.')
 
-  const titulo = '¿Qué tan parecidos son los animales?'
-  const etiquetaSvg = 'Barras del coeficiente de variación entre animales de cada grupo, por conducta. La varianza va debajo de cada barra.'
+  const titulo = '¿Qué tan parecidos son los especímenes?'
+  const etiquetaSvg = 'Barras del coeficiente de variación entre especímenes de cada grupo, por conducta. La varianza va debajo de cada barra.'
   const sinCvDibujable = cvs.length === 0
 
   return (
     <PanelGrafica
       titulo={titulo}
-      subtitulo="Variación de cada grupo entre sus animales: desviación estándar dividida entre el promedio."
+      subtitulo="Variación de cada grupo entre sus especímenes: desviación estándar dividida entre el promedio."
       nombre="g5_variabilidad"
       svgRef={svgRef}
       leyenda={grupos.map((g) => (
@@ -88,7 +88,7 @@ export default function G5Variabilidad({ datos, prefijo }) {
       tabla={(
         <table className="table" style={{ fontSize: 12 }}>
           <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>
-            CV y varianza entre animales de cada grupo, Día 2. Variación entre animales, no entre analistas.
+            CV y varianza entre especímenes de cada grupo, Día 2. Variación entre especímenes, no entre analistas.
           </caption>
           <thead>
             <tr>

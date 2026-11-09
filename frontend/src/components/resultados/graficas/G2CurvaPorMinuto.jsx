@@ -4,7 +4,7 @@ import Patrones from './Patrones'
 import { CONDUCTAS_GRAFICA, NOTA_MIXTO, SEGUNDOS_MINUTO, estilosDeGrupos, textoMediaDe, textoN } from './estilos'
 
 // G2 · Curva por minuto: una línea por grupo para la conducta elegida, con banda ± desviación estándar y un marcador por minuto.
-// Usa porMinuto tal cual lo manda el backend: no recalcula medias ni desviaciones. Un minuto sin animales
+// Usa porMinuto tal cual lo manda el backend: no recalcula medias ni desviaciones. Un minuto sin especímenes
 // (n = 0) no se dibuja; un minuto incompleto va con marcador hueco y su rango de segundos.
 const W = 420
 const H = 300
@@ -16,7 +16,7 @@ const TRAZOS = { solida: undefined, discontinua: '6 4', punteada: '1.5 3', 'traz
 
 const dibujable = (g) => !g.nivelMixto && !!g.porMinuto && g.n > 0
 
-// El valor de un grupo en un minuto, si hay animales con segundos en ese minuto y su media existe.
+// El valor de un grupo en un minuto, si hay especímenes con segundos en ese minuto y su media existe.
 function entradaDe(g, minuto, clave) {
   const e = g.porMinuto?.find((x) => x.minuto === minuto)
   if (!e || e.n === 0) return null
@@ -127,10 +127,10 @@ export default function G2CurvaPorMinuto({ datos, prefijo }) {
     else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'espécimen pendiente' : 'especímenes pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
-  notas.push('Un minuto con menos de 60 s en algún animal es incompleto; sus segundos son los reales.')
+  notas.push('Un minuto con menos de 60 s en algún espécimen es incompleto; sus segundos son los reales.')
 
   const titulo = '¿Cómo cambió minuto a minuto?'
 

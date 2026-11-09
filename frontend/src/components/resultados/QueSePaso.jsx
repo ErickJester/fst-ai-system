@@ -54,7 +54,7 @@ export default function QueSePaso({ datos, conductaInicial = 'inmovilidad' }) {
       <h3 id={`${id}-titulo`} style={{ margin: 0, fontSize: 16 }}>¿Qué pasó? (comparado con el control)</h3>
       <p className="hint" style={{ margin: 0, maxWidth: 680 }}>
         Cuánto tiempo, en segundos, pasó cada grupo en la conducta que elijas, y cuánto difiere del control. Son promedios de los
-        animales del Día 2; esta pantalla no hace pruebas estadísticas.
+        especímenes del Día 2; esta pantalla no hace pruebas estadísticas.
       </p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <label htmlFor={`${id}-conducta`} style={{ fontSize: 12.5 }}>Conducta </label>

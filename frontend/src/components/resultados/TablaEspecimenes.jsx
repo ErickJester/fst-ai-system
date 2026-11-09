@@ -40,7 +40,7 @@ export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto,
       <table className="table">
         <thead>
           <tr>
-            <th style={{ width: '27%' }}>Animal</th>
+            <th style={{ width: '27%' }}>Espécimen</th>
             {CONDUCTAS.map((c) => <th key={c.id} style={{ textAlign: 'right' }}>{c.label}</th>)}
             <th style={{ textAlign: 'right', fontWeight: 400, color: MUT }}>{SIN_VER.label}</th>
             <th style={{ width: '30%' }}>Distribución</th>
@@ -79,7 +79,7 @@ export default function TablaEspecimenes({ especimenes, duracion, grupoCompleto,
       </div>
 
       <p className="hint" style={{ margin: '14px 0 0' }}>
-        Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. <strong>Sin ver</strong> son los segundos en los que no se vio al animal o que la revisión marcó como no visibles: no cuentan en ninguna conducta, y con las cuatro suman el total de segundos. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
+        Cada segundo recibe una conducta y ninguna se descarta por durar poco; el buceo se contabiliza como nado activo. <strong>Sin ver</strong> son los segundos en los que no se vio al espécimen o que la revisión marcó como no visibles: no cuentan en ninguna conducta, y con las cuatro suman el total de segundos. Los tres renglones grises son la media, la desviación estándar y la varianza de lo que se ve ({grupoCompleto ? 'el grupo completo' : 'la tanda'}); el CSV y el XLSX descargan esos mismos.{grupoCompleto && faltan.length > 0 && <> Faltan {faltan.map((t) => 'Tanda ' + t.letra + ' (' + (PENDIENTE[t.estado] || 'sin subir') + ')').join(', ')}: no entran hasta tener su análisis completado.</>} El desglose por minuto se almacena y exporta <strong>en segundos</strong>, no en porcentaje.
       </p>
     </>
   )

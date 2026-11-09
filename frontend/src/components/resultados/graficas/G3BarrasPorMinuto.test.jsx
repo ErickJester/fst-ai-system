@@ -14,7 +14,7 @@ function porConducta(base) {
   return Object.fromEntries(CONDUCTAS.map((c) => [c, base[c] ?? est(null, null, 0)]))
 }
 
-// Una fila de porMinuto: n animales con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
+// Una fila de porMinuto: n especímenes con segundos en el minuto; `incompleto` y `seg` marcan un minuto corto.
 function fila(minuto, n, media, de, { incompleto = false, seg = 60 } = {}) {
   if (n === 0) {
     return { minuto, n: 0, segundosMin: null, segundosMax: null, incompleto: false, porConducta: porConducta({}) }
@@ -65,13 +65,13 @@ afterEach(() => {
 })
 
 describe('G3 · barras por minuto', () => {
-  it('con tres grupos dibuja una barra por grupo y minuto, salvo el minuto sin animales', () => {
+  it('con tres grupos dibuja una barra por grupo y minuto, salvo el minuto sin especímenes', () => {
     const { container } = render(<G3BarrasPorMinuto datos={tresGrupos} prefijo="g3a" />)
     expect(container.querySelector('[data-barra="Control|1"]')).not.toBeNull()
     expect(container.querySelector('[data-barra="Dosis 1|5"]')).not.toBeNull()
     expect(container.querySelector('[data-barra="Referencia|3"]')).toBeNull()
     expect(container.querySelector('[data-barra="Referencia|2"]')).not.toBeNull()
-    // Control 5 + Referencia 4 (el minuto 3 no tiene animales) + Dosis 1 5.
+    // Control 5 + Referencia 4 (el minuto 3 no tiene especímenes) + Dosis 1 5.
     expect(container.querySelectorAll('[data-barra]').length).toBe(14)
   })
 

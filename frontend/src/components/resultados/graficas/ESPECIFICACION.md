@@ -149,15 +149,15 @@ Los tokens están en `frontend/src/styles/app.css`. El tema es claro; no hay mod
 - **Textos:** título «Reparto de la duración analizada · Día 2». Subtítulo: «Media por espécimen de cada categoría; la suma es la duración analizada».
 - **Descarga:** `g4_apilada`.
 
-### G5 · Variabilidad entre animales: coeficiente de variación y varianza
+### G5 · Variabilidad entre especímenes: coeficiente de variación y varianza
 
-- **Pregunta:** ¿qué tan dispersos son los animales de un mismo grupo en cada conducta?
+- **Pregunta:** ¿qué tan dispersos son los especímenes de un mismo grupo en cada conducta?
 - **Datos:** `porConducta.<c>.cv`, `.varianza`, `.n`. Solo las cuatro conductas (no «sin ver»).
 - **Ejes:** X, una agrupación por conducta; dentro, una barra por grupo (orden de §2). Y, CV (fracción), de 0 a `escala`, donde `escala` es el múltiplo de 0,1 igual o inmediatamente mayor que el máximo de `cv` que se dibuja; si todo es `null`, sin eje y solo el mensaje.
 - **Barras:** la altura es el `cv`. Etiqueta sobre la barra: «CV 47 %». Si `cv` es `null`: sin barra y la etiqueta «no aplica».
 - **Varianza:** no se dibuja como barra. Siempre va en la tabla. Debajo de cada barra solo si la columna mide al menos 46 unidades; si no, se omite y una nota dice «La varianza de cada grupo está en la tabla.». Si es `null`: «no aplica».
 - **Etiquetas según el ancho de columna:** al menos 40, «CV 47 %»; de 24 a menos de 40, «47 %»; menos de 24, sin etiqueta (el dato queda en `<title>` y en la tabla). «no aplica», «sin datos» y «nivel mixto» pasan a «n/a», «—» y «mixto» por debajo de 40, y no se escriben por debajo de 24.
-- **Textos:** título «Variabilidad entre animales · Día 2». Nota obligatoria: «Mide la variación entre animales de cada grupo, no entre analistas.»
+- **Textos:** título «Variabilidad entre especímenes · Día 2». Nota obligatoria: «Mide la variación entre especímenes de cada grupo, no entre analistas.»
 - **Descarga:** `g5_variabilidad`.
 
 ### G6 · Mapa de calor: grupos por minuto
@@ -215,5 +215,5 @@ Para quien copie G1 como patrón (los minis de G2 a G6, y M1B en el PDF).
 
 - No dice que una conducta sea exacta: la clasificación del modelo no es 100 % exacta y su exactitud todavía no está medida. Todo se presenta como «sobre la salida del modelo».
 - Una barra ± DE no dice si una diferencia es significativa. No hay pruebas estadísticas en estas gráficas.
-- G5 mide variación entre animales, no entre analistas.
+- G5 mide variación entre especímenes, no entre analistas.
 - Un fármaco estimulante puede reducir la inmovilidad solo por aumentar la actividad, y este sistema no lo detecta.

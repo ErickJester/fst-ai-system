@@ -3,7 +3,7 @@ import Patrones, { patronId } from './graficas/Patrones'
 import MuestraLeyenda from './graficas/MuestraLeyenda'
 import { CONDUCTAS_GRAFICA, SIN_VER } from './graficas/estilos'
 
-// Segundo a segundo: la conducta de cada segundo de un animal, en una franja y en una tabla. Lo que llega
+// Segundo a segundo: la conducta de cada segundo de un espécimen, en una franja y en una tabla. Lo que llega
 // del servidor se muestra tal cual; un segundo que no viene queda vacío en la franja y no aparece en la tabla.
 const CATEGORIAS = [...CONDUCTAS_GRAFICA, SIN_VER]
 const ALTO_FRANJA = 34
@@ -44,18 +44,18 @@ export default function SegundoASegundo({ datos }) {
   const marcas = []
   for (let t = 0; t <= W; t += 60) marcas.push(t)
   const ordenados = [...actual.segundos].sort((a, b) => a.s - b.s)
-  const etiquetaEspecimen = `Tanda ${datos.letra} · Animal ${actual.numeroCilindro}`
+  const etiquetaEspecimen = `Tanda ${datos.letra} · Espécimen ${actual.numeroCilindro}`
 
   return (
     <section aria-labelledby={`${id}-titulo`} style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
       <h3 id={`${id}-titulo`} style={{ margin: 0, fontSize: 16 }}>{`Segundo a segundo · ${datos.grupo?.etiqueta ?? ''}, Tanda ${datos.letra}`}</h3>
 
       <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-        <label htmlFor={`${id}-esp`} style={{ fontSize: 12.5 }}>Animal </label>
+        <label htmlFor={`${id}-esp`} style={{ fontSize: 12.5 }}>Espécimen </label>
         <select id={`${id}-esp`} className="input" style={{ width: 230, padding: '4px 6px', fontSize: 12 }} value={i}
           onChange={(e) => setIndice(Number(e.target.value))}>
           {especimenes.map((e, k) => (
-            <option key={e.numeroCilindro ?? k} value={k}>{`Tanda ${datos.letra} · Animal ${e.numeroCilindro}`}</option>
+            <option key={e.numeroCilindro ?? k} value={k}>{`Tanda ${datos.letra} · Espécimen ${e.numeroCilindro}`}</option>
           ))}
         </select>
       </div>
@@ -99,7 +99,7 @@ export default function SegundoASegundo({ datos }) {
       <div tabIndex={0} style={{ maxHeight: 360, overflowY: 'auto', overflowX: 'auto' }}>
         <table className="table" style={{ fontSize: 12 }}>
           <caption className="hint" style={{ textAlign: 'left', padding: '0 0 6px' }}>
-            {`Conducta de cada segundo del animal ${actual.numeroCilindro}, Tanda ${datos.letra}.`}
+            {`Conducta de cada segundo del espécimen ${actual.numeroCilindro}, Tanda ${datos.letra}.`}
           </caption>
           <thead>
             <tr><th>Tiempo (m:ss)</th><th>Conducta</th><th>Origen</th></tr>

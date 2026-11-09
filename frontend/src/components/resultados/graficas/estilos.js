@@ -17,7 +17,7 @@ export const CONDUCTAS_BARRAS = CONDUCTAS_GRAFICA.filter((c) => c.clave !== 'con
 export const ESCALA_SEGUNDOS = 300   // la ventana del Día 2
 export const SEGUNDOS_MINUTO = 60    // el máximo de un minuto
 
-export const NOTA_DE = 'La barra de error (promedio ± desviación estándar) muestra la dispersión entre animales; no indica si una diferencia es significativa.'
+export const NOTA_DE = 'La barra de error (promedio ± desviación estándar) muestra la dispersión entre especímenes; no indica si una diferencia es significativa.'
 export const NOTA_ORIGEN = 'Los datos son sobre la salida del modelo; su exactitud todavía no está medida.'
 export const NOTA_MIXTO = 'Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.'
 
@@ -36,15 +36,15 @@ export function porcentaje(fraccion) {
   return fraccion == null ? 'no aplica' : `${Math.round(fraccion * 100)} %`
 }
 
-// «3 animales» o, con tandas pendientes, «2 de 4 animales».
-const palabraAnimales = (n) => (n === 1 ? 'animal' : 'animales')
+// «3 especímenes» o, con tandas pendientes, «2 de 4 especímenes».
+const palabraAnimales = (n) => (n === 1 ? 'espécimen' : 'especímenes')
 export function textoN(grupo) {
   return grupo.n < grupo.nTotal
     ? `${grupo.n} de ${grupo.nTotal} ${palabraAnimales(grupo.nTotal)}`
     : `${grupo.n} ${palabraAnimales(grupo.n)}`
 }
 
-// «1 animal» o «4 animales», para las filas por tanda.
+// «1 espécimen» o «4 especímenes», para las filas por tanda.
 export function textoAnimales(n) {
   return `${n} ${palabraAnimales(n)}`
 }

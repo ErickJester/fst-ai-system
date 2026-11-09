@@ -501,18 +501,18 @@ describe('cargar video', () => {
 })
 
 describe('resultados', () => {
-  it('muestra los animales de la tanda y la comparación entre grupos', async () => {
+  it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
-    expect(screen.getAllByText('Tanda A · Animal 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Comparación entre grupos' }))
     expect(await screen.findByText('Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Por animal' }))
+    await user.click(screen.getByRole('button', { name: 'Por espécimen' }))
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
     // «Sin ver» va aparte, al final, en los totales y en el desglose por minuto, con su explicación.
     expect(screen.getAllByRole('columnheader', { name: 'Sin ver' }).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/los segundos en los que no se vio al animal o que la revisión marcó como no visibles/)).toBeTruthy()
+    expect(screen.getByText(/los segundos en los que no se vio al espécimen o que la revisión marcó como no visibles/)).toBeTruthy()
   })
 
   it('los botones de reporte no generan archivos: explican lo que hará el backend', async () => {
@@ -528,14 +528,14 @@ describe('resultados', () => {
 
   it('ver el grupo completo: todas sus tandas completadas, con los estadísticos recalculados (D-93)', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
-    const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Animal \d/.test(f.textContent))
+    const filas = async () => (await screen.findAllByRole('row')).filter((f) => /Espécimen \d/.test(f.textContent))
     expect(await filas()).toHaveLength(4)
     const media = () => screen.getByRole('row', { name: /^Media/ }).textContent
     const mediaTanda = media()
-    await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 animales' }))
+    await user.click(screen.getByRole('link', { name: 'Grupo completo · 8 especímenes' }))
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, grupo completo' })).toBeTruthy()
     expect(await filas()).toHaveLength(8)
-    expect(screen.getByRole('cell', { name: /Tanda B · Animal 4/ })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: /Tanda B · Espécimen 4/ })).toBeTruthy()
     expect(media()).not.toBe(mediaTanda)
     expect(screen.getByText('8 de 8')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Revisar segundo a segundo' })).toBeNull() // la revisión es por tanda
@@ -552,11 +552,11 @@ describe('resultados', () => {
 
   it('cada conducta con su porcentaje, y el desglose por minuto de cualquier espécimen', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
-    const fila = await screen.findByRole('row', { name: /^1 Tanda A · Animal 1/ })
+    const fila = await screen.findByRole('row', { name: /^1 Tanda A · Espécimen 1/ })
     expect(fila.textContent).toMatch(/2:51 57 %/) // 171 s de 300 de nado activo
     await user.click(screen.getByRole('button', { name: 'Minuto a minuto' }))
     await user.selectOptions(screen.getByLabelText(/^Desglose por minuto/), 'A-3')
-    expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Animal 3/)
+    expect(screen.getByLabelText(/^Desglose por minuto/).closest('div').textContent).toMatch(/Tanda A · Espécimen 3/)
     const minutos = screen.getAllByRole('row').filter((f) => /^\d:\d\d–\d:\d\d/.test(f.textContent))
     expect(minutos).toHaveLength(5)
   })
@@ -958,7 +958,7 @@ describe('detalle de resultados: selector de grupo, vista conservada y glosas', 
 
   it('«Grupo completo» conserva la vista activa', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=1&tanda=A&vista=timeline')
-    await user.click(await screen.findByRole('link', { name: 'Grupo completo · 4 animales' }))
+    await user.click(await screen.findByRole('link', { name: 'Grupo completo · 4 especímenes' }))
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo control, grupo completo' }, { timeout: 5000 })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Minuto a minuto' }).getAttribute('aria-current')).toBe('true')
   })
@@ -971,7 +971,7 @@ describe('detalle de resultados: selector de grupo, vista conservada y glosas', 
 
   it('el detalle explica qué es una tanda y qué significa el nivel preciso', async () => {
     await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
-    expect(await screen.findByText('Tanda: un video con varios animales. El grupo completo reúne sus tandas con análisis completado; cada animal lleva el nombre de su tanda.')).toBeTruthy()
+    expect(await screen.findByText('Tanda: un video con varios especímenes. El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.')).toBeTruthy()
     expect(screen.getByText('preciso: el sistema distinguió nado y escalamiento.')).toBeTruthy()
   })
 

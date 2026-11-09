@@ -129,7 +129,7 @@ function VerDetalle({ clave, primera }) {
     <section aria-labelledby="ver-el-detalle" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <h3 id="ver-el-detalle" style={{ margin: 0, fontSize: 16 }}>Ver el detalle</h3>
       <p className="hint" style={{ margin: 0, maxWidth: 680 }}>
-        Tanda por tanda, animal por animal y segundo por segundo. Dentro del detalle eliges el grupo y la tanda.
+        Tanda por tanda, espécimen por espécimen y segundo por segundo. Dentro del detalle eliges el grupo y la tanda.
       </p>
       {primera ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

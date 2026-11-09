@@ -32,7 +32,7 @@ function rangoSegundos(e) {
   return e.segundosMin === e.segundosMax ? `${e.segundosMin}` : `${e.segundosMin}–${e.segundosMax}`
 }
 
-// La celda de un grupo en un minuto; null si no hay animales con segundos ahí o la media no existe.
+// La celda de un grupo en un minuto; null si no hay especímenes con segundos ahí o la media no existe.
 function celdaDe(g, minuto, clave) {
   const e = g.porMinuto?.find((x) => x.minuto === minuto)
   if (!e || e.n === 0) return null
@@ -129,10 +129,10 @@ export default function G6MapaPorMinuto({ datos, prefijo }) {
     else if (g.n === 0) avisos.push(`${g.etiqueta}: sin datos.`)
     if (g.faltantes.length) {
       const faltan = g.faltantes.reduce((a, f) => a + f.nCilindros, 0)
-      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'animal pendiente' : 'animales pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
+      avisos.push(`${g.etiqueta}: ${faltan} ${faltan === 1 ? 'espécimen pendiente' : 'especímenes pendientes'} (${g.faltantes.map((f) => `Tanda ${f.letra} ${f.estado ?? 'sin subir'}`).join(', ')}).`)
     }
   }
-  notas.push('Un minuto con menos de 60 s en algún animal es incompleto; sus segundos son los reales.')
+  notas.push('Un minuto con menos de 60 s en algún espécimen es incompleto; sus segundos son los reales.')
 
   const titulo = '¿En qué minuto cambia?'
   const maxCar = Math.max(6, Math.floor((IZQ - 10) / 6.3))

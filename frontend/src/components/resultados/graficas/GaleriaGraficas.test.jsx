@@ -48,7 +48,7 @@ describe('GaleriaGraficas · G1', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
     expect(screen.getByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
     expect(screen.getAllByText('120,0 ± 10,0 s').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('2 animales').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('2 especímenes').length).toBeGreaterThan(0)
   })
 
   it('con dos y con tres grupos dibuja una etiqueta por grupo, en el orden de la respuesta', () => {
@@ -86,7 +86,7 @@ describe('GaleriaGraficas · G1', () => {
 
   it('la conducta activa va fuera de las barras, con su nota de segundos medios', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    expect(screen.getByText(/Conducta activa, fuera de las barras \(segundos medios por animal\): Control 4,0 s\./)).toBeTruthy()
+    expect(screen.getByText(/Conducta activa, fuera de las barras \(segundos medios por espécimen\): Control 4,0 s\./)).toBeTruthy()
   })
 
   it('cada gráfica trae las dos notas obligatorias y la tabla con los mismos números', () => {
@@ -106,7 +106,7 @@ describe('GaleriaGraficas · selector y teclado', () => {
       '¿Cómo cambió minuto a minuto?',
       '¿Cómo se compara cada minuto?',
       '¿En qué se fue el tiempo?',
-      '¿Qué tan parecidos son los animales?',
+      '¿Qué tan parecidos son los especímenes?',
       '¿En qué minuto cambia?',
     ]
     for (const titulo of titulos) {
