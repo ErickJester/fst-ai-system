@@ -34,7 +34,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+// AopTestUtils: saca el objeto real que hay detrás del proxy que Spring pone alrededor de un bean.
 import org.springframework.test.util.AopTestUtils;
+// ReflectionTestUtils: escribe un campo privado de un objeto (aquí, para prender el modo desarrollador).
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -44,23 +46,32 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 // /results/groups contra una PostgreSQL de verdad. Mismas condiciones que AdministracionYRecuperacionTest: solo corre con
 // FST_TEST_DB_URL apuntando a una base de pruebas VACÍA con el esquema de db/init (cada prueba borra todos los datos). El
 // contenido de los archivos se prueba aparte, sin base, en ReporteCsvTest y ReporteXlsxTest.
+//
+// Esta clase prueba el recorrido completo de un reporte: la petición HTTP, los permisos, el cálculo con datos reales
+// de la base, el archivo que se guarda en disco (caché) y cuándo se invalida. Los formatos (CSV, XLSX y PDF) se
+// comparan celda por celda contra números calculados a mano en el escenario de @BeforeEach.
 @EnabledIfEnvironmentVariable(named = "FST_TEST_DB_URL", matches = ".+")
 @SpringBootTest(properties = {
 		"spring.datasource.url=${FST_TEST_DB_URL}",
 		"spring.datasource.username=${FST_TEST_DB_USER:fst}",
 		"spring.datasource.password=${FST_TEST_DB_PASSWORD:fst}",
 		"app.jwt.secreto=secreto-de-pruebas-secreto-de-pruebas-1234",
+		// Raíz de archivos propia de esta clase: aquí se guardan los reportes (caché) y los tiempos.json de prueba.
 		"app.archivos.raiz=${java.io.tmpdir}/fst-pruebas-reportes"
 })
 @AutoConfigureMockMvc
 class ReportesCsvXlsxTest {
 
+	// Contraseña común de las cuentas de prueba (se guarda cifrada para que el login real funcione).
 	private static final String CLAVE = "clave-de-prueba-1";
+	// Abreviaturas de las tres conductas, para que las filas de datos se lean cortas.
 	private static final String N = "nado activo";
 	private static final String I = "inmovilidad";
 	private static final String E = "escalamiento";
+	// Misma carpeta que app.archivos.raiz de arriba, como Path.
 	private static final Path RAIZ = Path.of(System.getProperty("java.io.tmpdir"), "fst-pruebas-reportes");
 
+	// Primera línea del CSV, tal como la espera el Dr. Sandino: las cinco columnas de identificación y las cinco conductas.
 	private static final String ENCABEZADO = "Grupo,Tanda,Espécimen,Tiempo (min:seg),Nado,Escalamiento,Inmovilidad,Conducta activa,Sin ver";
 
 	@Autowired
@@ -72,12 +83,14 @@ class ReportesCsvXlsxTest {
 	@Autowired
 	private PasswordEncoder passwordEncoder;
 
+	// Se inyectan los beans reales para poder prender el «modo desarrollador» en las pruebas del modelo (ver modoDesarrollador).
 	@Autowired
 	private ResultadosService resultadosService;
 
 	@Autowired
 	private ReporteAlmacen reporteAlmacen;
 
+	// Ids del escenario que arma @BeforeEach.
 	private int experimento;
 	private int control;
 	private int referencia;
@@ -85,13 +98,16 @@ class ReportesCsvXlsxTest {
 	private int tandaB;
 	private int analisisA;
 
+	// Antes de cada prueba: vacía base y disco y arma el escenario.
 	@BeforeEach
 	void base_limpia() throws IOException {
+		// De las hojas hacia arriba por las llaves foráneas.
 		for (String tabla : List.of("segundo", "observacion", "especimen", "reporte", "analisis", "video", "tanda", "grupo",
 				"notificacion", "experimento", "administrador", "usuario")) {
 			jdbc.update("DELETE FROM " + tabla);
 		}
 		borrarCarpeta(RAIZ);
+		// Dos cuentas: el creador del experimento y una ajena (para probar que ver reportes es para cualquiera con sesión).
 		cuenta("1", "creador@fst.mx");
 		cuenta("2", "otro@fst.mx");
 		experimento = experimento("Exp");
@@ -103,6 +119,7 @@ class ReportesCsvXlsxTest {
 		tandaA = tanda(control, 1, "completado");
 		analisisA = jdbc.queryForObject("SELECT a.idanalisis FROM analisis a JOIN video v ON v.idvideo = a.idvideo WHERE v.idtanda = ?",
 				Integer.class, tandaA);
+		// Cada argumento es un segundo, en orden (el primero es el segundo 1); null = «sin ver».
 		segundos(observacion(tandaA, 1), N, N, N, I, I, I, I, N, N, E, E, null);
 		segundos(observacion(tandaA, 2), I, I, I, I, I);
 		// Control, tanda B: completada, con un espécimen de 4 s de nado.
@@ -121,11 +138,13 @@ class ReportesCsvXlsxTest {
 		MvcResult r = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())
 				.andExpect(header().string("Content-Type", "text/csv;charset=UTF-8"))
+				// attachment + filename: el navegador lo descarga con ese nombre en lugar de mostrarlo.
 				.andExpect(header().string("Content-Disposition", "attachment; filename=reporte_experimento_" + experimento
 						+ "_grupo-" + control + ".csv"))
 				.andReturn();
 
 		byte[] cuerpo = r.getResponse().getContentAsByteArray();
+		// Los tres primeros bytes son el BOM de UTF-8 (EF BB BF): sin él, Excel abre el archivo y deforma las tildes.
 		assertEquals((byte) 0xEF, cuerpo[0]);
 		assertEquals((byte) 0xBB, cuerpo[1]);
 		assertEquals((byte) 0xBF, cuerpo[2]);
@@ -145,6 +164,7 @@ class ReportesCsvXlsxTest {
 
 	@Test
 	void el_csv_de_una_tanda_solo_trae_esa_tanda_y_se_nombra_con_su_letra() throws Exception {
+		// &tanda=b (en minúscula): se acepta sin importar mayúsculas y el archivo se nombra con la letra en mayúscula.
 		MvcResult r = mvc.perform(get(ruta("csv", experimento, "grupo=" + control + "&tanda=b")).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())
 				.andExpect(header().string("Content-Disposition", "attachment; filename=reporte_experimento_" + experimento
@@ -163,6 +183,7 @@ class ReportesCsvXlsxTest {
 
 	@Test
 	void con_tandas_de_niveles_distintos_agrega_el_aviso() throws Exception {
+		// Si una tanda se clasificó «agrupado» y otra «preciso», sus números no son del todo comparables: el reporte avisa.
 		jdbc.update("UPDATE analisis SET nivelclasif = 'agrupado' WHERE idanalisis = ?", analisisA);
 		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
@@ -171,6 +192,8 @@ class ReportesCsvXlsxTest {
 
 	@Test
 	void un_grupo_cuyo_nombre_empieza_con_igual_sale_con_apostrofo_en_el_csv_y_como_texto_en_el_xlsx() throws Exception {
+		// Un nombre que empieza con «=» sería tomado como FÓRMULA por Excel (inyección de fórmulas). El CSV lo neutraliza
+		// anteponiendo un apóstrofo; en el XLSX basta con guardarlo como texto.
 		jdbc.update("UPDATE grupo SET etiqueta = '=Control' WHERE idgrupo = ?", control);
 		String creador = login("creador@fst.mx");
 
@@ -200,15 +223,18 @@ class ReportesCsvXlsxTest {
 						+ "_grupo-" + control + ".xlsx"))
 				.andReturn();
 
+		// El cuerpo es un archivo .xlsx de verdad: se abre con Apache POI y se leen sus celdas.
 		try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(r.getResponse().getContentAsByteArray()))) {
 			Sheet hoja = libro.getSheet("Resultados");
 			assertEquals("Grupo", hoja.getRow(0).getCell(0).getStringCellValue());
 			assertEquals("Control", hoja.getRow(1).getCell(0).getStringCellValue());
+			// La diferencia con el CSV: aquí los números son NUMÉRICOS (se pueden sumar y graficar), no texto.
 			assertEquals(5.0, hoja.getRow(1).getCell(4).getNumericCellValue());
 			assertEquals("Varianza", hoja.getRow(6).getCell(2).getStringCellValue());
 			assertEquals(7.0, hoja.getRow(6).getCell(4).getNumericCellValue());
 			assertEquals("No", hoja.getRow(7).getCell(3).getStringCellValue());
 		}
+		// Y el reporte quedó guardado en disco (caché) en reportes/<experimento>/grupo-<grupo>.xlsx.
 		assertTrue(Files.isRegularFile(RAIZ.resolve("reportes/" + experimento + "/grupo-" + control + ".xlsx")));
 	}
 
@@ -217,14 +243,18 @@ class ReportesCsvXlsxTest {
 	@Test
 	void sin_grupo_400_y_una_tanda_que_no_es_una_letra_400() throws Exception {
 		String creador = login("creador@fst.mx");
+		// Se repite todo para los dos formatos: comparten validaciones y las dos rutas deben comportarse igual.
 		for (String formato : List.of("csv", "xlsx")) {
+			// Sin el parámetro obligatorio grupo, y con un grupo que no es un número.
 			mvc.perform(get(ruta(formato, experimento, null)).header("Authorization", "Bearer " + creador)).andExpect(status().isBadRequest());
 			mvc.perform(get(ruta(formato, experimento, "grupo=abc")).header("Authorization", "Bearer " + creador)).andExpect(status().isBadRequest());
+			// Una tanda debe ser UNA letra: dos letras, un número y una Ñ (%C3%91) se rechazan.
 			for (String tanda : List.of("AB", "1", "%C3%91")) {
 				mvc.perform(get(ruta(formato, experimento, "grupo=" + control + "&tanda=" + tanda)).header("Authorization", "Bearer " + creador))
 						.andExpect(status().isBadRequest());
 			}
 		}
+		// Ninguno generó ni guardó reportes.
 		assertEquals(0, filasDeReporte());
 	}
 
@@ -234,10 +264,14 @@ class ReportesCsvXlsxTest {
 		int otroExperimento = experimento("Otro");
 		int ajeno = grupo(otroExperimento, "Ajeno");
 		for (String formato : List.of("csv", "xlsx")) {
+			// Un grupo que existe pero es de OTRO experimento no se debe poder pedir por esta ruta: 404...
 			mvc.perform(get(ruta(formato, experimento, "grupo=" + ajeno)).header("Authorization", "Bearer " + creador)).andExpect(status().isNotFound());
+			// ...igual que un grupo inexistente...
 			mvc.perform(get(ruta(formato, experimento, "grupo=99999")).header("Authorization", "Bearer " + creador)).andExpect(status().isNotFound());
+			// ...una tanda C que el grupo no tiene...
 			mvc.perform(get(ruta(formato, experimento, "grupo=" + control + "&tanda=C")).header("Authorization", "Bearer " + creador))
 					.andExpect(status().isNotFound());
+			// ...o un experimento que no existe.
 			mvc.perform(get(ruta(formato, 99999, "grupo=" + control)).header("Authorization", "Bearer " + creador)).andExpect(status().isNotFound());
 		}
 		assertEquals(0, filasDeReporte());
@@ -246,6 +280,7 @@ class ReportesCsvXlsxTest {
 	@Test
 	void sin_analisis_completados_409_y_no_queda_ni_fila_ni_archivo() throws Exception {
 		String creador = login("creador@fst.mx");
+		// El grupo Referencia solo tiene una tanda «procesando»: no hay datos finales con los que armar un reporte.
 		for (String formato : List.of("csv", "xlsx")) {
 			mvc.perform(get(ruta(formato, experimento, "grupo=" + referencia)).header("Authorization", "Bearer " + creador)).andExpect(status().isConflict());
 			mvc.perform(get(ruta(formato, experimento, "grupo=" + referencia + "&tanda=A")).header("Authorization", "Bearer " + creador))
@@ -265,6 +300,9 @@ class ReportesCsvXlsxTest {
 	}
 
 	// ----------------------------------------------------------------- almacén y revisión
+	//
+	// El «almacén» (ReporteAlmacen) guarda cada reporte generado en disco y en la tabla reporte, para no recalcularlo
+	// en cada descarga. Estas pruebas fijan cuándo se reutiliza y cuándo se invalida.
 
 	@Test
 	void la_segunda_descarga_sale_del_archivo_guardado() throws Exception {
@@ -272,23 +310,27 @@ class ReportesCsvXlsxTest {
 		byte[] primera = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
 
+		// La primera descarga dejó una fila en reporte y el archivo con exactamente los mismos bytes.
 		String relativa = "reportes/" + experimento + "/grupo-" + control + ".csv";
 		assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM reporte WHERE ruta = ? AND formato = 'CSV'", Integer.class, relativa));
 		Path archivo = RAIZ.resolve(relativa);
 		assertArrayEquals(primera, Files.readAllBytes(archivo));
 
 		// Si la segunda descarga se volviera a generar, saldría la primera; sale lo que dice el archivo.
+		// Truco: se sobrescribe el archivo con un contenido reconocible; si la segunda respuesta lo trae, es que salió del disco.
 		byte[] marca = "marca del archivo guardado".getBytes(StandardCharsets.UTF_8);
 		Files.write(archivo, marca);
 		byte[] segunda = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
 		assertArrayEquals(marca, segunda);
+		// Y no se creó una segunda fila de reporte.
 		assertEquals(1, filasDeReporte());
 	}
 
 	@Test
 	void despues_de_corregir_segundos_el_reporte_se_regenera_y_marca_la_revision() throws Exception {
 		String creador = login("creador@fst.mx");
+		// Se generan y guardan los tres formatos (CSV, XLSX y PDF) antes de corregir.
 		mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador)).andExpect(status().isOk());
 		mvc.perform(get(ruta("xlsx", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador)).andExpect(status().isOk());
 		byte[] pdfAntes = mvc.perform(get("/experiments/" + experimento + "/report/pdf").header("Authorization", "Bearer " + creador))
@@ -300,8 +342,10 @@ class ReportesCsvXlsxTest {
 		// El segundo 12 del espécimen 1 (sin ver) pasa a nado: ese espécimen queda revisado.
 		mvc.perform(corregir(creador, "{\"especimenes\":[{\"numeroCilindro\":1,\"segundos\":"
 				+ "[{\"segundo\":12,\"conducta\":\"nado activo\",\"origen\":\"corregida\"}]}]}")).andExpect(status().isOk());
+		// Corregir cambia los números, así que los reportes guardados ya no valen: se borran los tres.
 		assertEquals(0, filasDeReporte(), "corregir invalida los tres reportes");
 
+		// El siguiente CSV se regenera con el dato corregido: ahora nado = 6 (antes 5) y sin ver = 0 (antes 1).
 		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
 		assertEquals("Control,A,Espécimen 1,0:00-1:00,6,2,4,0,0", lineas.get(1));
@@ -324,6 +368,7 @@ class ReportesCsvXlsxTest {
 	@Test
 	void un_segundo_marcado_dudoso_sin_conducta_tambien_cuenta_como_revision() throws Exception {
 		String creador = login("creador@fst.mx");
+		// Marcar un segundo como «dudoso» (sin asignarle conducta) también es una intervención humana y cuenta.
 		mvc.perform(corregir(creador, "{\"especimenes\":[{\"numeroCilindro\":1,\"segundos\":"
 				+ "[{\"segundo\":12,\"conducta\":null,\"origen\":\"dudosa\"}]}]}")).andExpect(status().isOk());
 		List<String> lineas = lineas(mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + creador))
@@ -354,16 +399,21 @@ class ReportesCsvXlsxTest {
 	}
 
 	// ------------------------------------------------- con qué modelo se hizo (modo desarrollador)
+	//
+	// En modo desarrollador los reportes agregan con qué modelo de red se hizo cada análisis (dato útil para comparar el
+	// modelo viejo contra el nuevo). El modo normal NO debe mostrarlo, y por eso hay una prueba de cada lado.
 
 	// El modo desarrollador se lee de la configuración al arrancar; aquí se prende solo para estas pruebas, en los dos
 	// servicios que lo consultan (el contexto de Spring es el mismo para toda la clase).
 	private void modoDesarrollador(boolean prendido) {
+		// getUltimateTargetObject atraviesa el proxy de Spring para llegar al objeto real, que es el que tiene el campo.
 		Object resultados = AopTestUtils.getUltimateTargetObject(resultadosService);
 		Object almacen = AopTestUtils.getUltimateTargetObject(reporteAlmacen);
 		ReflectionTestUtils.setField(resultados, "modoDesarrollador", prendido);
 		ReflectionTestUtils.setField(almacen, "modoDesarrollador", prendido);
 	}
 
+	// Después de CADA prueba se apaga: el contexto de Spring se comparte, y dejarlo prendido contaminaría a las demás.
 	@AfterEach
 	void apagar_el_modo_desarrollador() {
 		modoDesarrollador(false);
@@ -380,6 +430,7 @@ class ReportesCsvXlsxTest {
 				+ "\"modificado\":\"2026-10-19T21:27:32-06:00\",\"videosDeEntrenamiento\":4,\"clips\":3323}}");
 	}
 
+	// La línea del modelo tal como debe salir en el reporte: archivo · versión de la red · huella SHA-256 (16 caracteres) · tamaño · fecha.
 	private static final String MODELO_A = "Tanda A: fst_cnn_seg.pt · red 5.0.0 · SHA-256 480c5803998562f5 · 119.6 MB · archivo del 2026-10-19";
 
 	@Test
@@ -414,6 +465,7 @@ class ReportesCsvXlsxTest {
 				.andExpect(status().isOk()).andReturn();
 		try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(r.getResponse().getContentAsByteArray()))) {
 			Sheet hoja = libro.getSheet("Resultados");
+			// Las dos últimas filas son las del modelo (una por tanda): la penúltima es la A y la última la B.
 			int ultima = hoja.getLastRowNum();
 			assertEquals("Modelo", hoja.getRow(ultima - 1).getCell(2).getStringCellValue());
 			assertEquals(MODELO_A, hoja.getRow(ultima - 1).getCell(3).getStringCellValue());
@@ -423,6 +475,7 @@ class ReportesCsvXlsxTest {
 
 	@Test
 	void sin_modo_desarrollador_los_reportes_no_dicen_el_modelo_aunque_exista_el_archivo() throws Exception {
+		// Aquí el modo desarrollador queda apagado (su valor normal) aunque el tiempos.json con el modelo sí existe.
 		tiemposConModelo(analisisA);
 		String sesion = login("creador@fst.mx");
 		byte[] csv = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + sesion))
@@ -450,11 +503,15 @@ class ReportesCsvXlsxTest {
 	}
 
 	// ----------------------------------------------------------------- apoyo
+	//
+	// Métodos de apoyo: rutas, lectura de los archivos devueltos y datos de prueba por SQL directo.
 
+	// Ruta de un reporte: /experiments/{id}/report/{formato}, con una consulta opcional (?grupo=..&tanda=..).
 	private static String ruta(String formato, int id, String consulta) {
 		return "/experiments/" + id + "/report/" + formato + (consulta == null ? "" : "?" + consulta);
 	}
 
+	// PUT que corrige segundos del análisis A de Control, con la sesión y el cuerpo JSON dados.
 	private MockHttpServletRequestBuilder corregir(String sesion, String cuerpo) {
 		return put("/experiments/" + experimento + "/analyses/" + analisisA + "/segundos").header("Authorization", "Bearer " + sesion)
 				.contentType(MediaType.APPLICATION_JSON).content(cuerpo);
@@ -462,9 +519,11 @@ class ReportesCsvXlsxTest {
 
 	// Las líneas del CSV sin el BOM; el último elemento es el vacío que queda tras el \r\n final.
 	private static List<String> lineas(byte[] csv) {
+		// substring(1): el BOM es UN solo carácter (U+FEFF) al decodificarlo como UTF-8. split con -1 conserva el vacío final.
 		return Arrays.asList(new String(csv, StandardCharsets.UTF_8).substring(1).split("\r\n", -1));
 	}
 
+	// Extrae el texto de todas las páginas de un PDF (iText 5), para comprobar lo que dice sin abrirlo a ojo.
 	private static String textoDelPdf(byte[] pdf) throws IOException {
 		PdfReader lector = new PdfReader(pdf);
 		try {
@@ -474,14 +533,17 @@ class ReportesCsvXlsxTest {
 			}
 			return texto.toString();
 		} finally {
+			// close en finally: el lector retiene el archivo y debe liberarse aunque la extracción falle.
 			lector.close();
 		}
 	}
 
+	// Cuántos reportes hay guardados en la tabla reporte (la caché).
 	private int filasDeReporte() {
 		return jdbc.queryForObject("SELECT COUNT(*) FROM reporte", Integer.class);
 	}
 
+	// Borra una carpeta con todo lo que contiene (si existe). Orden inverso: primero lo más profundo.
 	private static void borrarCarpeta(Path carpeta) throws IOException {
 		if (!Files.exists(carpeta)) {
 			return;
@@ -498,6 +560,7 @@ class ReportesCsvXlsxTest {
 				+ "VALUES (?, 'Nombre', 'Apellidos', ?, ?, true, false)", id, correo, passwordEncoder.encode(CLAVE));
 	}
 
+	// Inserta un experimento a nombre de la cuenta 1 y devuelve su id.
 	private int experimento(String nombre) {
 		jdbc.update("INSERT INTO experimento (idinstitucional, nombre, fecha) VALUES ('1', ?, current_date)", nombre);
 		return jdbc.queryForObject("SELECT idexperimento FROM experimento WHERE nombre = ?", Integer.class, nombre);
@@ -508,11 +571,13 @@ class ReportesCsvXlsxTest {
 		return jdbc.queryForObject("SELECT idgrupo FROM grupo WHERE etiqueta = ?", Integer.class, etiqueta);
 	}
 
+	// Crea la tanda con su video (12 s) y su análisis en el estado dado, y devuelve el id de la tanda.
 	private int tanda(int grupo, int ordinal, String estado) {
 		jdbc.update("INSERT INTO tanda (idgrupo, ordinal, ncilindros) VALUES (?, ?, 2)", grupo, ordinal);
 		int tanda = jdbc.queryForObject("SELECT idtanda FROM tanda WHERE idgrupo = ? AND ordinal = ?", Integer.class, grupo, ordinal);
 		jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, 'Dia 2', 'videos/x.mp4', 12)", tanda);
 		int video = jdbc.queryForObject("SELECT idvideo FROM video WHERE idtanda = ?", Integer.class, tanda);
+		// ?::estado_analisis convierte el texto al tipo de dominio de la base.
 		jdbc.update("INSERT INTO analisis (idvideo, estado) VALUES (?, ?::estado_analisis)", video, estado);
 		return tanda;
 	}
@@ -527,6 +592,7 @@ class ReportesCsvXlsxTest {
 		return jdbc.queryForObject("SELECT idobservacion FROM observacion WHERE idespecimen = ?", Integer.class, especimen);
 	}
 
+	// Inserta un segundo por cada conducta recibida, numerados desde 1 (varargs: null = sin ver). Todos de origen «maquina».
 	private void segundos(int observacion, String... conductas) {
 		for (int i = 0; i < conductas.length; i++) {
 			jdbc.update("INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES (?, ?, ?::tipo_conducta, 'maquina')",
@@ -534,6 +600,7 @@ class ReportesCsvXlsxTest {
 		}
 	}
 
+	// Inicia sesión por el endpoint real y devuelve el JWT.
 	private String login(String correo) throws Exception {
 		MvcResult r = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"" + correo + "\",\"contrasena\":\"" + CLAVE + "\"}"))
