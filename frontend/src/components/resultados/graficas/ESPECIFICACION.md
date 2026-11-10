@@ -211,6 +211,53 @@ Para quien copie G1 como patrón (los minis de G2 a G6, y M1B en el PDF).
 - Axe sin violaciones con el caso mixto y el de sin datos.
 - Los números de la tabla son los del contrato (sin recalcular).
 
+## 4 ter. Cómo agregar una gráfica al PDF (M1B)
+
+El PDF lo dibuja el backend (`backend-spring/src/main/java/com/ipn/mx/fst/service/graficas/`), con iText 5 y vectorial. Los datos son los mismos que la pantalla (`GraficasDeResultados`): el PDF no calcula medias, desviaciones ni varianzas.
+
+**Firma exacta** (una clase por gráfica, en su archivo):
+
+```java
+public interface GraficaPdf {
+    String NOTA_DE = "La barra ± DE muestra la dispersión entre especímenes; no indica si una diferencia es significativa.";
+    String NOTA_ORIGEN = "Los datos son sobre la salida del modelo; su exactitud todavía no está medida.";
+
+    record Muestra(String texto, EstiloPdf estilo) { }
+
+    String id();                                           // "g3": id del marcador y del destino
+    String titulo();                                       // título de la sección y texto del marcador hijo
+    String subtitulo();
+    boolean aplica(Map<String, Object> datos);             // false = no se dibuja ni tiene marcador
+    float alto();                                          // alto del dibujo en puntos (sin leyenda ni notas)
+    List<Muestra> leyenda(Map<String, Object> datos);      // una muestra por grupo o conducta que se dibuja
+    List<String> notas(Map<String, Object> datos);         // las notas de la gráfica, incluidas NOTA_DE y NOTA_ORIGEN
+    void dibujar(DibujanteGraficas d, Map<String, Object> datos);
+}
+```
+
+**Piezas** (todas en `service/graficas/`):
+- `DibujanteGraficas`: el dibujo. Coordenadas locales con el origen arriba a la izquierda de la caja, en puntos. Métodos: `linea`, `rectangulo`, `patron`, `marca`, `texto`, `poligono`, `anchoTexto`. `patron` dibuja sobre el rectángulo ya hecho; la barra se pinta con `rectangulo` y después con `patron`.
+- `EstiloPdf`: estilos en grises. `EstiloPdf.grupo(tipo, indiceExperimental)` (control sólido; referencia rayada; experimentales rotan entre punteado, vertical y horizontal) y `EstiloPdf.conducta(clave)`. Patrones `Patron` (RAYADO, PUNTEADO, VERTICAL, HORIZONTAL); formas `Forma` (CIRCULO, CUADRADO, TRIANGULO, ROMBO, CRUZ); trazos `Trazo` (SOLIDA, DISCONTINUA, LARGA).
+- `DatosGraficas`: lectura del mapa, sin cálculo. `grupos`, `tieneDatos`, `estadisticos`, `valoresS`, `numero` (coma decimal), `mediaDe`, `textoN`, `escalaSegundos`.
+- `SeccionGraficasPdf.GRAFICAS`: la lista de las gráficas en su orden. `SeccionGraficasPdf.escribir` escribe la sección «Gráficas», su leyenda, el dibujo y las notas, y el marcador de cada gráfica que aplica.
+- `MarcadoresPdf`: los marcadores y sus destinos con nombre. El orden del PDF es fijo: Resumen · Resultados por grupo · Gráficas (las que aplican) · Tabla por espécimen · Desglose por minuto · Modelo del análisis (solo en modo desarrollador).
+
+**Pasos:**
+1. Implementar la clase de la gráfica (G3 a G6 ya existen como esqueleto que no aplica): `aplica`, `alto`, `leyenda`, `notas` y `dibujar`.
+2. En `dibujar`, leer solo del mapa `datos` (`DatosGraficas`). Un valor `null` no se dibuja como cero: se escribe «no aplica» o «sin datos», como en la pantalla.
+3. Escala: 0 a 300 s en las de segundos del Día 2 (solo crece si un grupo la rebasa); 0 a 60 s en las de minuto. Un minuto con menos de 60 s en algún espécimen se dibuja con marcador hueco y su nota.
+4. Leyenda: cada `Muestra` lleva el mismo `EstiloPdf` del dibujo, para que la leyenda también se distinga en blanco y negro.
+5. Registrar la clase en `SeccionGraficasPdf.GRAFICAS`, en su posición (G1 a G6). Si la gráfica no aplica, no sale ni en el dibujo ni en los marcadores.
+6. Si cambia lo que dibuja el PDF, subir `VERSION_PDF` en `ReporteAlmacen`: al arrancar se borran los PDF guardados de la versión anterior (ver `ReporteAlmacenVersionTest`).
+
+**Qué probar** (en `GraficasPdfTest`, o en una prueba propia de la gráfica, sin base de datos):
+- `aplica` es falso sin grupos con datos, y verdadero con ellos.
+- Con 1, 2 y 3 grupos; con un grupo sin datos y con uno de nivel mixto: no lanza excepción, el sin datos y el mixto se señalan, y no se dibujan promediados.
+- Con seis grupos de nombre largo: cada nombre cabe en su columna, o se parte o se recorta con «…».
+- El marcador sale bajo «Gráficas», con su título, en su posición, y su destino es válido.
+- Los números que se imprimen son los del mapa: se comprueban con `PdfTextExtractor` contra los valores de la prueba de `GraficasDeResultadosTest`.
+- El PDF de ejemplo (`FST_PDF_EJEMPLO`) se abre y se revisa con un rasterizador (`pdftoppm`): rayados y puntos visibles, sin color.
+
 ## 5. Lo que este contrato no afirma
 
 - No dice que una conducta sea exacta: la clasificación del modelo no es 100 % exacta y su exactitud todavía no está medida. Todo se presenta como «sobre la salida del modelo».
