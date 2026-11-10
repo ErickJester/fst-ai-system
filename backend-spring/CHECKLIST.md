@@ -374,6 +374,18 @@ cinco. Esta tabla sale de revisar el código, no de la memoria; la guía no se e
 - [x] Pruebas con PostgreSQL: `GraficasEndpointTest` y las existentes de `/results/groups` (`ArreglosE50Test`, `SinVerYNivelTest`, `ReportesCsvXlsxTest`, etc.), con `FST_TEST_DB_URL` en una base de pruebas vacía: 190/190, ninguna omitida
 - [x] `GraficasEndpointTest` comprueba que las cinco categorías (con «sin ver») suman `duracionS` en cada espécimen (G4). Compila; sin ejecutar: falta PostgreSQL
 
+## 18. M1B paso 1: gráficas en el PDF, marcadores e invalidación de PDF guardados
+- [x] Dibujante común en iText 5 (`DibujanteGraficas`, vectorial con `PdfContentByte`): ejes, escala, patrones en blanco y negro, leyenda y notas. Estilos en grises (`EstiloPdf`)
+- [x] G1 (barras agrupadas, tres conductas juntas) y G2 (curva por minuto, tres paneles) leen el mismo mapa de `GraficasDeResultados` (vía `resultadosService.graficas`), sin recalcular (`DatosGraficas`)
+- [x] Sección «Gráficas» con título, leyenda, n, nota de ± DE y nota de origen (`SeccionGraficasPdf`). Una gráfica que no aplica no sale ni tiene marcador
+- [x] Marcadores con la jerarquía del plan: Resumen · Resultados por grupo · Gráficas (con sus hijos) · Tabla por espécimen · Desglose por minuto · Modelo del análisis (solo en modo desarrollador). Destinos con nombre y `PageModeUseOutlines` (`MarcadoresPdf`)
+- [x] G3 a G6: una clase por gráfica con la misma interfaz (`GraficaPdf`), en su archivo; hoy no aplican. m1 hace G3 y G4, m2 hace G5 y G6
+- [x] PDF guardado de otra versión: marca `reportes/version-pdf.txt` con `ReporteAlmacen.VERSION_PDF = "2"`. Al arrancar, si no coincide, se borran las filas `PDF` y los `experimento.pdf`; si la base falla, el arranque se detiene. Sin cambios al esquema ni a `migraciones.sql`; la ruta del PDF no cambia
+- [x] Tabla de resultados por grupo con la columna «Sin ver» (queda en la primera página) y tabla por espécimen con segundos y porcentaje
+- [x] Pruebas sin base (`./mvnw -o test`: 202 corridas, 0 fallos, 120 omitidas por falta de base): `GraficasPdfTest` (8 + 1 condicionada por `FST_PDF_EJEMPLO`) y `ReporteAlmacenVersionTest` (3)
+- [ ] Pruebas con PostgreSQL que tocan el PDF y no corrí: `ArreglosE50Test` (el PDF debe decir «Sin ver» en la página 1), `ReportesCsvXlsxTest` (regeneración del PDF tras corregir segundos; textos del PDF), `AdministracionYRecuperacionTest` y `ReinicioDeAnalisisTest` (filas y ruta del PDF). Recomendado: todas las de PostgreSQL
+- [ ] `generarReporteDeResultados` completo (tablas de resultados por grupo y por espécimen, y el orden de los marcadores) necesita la base: no se probó de punta a punta. El PDF de ejemplo (`C:\Users\ID634\AppData\Local\Temp\fst-m1b\ejemplo.pdf`) solo trae la sección de gráficas
+
 ## 19. Pantalla del experimento, paso 1: segundo a segundo y Excel de todo el experimento
 - [x] `GET /experiments/{id}/results/seconds?grupo=&tanda=` (`SegundosController`, `SegundosDeResultados`): los segundos de una tanda desde `segundo`, con correcciones. `conducta` null para «sin ver» y `origen` crudo. 400 sin tanda, 404 si el grupo o la tanda no existen (lo da `alcanceDeReporte`) o si la tanda no tiene análisis completado. Lectura para cualquier usuario con sesión
 - [x] `GET /experiments/{id}/report/excel` (`ExcelExperimentoController`, `ReporteExcelExperimento`, `ExcelDelExperimento`): XLSX con «Resultados» (una tabla por grupo, la misma que su XLSX, con medias, desviaciones, varianzas y revisión) y «Segundo a segundo» (una fila por espécimen y segundo; Conducta; una columna por conducta con 1 o 0; Origen). Se genera al momento: no pasa por `ReporteAlmacen` ni por REPORTE. 409 si no hay análisis completados

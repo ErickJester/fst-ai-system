@@ -12,10 +12,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ReporteAlmacen {
 
 	private static final Logger log = LoggerFactory.getLogger(ReporteAlmacen.class);
+
+	// Versión del contenido del PDF del experimento. Subirla cuando cambie lo que el PDF dibuja: al arrancar se borran los PDF
+	// guardados de otra versión (sus filas y sus archivos experimento.pdf), y la próxima descarga los regenera. Así nadie
+	// recibe un PDF viejo, sin tocar el esquema. Versión 2: el PDF con la sección de gráficas y sus marcadores (M1B).
+	static final String VERSION_PDF = "2";
+	private static final String MARCA_VERSION = "version-pdf.txt";
 	private static final Pattern GRUPO_O_TANDA = Pattern.compile("(grupo|tanda)-\\d+");
 
 	// Genera los bytes del reporte (el generarReporte de ExperimentoServiceImpl para el PDF).
@@ -68,6 +76,32 @@ public class ReporteAlmacen {
 	@PostConstruct
 	void prepararRaiz() {
 		raiz = Path.of(raizConfigurada).toAbsolutePath().normalize();
+		invalidarPdfDeOtraVersion();
+	}
+
+	// Si la marca del volumen no es la versión actual del PDF, borra las filas y los archivos experimento.pdf de la versión
+	// anterior. Si no se puede, el arranque falla: servir un PDF de la versión anterior sería peor que no arrancar.
+	void invalidarPdfDeOtraVersion() {
+		Path reportes = raiz.resolve("reportes");
+		Path marca = reportes.resolve(MARCA_VERSION);
+		try {
+			if (Files.isRegularFile(marca) && VERSION_PDF.equals(Files.readString(marca).trim())) {
+				return;
+			}
+			jdbc.update("DELETE FROM reporte WHERE formato = 'PDF'::formato_reporte");
+			if (Files.isDirectory(reportes)) {
+				try (Stream<Path> carpetas = Files.list(reportes)) {
+					for (Path carpeta : carpetas.toList()) {
+						Files.deleteIfExists(carpeta.resolve("experimento.pdf"));
+					}
+				}
+			}
+			Files.createDirectories(reportes);
+			Files.writeString(marca, VERSION_PDF);
+			log.info("PDF de resultados invalidados: la versión guardada no coincide con la {}", VERSION_PDF);
+		} catch (IOException | DataAccessException e) {
+			throw new IllegalStateException("No se pudieron invalidar los PDF de resultados de otra versión", e);
+		}
 	}
 
 	// La ruta relativa a la raíz que se guarda en REPORTE.ruta. El PDF es solo del experimento; CSV y XLSX son del grupo o

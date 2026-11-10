@@ -46,6 +46,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
+import com.ipn.mx.fst.service.graficas.DatosGraficas;
+import com.ipn.mx.fst.service.graficas.GraficaPdf;
+import com.ipn.mx.fst.service.graficas.MarcadoresPdf;
+import com.ipn.mx.fst.service.graficas.SeccionGraficasPdf;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -707,8 +711,8 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		}
 	}
 
-	// Reporte de resultados con iText 5, igual que generarReporte de la práctica: arma el PDF en memoria y lo devuelve
-	// como bytes. Quien lo guarda y lo sirve es ReporteAlmacen (GET .../report/pdf); este método no escribe nada. Va dentro de una transacción porque lee al creador
+	// Reporte de resultados con iText 5: arma el PDF en memoria y lo devuelve como bytes. Quien lo guarda y lo sirve es
+	// ReporteAlmacen (GET .../report/pdf); este método no escribe nada. Va dentro de una transacción porque lee al creador
 	// del experimento, que es una relación LAZY (se carga hasta que se usa).
 	@Override
 	@Transactional(readOnly = true)
@@ -718,6 +722,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// Lo mismo que generarReporte, con la marca conResultados: false si el experimento no tiene análisis completados (el PDF
 	// dice «Sin resultados»). ReporteAlmacen no guarda ese PDF en caché.
+	//
+	// Orden de las secciones (los marcadores siguen este orden): Resumen · Resultados por grupo · Gráficas · Tabla por
+	// espécimen · Desglose por minuto · Modelo del análisis (solo en modo desarrollador). Las gráficas salen de
+	// resultadosService.graficas, el mismo mapa que consume la pantalla.
 	@Override
 	@Transactional(readOnly = true)
 	public ReporteDeResultados generarReporteDeResultados(Integer idExperimento) {
@@ -733,14 +741,17 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		ByteArrayOutputStream salida = new ByteArrayOutputStream();
 
 		try {
-			PdfWriter.getInstance(documento, salida);
+			PdfWriter writer = PdfWriter.getInstance(documento, salida);
+			MarcadoresPdf marcadores = new MarcadoresPdf(writer);
 			documento.open();
 
 			Font letraTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+			Font letraSeccion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
 			Font letraDato = FontFactory.getFont(FontFactory.HELVETICA, 10);
 			Font letraNota = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, BaseColor.DARK_GRAY);
 
-			Paragraph titulo = new Paragraph("Reporte de resultados", letraTitulo);
+			marcadores.seccion("Resumen", MarcadoresPdf.RESUMEN);
+			Paragraph titulo = MarcadoresPdf.encabezado("Reporte de resultados", letraTitulo, MarcadoresPdf.RESUMEN);
 			titulo.setAlignment(Element.ALIGN_CENTER);
 			documento.add(titulo);
 			documento.add(Chunk.NEWLINE);
@@ -764,35 +775,56 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				documento.add(new Paragraph(
 						"Sin resultados: el experimento todavía no tiene análisis completados.", letraDato));
 			} else {
+				// Los videos analizados: cada tanda con el nombre del archivo como lo subió el usuario. Siempre visible (no
+				// depende del modo desarrollador); los videos anteriores al 20-oct-2026 no tienen nombre.
+				Paragraph tituloVideos = new Paragraph("Videos analizados", letraSeccion);
+				tituloVideos.setSpacingAfter(6);
+				documento.add(tituloVideos);
+				documento.add(armarTablaVideos(resultadosService.videosAnalizados(idExperimento)));
+
+				// Resultados por grupo: las medias de la gráfica, las mismas cifras que dibuja el PDF y la pantalla.
+				Map<String, Object> graficas = resultadosService.graficas(idExperimento);
+				marcadores.seccion("Resultados por grupo", MarcadoresPdf.RESULTADOS_GRUPO);
+				documento.add(Chunk.NEWLINE);
+				documento.add(MarcadoresPdf.encabezado("Resultados por grupo", letraSeccion, MarcadoresPdf.RESULTADOS_GRUPO));
+				documento.add(armarTablaGrupos(graficas));
+				documento.add(new Paragraph("Media ± DE de los especímenes de cada grupo, en segundos del Día 2. Un grupo con "
+						+ "niveles de clasificación mezclados se da por tanda. " + GraficaPdf.NOTA_DE, letraNota));
+
+				// Gráficas: solo las que aplican; si ninguna aplica, no hay sección ni marcador.
+				SeccionGraficasPdf.escribir(documento, writer, graficas, marcadores);
+
+				marcadores.seccion("Tabla por espécimen", MarcadoresPdf.TABLA_ESPECIMEN);
+				documento.add(Chunk.NEWLINE);
+				documento.add(MarcadoresPdf.encabezado("Tabla por espécimen", letraSeccion, MarcadoresPdf.TABLA_ESPECIMEN));
+				documento.add(armarTablaEspecimenes(resultadosService.resultados(idExperimento)));
+
+				marcadores.seccion("Desglose por minuto", MarcadoresPdf.DESGLOSE_MINUTO);
+				documento.add(Chunk.NEWLINE);
+				documento.add(MarcadoresPdf.encabezado("Desglose por minuto", letraSeccion, MarcadoresPdf.DESGLOSE_MINUTO));
 				documento.add(armarTabla(filas, revisados));
 				documento.add(new Paragraph("Segundos de cada conducta en cada minuto. Un minuto suma menos de "
 						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió).",
 						letraNota));
 
-				// Los videos analizados: cada tanda con el nombre del archivo como lo subió el usuario. Siempre
-				// visible (no depende del modo desarrollador); los videos anteriores al 20-oct-2026 no tienen nombre.
-				documento.add(Chunk.NEWLINE);
-				Paragraph tituloVideos = new Paragraph("Videos analizados", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
-				tituloVideos.setSpacingAfter(6);
-				documento.add(tituloVideos);
-				documento.add(armarTablaVideos(resultadosService.videosAnalizados(idExperimento)));
-
-				// Cuánto tardó cada tanda analizada y en qué equipo, para comparar entre computadoras. Solo en modo
-				// desarrollador: sin él, tiemposDelExperimento devuelve una lista vacía y la sección no sale.
+				// Cuánto tardó cada tanda analizada y con qué modelo, solo en modo desarrollador: sin él, las dos listas
+				// salen vacías y la sección no sale.
 				List<Map<String, Object>> tiempos = resultadosService.tiemposDelExperimento(idExperimento);
 				if (!tiempos.isEmpty()) {
+					marcadores.seccion("Modelo del análisis", MarcadoresPdf.MODELO);
 					documento.add(Chunk.NEWLINE);
-					Paragraph subtitulo = new Paragraph("Tiempos de análisis", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+					documento.add(MarcadoresPdf.encabezado("Modelo del análisis", letraSeccion, MarcadoresPdf.MODELO));
+
+					Paragraph subtitulo = new Paragraph("Tiempos de análisis", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10));
 					subtitulo.setSpacingAfter(6);
 					documento.add(subtitulo);
 					documento.add(armarTablaTiempos(tiempos));
 					documento.add(new Paragraph("Tiempo que el worker trabajó en el análisis (no incluye la espera en la "
 							+ "cola). \"sin registro\": análisis de antes de que se midiera el tiempo.", letraNota));
 
-					// Con qué modelo se hizo cada análisis, también solo en modo desarrollador.
 					documento.add(Chunk.NEWLINE);
 					Paragraph subtituloModelo = new Paragraph("Modelo con el que se hizo cada análisis",
-							FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+							FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10));
 					subtituloModelo.setSpacingAfter(6);
 					documento.add(subtituloModelo);
 					documento.add(armarTablaModelos(tiempos));
@@ -803,7 +835,7 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			}
 
 			documento.close();
-		} catch (DocumentException e) {
+		} catch (DocumentException | IOException e) {
 			// A diferencia de la práctica (que imprimía el error y devolvía el PDF a medias), aquí la excepción
 			// sube hasta ManejadorErrores, que responde 500.
 			log.error("No se pudo generar el PDF del experimento {}: {}", idExperimento, e.getMessage());
@@ -812,6 +844,84 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 		return new ReporteDeResultados(salida.toByteArray(), !filas.isEmpty());
 	}
+
+	// Las medias de cada grupo: una fila por grupo con su n y, por conducta, media ± DE. Un grupo con niveles mezclados
+	// lleva «por nivel» y una fila por tanda debajo, con sus números (porNivel).
+	private PdfPTable armarTablaGrupos(Map<String, Object> graficas) throws DocumentException {
+		PdfPTable tabla = new PdfPTable(7);
+		tabla.setWidthPercentage(100);
+		tabla.setWidths(new float[] {2.4f, 1.1f, 1.5f, 1.5f, 1.5f, 1.5f, 1.3f});
+		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
+		Stream.of("Grupo", "n", "Nado activo (s)", "Inmovilidad (s)", "Escalamiento (s)", "Conducta activa (s)", "Sin ver (s)")
+				.forEach(texto -> {
+					PdfPCell encabezado = new PdfPCell(new Phrase(texto, letraEncabezado));
+					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
+					encabezado.setPadding(4);
+					tabla.addCell(encabezado);
+				});
+		for (Map<String, Object> grupo : DatosGraficas.grupos(graficas)) {
+			tabla.addCell(new PdfPCell(new Phrase(String.valueOf(grupo.get("etiqueta")), letraTexto)));
+			tabla.addCell(celdaCentrada(DatosGraficas.textoN(grupo), letraTexto));
+			if (DatosGraficas.bool(grupo.get("nivelMixto"))) {
+				for (int i = 0; i < CONDUCTAS_GRUPO.size() + 1; i++) {
+					tabla.addCell(celdaCentrada("por nivel", letraTexto));
+				}
+			} else {
+				for (String conducta : COLUMNAS_GRUPO) {
+					Map<String, Object> e = DatosGraficas.estadisticos(grupo, conducta);
+					tabla.addCell(celdaCentrada(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
+							DatosGraficas.dbl(e.get("de")), ""), letraTexto));
+				}
+			}
+			for (Map<String, Object> renglon : DatosGraficas.lista(grupo.get("porNivel"))) {
+				tabla.addCell(new PdfPCell(new Phrase("   Tanda " + renglon.get("letra") + " · " + renglon.get("nivelClasif"), letraTexto)));
+				tabla.addCell(celdaCentrada("n = " + renglon.get("n"), letraTexto));
+				Map<String, Object> porConducta = DatosGraficas.mapa(renglon.get("porConducta"));
+				for (String conducta : COLUMNAS_GRUPO) {
+					Map<String, Object> e = DatosGraficas.mapa(porConducta.get(conducta));
+					tabla.addCell(celdaCentrada(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
+							DatosGraficas.dbl(e.get("de")), ""), letraTexto));
+				}
+			}
+		}
+		return tabla;
+	}
+
+	// Lo que se ve en la pantalla por espécimen: los segundos de cada conducta y su porcentaje (los de resultados, los mismos).
+	private PdfPTable armarTablaEspecimenes(Map<String, Object> resultados) throws DocumentException {
+		PdfPTable tabla = new PdfPTable(6);
+		tabla.setWidthPercentage(100);
+		tabla.setWidths(new float[] {2.6f, 1.4f, 1.4f, 1.4f, 1.4f, 1.4f});
+		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
+		Stream.of("Espécimen", "Nado activo", "Inmovilidad", "Escalamiento", "Conducta activa", "Sin ver")
+				.forEach(texto -> {
+					PdfPCell encabezado = new PdfPCell(new Phrase(texto, letraEncabezado));
+					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
+					encabezado.setPadding(4);
+					tabla.addCell(encabezado);
+				});
+		List<String> columnas = new ArrayList<>(CONDUCTAS_GRUPO);
+		columnas.add(TablaDeReporte.SIN_VER);
+		for (Map<String, Object> especimen : DatosGraficas.lista(resultados.get("especimenes"))) {
+			tabla.addCell(new PdfPCell(new Phrase(especimen.get("tanda") + " · Espécimen " + especimen.get("numeroCilindro"), letraTexto)));
+			Map<String, Object> totales = DatosGraficas.mapa(especimen.get("totales"));
+			for (String columna : columnas) {
+				Map<String, Object> par = DatosGraficas.mapa(totales.get(columna));
+				String texto = par == null ? "" : par.get("segundos") + " (" + DatosGraficas.numero(DatosGraficas.dbl(par.get("porcentaje"))) + " %)";
+				tabla.addCell(celdaCentrada(texto, letraTexto));
+			}
+		}
+		return tabla;
+	}
+
+	// Las conductas que llevan las tablas de grupos y de espécimen, en el orden de la pantalla (sin «sin ver»).
+	private static final List<String> CONDUCTAS_GRUPO = List.of("nado activo", "inmovilidad", "escalamiento", "conducta activa");
+	// Las columnas de la tabla de grupos: las cuatro conductas y «sin ver» (la pantalla muestra las cinco).
+	private static final List<String> COLUMNAS_GRUPO = Stream.concat(CONDUCTAS_GRUPO.stream(), Stream.of(TablaDeReporte.SIN_VER)).toList();
 
 	// La consulta trae una fila por conducta; la tabla lleva una fila por espécimen y minuto con las cuatro
 	// conductas en columnas. Este método junta las cuatro filas de la consulta en una de la tabla.
