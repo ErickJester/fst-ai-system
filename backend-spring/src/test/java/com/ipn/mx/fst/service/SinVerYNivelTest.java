@@ -1,8 +1,10 @@
+// Mismo paquete que las clases que prueba, dentro de src/test.
 package com.ipn.mx.fst.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+// put: la petición PUT, que es la que usa la corrección de segundos.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,6 +27,13 @@ import org.springframework.test.web.servlet.MvcResult;
 // Encargo 49: «sin ver» (los segundos con conducta NULL) como quinta clave de totales y de cada minuto en /results y
 // /results/byminute, y nivelclasif recalculado después de un PUT .../segundos. Mismas condiciones que BloquesDeResultadosTest:
 // solo corre con FST_TEST_DB_URL apuntando a una base de pruebas VACÍA con el esquema de db/init (cada prueba borra todos los datos).
+//
+// Tiene dos mitades que se explican por separado:
+//   1. «sin ver» como quinta categoría: garantiza que las cinco sumen el 100 % y los 60 s, que es lo que
+//      permite confiar en las tablas (ver ResultadosServiceImpl.CONDUCTAS_Y_SIN_VER);
+//   2. el nivel de clasificación, que debe SEGUIR a los segundos: una corrección puede poner o quitar
+//      «conducta activa», y el nivel del análisis tiene que reflejarlo (ver RevisionServiceImpl.corregir).
+// La estructura de una prueba de integración está explicada en SegundosYExcelTest.
 @EnabledIfEnvironmentVariable(named = "FST_TEST_DB_URL", matches = ".+")
 @SpringBootTest(properties = {
 		"spring.datasource.url=${FST_TEST_DB_URL}",
@@ -37,6 +46,7 @@ import org.springframework.test.web.servlet.MvcResult;
 class SinVerYNivelTest {
 
 	private static final String CLAVE = "clave-de-prueba-1";
+	// Abreviaturas de las cinco categorías.
 	private static final String N = "nado activo";
 	private static final String I = "inmovilidad";
 	private static final String E = "escalamiento";
@@ -57,6 +67,7 @@ class SinVerYNivelTest {
 
 	@BeforeEach
 	void base_limpia() {
+		// De las hojas hacia arriba, por las llaves foráneas.
 		for (String tabla : List.of("segundo", "observacion", "especimen", "reporte", "analisis", "video", "tanda", "grupo",
 				"notificacion", "experimento", "administrador", "usuario")) {
 			jdbc.update("DELETE FROM " + tabla);
@@ -66,19 +77,24 @@ class SinVerYNivelTest {
 		jdbc.update("INSERT INTO experimento (idinstitucional, nombre, fecha) VALUES ('1', 'Exp', current_date)");
 		experimento = jdbc.queryForObject("SELECT idexperimento FROM experimento", Integer.class);
 		jdbc.update("INSERT INTO grupo (idexperimento, etiqueta, tipo, tratamiento) VALUES (?, 'Control', 'control', 'agua')", experimento);
+		// Con la base vacía, cada SELECT sin WHERE devuelve la única fila recién insertada.
 		int grupo = jdbc.queryForObject("SELECT idgrupo FROM grupo", Integer.class);
 		jdbc.update("INSERT INTO tanda (idgrupo, ordinal, ncilindros) VALUES (?, 1, 2)", grupo);
 		int tanda = jdbc.queryForObject("SELECT idtanda FROM tanda", Integer.class);
 		jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, 'Dia 2', 'videos/x.mp4', 70)", tanda);
 		int video = jdbc.queryForObject("SELECT idvideo FROM video", Integer.class);
+		// El análisis nace 'completado' y, al no indicar nivelclasif, con su DEFAULT: 'preciso'.
 		jdbc.update("INSERT INTO analisis (idvideo, estado) VALUES (?, 'completado'::estado_analisis)", video);
 		analisis = jdbc.queryForObject("SELECT idanalisis FROM analisis", Integer.class);
 
 		// Espécimen 1: 70 s (dos minutos, el segundo de 10 s): 1 sin ver en el minuto 1 y 3 en el 2. Espécimen 2: 5 s sin ver.
+		// Los datos están diseñados para que cada cifra se pueda verificar a mano: nado en 0-29, inmovilidad
+		// en 30-59 y escalamiento en 60-69, con cuatro agujeros (null) repartidos en los dos minutos.
 		String[] uno = new String[70];
 		for (int s = 0; s < 70; s++) {
 			uno[s] = s < 30 ? N : (s < 60 ? I : E);
 		}
+		// Un índice 3 (segundo 4) cae en el minuto 1; los índices 60, 61 y 62 (segundos 61-63), en el 2.
 		uno[3] = null;
 		uno[60] = null;
 		uno[61] = null;
@@ -93,19 +109,26 @@ class SinVerYNivelTest {
 		MvcResult r = mvc.perform(get("/experiments/" + experimento + "/results/byminute").header("Authorization", "Bearer " + login()))
 				.andExpect(status().isOk())
 				// Las cuatro de siempre siguen con su nombre y se agrega «sin ver».
+				// Las cifras salen de contar a mano: 30 de nado menos el segundo 4 que es null = 29, etc.
 				.andExpect(jsonPath("$.data.especimenes[0].totales['nado activo'].segundos").value(29))
 				.andExpect(jsonPath("$.data.especimenes[0].totales['inmovilidad'].segundos").value(30))
 				.andExpect(jsonPath("$.data.especimenes[0].totales['escalamiento'].segundos").value(7))
+				// Una conducta que no ocurrió sale con 0, no se omite.
 				.andExpect(jsonPath("$.data.especimenes[0].totales['conducta activa'].segundos").value(0))
 				.andExpect(jsonPath("$.data.especimenes[0].totales['" + SIN_VER + "'].segundos").value(4))
+				// Y por minuto: 1 sin ver en el primero y 3 en el segundo.
 				.andExpect(jsonPath("$.data.especimenes[0].minutos[0]['" + SIN_VER + "']").value(1))
 				.andExpect(jsonPath("$.data.especimenes[0].minutos[1]['" + SIN_VER + "']").value(3))
 				.andExpect(jsonPath("$.data.especimenes[1].totales['" + SIN_VER + "'].segundos").value(5))
+				// El espécimen que no se vio en nada es 100 % «sin ver»: el denominador del porcentaje son
+				// TODOS sus segundos.
 				.andExpect(jsonPath("$.data.especimenes[1].totales['" + SIN_VER + "'].porcentaje").value(100.0))
 				.andReturn();
 		String json = r.getResponse().getContentAsString();
 
 		// Los segundos de las cinco claves suman los segundos del espécimen, en el total y en cada minuto.
+		// Es la comprobación de COHERENCIA que justifica tener «sin ver» como categoría: sin ella, las
+		// cuatro conductas sumarían menos que el espécimen y no habría forma de saber dónde está la diferencia.
 		for (int e = 0; e < 2; e++) {
 			int suma = 0;
 			for (String clave : List.of(N, I, E, A, SIN_VER)) {
@@ -113,6 +136,7 @@ class SinVerYNivelTest {
 			}
 			assertEquals(e == 0 ? 70 : 5, suma);
 		}
+		// Y el primer minuto, completo, suma exactamente 60.
 		int minuto1 = 0;
 		for (String clave : List.of(N, I, E, A, SIN_VER)) {
 			minuto1 += (int) JsonPath.read(json, "$.data.especimenes[0].minutos[0]['" + clave + "']");
@@ -122,37 +146,49 @@ class SinVerYNivelTest {
 
 	@Test
 	void results_sin_minutos_tambien_trae_sin_ver_en_los_totales() throws Exception {
+		// /results y /results/byminute comparten el armado (respuestaDeEspecimenes); esto comprueba que
+		// la versión SIN minutos también lleva «sin ver», y no solo la completa.
 		mvc.perform(get("/experiments/" + experimento + "/results").header("Authorization", "Bearer " + login()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.especimenes[0].totales['" + SIN_VER + "'].segundos").value(4));
 	}
 
 	// ----------------------------------------------------------------- nivelclasif después de corregir
+	//
+	// La segunda mitad: el nivel de clasificación del análisis tiene que seguir a los segundos. 'agrupado'
+	// significa "queda alguna conducta activa" y 'preciso', "no queda ninguna" (ver NivelClasifAnalisis).
 
 	@Test
 	@Tag("trabajo-terminal")
 	void una_correccion_a_conducta_activa_sube_el_nivel_a_agrupado_y_quitarla_lo_baja_a_preciso() throws Exception {
 		String token = login();
+		// Punto de partida: ningún segundo es conducta activa, así que el nivel es el de por omisión.
 		assertEquals("preciso", nivel());
 
+		// Poner UN segundo como conducta activa sube el nivel.
 		mvc.perform(corregir(token, "[{\"segundo\":1,\"conducta\":\"conducta activa\",\"origen\":\"corregida\"}]")).andExpect(status().isOk());
 		assertEquals("agrupado", nivel());
 
 		// Un cambio que no toca esa conducta no baja el nivel mientras quede algún segundo así.
+		// Es la prueba de que se mira TODA la tabla y no solo lo que se acaba de tocar.
 		mvc.perform(corregir(token, "[{\"segundo\":2,\"conducta\":\"nado activo\",\"origen\":\"confirmada\"}]")).andExpect(status().isOk());
 		assertEquals("agrupado", nivel());
 
+		// Quitar el ÚLTIMO segundo de conducta activa devuelve el nivel a preciso.
 		mvc.perform(corregir(token, "[{\"segundo\":1,\"conducta\":\"nado activo\",\"origen\":\"corregida\"}]")).andExpect(status().isOk());
 		assertEquals("preciso", nivel());
 	}
 
 	@Test
 	void un_nivel_agrupado_del_worker_baja_si_la_revision_quita_la_ultima_conducta_activa() throws Exception {
+		// Se reproduce el estado que dejaría el worker: un segundo como conducta activa y el análisis ya
+		// marcado 'agrupado'. Se escribe directo en la base porque el worker no está en estas pruebas.
 		jdbc.update("UPDATE segundo SET conducta = 'conducta activa'::tipo_conducta WHERE segundo = 10 AND idobservacion = "
 				+ "(SELECT MIN(idobservacion) FROM observacion)");
 		jdbc.update("UPDATE analisis SET nivelclasif = 'agrupado'::nivel_clasif_analisis");
 
 		// Marcarlo como no visible (NULL, dudosa) deja de ser conducta activa: el nivel baja a preciso.
+		// Muestra que la revisión humana puede corregir también lo que decidió el worker.
 		mvc.perform(corregir(login(), "[{\"segundo\":10,\"conducta\":null,\"origen\":\"dudosa\"}]")).andExpect(status().isOk());
 		assertEquals("preciso", nivel());
 	}
@@ -160,21 +196,28 @@ class SinVerYNivelTest {
 	@Test
 	void una_correccion_rechazada_no_cambia_el_nivel() throws Exception {
 		String token = login();
+		// "vuela" no es una conducta del dominio: se rechaza con 400 ANTES de escribir nada. El nivel no
+		// cambia, porque validar() corre antes que cualquier UPDATE (ver RevisionServiceImpl).
 		mvc.perform(corregir(token, "[{\"segundo\":1,\"conducta\":\"vuela\",\"origen\":\"corregida\"}]")).andExpect(status().isBadRequest());
 		assertEquals("preciso", nivel());
 	}
 
 	// ----------------------------------------------------------------- apoyo
 
+	// El nivel de clasificación actual del análisis, leído directo de la base.
 	private String nivel() {
 		return jdbc.queryForObject("SELECT nivelclasif FROM analisis WHERE idanalisis = ?", String.class, analisis);
 	}
 
+	// Arma la petición PUT de corrección con el JSON que espera la API: los segundos que cambiaron, dentro
+	// del espécimen 1. Devuelve el constructor de la petición (sin ejecutarla), para que cada prueba la
+	// ejecute con mvc.perform y compruebe lo que le interese.
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder corregir(String token, String segundos) {
 		return put("/experiments/" + experimento + "/analyses/" + analisis + "/segundos").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content("{\"especimenes\":[{\"numeroCilindro\":1,\"segundos\":" + segundos + "}]}");
 	}
 
+	// Un espécimen con su observación en el video dado; devuelve el id de la observación.
 	private int observacion(int tanda, int video, int cilindro) {
 		jdbc.update("INSERT INTO especimen (idtanda, numerocilindro) VALUES (?, ?)", tanda, cilindro);
 		int especimen = jdbc.queryForObject("SELECT idespecimen FROM especimen WHERE idtanda = ? AND numerocilindro = ?",
@@ -183,6 +226,7 @@ class SinVerYNivelTest {
 		return jdbc.queryForObject("SELECT idobservacion FROM observacion WHERE idespecimen = ?", Integer.class, especimen);
 	}
 
+	// Los segundos de una observación, numerados desde 1 y con origen 'maquina'. Un null es el «sin ver».
 	private void segundos(int observacion, String... conductas) {
 		for (int i = 0; i < conductas.length; i++) {
 			jdbc.update("INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES (?, ?, ?::tipo_conducta, 'maquina')",
