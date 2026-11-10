@@ -251,3 +251,13 @@ En cada una, "Hecho" es lo que la pantalla ya hace con datos de ejemplo; falta v
 ## 21. Modelo del worker en la pantalla de carga (modo desarrollador)
 - [x] `services/modo.js`: `getModeloActual()` (real y de ejemplo). `CargarVideoPage.jsx`: recuadro «Modelo que se usará» solo con modo desarrollador, junto a los botones de guardar; sin modelo y con motivo; un fallo no bloquea la carga
 - [ ] Sin probar: lint, `npm test` y navegador (instrucción del orquestador: no correr pruebas en este encargo)
+
+## 22. Aviso de privacidad y términos en el primer acceso (RN-18)
+- [x] `PrimerAccesoPage.jsx`: casilla obligatoria «He leído y acepto el Aviso de privacidad y los Términos y condiciones de uso», con enlaces en pestaña nueva (`rel="noopener noreferrer"`). Sin marcarla no se envía: «Debes aceptar el aviso de privacidad y los términos para continuar.». Al enviar, `cambiarPassword(actual, nueva, true)`
+- [x] `AuthContext.jsx` y `services/auth.js` (real y mock) pasan `aceptaTerminos`; el mock rechaza con 400 si la cuenta tiene temporal y falta la aceptación. La aceptación no se guarda
+- [x] `LoginPage.jsx`: enlaces «Aviso de privacidad» y «Términos y condiciones de uso» bajo el formulario
+- [x] `router.jsx`: `/aviso-privacidad` y `/terminos` públicas, fuera de `Protegida` y de `SoloTemporal`; importan `AvisoPrivacidadPage` y `TerminosPage` (de miniprogramador1, sin tocar)
+- [x] Pruebas: `servicios.test.js` (sin aceptación → 400; con aceptación cambia; cambios existentes pasan `true`); `pantallas.test.jsx`: «una cuenta nueva pasa por el primer acceso» y los dos de error del servidor marcan la casilla; nuevas: casilla sin marcar, enlaces de la casilla, login con sus enlaces, páginas abiertas sin sesión y con temporal pendiente
+- [x] Lint 0; `npm test` 344/344 (28 archivos)
+- [ ] Navegador real sin probar en este encargo (lo indicado: sin pruebas extra del orquestador)
+- [ ] `npm test` avisó «Not implemented: navigation to another Document» al final; no lo revisé todavía

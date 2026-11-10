@@ -29,6 +29,9 @@ export const cuentaPublica = ({ idInstitucional, nombre, apellidos, correo, rol,
 // RESET_LINK_MINUTES del documento: cuánto vale el enlace de recuperación.
 const MINUTOS_ENLACE = 60
 
+// Mismo texto que AuthServiceImpl.cambiarContrasena (400 sin aceptación en el primer acceso).
+const MSG_TERMINOS = 'Para continuar debes aceptar el aviso de privacidad y los términos y condiciones de uso.'
+
 // Sin backend, un correo desconocido entra como cuenta nueva con
 // contraseña temporal, para poder recorrer el primer acceso (2i).
 function cuentaNueva(correo) {
@@ -59,9 +62,10 @@ const mock = {
     Object.assign(db.users.find((x) => x.idInstitucional === t.idInstitucional), { password: contrasenaNueva, cambioRequerido: false })
     return reply({})
   },
-  password(id, contrasenaActual, contrasenaNueva) {
+  password(id, contrasenaActual, contrasenaNueva, aceptaTerminos) {
     const c = db.users.find((x) => x.idInstitucional === id)
     if (!c) return fail(401, 'La sesión ya no es válida.')
+    if (c.cambioRequerido && aceptaTerminos !== true) return fail(400, MSG_TERMINOS)
     if (c.password && contrasenaActual !== c.password) return fail(400, 'La contraseña actual no es correcta.')
     Object.assign(c, { password: contrasenaNueva, cambioRequerido: false })
     return reply(cuentaPublica(c))
@@ -98,13 +102,13 @@ export async function resetPassword(token, nueva) {
   return { ok: true }
 }
 
-// PATCH /auth/password { contrasenaActual, contrasenaNueva } → la cuenta. También deja la
-// contraseña temporal del primer acceso (2i). Los nombres del cuerpo y la respuesta no están
-// en la guía: por confirmar con Erick.
-export async function changePassword(id, actual, nueva) {
+// PATCH /auth/password { contrasenaActual, contrasenaNueva, aceptaTerminos } → la cuenta. También deja la
+// contraseña temporal del primer acceso (2i), que exige aceptaTerminos: true (400 si falta). La aceptación
+// no se guarda. Los nombres del cuerpo y la respuesta no están en la guía: por confirmar con Erick.
+export async function changePassword(id, actual, nueva, aceptaTerminos) {
   const d = USE_MOCKS
-    ? await mock.password(id, actual, nueva)
-    : (await api.patch('/auth/password', { contrasenaActual: actual, contrasenaNueva: nueva })).data
+    ? await mock.password(id, actual, nueva, aceptaTerminos)
+    : (await api.patch('/auth/password', { contrasenaActual: actual, contrasenaNueva: nueva, aceptaTerminos })).data
   return deCuenta(d)
 }
 

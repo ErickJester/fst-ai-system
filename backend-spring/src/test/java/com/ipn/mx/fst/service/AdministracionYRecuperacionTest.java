@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,6 +119,7 @@ class AdministracionYRecuperacionTest {
 	// ---------------------------------------------------------------- R-07: solo Administradores
 
 	@Test
+	@Tag("trabajo-terminal")
 	void un_investigador_recibe_403_en_todo_admin() throws Exception {
 		cuenta("100", "inv@fst.mx", false, true);
 		String token = login("inv@fst.mx", CLAVE);
@@ -186,8 +188,36 @@ class AdministracionYRecuperacionTest {
 		String tokenNueva = JsonPath.read(entrada.getResponse().getContentAsString(), "$.data.token");
 		mvc.perform(conToken(get("/experiments"), tokenNueva)).andExpect(status().isUnauthorized());
 		mvc.perform(conToken(patch("/auth/password"), tokenNueva).contentType(MediaType.APPLICATION_JSON)
-				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\"}"))
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\",\"aceptaTerminos\":true}"))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.data.cambioRequerido").value(false));
+	}
+
+	@Test
+	@Tag("trabajo-terminal")
+	void con_contrasena_temporal_el_cambio_exige_aceptar_los_terminos_y_no_toca_nada_sin_ello() throws Exception {
+		cuenta("1", "admin@fst.mx", true, true);
+		cuenta("2", "inv@fst.mx", false, true);
+		String admin = login("admin@fst.mx", CLAVE);
+		MvcResult r = mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk()).andReturn();
+		String temporal = JsonPath.read(r.getResponse().getContentAsString(), "$.data.passwordTemporal");
+		String sesion = login("inv@fst.mx", temporal);
+
+		// Sin el campo, o con false, responde 400 y la cuenta sigue con la temporal.
+		mvc.perform(conToken(patch("/auth/password"), sesion).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Para continuar debes aceptar el aviso de privacidad y los términos y condiciones de uso."));
+		mvc.perform(conToken(patch("/auth/password"), sesion).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\",\"aceptaTerminos\":false}"))
+				.andExpect(status().isBadRequest());
+		assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '2'", Boolean.class));
+		mvc.perform(conToken(get("/experiments"), sesion)).andExpect(status().isUnauthorized());
+
+		// Con la aceptación, el cambio se hace y la cuenta queda libre de la temporal.
+		mvc.perform(conToken(patch("/auth/password"), sesion).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\",\"aceptaTerminos\":true}"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.data.cambioRequerido").value(false));
+		assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '2'", Boolean.class));
 	}
 
 	@Test
@@ -205,6 +235,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void identificador_o_correo_repetidos_responden_409() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "dos@fst.mx", false, true);
@@ -296,6 +327,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_administrador_no_puede_darse_una_temporal_a_si_mismo() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "otro@fst.mx", true, true);
@@ -328,7 +360,7 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isUnauthorized());
 		// Solo se puede cambiar la contraseña (con la temporal como actual) y cerrar sesión.
 		mvc.perform(conToken(patch("/auth/password"), tokenViejo).contentType(MediaType.APPLICATION_JSON)
-				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\"}"))
+				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\",\"aceptaTerminos\":true}"))
 				.andExpect(status().isOk());
 		// Y con la contraseña nueva, el mismo token vuelve a servir.
 		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isOk());
@@ -336,6 +368,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void con_la_temporal_el_health_publico_sigue_dando_200_pero_lo_demas_no() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "inv@fst.mx", false, true);
@@ -385,6 +418,7 @@ class AdministracionYRecuperacionTest {
 	// ---------------------------------------------------------------- PATCH: datos, rol, desactivar, nunca DELETE
 
 	@Test
+	@Tag("trabajo-terminal")
 	void patch_cambia_datos_y_rol_desactiva_y_no_hay_delete() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "inv@fst.mx", false, true);
@@ -443,6 +477,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void r16_no_se_desactiva_ni_se_le_quita_el_rol_al_ultimo_administrador() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		cuenta("2", "inv@fst.mx", false, true);
@@ -510,6 +545,7 @@ class AdministracionYRecuperacionTest {
 	// ---------------------------------------------------------------- candado de la cuenta: FOR NO KEY UPDATE
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_candado_de_la_cuenta_deja_pasar_las_notificaciones_del_worker_y_for_update_no() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		int experimento = experimento("1", "Exp");
@@ -652,6 +688,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_enlace_cambia_la_contrasena_una_sola_vez() throws Exception {
 		cuenta("2", "inv@fst.mx", false, true);
 		jdbc.update("UPDATE usuario SET cambiorequerido = true WHERE idinstitucional = '2'");
@@ -691,6 +728,7 @@ class AdministracionYRecuperacionTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_enlace_deja_de_servir_si_la_contrasena_cambia_por_otro_camino_o_si_vencio_o_no_es_de_restablecer() throws Exception {
 		cuenta("2", "inv@fst.mx", false, true);
 		mvc.perform(post("/auth/recover").contentType(MediaType.APPLICATION_JSON).content("{\"correo\":\"inv@fst.mx\"}"))

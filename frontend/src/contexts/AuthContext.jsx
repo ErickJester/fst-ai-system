@@ -76,9 +76,10 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [setUser])
 
-  // Cambia la contraseña (también la temporal del primer acceso).
-  const cambiarPassword = useCallback(async (actual, nueva) => {
-    setUser(aSesion(await auth.changePassword(user.id, actual, nueva)))
+  // Cambia la contraseña (también la temporal del primer acceso, que exige aceptar el aviso y los términos;
+  // la aceptación no se guarda).
+  const cambiarPassword = useCallback(async (actual, nueva, aceptaTerminos) => {
+    setUser(aSesion(await auth.changePassword(user.id, actual, nueva, aceptaTerminos)))
   }, [user, setUser])
 
   const actualizarPerfil = useCallback(async ({ nombre, apellidos, correo }) => {

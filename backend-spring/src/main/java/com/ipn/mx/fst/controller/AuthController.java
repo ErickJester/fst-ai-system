@@ -48,12 +48,13 @@ public class AuthController {
 
 	// Cambia la contraseña de quien tiene la sesión abierta (el usuario sale del token). Es lo único, junto
 	// con cerrar sesión, que se permite mientras la cuenta tiene una contraseña temporal. No devuelve token:
-	// el mismo sigue sirviendo.
+	// el mismo sigue sirviendo. Con contraseña temporal, aceptaTerminos debe venir en true (400 si no); en un
+	// cambio normal el campo se ignora.
 	@PatchMapping("/password")
 	public ResponseEntity<Map<String, Object>> cambiarContrasena(
 			@Valid @RequestBody CambioContrasenaPeticion peticion, Authentication authentication) {
 		return Respuesta.ok(authService.cambiarContrasena(authentication.getName(),
-				peticion.getContrasenaActual(), peticion.getContrasenaNueva()), HttpStatus.OK);
+				peticion.getContrasenaActual(), peticion.getContrasenaNueva(), peticion.getAceptaTerminos()), HttpStatus.OK);
 	}
 
 	// No hay lista de bloqueo de tokens ni sesión en el servidor: el cliente descarta su token y deja de

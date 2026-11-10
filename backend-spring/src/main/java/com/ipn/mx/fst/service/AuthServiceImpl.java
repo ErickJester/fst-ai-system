@@ -130,11 +130,17 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	@Transactional
-	public Map<String, Object> cambiarContrasena(String id, String actual, String nueva) {
+	public Map<String, Object> cambiarContrasena(String id, String actual, String nueva, Boolean aceptaTerminos) {
 		// Con el candado de la cuenta, un cambio de contraseña y un restablecer con enlace no se cruzan.
 		candados.bloquearCuenta(id);
 		Usuario usuario = usuarioRepository.findById(id)
 				.orElseThrow(() -> new ErrorApi(HttpStatus.UNAUTHORIZED, "Sesión no válida o vencida"));
+		// En el primer acceso (contraseña temporal) hay que aceptar el aviso de privacidad y los términos antes
+		// de tocar nada. La aceptación no se guarda: solo se exige aquí. Un cambio normal ignora el campo.
+		if (usuario.getCambioRequerido() && !Boolean.TRUE.equals(aceptaTerminos)) {
+			throw new ErrorApi(HttpStatus.BAD_REQUEST,
+					"Para continuar debes aceptar el aviso de privacidad y los términos y condiciones de uso.");
+		}
 
 		if (!coincide(actual, usuario.getContrasenaHash())) {
 			throw new ErrorApi(HttpStatus.BAD_REQUEST, "La contraseña actual no es correcta.");

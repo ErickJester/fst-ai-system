@@ -11,6 +11,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -76,6 +77,7 @@ class GraficasEndpointTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void da_los_grupos_en_orden_con_sus_faltantes_y_sus_estadisticos() throws Exception {
 		MvcResult r = mvc.perform(get(ruta(experimento)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())

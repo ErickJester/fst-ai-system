@@ -8,17 +8,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 
 // R-16 y la contraseña temporal, sin base de datos ni Docker. Las pruebas con la base (dos peticiones al mismo tiempo, 409 por HTTP)
 // están en AdministracionYRecuperacionTest.
 class ReglaAdministradoresTest {
 
 	@Test
+	@Tag("trabajo-terminal")
 	void quitar_al_unico_administrador_activo_deja_el_sistema_sin_administrador() {
 		assertTrue(ReglaAdministradores.dejaSinAdministrador(true, false, 0));
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void con_otro_administrador_activo_si_se_puede() {
 		assertFalse(ReglaAdministradores.dejaSinAdministrador(true, false, 1));
 		assertFalse(ReglaAdministradores.dejaSinAdministrador(true, false, 5));

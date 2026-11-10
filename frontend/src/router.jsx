@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage'
 import ExperimentosPage from './pages/ExperimentosPage'
 const PrimerAccesoPage = lazy(() => import('./pages/PrimerAccesoPage'))
 const RestablecerPage = lazy(() => import('./pages/RestablecerPage'))
+const AvisoPrivacidadPage = lazy(() => import('./pages/AvisoPrivacidadPage'))
+const TerminosPage = lazy(() => import('./pages/TerminosPage'))
 const PerfilPage = lazy(() => import('./pages/PerfilPage'))
 const ExperimentoPage = lazy(() => import('./pages/ExperimentoPage'))
 const NuevoExperimentoPage = lazy(() => import('./pages/NuevoExperimentoPage'))
@@ -75,6 +77,9 @@ export default function AppRouter() {
       <Routes>
         <Route path="/login" element={<SinSesion><LoginPage /></SinSesion>} />
         <Route path="/restablecer" element={<RestablecerPage />} />
+        {/* Públicas: con o sin sesión, también con una contraseña temporal pendiente. */}
+        <Route path="/aviso-privacidad" element={<AvisoPrivacidadPage />} />
+        <Route path="/terminos" element={<TerminosPage />} />
         <Route path="/primer-acceso" element={<SoloTemporal><PrimerAccesoPage /></SoloTemporal>} />
 
         <Route path="/experimentos" element={p(<ExperimentosPage />)} />

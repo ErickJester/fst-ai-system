@@ -10,6 +10,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -98,6 +99,7 @@ class ListaDeExperimentosTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void cada_estado_filtra_los_experimentos_que_tienen_ese_estado() throws Exception {
 		assertEquals(List.of("Alfa"), nombres(lista("estado=completado")));
 		assertEquals(List.of("Beta"), nombres(lista("estado=en%20cola")));
@@ -252,6 +254,7 @@ class ListaDeExperimentosTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_resumen_trae_los_avisos_de_vencimiento() throws Exception {
 		// El análisis de Alfa se completó hace 25 días: al video le quedan 5 de los 30 de retención (R-05).
 		jdbc.update("UPDATE analisis SET fechaanalisis = now() - interval '25 days' WHERE estado = 'completado'");

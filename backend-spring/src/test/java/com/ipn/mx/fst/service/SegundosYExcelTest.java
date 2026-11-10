@@ -12,6 +12,7 @@ import java.util.List;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -99,6 +100,7 @@ class SegundosYExcelTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_excel_del_experimento_tiene_las_dos_hojas() throws Exception {
 		byte[] xlsx = mvc.perform(get("/experiments/" + experimento + "/report/excel").header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())

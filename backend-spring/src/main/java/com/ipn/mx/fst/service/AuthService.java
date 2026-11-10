@@ -12,7 +12,7 @@ public interface AuthService {
 
 	// Cambia la contraseña de la cuenta id y quita cambioRequerido. 400 si la actual no coincide, si la nueva
 	// es corta o es igual a la actual. Devuelve los datos de la cuenta, sin token.
-	Map<String, Object> cambiarContrasena(String id, String actual, String nueva);
+	Map<String, Object> cambiarContrasena(String id, String actual, String nueva, Boolean aceptaTerminos);
 
 	// Cambia nombre, apellidos y correo de la cuenta id. 409 si el correo es de otra cuenta. Devuelve los
 	// datos de la cuenta, sin token.

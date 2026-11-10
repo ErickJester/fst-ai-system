@@ -11,6 +11,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -87,6 +88,7 @@ class SinVerYNivelTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void totales_y_minutos_traen_las_cinco_claves_y_suman_el_cien_por_ciento() throws Exception {
 		MvcResult r = mvc.perform(get("/experiments/" + experimento + "/results/byminute").header("Authorization", "Bearer " + login()))
 				.andExpect(status().isOk())
@@ -128,6 +130,7 @@ class SinVerYNivelTest {
 	// ----------------------------------------------------------------- nivelclasif después de corregir
 
 	@Test
+	@Tag("trabajo-terminal")
 	void una_correccion_a_conducta_activa_sube_el_nivel_a_agrupado_y_quitarla_lo_baja_a_preciso() throws Exception {
 		String token = login();
 		assertEquals("preciso", nivel());

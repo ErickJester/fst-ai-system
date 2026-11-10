@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -129,6 +130,7 @@ class ReinicioDeAnalisisTest {
 	// ---------------------------------------------------------------- el reinicio bueno
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_creador_reinicia_y_el_analisis_queda_en_cola_sin_resultados_ni_reportes_ni_archivos_viejos() throws Exception {
 		Path carpeta = RAIZ.resolve("analisis").resolve(String.valueOf(analisis));
 		for (String nombre : List.of("pausa.json", "pausa.jpg", "correcciones.json", "rachas_aceptadas.json", "web.mp4",
@@ -198,6 +200,7 @@ class ReinicioDeAnalisisTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void dos_reinicios_a_la_vez_solo_pasa_uno() throws Exception {
 		String creador = login("creador@fst.mx");
 		for (int vuelta = 0; vuelta < 15; vuelta++) {

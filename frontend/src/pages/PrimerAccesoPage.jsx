@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { FieldError, Campo, Acceso } from '../components/ui'
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
@@ -12,6 +12,7 @@ export default function PrimerAccesoPage() {
   const { logout, cambiarPassword } = useAuth()
   const navigate = useNavigate()
   const [v, setV] = useState({ tmp: '', nw: '', rep: '' })
+  const [acepta, setAcepta] = useState(false) // aviso de privacidad y términos: obligatorio; no se guarda
   const [guardando, setGuardando] = useState(false)
   const { err, fail, clase } = useErrorDeCampo()
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value })
@@ -24,10 +25,11 @@ export default function PrimerAccesoPage() {
     if (v.nw === v.tmp) return fail('nw', 'La nueva contraseña debe ser distinta de la temporal.')
     if (v.nw !== v.rep) return fail('rep', 'Las contraseñas no coinciden.')
     if (new TextEncoder().encode(v.nw).length > 72) return fail('nw', 'La nueva contraseña no puede pasar de 72 bytes.')
+    if (!acepta) return fail('acepta', 'Debes aceptar el aviso de privacidad y los términos para continuar.')
     fail(null, '')
     setGuardando(true)
     try {
-      await cambiarPassword(v.tmp, v.nw)
+      await cambiarPassword(v.tmp, v.nw, true)
       navigate('/experimentos')
     } catch (e) {
       // El servidor dice «La contraseña actual no es correcta.» cuando la temporal no coincide; ese caso marca el campo.
@@ -52,6 +54,13 @@ export default function PrimerAccesoPage() {
           <Campo id="pNew" label="Nueva contraseña"><input className={cls('nw')} id="pNew" type="password" autoComplete="new-password" value={v.nw} onChange={set('nw')} /></Campo>
           <Campo id="pRep" label="Confirmar nueva contraseña"><input className={cls('rep')} id="pRep" type="password" autoComplete="new-password" value={v.rep} onChange={set('rep')} /></Campo>
           <div className="hint">Mínimo 8 caracteres, distinta de la temporal.</div>
+          <label htmlFor="pAcepta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.5 }}>
+            <input id="pAcepta" type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>
+              He leído y acepto el <Link to="/aviso-privacidad" target="_blank" rel="noopener noreferrer">Aviso de privacidad</Link> y los{' '}
+              <Link to="/terminos" target="_blank" rel="noopener noreferrer">Términos y condiciones de uso</Link>.
+            </span>
+          </label>
           <FieldError msg={err.msg} />
           <button className="btn btn-primary btn-block" type="submit" disabled={guardando}>Guardar y entrar</button>
         </div>

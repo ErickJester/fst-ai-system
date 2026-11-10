@@ -164,8 +164,10 @@ describe('contraseña temporal', () => {
     const r = await auth.login('abarrera@ipn.mx', u.password_temporal)
     expect(r.user.must_change_password).toBe(true)
 
-    expect(await status(auth.changePassword(u.id, 'equivocada', 'mi-clave-123'))).toBe(400)
-    const cambiado = await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123')
+    expect(await status(auth.changePassword(u.id, 'equivocada', 'mi-clave-123', true))).toBe(400)
+    // Sin aceptar el aviso y los términos, la temporal no se cambia (400, con su propio mensaje).
+    expect(await status(auth.changePassword(u.id, u.password_temporal, 'mi-clave-123'))).toBe(400)
+    const cambiado = await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123', true)
     expect(cambiado.must_change_password).toBe(false)
     expect(await status(auth.login('abarrera@ipn.mx', u.password_temporal))).toBe(401)
     expect(await status(auth.login('abarrera@ipn.mx', 'mi-clave-123'))).toBe('ok')
@@ -173,7 +175,7 @@ describe('contraseña temporal', () => {
 
   it('restablecer la temporal invalida la contraseña anterior', async () => {
     const u = await admin.createUser({ nombre: 'Luis', apellidos: 'Pérez', email: 'lperez@ipn.mx', identificador: '1' })
-    await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123')
+    await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123', true)
     const { password_temporal } = await admin.resetTemporal(u.id)
     expect(await status(auth.login('lperez@ipn.mx', 'mi-clave-123'))).toBe(401)
     const r = await auth.login('lperez@ipn.mx', password_temporal)
@@ -182,7 +184,7 @@ describe('contraseña temporal', () => {
 
   it('restablecer la temporal deja la cuenta con el cambio pendiente y una contraseña distinta', async () => {
     const u = await admin.createUser({ nombre: 'Luis', apellidos: 'Pérez', email: 'lperez@ipn.mx', identificador: '1' })
-    await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123')
+    await auth.changePassword(u.id, u.password_temporal, 'mi-clave-123', true)
     const cuenta = db.users.find((x) => x.idInstitucional === u.id)
     expect(cuenta).toMatchObject({ cambioRequerido: false, password: 'mi-clave-123' })
     const { password_temporal } = await admin.resetTemporal(u.id)

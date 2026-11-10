@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -87,6 +88,7 @@ class EstadoConPausaTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void con_pausa_json_devuelve_cilindro_desde_segundo_y_el_plazo_que_queda() throws Exception {
 		escribirPausa("{\"cilindro\": 2, \"desde_segundo\": 137, \"hora_pausa\": \"" + OffsetDateTime.now().minusHours(2) + "\"}");
 

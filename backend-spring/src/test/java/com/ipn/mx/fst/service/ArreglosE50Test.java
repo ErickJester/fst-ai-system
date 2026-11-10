@@ -18,6 +18,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -193,6 +194,7 @@ class ArreglosE50Test {
 	// ----------------------------------------------------------------- 78: contador de no leídas del servidor
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_contador_de_no_leidas_cuenta_todas_las_de_la_cuenta() throws Exception {
 		for (int i = 0; i < 3; i++) {
 			jdbc.update("INSERT INTO notificacion (idinstitucional, tipo, mensaje, leido) VALUES ('1', "

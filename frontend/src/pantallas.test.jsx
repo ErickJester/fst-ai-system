@@ -43,6 +43,11 @@ async function entrar(user, correo, password = 'x') {
   await user.click(screen.getByRole('button', { name: 'Entrar' }))
 }
 
+// La casilla del primer acceso: el aviso de privacidad y los términos son obligatorios.
+async function aceptarTerminos(user) {
+  await user.click(screen.getByLabelText(/He leído y acepto/))
+}
+
 // Inicia sesión y abre directamente otra ruta (la sesión queda en localStorage).
 async function conSesion(ruta, correo = 'mrivera@ipn.mx') {
   const user = abrir('/login')
@@ -86,8 +91,15 @@ describe('acceso', () => {
     await user.type(screen.getByLabelText('Contraseña temporal'), 'temporal-1')
     await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
     await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+    await aceptarTerminos(user)
     await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
     expect(await screen.findByRole('heading', { name: 'Experimentos' })).toBeTruthy()
+  })
+
+  it('el login ofrece el aviso de privacidad y los términos', async () => {
+    abrir('/login')
+    expect(screen.getByRole('link', { name: 'Aviso de privacidad' }).getAttribute('href')).toBe('/aviso-privacidad')
+    expect(screen.getByRole('link', { name: 'Términos y condiciones de uso' }).getAttribute('href')).toBe('/terminos')
   })
 
   it('recuperar la contraseña con el enlace y entrar con la nueva', async () => {
@@ -819,6 +831,7 @@ describe('mensajes de formulario (encargo M11)', () => {
     await user.type(screen.getByLabelText('Contraseña temporal'), 'otra-temporal')
     await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
     await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+    await aceptarTerminos(user)
     await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
     expect(await screen.findByText('La contraseña temporal no es correcta.')).toBeTruthy()
     expect(screen.getByLabelText('Contraseña temporal').className).toMatch(/error/)
@@ -835,6 +848,7 @@ describe('mensajes de formulario (encargo M11)', () => {
       await user.type(screen.getByLabelText('Contraseña temporal'), 'temporal-2')
       await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
       await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+      await aceptarTerminos(user)
       await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
       expect(await screen.findByText('La contraseña nueva no puede pasar de 72 bytes.')).toBeTruthy()
       expect(screen.queryByText('La contraseña temporal no es correcta.')).toBeNull()
@@ -854,6 +868,55 @@ describe('mensajes de formulario (encargo M11)', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
     expect(await screen.findByText('La nueva contraseña no puede pasar de 72 bytes.')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Cambiar contraseña' })).toBeTruthy()
+  })
+
+  it('primer acceso: sin marcar la casilla no se envía y el campo lo dice', async () => {
+    const user = abrir('/login')
+    await entrar(user, 'nueva.cuenta@ipn.mx', 'temporal-1')
+    await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+    await user.type(screen.getByLabelText('Contraseña temporal'), 'temporal-1')
+    await user.type(screen.getByLabelText('Nueva contraseña'), 'mi-clave-123')
+    await user.type(screen.getByLabelText('Confirmar nueva contraseña'), 'mi-clave-123')
+    await user.click(screen.getByRole('button', { name: 'Guardar y entrar' }))
+    expect(await screen.findByText('Debes aceptar el aviso de privacidad y los términos para continuar.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Cambiar contraseña' })).toBeTruthy()
+    expect(screen.getByLabelText(/He leído y acepto/).checked).toBe(false)
+  })
+
+  it('primer acceso: la casilla enlaza el aviso y los términos en pestaña nueva', async () => {
+    const user = abrir('/login')
+    await entrar(user, 'nueva.cuenta@ipn.mx', 'temporal-1')
+    await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+    const aviso = screen.getByRole('link', { name: 'Aviso de privacidad' })
+    const terminos = screen.getByRole('link', { name: 'Términos y condiciones de uso' })
+    expect(aviso.getAttribute('href')).toBe('/aviso-privacidad')
+    expect(aviso.getAttribute('target')).toBe('_blank')
+    expect(aviso.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(terminos.getAttribute('href')).toBe('/terminos')
+    expect(terminos.getAttribute('target')).toBe('_blank')
+    expect(terminos.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('el aviso y los términos se abren sin sesión', async () => {
+    abrir('/aviso-privacidad')
+    expect(await screen.findByRole('heading', { name: 'Aviso de privacidad' })).toBeTruthy()
+    cleanup()
+    abrir('/terminos')
+    expect(await screen.findByRole('heading', { name: 'Términos y condiciones de uso' })).toBeTruthy()
+  })
+
+  it('el aviso y los términos se abren con una contraseña temporal pendiente', async () => {
+    users.push({ idInstitucional: '2030000003', nombre: 'Temporal', apellidos: 'Cuenta', correo: 'temporal.cuenta@ipn.mx', rol: 'Investigador',
+      activo: true, cambioRequerido: true, password: 'temporal-3' })
+    const user = abrir('/login')
+    await entrar(user, 'temporal.cuenta@ipn.mx', 'temporal-3')
+    await screen.findByRole('heading', { name: 'Cambiar contraseña' })
+    cleanup()
+    abrir('/terminos')
+    expect(await screen.findByRole('heading', { name: 'Términos y condiciones de uso' })).toBeTruthy()
+    cleanup()
+    abrir('/aviso-privacidad')
+    expect(await screen.findByRole('heading', { name: 'Aviso de privacidad' })).toBeTruthy()
   })
 
   it('crear cuenta: un identificador repetido marca el campo del identificador, no el del correo', async () => {

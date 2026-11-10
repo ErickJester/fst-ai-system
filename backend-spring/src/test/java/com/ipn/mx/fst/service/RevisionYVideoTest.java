@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -94,6 +95,7 @@ class RevisionYVideoTest {
 	// ----------------------------------------------------------------- POST video-token
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_token_de_video_lo_piden_quien_subio_el_video_y_un_administrador_y_otra_cuenta_recibe_403() throws Exception {
 		mvc.perform(pedirToken(login("creador@fst.mx"))).andExpect(status().isOk()).andExpect(jsonPath("$.data.token").isString());
 		mvc.perform(pedirToken(login("admin@fst.mx"))).andExpect(status().isOk()).andExpect(jsonPath("$.data.token").isString());
@@ -150,6 +152,7 @@ class RevisionYVideoTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_jwt_de_sesion_en_la_url_se_rechaza() throws Exception {
 		String sesion = login("creador@fst.mx");
 
@@ -199,6 +202,7 @@ class RevisionYVideoTest {
 	// ----------------------------------------------------------------- PUT segundos
 
 	@Test
+	@Tag("trabajo-terminal")
 	void solo_se_guardan_los_segundos_que_vienen_y_el_resto_queda_como_estaba() throws Exception {
 		mvc.perform(corregir(login("creador@fst.mx"), cuerpo(1, segundo(2, I, "corregida"), segundo(4, null, "dudosa"))))
 				.andExpect(status().isOk())

@@ -10,6 +10,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -76,6 +77,7 @@ class BloquesDeResultadosTest {
 	}
 
 	@Test
+	@Tag("trabajo-terminal")
 	void devuelve_los_bloques_de_cada_especimen_con_la_forma_de_la_guia() throws Exception {
 		MvcResult r = mvc.perform(get(ruta(experimento)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())

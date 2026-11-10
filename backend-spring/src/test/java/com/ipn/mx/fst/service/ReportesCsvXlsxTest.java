@@ -26,6 +26,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -115,6 +116,7 @@ class ReportesCsvXlsxTest {
 	// ----------------------------------------------------------------- CSV
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_csv_del_grupo_trae_las_columnas_las_filas_y_los_estadisticos() throws Exception {
 		MvcResult r = mvc.perform(get(ruta("csv", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())
@@ -189,6 +191,7 @@ class ReportesCsvXlsxTest {
 	// ----------------------------------------------------------------- XLSX
 
 	@Test
+	@Tag("trabajo-terminal")
 	void el_xlsx_trae_lo_mismo_con_numeros_de_verdad() throws Exception {
 		MvcResult r = mvc.perform(get(ruta("xlsx", experimento, "grupo=" + control)).header("Authorization", "Bearer " + login("creador@fst.mx")))
 				.andExpect(status().isOk())

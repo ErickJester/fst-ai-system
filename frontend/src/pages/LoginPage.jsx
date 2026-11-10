@@ -114,6 +114,10 @@ export default function LoginPage() {
           <a href="#" style={{ fontSize: 12.5 }} onClick={(e) => { e.preventDefault(); setREmail(email); setVista('recuperar') }}>Olvidé mi contraseña</a>
         </div>
       </form>
+      <div style={{ padding: '0 34px 26px', fontSize: 12, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <Link to="/aviso-privacidad">Aviso de privacidad</Link>
+        <Link to="/terminos">Términos y condiciones de uso</Link>
+      </div>
     </Acceso>
   )
 }

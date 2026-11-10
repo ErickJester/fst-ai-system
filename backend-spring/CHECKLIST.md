@@ -386,3 +386,10 @@ cinco. Esta tabla sale de revisar el código, no de la memoria; la guía no se e
 ## 20. Modelo del worker en la pantalla de carga (modo desarrollador)
 - [x] `GET /dev/modelo-actual` (`DevModeloController`, `ModeloActualDeDesarrollo`): lee `modelo-actual.json` del volumen de archivos y añade `texto` (mismo texto que el PDF). Sin modo desarrollador, 404; si el worker no informó o el archivo no se lee, 200 con `archivo: null` y `motivo`
 - [x] Pruebas: `ModeloActualDeDesarrolloTest` (5), corridas antes de la instrucción de no probar más. Sin ejecutar la versión final de la pantalla
+
+## 22. Aviso de privacidad y términos en el primer acceso (RN-18)
+- [x] `PATCH /auth/password` acepta `aceptaTerminos` (opcional, `CambioContrasenaPeticion`). Con `cambioRequerido` verdadero y el campo distinto de `true`, responde 400 «Para continuar debes aceptar el aviso de privacidad y los términos y condiciones de uso.» antes de comprobar la contraseña actual. En un cambio normal el campo se ignora. Sin columnas nuevas ni cambios de esquema; la aceptación no se guarda
+- [x] Firmas: `AuthService.cambiarContrasena` y `AuthServiceImpl` reciben `Boolean aceptaTerminos`; `AuthController` lo pasa
+- [x] Pruebas: `AdministracionYRecuperacionTest`: dos pruebas existentes de temporal mandan `"aceptaTerminos":true`; nueva `con_contrasena_temporal_el_cambio_exige_aceptar_los_terminos_y_no_toca_nada_sin_ello` (ausente o `false` → 400 y la cuenta sigue con temporal; `true` → 200)
+- [ ] Pruebas con PostgreSQL no corridas: `AdministracionYRecuperacionTest` (31, todas omitidas sin base; incluye la nueva)
+- [x] `./mvnw -o test` sin base: compila y pasa; las de PostgreSQL salen omitidas
