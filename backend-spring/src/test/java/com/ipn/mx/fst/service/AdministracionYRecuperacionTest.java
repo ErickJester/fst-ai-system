@@ -38,6 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+// ArgumentCaptor: «atrapa» los argumentos con los que se llamó a un doble (aquí, el texto del correo enviado).
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -62,6 +63,16 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 //     -v "<ruta>/backend-spring/db/init:/docker-entrypoint-initdb.d:ro" postgres:16-alpine
 //   FST_TEST_DB_URL=jdbc:postgresql://localhost:5544/fst_test ./mvnw test
 // Sin la variable se omite. El correo es un simulacro (EmailService): no sale nada.
+//
+// Es la prueba de integración más grande y la que más reglas del sistema defiende. Sus secciones:
+//   1. R-07: todo /admin es solo para Administradores (y el rol se lee de la base en cada petición).
+//   2. Crear cuenta y contraseña temporal (se muestra una vez, se manda por correo, obliga a cambiarla).
+//   3. PATCH de cuentas (datos, rol, desactivar; nunca borrar) y R-16 (siempre debe quedar un Administrador activo).
+//   4. Candados de la cuenta (FOR NO KEY UPDATE) frente al worker, que inserta notificaciones al mismo tiempo.
+//   5. GET /admin/system (disco, conductas y cola).
+//   6. Recuperar y restablecer contraseña con enlace de un solo uso.
+// Varias pruebas lanzan dos peticiones A LA VEZ en hilos distintos (enParalelo) para comprobar que las reglas aguantan
+// las carreras: ahí es donde se nota que los candados de la base están bien puestos.
 @EnabledIfEnvironmentVariable(named = "FST_TEST_DB_URL", matches = ".+")
 @SpringBootTest(properties = {
 		"spring.datasource.url=${FST_TEST_DB_URL}",
@@ -69,12 +80,15 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 		"spring.datasource.password=${FST_TEST_DB_PASSWORD:fst}",
 		"app.jwt.secreto=secreto-de-pruebas-secreto-de-pruebas-1234",
 		"app.archivos.raiz=${java.io.tmpdir}/fst-pruebas-admin",
+		// El enlace de restablecer dura 60 minutos; el correo lo dice y una prueba lo comprueba.
 		"app.reset.minutos=60"
 })
 @AutoConfigureMockMvc
 class AdministracionYRecuperacionTest {
 
+	// Contraseña común de todas las cuentas de prueba (se guarda cifrada para que el login real funcione).
 	private static final String CLAVE = "clave-de-prueba-1";
+	// Saca el token del enlace del correo: ".../restablecer?token=<JWT>". El JWT son letras, números, puntos y guiones.
 	private static final Pattern TOKEN_DEL_CORREO = Pattern.compile("/restablecer\\?token=([\\w.\\-]+)");
 
 	@Autowired
@@ -83,21 +97,26 @@ class AdministracionYRecuperacionTest {
 	@Autowired
 	private JdbcTemplate jdbc;
 
+	// DataSource: para abrir conexiones SQL propias (con transacciones manuales) en las pruebas de candados.
 	@Autowired
 	private DataSource dataSource;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
 
+	// JwtEncoder: para firmar a mano tokens (vencidos, de otro tipo) que el sistema nunca emitiría por sí mismo.
 	@Autowired
 	private JwtEncoder jwtEncoder;
 
+	// El servicio real, para llamarlo directo desde hilos en las pruebas de concurrencia.
 	@Autowired
 	private AdminService adminService;
 
+	// Doble del servicio de correo: no se manda nada de verdad y se puede inspeccionar qué se habría enviado.
 	@MockitoBean
 	private EmailService emailService;
 
+	// Antes de cada prueba: limpia el doble y vacía todas las tablas.
 	@BeforeEach
 	void base_limpia() {
 		reset(emailService);
@@ -121,9 +140,11 @@ class AdministracionYRecuperacionTest {
 	@Test
 	@Tag("trabajo-terminal")
 	void un_investigador_recibe_403_en_todo_admin() throws Exception {
+		// cuenta(id, correo, administrador, activo): aquí un Investigador activo.
 		cuenta("100", "inv@fst.mx", false, true);
 		String token = login("inv@fst.mx", CLAVE);
 
+		// Todas las rutas de /admin, con todos los verbos: 403 (autenticado, pero sin el rol).
 		mvc.perform(conToken(get("/admin/users"), token)).andExpect(status().isForbidden());
 		mvc.perform(conToken(get("/admin/system"), token)).andExpect(status().isForbidden());
 		mvc.perform(conToken(post("/admin/users"), token).contentType(MediaType.APPLICATION_JSON)
@@ -131,6 +152,7 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(conToken(patch("/admin/users/100"), token).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"activo\":false}")).andExpect(status().isForbidden());
 		mvc.perform(conToken(post("/admin/users/100/reset-temporal"), token)).andExpect(status().isForbidden());
+		// Y el intento de crear una cuenta no dejó nada.
 		assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM usuario WHERE idinstitucional = '200'", Integer.class));
 	}
 
@@ -143,6 +165,7 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(conToken(get("/admin/users"), token)).andExpect(status().isOk());
 
 		// Le quitan el rol con el token todavía vigente: la siguiente petición ya es 403.
+		// (El token no guarda el rol; ConvertidorJwt lo consulta en cada petición. Por eso un cambio de rol surte efecto al instante.)
 		jdbc.update("DELETE FROM administrador WHERE idinstitucional = '1'");
 		mvc.perform(conToken(get("/admin/users"), token)).andExpect(status().isForbidden());
 	}
@@ -154,6 +177,7 @@ class AdministracionYRecuperacionTest {
 		cuenta("1", "admin@fst.mx", true, true);
 		String admin = login("admin@fst.mx", CLAVE);
 
+		// El correo se escribe con mayúsculas y sale normalizado en minúsculas.
 		MvcResult r = mvc.perform(conToken(post("/admin/users"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content(cuentaNueva("2021630154", "Nueva@Fst.mx")))
 				.andExpect(status().isCreated())
@@ -186,6 +210,7 @@ class AdministracionYRecuperacionTest {
 				.content("{\"correo\":\"nueva@fst.mx\",\"contrasena\":\"" + temporal + "\"}"))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.data.cambioRequerido").value(true)).andReturn();
 		String tokenNueva = JsonPath.read(entrada.getResponse().getContentAsString(), "$.data.token");
+		// Con ese token «de cambio pendiente», el resto de la API responde 401 (FiltroCambioPendiente).
 		mvc.perform(conToken(get("/experiments"), tokenNueva)).andExpect(status().isUnauthorized());
 		mvc.perform(conToken(patch("/auth/password"), tokenNueva).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"contrasenaActual\":\"" + temporal + "\",\"contrasenaNueva\":\"otra-clave-123\",\"aceptaTerminos\":true}"))
@@ -224,10 +249,12 @@ class AdministracionYRecuperacionTest {
 	void un_correo_que_falla_no_deshace_la_cuenta() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		String admin = login("admin@fst.mx", CLAVE);
+		// Se programa el doble para que lance una excepción al mandar cualquier correo.
 		org.mockito.Mockito.doThrow(new RuntimeException("SMTP caído")).when(emailService)
 				.enviarCorreo(anyString(), anyString(), anyString());
 
 		// El envío ocurre después del commit: aunque falle, la cuenta existe y la respuesta lleva la contraseña.
+		// (Así el administrador puede dársela a la persona a mano, que es el plan B cuando el correo no sale.)
 		mvc.perform(conToken(post("/admin/users"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content(cuentaNueva("300", "c@fst.mx")))
 				.andExpect(status().isCreated()).andExpect(jsonPath("$.data.passwordTemporal").isString());
@@ -241,13 +268,16 @@ class AdministracionYRecuperacionTest {
 		cuenta("2", "dos@fst.mx", false, true);
 		String admin = login("admin@fst.mx", CLAVE);
 
+		// Mismo identificador (2) con otro correo...
 		mvc.perform(conToken(post("/admin/users"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content(cuentaNueva("2", "distinto@fst.mx")))
 				.andExpect(status().isConflict()).andExpect(jsonPath("$.error").value("Ya existe una cuenta con ese identificador."));
+		// ...y mismo correo (sin importar mayúsculas) con otro identificador.
 		mvc.perform(conToken(post("/admin/users"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content(cuentaNueva("3", "DOS@fst.mx")))
 				.andExpect(status().isConflict()).andExpect(jsonPath("$.error").value("Ya existe una cuenta con ese correo."));
 		assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM usuario", Integer.class));
+		// Las cuentas rechazadas no mandaron ningún correo.
 		verify(emailService, never()).enviarCorreo(anyString(), anyString(), anyString());
 	}
 
@@ -255,11 +285,13 @@ class AdministracionYRecuperacionTest {
 	void la_misma_cuenta_pedida_dos_veces_a_la_vez_se_crea_una_sola_vez() throws Exception {
 		cuenta("1", "admin@fst.mx", true, true);
 		String admin = login("admin@fst.mx", CLAVE);
+		// La misma petición de creación, que devuelve su código HTTP, para lanzarla dos veces simultáneas.
 		Callable<Integer> crear = () -> mvc.perform(conToken(post("/admin/users"), admin)
 				.contentType(MediaType.APPLICATION_JSON).content(cuentaNueva("500", "uno@fst.mx")))
 				.andReturn().getResponse().getStatus();
 
 		List<Integer> codigos = enParalelo(crear, crear);
+		// Una gana (201) y la otra pierde (409): nunca dos cuentas ni un error 500 por la llave duplicada.
 		assertTrue(codigos.contains(201), codigos.toString());
 		assertTrue(codigos.contains(409), codigos.toString());
 		assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM usuario WHERE idinstitucional = '500'", Integer.class));
@@ -277,6 +309,7 @@ class AdministracionYRecuperacionTest {
 		assertEquals(2, cuentasDe(admin, "/admin/users?rol=Investigador").size());
 		assertEquals(List.of("3"), cuentasDe(admin, "/admin/users?estado=inactiva"));
 		assertEquals(List.of("2"), cuentasDe(admin, "/admin/users?rol=Investigador&estado=activa"));
+		// Un rol que no existe es un error del cliente.
 		mvc.perform(conToken(get("/admin/users?rol=Dios"), admin)).andExpect(status().isBadRequest());
 	}
 
@@ -290,6 +323,7 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(post("/auth/recover").contentType(MediaType.APPLICATION_JSON).content("{\"correo\":\"inv@fst.mx\"}"))
 				.andExpect(status().isOk());
 		String enlaceViejo = tokenDelCorreo("inv@fst.mx");
+		// Se borra lo registrado en el doble para que verify de abajo vea solo el correo de la temporal.
 		reset(emailService);
 
 		MvcResult r = mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk()).andReturn();
@@ -300,10 +334,12 @@ class AdministracionYRecuperacionTest {
 		verify(emailService).enviarCorreo(eq("inv@fst.mx"), anyString(), texto.capture());
 		assertTrue(texto.getValue().contains(temporal));
 
+		// La contraseña anterior ya no entra; la temporal sí.
 		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"" + CLAVE + "\"}")).andExpect(status().isUnauthorized());
 		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"" + temporal + "\"}")).andExpect(status().isOk());
+		// Y el enlace viejo ya no cambia nada (la huella del hash de la contraseña cambió).
 		mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlaceViejo + "\",\"contrasenaNueva\":\"otra-clave-123\"}")).andExpect(status().isBadRequest());
 
@@ -321,6 +357,7 @@ class AdministracionYRecuperacionTest {
 
 		mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.error").exists());
+		// El hash es el mismo de antes, no se marcó cambio requerido y no se mandó correo.
 		assertEquals(hash, hashDe("2"));
 		assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT cambiorequerido FROM usuario WHERE idinstitucional = '2'", Boolean.class));
 		verify(emailService, never()).enviarCorreo(anyString(), anyString(), anyString());
@@ -357,6 +394,7 @@ class AdministracionYRecuperacionTest {
 		MvcResult r = mvc.perform(conToken(post("/admin/users/2/reset-temporal"), admin)).andExpect(status().isOk()).andReturn();
 		String temporal = JsonPath.read(r.getResponse().getContentAsString(), "$.data.passwordTemporal");
 
+		// Aunque el token siga vigente, la cuenta quedó «con cambio pendiente»: el resto de la API le responde 401.
 		mvc.perform(conToken(get("/experiments"), tokenViejo)).andExpect(status().isUnauthorized());
 		// Solo se puede cambiar la contraseña (con la temporal como actual) y cerrar sesión.
 		mvc.perform(conToken(patch("/auth/password"), tokenViejo).contentType(MediaType.APPLICATION_JSON)
@@ -424,6 +462,7 @@ class AdministracionYRecuperacionTest {
 		cuenta("2", "inv@fst.mx", false, true);
 		String admin = login("admin@fst.mx", CLAVE);
 
+		// Cambia nombre, apellidos, correo (se normaliza a minúsculas) y asciende a Administrador.
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"nombre\":\"Ana\",\"apellidos\":\"Pérez\",\"correo\":\"NUEVO@fst.mx\",\"rol\":\"Administrador\"}"))
 				.andExpect(status().isOk())
@@ -433,6 +472,7 @@ class AdministracionYRecuperacionTest {
 		assertEquals(Boolean.TRUE, jdbc.queryForObject(
 				"SELECT EXISTS (SELECT 1 FROM administrador WHERE idinstitucional = '2')", Boolean.class));
 
+		// Lo desactiva y lo regresa a Investigador en la misma petición.
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"activo\":false,\"rol\":\"Investigador\"}"))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.data.activo").value(false))
@@ -441,6 +481,7 @@ class AdministracionYRecuperacionTest {
 		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"nuevo@fst.mx\",\"contrasena\":\"" + CLAVE + "\"}")).andExpect(status().isUnauthorized());
 
+		// No existe DELETE: las cuentas se desactivan, nunca se borran (tienen experimentos colgando por llave foránea).
 		mvc.perform(conToken(delete("/admin/users/2"), admin)).andExpect(status().is4xxClientError());
 		assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM usuario", Integer.class));
 
@@ -456,6 +497,7 @@ class AdministracionYRecuperacionTest {
 
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"ADMIN@fst.mx\"}")).andExpect(status().isConflict());
+		// El identificador institucional es la llave primaria y no se puede cambiar.
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"idInstitucional\":\"22\"}")).andExpect(status().isBadRequest());
 		// El mismo identificador de la URL se acepta (el frontend lo mandaba).
@@ -483,6 +525,7 @@ class AdministracionYRecuperacionTest {
 		cuenta("2", "inv@fst.mx", false, true);
 		String admin = login("admin@fst.mx", CLAVE);
 
+		// R-16: siempre debe quedar al menos un Administrador activo. Las tres formas de quitarlo dan 409.
 		mvc.perform(conToken(patch("/admin/users/1"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"activo\":false}")).andExpect(status().isConflict());
 		mvc.perform(conToken(patch("/admin/users/1"), admin).contentType(MediaType.APPLICATION_JSON)
@@ -508,6 +551,7 @@ class AdministracionYRecuperacionTest {
 
 	@Test
 	void r16_dos_administradores_que_se_desactivan_a_la_vez_no_dejan_el_sistema_sin_ninguno() throws Exception {
+		// 25 vueltas: una carrera no sale siempre, así que se repite para que, si faltara el candado, se notara.
 		for (int vuelta = 0; vuelta < 25; vuelta++) {
 			base_limpia();
 			cuenta("1", "a@fst.mx", true, true);
@@ -515,10 +559,12 @@ class AdministracionYRecuperacionTest {
 			ModificarCuentaPeticion baja = new ModificarCuentaPeticion();
 			baja.setActivo(false);
 
+			// Cada Administrador desactiva al otro al mismo tiempo (el tercer argumento es quién lo pide).
 			List<Integer> codigos = enParalelo(
 					() -> codigoDe(() -> adminService.modificar("1", baja, "2")),
 					() -> codigoDe(() -> adminService.modificar("2", baja, "1")));
 
+			// Sin candado ganarían las dos y quedarían cero administradores; con candado una pasa (200) y la otra se rechaza (409).
 			assertEquals(1, administradoresActivos(), "vuelta " + vuelta + ": " + codigos);
 			assertTrue(codigos.contains(200) && codigos.contains(409), "vuelta " + vuelta + ": " + codigos);
 		}
@@ -543,6 +589,11 @@ class AdministracionYRecuperacionTest {
 	}
 
 	// ---------------------------------------------------------------- candado de la cuenta: FOR NO KEY UPDATE
+	//
+	// El worker (Python) inserta notificaciones que apuntan a la cuenta del creador por llave foránea. Si el servicio de
+	// administración bloqueara esa cuenta con FOR UPDATE, esas inserciones esperarían, y mientras el worker ya tiene bloqueado
+	// el experimento se produciría un INTERBLOQUEO. FOR NO KEY UPDATE bloquea lo suficiente para proteger la edición pero deja
+	// pasar a quien solo referencia la fila. Esta prueba demuestra la diferencia con dos conexiones reales.
 
 	@Test
 	@Tag("trabajo-terminal")
@@ -550,6 +601,7 @@ class AdministracionYRecuperacionTest {
 		cuenta("1", "admin@fst.mx", true, true);
 		int experimento = experimento("1", "Exp");
 
+		// Dos conexiones independientes, cada una con su propia transacción manual (autocommit apagado).
 		try (Connection edicion = dataSource.getConnection(); Connection worker = dataSource.getConnection()) {
 			edicion.setAutoCommit(false);
 			worker.setAutoCommit(false);
@@ -558,6 +610,7 @@ class AdministracionYRecuperacionTest {
 			ejecutar(edicion, "SELECT 1 FROM usuario WHERE idinstitucional = '1' FOR NO KEY UPDATE");
 
 			// Su notificación (llave foránea a la cuenta) entra sin esperar.
+			// lock_timeout: si el INSERT tuviera que esperar más de 1.5 s, fallaría en vez de colgar la prueba.
 			ejecutar(worker, "SET LOCAL lock_timeout = '1500ms'");
 			ejecutar(worker, "INSERT INTO notificacion (idinstitucional, idexperimento, tipo, mensaje) "
 					+ "VALUES ('1', " + experimento + ", 'analisis completado', 'listo')");
@@ -578,6 +631,7 @@ class AdministracionYRecuperacionTest {
 			} catch (SQLException e) {
 				bloqueo = e;
 			}
+			// 55P03 es el SQLSTATE de «lock_not_available» (se agotó el lock_timeout): la inserción quedó esperando.
 			assertTrue(bloqueo != null && "55P03".equals(bloqueo.getSQLState()), "esperaba lock_timeout con FOR UPDATE");
 			edicion.rollback();
 			worker.rollback();
@@ -591,6 +645,7 @@ class AdministracionYRecuperacionTest {
 		int experimento = experimento("2", "Exp");
 		ModificarCuentaPeticion cambio = new ModificarCuentaPeticion();
 
+		// 20 vueltas: cada una edita la cuenta y, al mismo tiempo, simula al worker creando una notificación.
 		for (int vuelta = 0; vuelta < 20; vuelta++) {
 			cambio.setNombre("Nombre " + vuelta);
 			cambio.setCorreo("inv" + vuelta + "@fst.mx");
@@ -607,8 +662,10 @@ class AdministracionYRecuperacionTest {
 							return 200;
 						}
 					});
+			// Las dos terminan bien (200): ninguna se trabó ni se rechazó.
 			assertEquals(List.of(200, 200), codigos, "vuelta " + vuelta);
 		}
+		// Ninguna de las 20 notificaciones se perdió.
 		assertEquals(20, jdbc.queryForObject("SELECT COUNT(*) FROM notificacion", Integer.class));
 	}
 
@@ -620,10 +677,12 @@ class AdministracionYRecuperacionTest {
 		jdbc.update("INSERT INTO reporte (idexperimento, formato, ruta) VALUES (?, 'PDF', 'reportes/x/experimento.pdf')", experimento);
 		String admin = login("admin@fst.mx", CLAVE);
 
+		// El reporte muestra el nombre del investigador. Cambiar solo el correo o el rol NO lo altera: el reporte se conserva.
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"otro@fst.mx\",\"rol\":\"Administrador\"}")).andExpect(status().isOk());
 		assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM reporte", Integer.class));
 
+		// Cambiar el apellido SÍ altera lo que dice el reporte, así que el guardado se borra para regenerarlo.
 		mvc.perform(conToken(patch("/admin/users/2"), admin).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"apellidos\":\"Distinto\"}")).andExpect(status().isOk());
 		assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM reporte", Integer.class));
@@ -640,6 +699,7 @@ class AdministracionYRecuperacionTest {
 		int tanda1 = tanda(grupo, 1);
 		int tanda2 = tanda(grupo, 2);
 		int tanda3 = tanda(grupo, 3);
+		// Tres análisis con fechas distintas: uno en cola (10:00), uno procesando (11:00) y uno ya completado (09:00).
 		analisis(tanda1, "en cola", "2026-10-25 10:00:00+00");
 		analisis(tanda2, "procesando", "2026-10-25 11:00:00+00");
 		analisis(tanda3, "completado", "2026-10-25 09:00:00+00");
@@ -653,6 +713,7 @@ class AdministracionYRecuperacionTest {
 				.andExpect(jsonPath("$.data.disco.por_liberar_7d_gb").isNumber())
 				.andExpect(jsonPath("$.data.conductas[0]").value("nado activo"))
 				.andExpect(jsonPath("$.data.conductas[3]").value("conducta activa"))
+				// La cola solo incluye lo pendiente (el completado no): dos elementos, y el que está procesando va primero.
 				.andExpect(jsonPath("$.data.cola.length()").value(2))
 				.andExpect(jsonPath("$.data.cola[0].estado").value("procesando"))
 				.andExpect(jsonPath("$.data.cola[0].letra").value("B"))
@@ -669,19 +730,23 @@ class AdministracionYRecuperacionTest {
 		cuenta("2", "inv@fst.mx", false, true);
 		cuenta("3", "baja@fst.mx", false, false);
 
+		// Tres casos: cuenta activa (con mayúsculas en el correo), correo que no existe y cuenta desactivada.
 		String existe = mvc.perform(post("/auth/recover").contentType(MediaType.APPLICATION_JSON).content("{\"correo\":\"INV@fst.mx\"}"))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		String noExiste = mvc.perform(post("/auth/recover").contentType(MediaType.APPLICATION_JSON).content("{\"correo\":\"nadie@fst.mx\"}"))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		String inactiva = mvc.perform(post("/auth/recover").contentType(MediaType.APPLICATION_JSON).content("{\"correo\":\"baja@fst.mx\"}"))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		// La respuesta es idéntica en los tres: así nadie puede usar este endpoint para averiguar qué correos están registrados.
 		assertEquals(existe, noExiste);
 		assertEquals(existe, inactiva);
 
 		ArgumentCaptor<String> texto = ArgumentCaptor.forClass(String.class);
+		// timeout(5000): el envío se hace en otro hilo (para no delatar con el tiempo si el correo existe), así que se espera.
 		verify(emailService, timeout(5000)).enviarCorreo(eq("inv@fst.mx"), anyString(), texto.capture());
 		assertTrue(TOKEN_DEL_CORREO.matcher(texto.getValue()).find());
 		assertTrue(texto.getValue().contains("60 minutos"));
+		// Se da un momento a que un envío indebido, de haberlo, alcance a ocurrir antes de comprobar que no pasó.
 		Thread.sleep(300);
 		verify(emailService, never()).enviarCorreo(eq("nadie@fst.mx"), anyString(), anyString());
 		verify(emailService, never()).enviarCorreo(eq("baja@fst.mx"), anyString(), anyString());
@@ -698,6 +763,7 @@ class AdministracionYRecuperacionTest {
 
 		mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"la-nueva-clave-1\"}")).andExpect(status().isOk());
+		// Con la contraseña nueva entra, y el cambio pendiente quedó resuelto; la anterior ya no sirve.
 		mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"inv@fst.mx\",\"contrasena\":\"la-nueva-clave-1\"}"))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.data.cambioRequerido").value(false));
@@ -719,11 +785,13 @@ class AdministracionYRecuperacionTest {
 				.andExpect(status().isOk());
 		String enlace = tokenDelCorreo("inv@fst.mx");
 
+		// Dos personas (o dos pestañas) usan el mismo enlace al mismo tiempo, con contraseñas distintas.
 		Callable<Integer> a = () -> mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"clave-de-a-123\"}")).andReturn().getResponse().getStatus();
 		Callable<Integer> b = () -> mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"clave-de-b-123\"}")).andReturn().getResponse().getStatus();
 		List<Integer> codigos = enParalelo(a, b);
+		// El UPDATE condicional («regla b») garantiza que solo uno cambie la contraseña: un 200 y un 400.
 		assertTrue(codigos.contains(200) && codigos.contains(400), codigos.toString());
 	}
 
@@ -765,10 +833,12 @@ class AdministracionYRecuperacionTest {
 				.andExpect(status().isOk());
 		String enlace = tokenDelCorreo("inv@fst.mx");
 
+		// Una contraseña demasiado corta y la misma que ya tenía: 422 las dos, y el enlace sigue intacto...
 		mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"corta\"}")).andExpect(status().isUnprocessableEntity());
 		mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"" + CLAVE + "\"}")).andExpect(status().isUnprocessableEntity());
+		// ...porque con una válida todavía funciona.
 		mvc.perform(post("/auth/reset").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"token\":\"" + enlace + "\",\"contrasenaNueva\":\"ahora-si-vale-1\"}")).andExpect(status().isOk());
 	}
@@ -786,11 +856,16 @@ class AdministracionYRecuperacionTest {
 	}
 
 	// ---------------------------------------------------------------- ayudas
+	//
+	// Métodos de apoyo: datos de prueba por SQL directo, utilidades HTTP, el truco para firmar tokens a mano y las
+	// herramientas de concurrencia (enParalelo).
 
+	// El hash bcrypt actual de la contraseña de una cuenta (para comprobar que NO cambió).
 	private String hashDe(String id) {
 		return jdbc.queryForObject("SELECT contrasenahash FROM usuario WHERE idinstitucional = ?", String.class, id);
 	}
 
+	// Crea una cuenta; si es administrador, también su fila en la tabla administrador. Contraseña = CLAVE (cifrada).
 	private void cuenta(String id, String correo, boolean administrador, boolean activo) {
 		jdbc.update("INSERT INTO usuario (idinstitucional, nombre, apellidos, correo, contrasenahash, activo, cambiorequerido) "
 				+ "VALUES (?, 'Nombre', 'Apellidos', ?, ?, ?, false)", id, correo, passwordEncoder.encode(CLAVE), activo);
@@ -809,6 +884,7 @@ class AdministracionYRecuperacionTest {
 		return jdbc.queryForObject("SELECT idtanda FROM tanda WHERE idgrupo = ? AND ordinal = ?", Integer.class, grupo, ordinal);
 	}
 
+	// Un video del Día 2 con su análisis en el estado y con la fecha dadas (casts a los tipos de la base).
 	private void analisis(int tanda, String estado, String fecha) {
 		jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, 'Dia 2', NULL, 300)", tanda);
 		int video = jdbc.queryForObject("SELECT idvideo FROM video WHERE idtanda = ?", Integer.class, tanda);
@@ -816,11 +892,13 @@ class AdministracionYRecuperacionTest {
 				video, estado, fecha);
 	}
 
+	// Cuántos Administradores ACTIVOS hay: es lo que protege la regla R-16.
 	private int administradoresActivos() {
 		return jdbc.queryForObject("SELECT COUNT(*) FROM administrador a JOIN usuario u ON u.idinstitucional = a.idinstitucional "
 				+ "WHERE u.activo", Integer.class);
 	}
 
+	// Inicia sesión por el endpoint real y devuelve el JWT.
 	private String login(String correo, String contrasena) throws Exception {
 		MvcResult r = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"correo\":\"" + correo + "\",\"contrasena\":\"" + contrasena + "\"}"))
@@ -828,14 +906,17 @@ class AdministracionYRecuperacionTest {
 		return JsonPath.read(r.getResponse().getContentAsString(), "$.data.token");
 	}
 
+	// Agrega la cabecera «Authorization: Bearer <token>» a cualquier petición.
 	private static MockHttpServletRequestBuilder conToken(MockHttpServletRequestBuilder peticion, String token) {
 		return peticion.header("Authorization", "Bearer " + token);
 	}
 
+	// Cuerpo JSON para crear una cuenta nueva con un id y un correo.
 	private static String cuentaNueva(String id, String correo) {
 		return "{\"idInstitucional\":\"" + id + "\",\"nombre\":\"Ana\",\"apellidos\":\"López\",\"correo\":\"" + correo + "\"}";
 	}
 
+	// Los identificadores institucionales de la lista que devuelve una ruta de /admin/users (con sus filtros).
 	private List<String> cuentasDe(String token, String ruta) throws Exception {
 		String cuerpo = mvc.perform(conToken(get(ruta), token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(cuerpo, "$.data[*].idInstitucional");
@@ -850,6 +931,9 @@ class AdministracionYRecuperacionTest {
 		return m.group(1);
 	}
 
+	// La «huella» que lleva dentro un enlace de restablecer verdadero: es un dato derivado del hash de la contraseña
+	// actual. Para firmar a mano un token que pase esa comprobación hace falta conocerla, y la única forma honesta de
+	// obtenerla es pedir un enlace real y leer su carga útil.
 	private String huellaActual(String id) throws Exception {
 		// La huella se obtiene de un enlace verdadero: se lee del token que mandó recover.
 		reset(emailService);
@@ -859,10 +943,13 @@ class AdministracionYRecuperacionTest {
 		verify(emailService, timeout(5000)).enviarCorreo(anyString(), anyString(), texto.capture());
 		Matcher m = TOKEN_DEL_CORREO.matcher(texto.getValue());
 		assertTrue(m.find());
+		// Un JWT son tres partes separadas por puntos; la segunda (índice 1) es la carga útil, en Base64 URL.
 		String cargaUtil = new String(java.util.Base64.getUrlDecoder().decode(m.group(1).split("\\.")[1]));
 		return JsonPath.read(cargaUtil, "$.huella");
 	}
 
+	// Firma un JWT con la misma llave del sistema (HS256) con el tipo, sujeto, vencimiento y huella dados. Sirve para
+	// fabricar tokens que el sistema jamás emitiría solo (ya vencidos, o de tipo «reset» usados como sesión).
 	private String firmar(String tipo, String id, Instant vence, String huella) {
 		Instant emitido = vence.minus(Duration.ofMinutes(30));
 		JwtClaimsSet claims = JwtClaimsSet.builder().subject(id).claim("tipo", tipo).claim("huella", huella)
@@ -870,6 +957,7 @@ class AdministracionYRecuperacionTest {
 		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
 	}
 
+	// Ejecuta una sentencia SQL en una conexión dada y cierra el Statement.
 	private static void ejecutar(Connection c, String sql) throws SQLException {
 		try (Statement s = c.createStatement()) {
 			s.execute(sql);
@@ -891,6 +979,7 @@ class AdministracionYRecuperacionTest {
 	private static List<Integer> enParalelo(Callable<Integer>... tareas) throws Exception {
 		ExecutorService hilos = Executors.newFixedThreadPool(tareas.length);
 		try {
+			// Barrera: cada hilo avisa que llegó (countDown) y espera (await) a que lleguen todos; así arrancan casi a la vez.
 			CountDownLatch salida = new CountDownLatch(tareas.length);
 			List<Future<Integer>> futuros = new java.util.ArrayList<>();
 			for (Callable<Integer> tarea : tareas) {
