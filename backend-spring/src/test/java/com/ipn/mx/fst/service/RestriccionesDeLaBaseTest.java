@@ -1,3 +1,4 @@
+// Mismo paquete que las clases que prueba, dentro de src/test.
 package com.ipn.mx.fst.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+// DataIntegrityViolationException: la excepción de Spring que envuelve cualquier violación de una
+// restricción de la base (CHECK, UNIQUE, llave foránea). Es lo que estas pruebas esperan que salte.
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -20,6 +23,22 @@ import org.springframework.jdbc.core.JdbcTemplate;
 // inserta lo válido, para asegurar que el SQL está bien armado.
 // Mismas condiciones que las demás pruebas de integración: solo corre con FST_TEST_DB_URL apuntando a una base de
 // pruebas VACÍA con el esquema de db/init (cada prueba borra todos los datos).
+//
+// Esta clase es distinta a todas las demás: NO prueba código Java, prueba el ESQUEMA de la base. Y eso
+// es importante porque buena parte de las reglas del modelo viven ahí y no en el código (ver
+// application.properties: ddl-auto=validate existe justo porque el SQL trae CHECK y dominios que
+// Hibernate no genera).
+// Escribe con SQL directo (JdbcTemplate) y no con los servicios, a propósito: así se prueba la base sola,
+// sin que una validación de Java se adelante y oculte un hueco en el esquema. La base es la ÚLTIMA defensa
+// y tiene que sostenerse aunque el código falle (ver ManejadorErrores.choqueDeDatos).
+// Los códigos de la cabecera son los SQLSTATE de PostgreSQL: 23514 (check_violation), 23505
+// (unique_violation) y 23503 (foreign_key_violation).
+// Por qué hay "controles": una prueba de rechazo puede pasar por la razón equivocada. Si el INSERT tuviera
+// un error de sintaxis, también lanzaría excepción y la prueba daría por buena una restricción que quizá
+// no existe. El control inserta LO VÁLIDO con el mismo SQL y comprueba que entra, demostrando que lo que
+// falla en la prueba de rechazo es la regla y no el SQL.
+// Las dos comprobaciones de cada prueba de rechazo (excepción Y que la fila no quedó) cubren dos cosas: que
+// la base se negó, y que no dejó la inserción a medias.
 @Tag("trabajo-terminal")
 @EnabledIfEnvironmentVariable(named = "FST_TEST_DB_URL", matches = ".+")
 @SpringBootTest(properties = {
@@ -45,6 +64,7 @@ class RestriccionesDeLaBaseTest {
 		vaciar();
 	}
 
+	// De las hojas hacia arriba, por las llaves foráneas.
 	private void vaciar() {
 		for (String tabla : List.of("segundo", "observacion", "especimen", "reporte", "analisis", "video", "tanda", "grupo",
 				"notificacion", "experimento", "administrador", "usuario")) {
@@ -53,6 +73,9 @@ class RestriccionesDeLaBaseTest {
 	}
 
 	// ------------------------------------------------------------------ piezas de la cadena válida
+	//
+	// Un método por cada tabla, para construir la cadena que pide el modelo (usuario → experimento → grupo →
+	// tanda → espécimen y video → análisis → observación). Cada prueba usa solo las piezas que necesita.
 
 	private void usuario(String id, String correo) {
 		jdbc.update("INSERT INTO usuario (idinstitucional, nombre, apellidos, correo, contrasenahash, activo, cambiorequerido) "
@@ -83,6 +106,7 @@ class RestriccionesDeLaBaseTest {
 				Integer.class, idTanda, numeroCilindro);
 	}
 
+	// archivo NULL: un video ya borrado, que es una situación válida (ver la entidad Video).
 	private int video(int idTanda, String sesion) {
 		jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, ?, NULL, 300)", idTanda, sesion);
 		return jdbc.queryForObject("SELECT idvideo FROM video WHERE idtanda = ? AND sesion = ?", Integer.class,
@@ -101,10 +125,12 @@ class RestriccionesDeLaBaseTest {
 	}
 
 	// Una cadena completa y válida: usuario → experimento → grupo → tanda → espécimen y video → análisis → observación.
+	// Un record con todos los ids, para que cada prueba tome el que necesite.
 	private record Cadena(int idExperimento, int idGrupo, int idTanda, int idEspecimen, int idVideo, int idAnalisis,
 			int idObservacion) {
 	}
 
+	// Construye la cadena entera con valores válidos y devuelve sus ids.
 	private Cadena cadenaValida() {
 		usuario("1", "ana@fst.mx");
 		int exp = experimento("Experimento de prueba");
@@ -117,11 +143,15 @@ class RestriccionesDeLaBaseTest {
 		return new Cadena(exp, grp, tan, esp, vid, ana, obs);
 	}
 
+	// Cuenta las filas de una consulta, envolviéndola en un COUNT(*). Varargs para los parámetros.
 	private int cuenta(String sql, Object... argumentos) {
 		return jdbc.queryForObject("SELECT COUNT(*) FROM (" + sql + ") AS c", Integer.class, argumentos);
 	}
 
 	// ------------------------------------------------------------------ controles: lo válido sí entra
+	//
+	// Los controles de las pruebas de rechazo de más abajo. Cubren los BORDES válidos (2 y 4 cilindros,
+	// segundos 1 y 300, duración positiva), que son los que deberían quedar justo dentro de cada CHECK.
 
 	@Test
 	void control_la_cadena_completa_y_valida_se_inserta_sin_error() {
@@ -134,6 +164,7 @@ class RestriccionesDeLaBaseTest {
 	void control_tandas_de_dos_y_cuatro_cilindros_son_validas() {
 		usuario("1", "ana@fst.mx");
 		int grp = grupo(experimento("Exp dos y cuatro"), "Control");
+		// 2 y 4 son los DOS extremos permitidos de la regla "de 2 a 4 cilindros".
 		tanda(grp, 1, 2);
 		tanda(grp, 2, 4);
 		assertEquals(2, cuenta("SELECT idtanda FROM tanda WHERE idgrupo = ?", grp));
@@ -144,6 +175,7 @@ class RestriccionesDeLaBaseTest {
 		Cadena c = cadenaValida();
 		jdbc.update("INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES (?, 1, 'nado activo', 'maquina')",
 				c.idObservacion());
+		// Un segundo con conducta NULL también es válido: es el «sin ver» (ver la entidad Segundo).
 		jdbc.update("INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES (?, 300, NULL, 'maquina')",
 				c.idObservacion());
 		assertEquals(2, cuenta("SELECT segundo FROM segundo WHERE idobservacion = ?", c.idObservacion()));
@@ -153,6 +185,7 @@ class RestriccionesDeLaBaseTest {
 	void control_video_con_duracion_positiva_es_valido() {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp video"), "Control"), 1, 4);
+		// 0.01 es el valor positivo más pequeño que admite NUMERIC(8,2): el borde de la regla "mayor que cero".
 		jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, 'Dia 1', 'videos/1.mp4', 0.01)", tan);
 		assertEquals(1, cuenta("SELECT idvideo FROM video WHERE idtanda = ?", tan));
 	}
@@ -162,11 +195,16 @@ class RestriccionesDeLaBaseTest {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp diagnostico"), "Control"), 1, 4);
 		int vid = video(tan, "Dia 2");
+		// El caso permitido de la regla "solo hay diagnóstico si el estado es error".
 		jdbc.update("INSERT INTO analisis (idvideo, estado, rutadiagnostico) VALUES (?, 'error', 'diagnostico.pdf')", vid);
 		assertEquals(1, cuenta("SELECT idanalisis FROM analisis WHERE idvideo = ? AND estado = 'error'", vid));
 	}
 
 	// ------------------------------------------------------------------ CHECK
+	//
+	// Un CHECK es una condición que cada fila tiene que cumplir. Estas pruebas fijan los valores JUSTO
+	// FUERA de cada rango (1 y 5 cilindros, 0 y 301 segundos, duración 0 y negativa).
+	// assertThrows recibe una lambda () -> ... con el INSERT que debe fallar.
 
 	@Test
 	void tanda_con_uno_cilindro_se_rechaza() {
@@ -174,6 +212,7 @@ class RestriccionesDeLaBaseTest {
 		int grp = grupo(experimento("Exp ncilindros uno"), "Control");
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO tanda (idgrupo, ordinal, ncilindros) VALUES (?, 1, 1)", grp));
+		// Y que la fila mala NO quedó: la base no deja inserciones a medias.
 		assertEquals(0, cuenta("SELECT idtanda FROM tanda WHERE idgrupo = ?", grp));
 	}
 
@@ -190,6 +229,7 @@ class RestriccionesDeLaBaseTest {
 	void tanda_con_ordinal_cero_se_rechaza() {
 		usuario("1", "ana@fst.mx");
 		int grp = grupo(experimento("Exp ordinal cero"), "Control");
+		// Los ordinales empiezan en 1 (A). El 0 no es una letra.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO tanda (idgrupo, ordinal, ncilindros) VALUES (?, 0, 4)", grp));
 		assertEquals(0, cuenta("SELECT idtanda FROM tanda WHERE idgrupo = ?", grp));
@@ -208,6 +248,7 @@ class RestriccionesDeLaBaseTest {
 	void especimen_con_numero_de_cilindro_cinco_se_rechaza() {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp cilindro cinco"), "Control"), 1, 4);
+		// En el cuadro caben cuatro cilindros como máximo.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO especimen (idtanda, numerocilindro) VALUES (?, 5)", tan));
 		assertEquals(0, cuenta("SELECT idespecimen FROM especimen WHERE idtanda = ?", tan));
@@ -216,6 +257,7 @@ class RestriccionesDeLaBaseTest {
 	@Test
 	void segundo_cero_se_rechaza() {
 		Cadena c = cadenaValida();
+		// Los segundos van del 1 al 300 (ver SegundoId).
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO segundo (idobservacion, segundo, conducta, origen) VALUES (?, 0, 'nado activo', 'maquina')",
 						c.idObservacion()));
@@ -254,6 +296,8 @@ class RestriccionesDeLaBaseTest {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp diagnostico en cola"), "Control"), 1, 4);
 		int vid = video(tan, "Dia 2");
+		// Es la regla de la columna rutadiagnostico: solo se llena cuando el estado es 'error' (ver la
+		// entidad Analisis). Un CHECK que relaciona DOS columnas, a diferencia de los de arriba.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO analisis (idvideo, estado, rutadiagnostico) VALUES (?, 'en cola', 'diagnostico.pdf')",
 						vid));
@@ -261,6 +305,10 @@ class RestriccionesDeLaBaseTest {
 	}
 
 	// ------------------------------------------------------------------ dominios
+	//
+	// Un dominio es la lista cerrada de textos que admite una columna (ver ValorDeBase y los enums de
+	// domain/valores). Aquí se comprueba que la base rechaza un texto que no está en la lista, que es
+	// justo lo que garantiza que los enums de Java y el esquema no puedan descuadrarse en silencio.
 
 	@Test
 	void grupo_con_tipo_fuera_del_dominio_se_rechaza() {
@@ -292,10 +340,14 @@ class RestriccionesDeLaBaseTest {
 	}
 
 	// ------------------------------------------------------------------ UNIQUE
+	//
+	// Una restricción UNIQUE impide que dos filas repitan un valor (o una combinación). Son las que
+	// ErrorApi y ManejadorErrores traducen a un 409 cuando ningún servicio las comprobó antes.
 
 	@Test
 	void correo_de_usuario_repetido_se_rechaza() {
 		usuario("1", "repetido@fst.mx");
+		// Aquí la excepción salta DENTRO del método de apoyo usuario(), que es el que hace el INSERT.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> usuario("2", "repetido@fst.mx"));
 		assertEquals(0, cuenta("SELECT idinstitucional FROM usuario WHERE idinstitucional = '2'"));
@@ -306,6 +358,7 @@ class RestriccionesDeLaBaseTest {
 		usuario("1", "ana@fst.mx");
 		int grp = grupo(experimento("Exp ordinal repetido"), "Control");
 		tanda(grp, 1, 4);
+		// Dos tandas A en el mismo grupo: es la restricción que hace que la letra de una tanda sea única.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO tanda (idgrupo, ordinal, ncilindros) VALUES (?, 1, 4)", grp));
 		assertEquals(1, cuenta("SELECT idtanda FROM tanda WHERE idgrupo = ?", grp));
@@ -316,6 +369,7 @@ class RestriccionesDeLaBaseTest {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp sesion repetida"), "Control"), 1, 4);
 		video(tan, "Dia 2");
+		// Una tanda lleva como mucho UN video por sesión (ver la entidad Video).
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO video (idtanda, sesion, archivo, duracion) VALUES (?, 'Dia 2', NULL, 300)", tan));
 		assertEquals(1, cuenta("SELECT idvideo FROM video WHERE idtanda = ?", tan));
@@ -326,6 +380,8 @@ class RestriccionesDeLaBaseTest {
 		usuario("1", "ana@fst.mx");
 		int tan = tanda(grupo(experimento("Exp cilindro repetido"), "Control"), 1, 4);
 		especimen(tan, 2);
+		// Un espécimen se identifica solo por su posición (ver la entidad Especimen): dos en el mismo
+		// cilindro serían indistinguibles.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO especimen (idtanda, numerocilindro) VALUES (?, 2)", tan));
 		assertEquals(1, cuenta("SELECT idespecimen FROM especimen WHERE idtanda = ?", tan));
@@ -335,6 +391,8 @@ class RestriccionesDeLaBaseTest {
 	void nombre_de_experimento_repetido_se_rechaza() {
 		usuario("1", "ana@fst.mx");
 		experimento("Mismo nombre");
+		// RF-11: el nombre es único en todo el sistema. ExperimentoServiceImpl.crear lo comprueba antes
+		// para dar un 409 claro; esto prueba que, si dos peticiones se cruzan, la base sigue defendiéndolo.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO experimento (idinstitucional, nombre, fecha) VALUES ('1', 'Mismo nombre', current_date)"));
 		assertEquals(1, cuenta("SELECT idexperimento FROM experimento WHERE nombre = 'Mismo nombre'"));
@@ -346,18 +404,26 @@ class RestriccionesDeLaBaseTest {
 		int tan = tanda(grupo(experimento("Exp un analisis"), "Control"), 1, 4);
 		int vid = video(tan, "Dia 2");
 		analisis(vid);
+		// Un video tiene como mucho UN análisis (por eso la relación de la entidad Analisis es @OneToOne
+		// con unique = true). Reanalizar reinicia ese análisis, no crea otro.
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("INSERT INTO analisis (idvideo, estado) VALUES (?, 'en cola')", vid));
 		assertEquals(1, cuenta("SELECT idanalisis FROM analisis WHERE idvideo = ?", vid));
 	}
 
 	// ------------------------------------------------------------------ llaves foráneas con NO ACTION
+	//
+	// Las llaves foráneas están declaradas ON DELETE NO ACTION: la base se niega a borrar un padre que aún
+	// tiene hijos, en vez de borrarlos en cascada. Es una decisión consciente (ver ExperimentoServiceImpl.eliminar):
+	// el borrado hay que escribirlo de las hojas hacia arriba, y así queda a la vista todo lo que desaparece.
+	// Cada prueba intenta borrar un padre con la cadena completa debajo y espera que la base se niegue.
 
 	@Test
 	void no_se_borra_un_usuario_que_tiene_experimentos() {
 		cadenaValida();
 		assertThrows(DataIntegrityViolationException.class,
 				() -> jdbc.update("DELETE FROM usuario WHERE idinstitucional = '1'"));
+		// Y sigue ahí. Es la razón de que las cuentas se desactiven y nunca se borren (ver Usuario.activo).
 		assertEquals(1, cuenta("SELECT idinstitucional FROM usuario WHERE idinstitucional = '1'"));
 	}
 
