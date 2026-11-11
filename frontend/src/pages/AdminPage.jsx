@@ -8,7 +8,7 @@ import { useAsync, useAsyncVivo, CADA_ACTIVO_MS, CADA_INACTIVO_MS } from '../hoo
 import { useErrorDeCampo } from '../hooks/useErrorDeCampo'
 import { useAtraparFoco } from '../hooks/useAtraparFoco'
 import { mensajeError } from '../services/api'
-import { esCorreo, DIA, nombreDeConductaBD } from '../lib/fst'
+import { esCorreo, DIA } from '../lib/fst'
 import { MUT60, MUT70, btnLeft } from '../lib/estilos'
 
 const VACIO = { nombre: '', apellidos: '', correo: '', id: '', rol: 'INVESTIGADOR' }
@@ -21,7 +21,7 @@ const MIN_POR_VIDEO = 10 // cada video de 5 min tarda unos 10 min en analizarse
 const nombreCorto = (u) => u.nombre.split(/\s+/).map((p) => p[0] + '.').join(' ') + ' ' + u.apellidos
 const gb = (v) => v + ' GB'
 
-// 2g · Administración (§9.6): cuentas con filtros, cola, disco y conductas.
+// 2g · Administración (§9.6): cuentas con filtros, cola y disco.
 export default function AdminPage() {
   const { user } = useAuth()
   const { data: usuarios, error: errUsuarios, reload } = useAsync(listUsers)
@@ -275,31 +275,6 @@ export default function AdminPage() {
             {sistema ? <Disco d={sistema.disco} /> : <p className="hint">Cargando…</p>}
           </div>
 
-          <div style={{ background: 'var(--color-bg)', padding: '18px 20px', gridColumn: '1 / -1', borderTop: '1px solid var(--color-divider)', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div className="k" style={{ marginBottom: 6 }}>Experimentos de todos los investigadores</div>
-              <div style={{ fontSize: 12, color: 'var(--muted-2)' }}>Como Administrador puedes eliminar cualquier experimento desde la lista o desde su detalle.</div>
-            </div>
-            <Link className="btn btn-secondary" to="/experimentos">Ver y gestionar experimentos</Link>
-          </div>
-
-          <div style={{ background: 'var(--color-bg)', padding: '18px 20px', gridColumn: '1 / -1', borderTop: '1px solid var(--color-divider)' }}>
-            <div className="k" style={{ marginBottom: 14 }}>Conductas</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-              {sistema && catalogos(sistema).map((c) => (
-                <div key={c.titulo} style={{ background: 'var(--color-bg)', paddingRight: 18 }}>
-                  <div className="nd" style={{ fontSize: 13, marginBottom: 10 }}>{c.titulo}</div>
-                  <div style={{ borderTop: '1px solid var(--color-divider)' }}>
-                    {c.items.map((i) => (
-                      <div key={i.n} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderBottom: '1px solid var(--color-divider)', fontSize: 12 }}>
-                        <span>{i.n}</span><span className="num" style={{ fontSize: 11, color: 'var(--muted)' }}>{i.m}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -364,11 +339,6 @@ function Disco({ d }) {
     </>
   )
 }
-
-// Solo de consulta: ningún requisito permite cambiar las conductas.
-const catalogos = (s) => [
-  { titulo: 'Conductas', items: s.conductas.map((c) => ({ n: nombreDeConductaBD(c), m: 'sin duración mínima' })) },
-]
 
 // La contraseña temporal se muestra una sola vez: no se cierra con Escape ni al hacer clic
 // fuera, solo con «Listo», para que no se pierda sin querer.

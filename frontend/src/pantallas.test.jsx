@@ -145,7 +145,14 @@ describe('administración', () => {
     await user.selectOptions(screen.getByLabelText('Rol'), '')
     await user.selectOptions(screen.getByLabelText('Estado'), 'inactiva')
     expect(screen.getByText('Ninguna cuenta coincide con los filtros.')).toBeTruthy()
-    expect(screen.getAllByText('sin duración mínima')).toHaveLength(4) // las cuatro conductas (RF-18)
+  })
+
+  it('la administración no repite el acceso a los experimentos ni lista las conductas (no se pueden cambiar)', async () => {
+    await conSesion('/admin', 'creyesl@ipn.mx')
+    await screen.findByRole('columnheader', { name: 'Experimentos' })
+    expect(screen.queryByRole('link', { name: 'Ver y gestionar experimentos' })).toBeNull()
+    expect(screen.queryByText('Experimentos de todos los investigadores')).toBeNull()
+    expect(screen.queryByText('sin duración mínima')).toBeNull()
   })
 
   // Abre «Editar cuenta» de la fila de este correo.
