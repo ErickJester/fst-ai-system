@@ -40,7 +40,7 @@ describe('AvisoPrivacidadPage', () => {
     renderSinSesion(AvisoPrivacidadPage)
     expect(screen.getByText('Correo electrónico.')).toBeTruthy()
     expect(screen.getByText(/hash y sal/)).toBeTruthy()
-    expect(screen.getByText(/Este texto se ajustará a la redacción oficial/)).toBeTruthy()
+    expect(screen.queryByText(/redacción oficial/)).toBeNull()
   })
 
   it('tiene un enlace «Volver»', () => {
@@ -74,7 +74,7 @@ describe('TerminosPage', () => {
   it('tiene un enlace «Volver» y la nota de redacción', () => {
     renderSinSesion(TerminosPage)
     expect(screen.getByRole('link', { name: 'Volver' })).toBeTruthy()
-    expect(screen.getByText(/Este texto se ajustará a la redacción oficial/)).toBeTruthy()
+    expect(screen.queryByText(/redacción oficial/)).toBeNull()
   })
 
   it('sin fallos de axe-core', async () => {

@@ -49,10 +49,6 @@ export default function AvisoPrivacidadPage() {
           </ul>
         </section>
 
-        <p className="hint" style={{ margin: 0 }}>
-          Este texto se ajustará a la redacción oficial de la institución cuando se revise.
-        </p>
-
         <Link to="/login" onClick={volver} style={{ alignSelf: 'flex-start' }}>Volver</Link>
       </div>
     </Acceso>
