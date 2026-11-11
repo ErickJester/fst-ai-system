@@ -54,18 +54,7 @@ export default function CabeceraResultados({ clave, gid, r, rs, grupos, vista, g
           Grupo completo · {nCompletos} especímenes
         </Link>
       </nav>
-      <p className="hint" style={{ margin: '8px 0 0', maxWidth: 680 }}>
-        Tanda: un video con varios especímenes. El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.
-      </p>
-      {/* D-78: el sistema solo entrega la conducta de cada segundo; conviene revisarla. */}
-      <p className="hint" style={{ margin: '10px 0 0', maxWidth: 680 }}>
-        La conducta de cada segundo la asigna el sistema de forma automática y no es 100 % exacta: conviene revisarla con «Revisar segundo a segundo».
-      </p>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
-        <span className="tag tag-accent" style={{ whiteSpace: 'nowrap' }}>Nivel: {agrupado ? 'agrupado' : 'preciso'}</span>
-        <span className="hint">
-          {agrupado ? 'agrupado: el sistema no siempre pudo distinguirlos.' : 'preciso: el sistema distinguió nado y escalamiento.'}
-        </span>
         {revisado && <span className="tag tag-outline" style={{ whiteSpace: 'nowrap' }}>Con revisión humana</span>}
         {agrupado
           ? <span className="hint">Hay segundos de <strong>conducta activa</strong>: el espécimen no estaba inmóvil, pero el sistema no decidió entre nado activo y escalamiento.</span>

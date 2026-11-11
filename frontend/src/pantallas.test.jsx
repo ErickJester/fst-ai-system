@@ -1032,10 +1032,14 @@ describe('detalle de resultados: selector de grupo, vista conservada y glosas', 
     expect(screen.getByRole('button', { name: 'Segundo a segundo' }).getAttribute('aria-current')).toBe('true')
   })
 
-  it('el detalle explica qué es una tanda y qué significa el nivel preciso', async () => {
+  it('el detalle no lleva los textos explicativos de la tanda, del nivel ni del buceo', async () => {
     await conSesion('/experimentos/7/resultados?grupo=1&tanda=A')
-    expect(await screen.findByText('Tanda: un video con varios especímenes. El grupo completo reúne sus tandas con análisis completado; cada espécimen lleva el nombre de su tanda.')).toBeTruthy()
-    expect(screen.getByText('preciso: el sistema distinguió nado y escalamiento.')).toBeTruthy()
+    expect((await screen.findAllByText(/Tanda A/, {}, { timeout: 5000 })).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Tanda: un video con varios especímenes/)).toBeNull()
+    expect(screen.queryByText(/no es 100 % exacta/)).toBeNull()
+    expect(screen.queryByText(/Nivel:/)).toBeNull()
+    expect(screen.queryByText(/el sistema distinguió nado y escalamiento/)).toBeNull()
+    expect(screen.queryByText(/El buceo cuenta como nado activo/)).toBeNull()
   })
 
   it('el resumen del experimento dice qué es el Día 2', async () => {

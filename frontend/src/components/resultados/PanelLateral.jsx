@@ -34,7 +34,6 @@ export default function PanelLateral({ r, especimenes, g, grupoCompleto }) {
             </div>
           ))}
         </div>
-        <p className="hint" style={{ margin: '11px 0 0' }}>El buceo cuenta como nado activo.</p>
       </div>
     </div>
   )

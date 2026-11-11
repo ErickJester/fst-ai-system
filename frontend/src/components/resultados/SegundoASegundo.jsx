@@ -6,8 +6,12 @@ import { CONDUCTAS_GRAFICA, SIN_VER } from './graficas/estilos'
 // Segundo a segundo: la conducta de cada segundo de un espécimen, en una franja y en una tabla. Lo que llega
 // del servidor se muestra tal cual; un segundo que no viene queda vacío en la franja y no aparece en la tabla.
 const CATEGORIAS = [...CONDUCTAS_GRAFICA, SIN_VER]
-const ALTO_FRANJA = 34
-const ALTO_VISTA = 52
+// Cuadrícula: un renglón por minuto y un cuadro por segundo (60 por renglón), para que cada segundo se distinga.
+const ANCHO_CUADRO = 12
+const ALTO_CUADRO = 22
+const PASO_RENGLON = 28
+const MARGEN_IZQ = 44
+const ANCHO_VISTA = MARGEN_IZQ + 60 * ANCHO_CUADRO
 
 // La categoría de un segundo: null es «Sin ver».
 const categoriaDe = (conducta) => (conducta == null ? SIN_VER : CONDUCTAS_GRAFICA.find((c) => c.clave === conducta) ?? { etiqueta: conducta, color: 'var(--color-divider)', patron: null, clave: conducta })
@@ -41,8 +45,8 @@ export default function SegundoASegundo({ datos }) {
   const i = Math.min(indice, especimenes.length - 1)
   const actual = especimenes[i]
   const W = datos.duracionS || 300
-  const marcas = []
-  for (let t = 0; t <= W; t += 60) marcas.push(t)
+  const minutos = Math.max(1, Math.ceil(W / 60))
+  const altoVista = minutos * PASO_RENGLON + 20
   const ordenados = [...actual.segundos].sort((a, b) => a.s - b.s)
   const etiquetaEspecimen = `Tanda ${datos.letra} · Espécimen ${actual.numeroCilindro}`
 
@@ -60,30 +64,36 @@ export default function SegundoASegundo({ datos }) {
         </select>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${ALTO_VISTA}`} role="img" aria-labelledby={`${id}-t ${id}-d`}
-        style={{ display: 'block', width: '100%', maxWidth: 700, height: 'auto', fontFamily: 'var(--font-body)' }}>
+      <svg viewBox={`0 0 ${ANCHO_VISTA} ${altoVista}`} role="img" aria-labelledby={`${id}-t ${id}-d`}
+        style={{ display: 'block', width: '100%', maxWidth: 800, height: 'auto', fontFamily: 'var(--font-body)' }}>
         <title id={`${id}-t`}>{`Conducta segundo a segundo, ${etiquetaEspecimen}`}</title>
-        <desc id={`${id}-d`}>Una franja con un rectángulo por segundo: el color y el patrón indican la conducta; los segundos sin dato quedan vacíos.</desc>
+        <desc id={`${id}-d`}>Una cuadrícula con un renglón por minuto y un cuadro por segundo: el color y el patrón indican la conducta; los segundos sin dato quedan vacíos.</desc>
         <Patrones prefijo={id} />
+        {Array.from({ length: minutos }, (_, m) => (
+          <text key={m} x={0} y={m * PASO_RENGLON + ALTO_CUADRO / 2 + 3.5} fontSize="10" fill="var(--muted-2)">{`Min ${m + 1}`}</text>
+        ))}
         {actual.segundos.map((x) => {
           const c = categoriaDe(x.conducta)
           const sinVer = x.conducta == null
+          const m = Math.floor((x.s - 1) / 60)
+          const px = MARGEN_IZQ + ((x.s - 1) % 60) * ANCHO_CUADRO
+          const py = m * PASO_RENGLON
           return (
             <g key={x.s} data-s={x.s} data-conducta={sinVer ? 'sin ver' : x.conducta}>
-              <rect x={x.s - 1} y={0} width={1} height={ALTO_FRANJA} fill={c.color} shapeRendering="crispEdges" />
-              {c.patron && <rect x={x.s - 1} y={0} width={1} height={ALTO_FRANJA} fill={`url(#${patronId(id, c.patron)})`} />}
+              <rect x={px} y={py} width={ANCHO_CUADRO - 1.5} height={ALTO_CUADRO} fill={c.color} shapeRendering="crispEdges" />
+              {c.patron && <rect x={px} y={py} width={ANCHO_CUADRO - 1.5} height={ALTO_CUADRO} fill={`url(#${patronId(id, c.patron)})`} />}
               {sinVer && (
-                <rect x={x.s - 1} y={0} width={1} height={ALTO_FRANJA} fill="none" stroke="var(--color-text)" strokeWidth="1"
+                <rect x={px} y={py} width={ANCHO_CUADRO - 1.5} height={ALTO_CUADRO} fill="none" stroke="var(--color-text)" strokeWidth="1"
                   vectorEffect="non-scaling-stroke" />
               )}
             </g>
           )
         })}
-        <line x1={0} x2={W} y1={ALTO_FRANJA} y2={ALTO_FRANJA} stroke="var(--color-text)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        {marcas.map((t) => (
-          <g key={t}>
-            <line x1={t} x2={t} y1={ALTO_FRANJA} y2={ALTO_FRANJA + 5} stroke="var(--color-text)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            <text x={t} y={ALTO_VISTA - 4} textAnchor={t === 0 ? 'start' : t >= W ? 'end' : 'middle'} fontSize="9" fill="var(--muted-2)">{mss(t)}</text>
+        {[0, 10, 20, 30, 40, 50].map((seg) => (
+          <g key={seg}>
+            <line x1={MARGEN_IZQ + seg * ANCHO_CUADRO - 0.75} x2={MARGEN_IZQ + seg * ANCHO_CUADRO - 0.75} y1={minutos * PASO_RENGLON - 2} y2={minutos * PASO_RENGLON + 3}
+              stroke="var(--color-text)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <text x={MARGEN_IZQ + seg * ANCHO_CUADRO} y={minutos * PASO_RENGLON + 14} fontSize="10" fill="var(--muted-2)">{`${seg} s`}</text>
           </g>
         ))}
       </svg>
