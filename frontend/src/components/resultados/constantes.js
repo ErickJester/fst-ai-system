@@ -59,6 +59,6 @@ export const REPORTES = {
 export const TABS = [
   { id: 'especimen', label: 'Por espécimen' },
   { id: 'segundo', label: 'Segundo a segundo' },
-  { id: 'timeline', label: 'Minuto a minuto' },
   { id: 'bloques', label: 'Cada 5 segundos' },
+  { id: 'timeline', label: 'Minuto a minuto' },
 ]
