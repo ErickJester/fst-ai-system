@@ -518,7 +518,9 @@ describe('resultados', () => {
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Comparación entre grupos' }))
-    expect(await screen.findByText('Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas. Míralas por separado en el detalle.')).toBeTruthy()
+    // La comparación es la galería de gráficas, con todos los grupos del experimento.
+    expect(await screen.findByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
+    expect((await screen.findAllByText(/Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas\. Míralas por separado en el detalle\./)).length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Por espécimen' }))
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)

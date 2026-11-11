@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
-import { getBatchResults, getGroupComparison, getReporte, getSalidaModelo } from '../services/results'
+import { getBatchResults, getReporte, getSalidaModelo } from '../services/results'
 import { mensajeError } from '../services/api'
 import { getExperiment } from '../services/experiments'
 import { useAsync } from '../hooks/useAsync'
@@ -35,7 +35,6 @@ function ResultadosTanda({ clave, gid, letra }) {
   const [params, setParams] = useSearchParams()
   const vista = VISTAS.includes(params.get('vista')) ? params.get('vista') : 'especimen'
   const cambiarVista = (id) => setParams((p) => { p.set('vista', id); return p }, { replace: true })
-  const [conducta, setConducta] = useState('inmovilidad') // la que se compara entre grupos
   const [reporte, setReporte] = useState(null) // { formato, error } del último botón de reporte
   const [lineaSel, setLineaSel] = useState('') // espécimen del desglose por minuto: «A-1»
   // Una tanda (letra) o el grupo completo (letra null). El grupo completo reúne solo las tandas
@@ -48,7 +47,6 @@ function ResultadosTanda({ clave, gid, letra }) {
     if (!listas.length) throw new Error('Todavía no hay resultados.')
     return { g, grupos: e.grupos, rs: await Promise.all(listas.map((t) => getBatchResults(clave, gid, t.letra))) }
   }, [clave, gid, letra])
-  const { data: comparacion } = useAsync(() => getGroupComparison(clave), [clave])
 
   if (loading) return <Cargando />
   if (error) return <SinResultados clave={clave} />
@@ -136,8 +134,7 @@ function ResultadosTanda({ clave, gid, letra }) {
         <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 2, background: 'var(--color-divider)' }}>
           <div style={{ background: 'var(--color-bg)', paddingRight: 26, minWidth: 0 }}>
             <ContenidoResultados vista={vista} clave={clave} gid={gid} rs={rs} r={r} especimenes={especimenes} grupoCompleto={grupoCompleto}
-              faltan={faltan} lineas={lineas} linea={linea} setLineaSel={setLineaSel} comparacion={comparacion}
-              conducta={conducta} setConducta={setConducta} />
+              faltan={faltan} lineas={lineas} linea={linea} setLineaSel={setLineaSel} />
           </div>
 
           <PanelLateral r={r} especimenes={especimenes} g={g} grupoCompleto={grupoCompleto} />
