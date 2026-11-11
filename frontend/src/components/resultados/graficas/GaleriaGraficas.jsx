@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react'
-import G1BarrasGrupos from './G1BarrasGrupos'
+import G1BarrasGrupos, { ESTILOS_G1 } from './G1BarrasGrupos'
+import { UNIDADES } from './explicacion'
 import G2CurvaPorMinuto from './G2CurvaPorMinuto'
 import G3BarrasPorMinuto from './G3BarrasPorMinuto'
 import G4ApiladaPorGrupo from './G4ApiladaPorGrupo'
@@ -20,7 +21,7 @@ const HABILITADAS = GRAFICAS.filter((g) => g.disponible).map((g) => g.id)
 // Punto de corte de la maquetación de resultados (app.css, .rejilla-lateral): por debajo, una gráfica a la vez.
 const ANCHO_ANGOSTO = '(max-width: 1100px)'
 const CLAVE_MEMORIA = 'fst.resultados.graficas'
-const ESTADO_INICIAL = { vista: 'g1', varias: false, marcadas: ['g1'], conducta: 'inmovilidad', puntos: true }
+const ESTADO_INICIAL = { vista: 'g1', varias: false, marcadas: ['g1'], conducta: 'inmovilidad', puntos: true, estilo: 'puntos', unidad: 's' }
 
 // La elección se recuerda en el navegador. Si no hay almacenamiento o el valor no sirve, sale el inicial.
 function leerMemoria() {
@@ -34,6 +35,8 @@ function leerMemoria() {
       marcadas: Array.isArray(guardado.marcadas) ? guardado.marcadas.filter((id) => HABILITADAS.includes(id)) : ESTADO_INICIAL.marcadas,
       conducta: typeof guardado.conducta === 'string' ? guardado.conducta : ESTADO_INICIAL.conducta,
       puntos: typeof guardado.puntos === 'boolean' ? guardado.puntos : ESTADO_INICIAL.puntos,
+      estilo: ESTILOS_G1.some((e) => e.clave === guardado.estilo) ? guardado.estilo : ESTADO_INICIAL.estilo,
+      unidad: UNIDADES.some((u) => u.clave === guardado.unidad) ? guardado.unidad : ESTADO_INICIAL.unidad,
     }
   } catch {
     return ESTADO_INICIAL
@@ -142,7 +145,9 @@ export default function GaleriaGraficas({ datos }) {
           <div key={id} style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 18, minWidth: 0 }}>
             {id === 'g1' ? (
               <G1BarrasGrupos datos={datos} conducta={estado.conducta} setConducta={(conducta) => cambiar({ conducta })}
-                puntos={estado.puntos} setPuntos={(puntos) => cambiar({ puntos })} prefijo={`${prefijo}-g1`} />
+                puntos={estado.puntos} setPuntos={(puntos) => cambiar({ puntos })}
+                estilo={estado.estilo} setEstilo={(estilo) => cambiar({ estilo })}
+                unidad={estado.unidad} setUnidad={(unidad) => cambiar({ unidad })} prefijo={`${prefijo}-g1`} />
             ) : <Componente datos={datos} prefijo={`${prefijo}-${id}`} />}
           </div>
         )

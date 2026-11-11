@@ -84,9 +84,9 @@ describe('GaleriaGraficas · G1', () => {
     expect(screen.getAllByText('42,0 s ± no aplica').length).toBeGreaterThan(0)
   })
 
-  it('la conducta activa va fuera de las barras, con su nota de segundos medios', () => {
+  it('la conducta activa va fuera de la gráfica, con su nota de segundos medios', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
-    expect(screen.getByText(/Conducta activa, fuera de las barras \(segundos medios por espécimen\): Control 4,0 s\./)).toBeTruthy()
+    expect(screen.getByText(/Conducta activa, fuera de la gráfica \(segundos medios por espécimen\): Control 4,0 s\./)).toBeTruthy()
   })
 
   it('cada gráfica trae las dos notas obligatorias y la tabla con los mismos números', () => {
@@ -162,6 +162,7 @@ describe('GaleriaGraficas · memoria y patrones', () => {
   it('el rayado de la referencia va dentro del mismo svg, con un id propio de la gráfica', () => {
     const datos = { ...datosDeUnGrupo, grupos: [grupo({}), grupo({ idGrupo: 2, etiqueta: 'Referencia', tipo: 'referencia' })] }
     const { container } = render(<GaleriaGraficas datos={datos} />)
+    fireEvent.change(screen.getByLabelText('Ver como'), { target: { value: 'barras' } })
     const svg = container.querySelector('svg')
     const patron = svg.querySelector('pattern[id$="-rayado"]')
     expect(patron).toBeTruthy()
@@ -233,9 +234,10 @@ describe('G1 · etiquetas largas, escala y nivel mixto', () => {
     expect(within(tabla).getByRole('cell', { name: '140,0 ± 8,0 s' })).toBeTruthy()
   })
 
-  it('la leyenda muestra el patrón del grupo, no solo su color', () => {
+  it('en barras, la leyenda muestra el patrón del grupo, no solo su color', () => {
     const datos = { ...datosDeUnGrupo, grupos: [grupo({}), grupo({ idGrupo: 2, etiqueta: 'Referencia', tipo: 'referencia' })] }
     const { container } = render(<GaleriaGraficas datos={datos} />)
+    fireEvent.change(screen.getByLabelText('Ver como'), { target: { value: 'barras' } })
     const muestras = [...container.querySelectorAll('svg[aria-hidden=true]')]
     const conPatron = muestras.filter((m) => m.querySelector('rect[fill^="url(#"]'))
     expect(conPatron.length).toBe(1) // la referencia lleva rayado; el control, no
@@ -258,5 +260,93 @@ describe('G1 · etiquetas largas, escala y nivel mixto', () => {
     const alto = { ...datosDeUnGrupo, grupos: [grupo({ porConducta: porConducta({ inmovilidad: est(350, 10, 2, [340, 360]) }) })] }
     const otro = render(<GaleriaGraficas datos={alto} />)
     expect([...otro.container.querySelector('svg[role=img]').querySelectorAll('text')].map((t) => t.textContent)).toContain('360')
+  })
+})
+
+describe('G1 · puntos con línea, unidades y frase en palabras', () => {
+  const dos = {
+    ...datosDeUnGrupo,
+    grupos: [
+      grupo({ etiqueta: 'Acu-YBN', porConducta: porConducta({ inmovilidad: est(122.4, 37.2, 4, [90, 110, 130, 160]) }) }),
+      grupo({ idGrupo: 2, etiqueta: 'Acu yn', tipo: 'tratamiento experimental', porConducta: porConducta({ inmovilidad: est(142.6, 46.5, 4, [100, 130, 150, 190]) }) }),
+    ],
+  }
+
+  it('por defecto dibuja puntos con línea, no barras: un punto grande por grupo y uno pequeño por espécimen', () => {
+    const { container } = render(<GaleriaGraficas datos={dos} />)
+    const svg = container.querySelector('svg[role=img]')
+    expect(svg.querySelector('rect[fill="var(--color-accent)"]')).toBeNull()
+    expect(svg.querySelectorAll('circle[r="2.7"]').length).toBe(8) // 4 + 4 especímenes
+    expect(svg.querySelectorAll('circle[r="6.5"]').length).toBe(1) // el control es un círculo
+    expect(svg.querySelectorAll('polygon, rect[width="13"]').length).toBeGreaterThan(0) // el experimental, otra forma
+  })
+
+  it('con «Barras» vuelve a la forma de antes', () => {
+    const { container } = render(<GaleriaGraficas datos={dos} />)
+    fireEvent.change(screen.getByLabelText('Ver como'), { target: { value: 'barras' } })
+    expect(container.querySelector('svg[role=img]').querySelectorAll('circle[r="6.5"]').length).toBe(0)
+    expect(container.querySelector('svg[role=img]').querySelectorAll('rect').length).toBeGreaterThan(1)
+  })
+
+  it('la frase cuenta los promedios, su diferencia y que las líneas se traslapan, y avisa que no es una prueba', () => {
+    render(<GaleriaGraficas datos={dos} />)
+    const nota = screen.getByRole('note')
+    expect(nota.textContent).toContain('En palabras')
+    expect(nota.textContent).toContain('en Acu-YBN, cada espécimen pasó 2 min 2 s inmóvil (41 % del tiempo)')
+    expect(nota.textContent).toContain('La diferencia entre los dos promedios es de 20 s')
+    expect(nota.textContent).toContain('se traslapan')
+    expect(nota.textContent).toContain('no es una prueba estadística')
+  })
+
+  it('con «Las tres juntas» no hay frase (no hay una sola conducta que contar)', () => {
+    render(<GaleriaGraficas datos={dos} />)
+    fireEvent.change(screen.getByLabelText('Conducta'), { target: { value: 'tres' } })
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+
+  it('«Mostrar en» cambia los valores y el eje: reloj y porcentaje', () => {
+    const { container } = render(<GaleriaGraficas datos={dos} />)
+    const textos = () => [...container.querySelector('svg[role=img]').querySelectorAll('text')].map((t) => t.textContent)
+    fireEvent.change(screen.getByLabelText('Mostrar en'), { target: { value: 'min' } })
+    expect(textos()).toContain('2:02 ± 0:37')
+    expect(textos()).toContain('5:00')
+    fireEvent.change(screen.getByLabelText('Mostrar en'), { target: { value: 'pct' } })
+    expect(textos()).toContain('41 ± 12 %')
+    expect(textos()).toContain('100 %')
+    fireEvent.change(screen.getByLabelText('Mostrar en'), { target: { value: 's' } })
+    expect(textos()).toContain('122,4 ± 37,2 s')
+  })
+
+  it('al pasar el cursor por un punto se lee su valor, y al salir vuelve la ayuda', () => {
+    const { container } = render(<GaleriaGraficas datos={dos} />)
+    const estado = () => container.querySelector('p[role=status]').textContent
+    expect(estado()).toBe('Pasa el cursor sobre un punto para ver su valor.')
+    const pequeno = container.querySelector('svg[role=img] circle[r="2.7"]')
+    fireEvent.mouseEnter(pequeno)
+    expect(estado()).toMatch(/^Un espécimen de Acu-YBN, inmovilidad: 90,0 s \(30 % del tiempo\)\.$/)
+    fireEvent.mouseLeave(pequeno)
+    expect(estado()).toBe('Pasa el cursor sobre un punto para ver su valor.')
+    fireEvent.mouseEnter(container.querySelector('svg[role=img] circle[r="6.5"]'))
+    expect(estado()).toContain('Promedio de Acu-YBN, inmovilidad: 122,4 ± 37,2 s (41 % del tiempo); la línea va de 1 min 25 s a 2 min 40 s.')
+  })
+
+  it('el estilo y la unidad se recuerdan en el navegador, y un valor viejo o raro se ignora', () => {
+    render(<GaleriaGraficas datos={dos} />)
+    fireEvent.change(screen.getByLabelText('Ver como'), { target: { value: 'barras' } })
+    fireEvent.change(screen.getByLabelText('Mostrar en'), { target: { value: 'pct' } })
+    const guardado = JSON.parse(localStorage.getItem('fst.resultados.graficas'))
+    expect(guardado.estilo).toBe('barras')
+    expect(guardado.unidad).toBe('pct')
+    cleanup()
+    localStorage.setItem('fst.resultados.graficas', JSON.stringify({ estilo: 'otro', unidad: 'horas' }))
+    render(<GaleriaGraficas datos={dos} />)
+    expect(screen.getByLabelText('Ver como').value).toBe('puntos')
+    expect(screen.getByLabelText('Mostrar en').value).toBe('s')
+  })
+
+  it('sin fallos de axe-core con puntos, frase y lectura', async () => {
+    const { container } = render(<GaleriaGraficas datos={dos} />)
+    const resultado = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } })
+    expect(resultado.violations.map((v) => v.id)).toEqual([])
   })
 })
