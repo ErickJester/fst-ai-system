@@ -4,11 +4,9 @@ package com.ipn.mx.fst.service.graficas;
 // Las clases de iText: color, el documento, su excepción, la tipografía y su fábrica, párrafos, frases,
 // el rectángulo (aquí solo por su constante NO_BORDER), la fuente de bajo nivel, el lienzo de dibujo
 // directo, el marcador, la celda, la tabla y el escritor.
-import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
 import com.itextpdf.text.Font;
-import com.itextpdf.text.FontFactory;
 import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.Phrase;
 import com.itextpdf.text.Rectangle;
@@ -47,13 +45,22 @@ public final class SeccionGraficasPdf {
 	private static final float TAMANO_LEYENDA = 7.5f;
 	// El aire que se deja debajo del subtítulo: sin él la leyenda empieza pegada a la letra del subtítulo y se encima.
 	private static final float ESPACIO_SUBTITULO = 8f;
+	// Lo que ocupa el título «Gráficas», con su aire de arriba y de abajo.
+	private static final float ALTO_TITULO_SECCION = 40f;
 
 	private SeccionGraficasPdf() {
 	}
 
-	// Escribe la sección y sus marcadores. Devuelve false si ninguna gráfica aplica (no se escribe nada).
+	// Lo mismo, con un estilo propio del documento: las pruebas de las gráficas solas no lo traen.
 	public static boolean escribir(Document documento, PdfWriter writer, Map<String, Object> datos, MarcadoresPdf marcadores)
 			throws DocumentException, IOException {
+		return escribir(documento, writer, datos, marcadores, new EstiloReportePdf());
+	}
+
+	// Escribe la sección y sus marcadores. Devuelve false si ninguna gráfica aplica (no se escribe nada). El estilo es el del
+	// documento entero: así las gráficas usan la misma Archivo incrustada, no otra copia.
+	public static boolean escribir(Document documento, PdfWriter writer, Map<String, Object> datos, MarcadoresPdf marcadores,
+			EstiloReportePdf estilo) throws DocumentException, IOException {
 		// Primero se filtra: solo las que tienen algo que dibujar con estos datos.
 		List<GraficaPdf> aplican = GRAFICAS.stream().filter(g -> g.aplica(datos)).toList();
 		// Sin ninguna, ni siquiera se escribe el título de la sección: un apartado «Gráficas» vacío sería
@@ -63,14 +70,20 @@ public final class SeccionGraficasPdf {
 		}
 		// BaseFont es la tipografía de bajo nivel, la que entiende el lienzo de dibujo directo (las
 		// Font normales solo valen para párrafos).
-		// NOT_EMBEDDED: no se incrusta la tipografía en el PDF, porque Helvetica es una de las catorce que
-		// todo lector trae de serie. Así el archivo pesa menos.
-		BaseFont fuente = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
-		BaseFont negrita = BaseFont.createFont(BaseFont.HELVETICA_BOLD, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+		// La tipografía del sistema (Archivo), la misma de todo el documento; el PDF solo incrusta las letras que usa.
+		BaseFont fuente = estilo.base(EstiloReportePdf.Peso.NORMAL);
+		BaseFont negrita = estilo.base(EstiloReportePdf.Peso.NEGRITA);
+
+		// El título de la sección no se queda solo al pie de una página: si no cabe junto con la primera gráfica, la sección empieza
+		// en la hoja siguiente.
+		if (writer.getVerticalPosition(false) - (alturaDeBloque(documento, fuente, aplican.get(0), datos) + ALTO_TITULO_SECCION)
+				< documento.bottomMargin()) {
+			documento.newPage();
+		}
 
 		// El marcador padre, del que colgarán los de cada gráfica.
 		PdfOutline seccion = marcadores.seccion("Gráficas", MarcadoresPdf.GRAFICAS);
-		documento.add(MarcadoresPdf.encabezado("Gráficas", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12), MarcadoresPdf.GRAFICAS));
+		documento.add(estilo.seccion("Gráficas", MarcadoresPdf.GRAFICAS));
 
 		for (GraficaPdf grafica : aplican) {
 			// El ancho útil: la página menos los dos márgenes.
@@ -91,16 +104,25 @@ public final class SeccionGraficasPdf {
 			// Por eso el salto de página va ANTES: si se creara el destino y luego se saltara, el marcador
 			// apuntaría a la página anterior, donde ya no está la gráfica.
 			MarcadoresPdf.hijo(seccion, grafica.titulo(), "grafica-" + grafica.id());
-			Paragraph titulo = MarcadoresPdf.encabezado(grafica.titulo(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10), "grafica-" + grafica.id());
+			Paragraph titulo = MarcadoresPdf.encabezado(grafica.titulo(), estilo.fuente(10.5f, EstiloReportePdf.Peso.EXTRANEGRITA, EstiloReportePdf.TINTA),
+					"grafica-" + grafica.id());
 			titulo.setSpacingBefore(8);
 			documento.add(titulo);
-			// El subtítulo en cursiva gris, como las notas: se lee como una aclaración.
-			Paragraph subtitulo = new Paragraph(grafica.subtitulo(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, BaseColor.DARK_GRAY));
+			// El subtítulo con la letra de las notas (apagada y pequeña): se lee como una aclaración.
+			Paragraph subtitulo = new Paragraph(grafica.subtitulo(), estilo.nota());
 			subtitulo.setSpacingAfter(ESPACIO_SUBTITULO);
 			documento.add(subtitulo);
-			dibujarBloque(documento, writer, fuente, negrita, grafica, datos, alturaLeyenda);
+			dibujarBloque(documento, writer, fuente, negrita, grafica, datos, alturaLeyenda, estilo);
 		}
 		return true;
+	}
+
+	// Lo que ocupa una gráfica entera: título, subtítulo, leyenda, dibujo, notas y un margen. Es la misma cuenta que hace escribir para
+	// saber si el bloque cabe en lo que queda de página.
+	private static float alturaDeBloque(Document documento, BaseFont fuente, GraficaPdf grafica, Map<String, Object> datos) {
+		float ancho = documento.getPageSize().getWidth() - documento.leftMargin() - documento.rightMargin();
+		float alturaLeyenda = filasDeLeyenda(fuente, grafica.leyenda(datos), ancho) * ALTO_FILA_LEYENDA + 4;
+		return ALTO_TITULO + ESPACIO_SUBTITULO + alturaLeyenda + grafica.alto() + grafica.notas(datos).size() * ALTO_NOTA + 14;
 	}
 
 	// Leyenda, dibujo y notas de una gráfica. El dibujo va en un hueco de altura fija que empieza en la posición actual de
@@ -111,7 +133,7 @@ public final class SeccionGraficasPdf {
 	// abajo, como si el dibujo ocupara su sitio. Y el dibujo se pinta aparte, con coordenadas absolutas,
 	// justo encima de ese hueco.
 	private static void dibujarBloque(Document documento, PdfWriter writer, BaseFont fuente, BaseFont negrita,
-			GraficaPdf grafica, Map<String, Object> datos, float alturaLeyenda) throws DocumentException {
+			GraficaPdf grafica, Map<String, Object> datos, float alturaLeyenda, EstiloReportePdf estilo) throws DocumentException {
 		float ancho = documento.getPageSize().getWidth() - documento.leftMargin() - documento.rightMargin();
 		// La altura actual del cursor: de aquí para abajo irá el dibujo.
 		float yInicio = writer.getVerticalPosition(false);
@@ -119,7 +141,7 @@ public final class SeccionGraficasPdf {
 
 		// La celda invisible: un espacio con letra de 2 puntos (el contenido no importa, solo que exista),
 		// altura fija, sin borde y sin relleno.
-		PdfPCell hueco = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA, 2)));
+		PdfPCell hueco = new PdfPCell(new Phrase(" ", estilo.texto(2)));
 		hueco.setFixedHeight(alturaDibujo);
 		hueco.setBorder(Rectangle.NO_BORDER);
 		hueco.setPadding(0);
@@ -144,12 +166,12 @@ public final class SeccionGraficasPdf {
 
 		// Las notas, con viñeta, en gris y pequeñas.
 		for (String nota : grafica.notas(datos)) {
-			Paragraph p = new Paragraph("• " + nota, FontFactory.getFont(FontFactory.HELVETICA, TAMANO_LEYENDA, BaseColor.DARK_GRAY));
+			Paragraph p = new Paragraph("• " + nota, estilo.fuente(TAMANO_LEYENDA, EstiloReportePdf.Peso.NORMAL, EstiloReportePdf.APAGADO_2));
 			p.setSpacingBefore(1);
 			documento.add(p);
 		}
 		// Un párrafo vacío para separar esta gráfica de la siguiente.
-		Paragraph separacion = new Paragraph(" ", FontFactory.getFont(FontFactory.HELVETICA, 6));
+		Paragraph separacion = new Paragraph(" ", estilo.texto(6));
 		separacion.setSpacingAfter(4);
 		documento.add(separacion);
 	}

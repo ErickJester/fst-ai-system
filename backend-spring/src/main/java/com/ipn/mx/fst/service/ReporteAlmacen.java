@@ -64,7 +64,7 @@ public class ReporteAlmacen {
 	// Es una solución elegante a un problema real: al mejorar el PDF, los ya guardados siguen siendo los
 	// viejos y nada en los datos ha cambiado, así que ninguna invalidación normal los tocaría. Un número
 	// de versión en un archivo del volumen resuelve el caso sin añadir una columna al esquema.
-	static final String VERSION_PDF = "3";
+	static final String VERSION_PDF = "4";
 	private static final String MARCA_VERSION = "version-pdf.txt";
 	// La expresión regular que valida el alcance: la palabra grupo o tanda, un guion y uno o más dígitos.
 	// \\d es un dígito (la barra va doble porque en Java la primera escapa a la segunda).

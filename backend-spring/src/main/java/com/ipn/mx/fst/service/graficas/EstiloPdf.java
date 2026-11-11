@@ -40,12 +40,14 @@ public record EstiloPdf(BaseColor color, Patron patron, Forma forma, Trazo trazo
 		}
 	}
 
-	// La paleta: cinco tonos de gris, de negro a blanco. No hay colores a propósito (ver el encabezado).
-	// Los tres números de BaseColor son rojo, verde y azul, de 0 a 255; iguales entre sí dan un gris.
-	public static final BaseColor NEGRO = new BaseColor(0, 0, 0);
-	public static final BaseColor GRIS_OSCURO = new BaseColor(90, 90, 90);
-	public static final BaseColor GRIS_MEDIO = new BaseColor(150, 150, 150);
-	public static final BaseColor GRIS_CLARO = new BaseColor(215, 215, 215);
+	// La paleta del sistema (la misma de la web, ver EstiloReportePdf): la tinta, el vino del acento y cuatro neutros. Cada serie sigue
+	// distinguiéndose en blanco y negro por su patrón, su forma y su trazo, no por el tono: el vino y la tinta son oscuros los dos.
+	// Los nombres son los de antes; ahora son los tonos del sistema y no grises puros.
+	public static final BaseColor NEGRO = EstiloReportePdf.TINTA;
+	public static final BaseColor VINO = EstiloReportePdf.ACENTO;
+	public static final BaseColor GRIS_OSCURO = EstiloReportePdf.APAGADO_2;
+	public static final BaseColor GRIS_MEDIO = new BaseColor(0x91, 0x93, 0x96);   // --color-neutral-500
+	public static final BaseColor GRIS_CLARO = EstiloReportePdf.NEUTRO_300;
 	public static final BaseColor BLANCO = new BaseColor(255, 255, 255);
 
 	// Conducta del PDF: nado sólido negro, inmovilidad rayada, escalamiento punteada (las tres juntas en G1).
@@ -56,7 +58,7 @@ public record EstiloPdf(BaseColor color, Patron patron, Forma forma, Trazo trazo
 	public static EstiloPdf conducta(String clave) {
 		return switch (clave) {
 			case "nado activo" -> new EstiloPdf(NEGRO, Patron.NINGUNO, Forma.CIRCULO, Trazo.SOLIDA);
-			case "inmovilidad" -> new EstiloPdf(GRIS_OSCURO, Patron.RAYADO, Forma.CUADRADO, Trazo.DISCONTINUA);
+			case "inmovilidad" -> new EstiloPdf(VINO, Patron.RAYADO, Forma.CUADRADO, Trazo.DISCONTINUA);
 			// default y no un case para "escalamiento": cubre también cualquier otra conducta, así que el
 			// switch nunca se queda sin respuesta.
 			default -> new EstiloPdf(GRIS_MEDIO, Patron.PUNTEADO, Forma.TRIANGULO, Trazo.LARGA);
@@ -74,7 +76,7 @@ public record EstiloPdf(BaseColor color, Patron patron, Forma forma, Trazo trazo
 			return new EstiloPdf(NEGRO, Patron.NINGUNO, Forma.CIRCULO, Trazo.SOLIDA);
 		}
 		if ("referencia".equals(tipo)) {
-			return new EstiloPdf(GRIS_OSCURO, Patron.RAYADO, Forma.ROMBO, Trazo.DISCONTINUA);
+			return new EstiloPdf(VINO, Patron.RAYADO, Forma.ROMBO, Trazo.DISCONTINUA);
 		}
 		// Los experimentales pueden ser varios, así que rotan entre tres combinaciones.
 		// Los tres arreglos van EN PARALELO: el índice k elige a la vez patrón, forma y trazo, de modo que

@@ -22,17 +22,11 @@ import com.ipn.mx.fst.repository.UsuarioRepository;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 // iText 5, la biblioteca que escribe el PDF: colores, saltos, el documento, alineaciones, tipografías,
 // tamaño de página, párrafos, frases, celdas, tablas y el escritor.
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Chunk;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.Element;
 import com.itextpdf.text.Font;
-import com.itextpdf.text.FontFactory;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import java.io.ByteArrayInputStream;
@@ -56,6 +50,7 @@ import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 // Las clases del paquete graficas, que dibujan la sección de gráficas del PDF y sus marcadores.
 import com.ipn.mx.fst.service.graficas.DatosGraficas;
+import com.ipn.mx.fst.service.graficas.EstiloReportePdf;
 import com.ipn.mx.fst.service.graficas.GraficaPdf;
 import com.ipn.mx.fst.service.graficas.MarcadoresPdf;
 import com.ipn.mx.fst.service.graficas.SeccionGraficasPdf;
@@ -155,6 +150,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	private JdbcTemplate jdbc;
 
 	// Raíz del volumen videos_reportes: de ahí se borran los videos y la carpeta del análisis de una tanda o un experimento eliminado.
+	// La versión del sistema que firma el pie de cada página del PDF (la de version.properties).
+	@Value("${app.version:}")
+	private String versionApp;
+
 	@Value("${app.archivos.raiz}")
 	private String raizConfigurada;
 
@@ -952,48 +951,43 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				.map(r -> r.getGrupo() + "|" + r.getOrdinal().intValue() + "|" + r.getCilindro().intValue())
 				.collect(Collectors.toSet());
 
-		// PageSize.LETTER: el tamaño de papel de México y Estados Unidos (no A4).
-		Document documento = new Document(PageSize.LETTER);
+		// PageSize.LETTER: el tamaño de papel de México y Estados Unidos (no A4). Los márgenes de arriba y abajo dejan sitio al
+		// encabezado y al pie de cada página, que llevan el estilo del sistema (ver EstiloReportePdf).
+		Document documento = new Document(PageSize.LETTER, 48, 48, 66, 62);
 		// El PDF se arma en memoria: estos reportes son de unos pocos cientos de kilobytes.
 		ByteArrayOutputStream salida = new ByteArrayOutputStream();
 
 		try {
 			PdfWriter writer = PdfWriter.getInstance(documento, salida);
+			// La tipografía y los colores del sistema, para todo el documento; el marco pone «FST» y las migas arriba y la versión y la
+			// página abajo.
+			EstiloReportePdf estilo = new EstiloReportePdf();
+			writer.setPageEvent(new EstiloReportePdf.Marco(estilo, experimento.getNombre(), versionApp));
 			// Los marcadores son el índice lateral del PDF, que permite saltar entre secciones.
 			MarcadoresPdf marcadores = new MarcadoresPdf(writer);
 			documento.open();
 
-			// Las cuatro tipografías del documento, creadas una vez y reutilizadas.
-			Font letraTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-			Font letraSeccion = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-			Font letraDato = FontFactory.getFont(FontFactory.HELVETICA, 10);
-			// Las notas al pie van en cursiva, más pequeñas y en gris: se leen como aclaraciones.
-			Font letraNota = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, BaseColor.DARK_GRAY);
+			Font letraDato = estilo.texto(9.5f);
 
 			marcadores.seccion("Resumen", MarcadoresPdf.RESUMEN);
-			Paragraph titulo = MarcadoresPdf.encabezado("Reporte de resultados", letraTitulo, MarcadoresPdf.RESUMEN);
-			titulo.setAlignment(Element.ALIGN_CENTER);
-			documento.add(titulo);
-			documento.add(Chunk.NEWLINE);
+			documento.add(estilo.titulo("Reporte de resultados", MarcadoresPdf.RESUMEN));
 
 			// Datos del experimento, un renglón cada uno.
-			documento.add(new Paragraph("Experimento: " + experimento.getNombre(), letraDato));
-			documento.add(new Paragraph("Fecha: " + experimento.getFecha(), letraDato));
+			documento.add(estilo.dato("Experimento", experimento.getNombre()));
+			documento.add(estilo.dato("Fecha", String.valueOf(experimento.getFecha())));
 			// El nombre del creador impreso aquí es lo que obliga a invalidar los reportes cuando alguien
 			// cambia su nombre (ver AuthServiceImpl.actualizarPerfil).
-			documento.add(new Paragraph("Creado por: " + creador.getNombre() + " " + creador.getApellidos()
-					+ " (" + creador.getIdInstitucional() + ")", letraDato));
+			documento.add(estilo.dato("Creado por", creador.getNombre() + " " + creador.getApellidos()
+					+ " (" + creador.getIdInstitucional() + ")"));
 			if (experimento.getNotas() != null && !experimento.getNotas().isBlank()) {
-				documento.add(new Paragraph("Notas: " + experimento.getNotas(), letraDato));
+				documento.add(estilo.dato("Notas", experimento.getNotas()));
 			}
 			// La línea de transparencia: cuántos especímenes tocó una persona. El ternario de dentro
 			// resuelve el singular y el plural.
-			documento.add(new Paragraph("Revisión humana: " + (revisados.isEmpty() ? "No"
+			documento.add(estilo.dato("Revisión humana", revisados.isEmpty() ? "No"
 					: "Sí (" + revisados.size() + (revisados.size() == 1 ? " espécimen" : " especímenes")
-					+ " con segundos corregidos)"), letraDato));
-			documento.add(new Paragraph("Generado: "
-					+ LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), letraDato));
-			documento.add(Chunk.NEWLINE);
+					+ " con segundos corregidos)"));
+			documento.add(estilo.dato("Generado", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))));
 
 			if (filas.isEmpty()) {
 				// El PDF "vacío": se genera igual (el usuario pidió un reporte y recibe uno), pero
@@ -1003,41 +997,35 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			} else {
 				// Los videos analizados: cada tanda con el nombre del archivo como lo subió el usuario. Siempre visible (no
 				// depende del modo desarrollador); los videos anteriores al 20-oct-2026 no tienen nombre.
-				Paragraph tituloVideos = new Paragraph("Videos analizados", letraSeccion);
-				tituloVideos.setSpacingAfter(6);
-				documento.add(tituloVideos);
-				documento.add(armarTablaVideos(resultadosService.videosAnalizados(idExperimento)));
+				documento.add(estilo.seccion("Videos analizados", "videos-analizados"));
+				documento.add(armarTablaVideos(resultadosService.videosAnalizados(idExperimento), estilo));
 
 				// Resultados por grupo: las medias de la gráfica, las mismas cifras que dibuja el PDF y la pantalla.
 				// Se piden UNA vez y se reutilizan para la tabla y para las gráficas de más abajo.
 				Map<String, Object> graficas = resultadosService.graficas(idExperimento);
 				marcadores.seccion("Resultados por grupo", MarcadoresPdf.RESULTADOS_GRUPO);
-				documento.add(Chunk.NEWLINE);
-				documento.add(MarcadoresPdf.encabezado("Resultados por grupo", letraSeccion, MarcadoresPdf.RESULTADOS_GRUPO));
-				documento.add(armarTablaGrupos(graficas));
+				documento.add(estilo.seccion("Resultados por grupo", MarcadoresPdf.RESULTADOS_GRUPO));
+				documento.add(armarTablaGrupos(graficas, estilo));
 				// La nota explica qué significan los números: sin ella, un "12.3 ± 4.5" no dice si el
 				// segundo número es la desviación estándar o el error estándar.
-				documento.add(new Paragraph("Media ± DE de los especímenes de cada grupo, en segundos del Día 2. Un grupo con "
-						+ "niveles de clasificación mezclados se da por tanda. " + GraficaPdf.NOTA_DE, letraNota));
+				documento.add(estilo.nota("Media ± DE de los especímenes de cada grupo, en segundos del Día 2. Un grupo con "
+						+ "niveles de clasificación mezclados se da por tanda. " + GraficaPdf.NOTA_DE));
 
 				// Gráficas: solo las que aplican; si ninguna aplica, no hay sección ni marcador.
 				// Toda la lógica vive en SeccionGraficasPdf; aquí solo se le pasa el documento y los datos.
-				SeccionGraficasPdf.escribir(documento, writer, graficas, marcadores);
+				SeccionGraficasPdf.escribir(documento, writer, graficas, marcadores, estilo);
 
 				marcadores.seccion("Tabla por espécimen", MarcadoresPdf.TABLA_ESPECIMEN);
-				documento.add(Chunk.NEWLINE);
-				documento.add(MarcadoresPdf.encabezado("Tabla por espécimen", letraSeccion, MarcadoresPdf.TABLA_ESPECIMEN));
-				documento.add(armarTablaEspecimenes(resultadosService.resultados(idExperimento)));
+				documento.add(estilo.seccion("Tabla por espécimen", MarcadoresPdf.TABLA_ESPECIMEN));
+				documento.add(armarTablaEspecimenes(resultadosService.resultados(idExperimento), estilo));
 
 				marcadores.seccion("Desglose por minuto", MarcadoresPdf.DESGLOSE_MINUTO);
-				documento.add(Chunk.NEWLINE);
-				documento.add(MarcadoresPdf.encabezado("Desglose por minuto", letraSeccion, MarcadoresPdf.DESGLOSE_MINUTO));
-				documento.add(armarTabla(filas, revisados));
+				documento.add(estilo.seccion("Desglose por minuto", MarcadoresPdf.DESGLOSE_MINUTO));
+				documento.add(armarTabla(filas, revisados, estilo));
 				// La nota se adelanta a la pregunta obvia de quien mire la tabla: por qué un minuto no
 				// suma 60 segundos.
-				documento.add(new Paragraph("Segundos de cada conducta en cada minuto. Un minuto suma menos de "
-						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió).",
-						letraNota));
+				documento.add(estilo.nota("Segundos de cada conducta en cada minuto. Un minuto suma menos de "
+						+ "60 s cuando hubo segundos sin conducta (el espécimen no se ve o el sistema no decidió)."));
 
 				// Cuánto tardó cada tanda analizada y con qué modelo, solo en modo desarrollador: sin él, las dos listas
 				// salen vacías y la sección no sale.
@@ -1046,25 +1034,17 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				List<Map<String, Object>> tiempos = resultadosService.tiemposDelExperimento(idExperimento);
 				if (!tiempos.isEmpty()) {
 					marcadores.seccion("Modelo del análisis", MarcadoresPdf.MODELO);
-					documento.add(Chunk.NEWLINE);
-					documento.add(MarcadoresPdf.encabezado("Modelo del análisis", letraSeccion, MarcadoresPdf.MODELO));
+					documento.add(estilo.seccion("Modelo del análisis", MarcadoresPdf.MODELO));
 
-					Paragraph subtitulo = new Paragraph("Tiempos de análisis", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10));
-					subtitulo.setSpacingAfter(6);
-					documento.add(subtitulo);
-					documento.add(armarTablaTiempos(tiempos));
-					documento.add(new Paragraph("Tiempo que el worker trabajó en el análisis (no incluye la espera en la "
-							+ "cola). \"sin registro\": análisis de antes de que se midiera el tiempo.", letraNota));
+					documento.add(estilo.subseccion("Tiempos de análisis"));
+					documento.add(armarTablaTiempos(tiempos, estilo));
+					documento.add(estilo.nota("Tiempo que el worker trabajó en el análisis (no incluye la espera en la "
+							+ "cola). \"sin registro\": análisis de antes de que se midiera el tiempo."));
 
-					documento.add(Chunk.NEWLINE);
-					Paragraph subtituloModelo = new Paragraph("Modelo con el que se hizo cada análisis",
-							FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10));
-					subtituloModelo.setSpacingAfter(6);
-					documento.add(subtituloModelo);
-					documento.add(armarTablaModelos(tiempos));
-					documento.add(new Paragraph("SHA-256: los primeros 16 caracteres de la huella del archivo del modelo; lo "
-							+ "identifica aunque cambie de nombre. \"sin registro\": análisis de antes de que se anotara el modelo.",
-							letraNota));
+					documento.add(estilo.subseccion("Modelo con el que se hizo cada análisis"));
+					documento.add(armarTablaModelos(tiempos, estilo));
+					documento.add(estilo.nota("SHA-256: los primeros 16 caracteres de la huella del archivo del modelo; lo "
+							+ "identifica aunque cambie de nombre. \"sin registro\": análisis de antes de que se anotara el modelo."));
 				}
 			}
 
@@ -1089,38 +1069,26 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	//
 	// Es la tabla que responde la pregunta del experimento. El caso de niveles mezclados sale de
 	// NivelClasifAnalisis: dos tandas clasificadas con distinto detalle no se pueden promediar juntas.
-	private PdfPTable armarTablaGrupos(Map<String, Object> graficas) throws DocumentException {
+	private PdfPTable armarTablaGrupos(Map<String, Object> graficas, EstiloReportePdf estilo) throws DocumentException {
 		// 7 columnas: el grupo, la n y las cinco de conducta.
-		PdfPTable tabla = new PdfPTable(7);
-		tabla.setWidthPercentage(100);
-		// Los anchos relativos: la primera columna es la más ancha porque lleva el nombre del grupo.
-		tabla.setWidths(new float[] {2.4f, 1.1f, 1.5f, 1.5f, 1.5f, 1.5f, 1.3f});
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
-		// Los encabezados, con el mismo formato cada uno: centrados, con fondo gris y relleno.
-		Stream.of("Grupo", "n", "Nado activo (s)", "Inmovilidad (s)", "Escalamiento (s)", "Conducta activa (s)", "Sin ver (s)")
-				.forEach(texto -> {
-					PdfPCell encabezado = new PdfPCell(new Phrase(texto, letraEncabezado));
-					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-					encabezado.setPadding(4);
-					tabla.addCell(encabezado);
-				});
+		PdfPTable tabla = estilo.tabla(2.0f, 1.2f, 1.6f, 1.6f, 1.7f, 1.6f, 1.4f);
+		Font letraTexto = estilo.texto(8.5f);
+		estilo.encabezados(tabla, "IDDDDDD", "Grupo", "n", "Nado activo (s)", "Inmovilidad (s)", "Escalamiento (s)", "Conducta activa (s)", "Sin ver (s)");
 		// DatosGraficas son utilidades para leer el mapa de graficas sin conversiones repetidas.
 		for (Map<String, Object> grupo : DatosGraficas.grupos(graficas)) {
-			tabla.addCell(new PdfPCell(new Phrase(String.valueOf(grupo.get("etiqueta")), letraTexto)));
+			tabla.addCell(estilo.izquierda(String.valueOf(grupo.get("etiqueta")), letraTexto, true));
 			// textoN da "n = 6" o "n = 6 de 8" si faltan especímenes por analizar.
-			tabla.addCell(celdaCentrada(DatosGraficas.textoN(grupo), letraTexto));
+			tabla.addCell(estilo.derecha(DatosGraficas.textoN(grupo), letraTexto));
 			if (DatosGraficas.bool(grupo.get("nivelMixto"))) {
 				// Las cinco columnas dicen "por nivel" y los números van en las filas de abajo.
 				for (int i = 0; i < CONDUCTAS_GRUPO.size() + 1; i++) {
-					tabla.addCell(celdaCentrada("por nivel", letraTexto));
+					tabla.addCell(estilo.derecha("por nivel", letraTexto));
 				}
 			} else {
 				for (String conducta : COLUMNAS_GRUPO) {
 					Map<String, Object> e = DatosGraficas.estadisticos(grupo, conducta);
 					// mediaDe arma el "12.3 ± 4.5"; con la DE en null (un solo espécimen) escribe solo la media.
-					tabla.addCell(celdaCentrada(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
+					tabla.addCell(estilo.derecha(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
 							DatosGraficas.dbl(e.get("de")), ""), letraTexto));
 				}
 			}
@@ -1128,12 +1096,12 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			// Con null, lista() devuelve una lista vacía y el bucle no da vueltas.
 			for (Map<String, Object> renglon : DatosGraficas.lista(grupo.get("porNivel"))) {
 				// Los espacios del principio indentan la fila bajo su grupo.
-				tabla.addCell(new PdfPCell(new Phrase("   Tanda " + renglon.get("letra") + " · " + renglon.get("nivelClasif"), letraTexto)));
-				tabla.addCell(celdaCentrada("n = " + renglon.get("n"), letraTexto));
+				tabla.addCell(estilo.izquierda("   Tanda " + renglon.get("letra") + " · " + renglon.get("nivelClasif"), letraTexto, true));
+				tabla.addCell(estilo.derecha("n = " + renglon.get("n"), letraTexto));
 				Map<String, Object> porConducta = DatosGraficas.mapa(renglon.get("porConducta"));
 				for (String conducta : COLUMNAS_GRUPO) {
 					Map<String, Object> e = DatosGraficas.mapa(porConducta.get(conducta));
-					tabla.addCell(celdaCentrada(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
+					tabla.addCell(estilo.derecha(DatosGraficas.mediaDe(DatosGraficas.dbl(e.get("media")),
 							DatosGraficas.dbl(e.get("de")), ""), letraTexto));
 				}
 			}
@@ -1143,32 +1111,22 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// Lo que se ve en la pantalla por espécimen: los segundos de cada conducta y su porcentaje (los de resultados, los mismos).
 	// "Los mismos" otra vez: salen de resultadosService.resultados, no se recalculan aquí.
-	private PdfPTable armarTablaEspecimenes(Map<String, Object> resultados) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(6);
-		tabla.setWidthPercentage(100);
-		tabla.setWidths(new float[] {2.6f, 1.4f, 1.4f, 1.4f, 1.4f, 1.4f});
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
-		Stream.of("Espécimen", "Nado activo", "Inmovilidad", "Escalamiento", "Conducta activa", "Sin ver")
-				.forEach(texto -> {
-					PdfPCell encabezado = new PdfPCell(new Phrase(texto, letraEncabezado));
-					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-					encabezado.setPadding(4);
-					tabla.addCell(encabezado);
-				});
+	private PdfPTable armarTablaEspecimenes(Map<String, Object> resultados, EstiloReportePdf estilo) throws DocumentException {
+		PdfPTable tabla = estilo.tabla(2.6f, 1.4f, 1.4f, 1.4f, 1.4f, 1.4f);
+		Font letraTexto = estilo.texto(9);
+		estilo.encabezados(tabla, "IDDDDD", "Espécimen", "Nado activo", "Inmovilidad", "Escalamiento", "Conducta activa", "Sin ver");
 		// Se copia la lista para poder añadirle «sin ver»: CONDUCTAS_GRUPO es inmutable (List.of).
 		List<String> columnas = new ArrayList<>(CONDUCTAS_GRUPO);
 		columnas.add(TablaDeReporte.SIN_VER);
 		for (Map<String, Object> especimen : DatosGraficas.lista(resultados.get("especimenes"))) {
-			tabla.addCell(new PdfPCell(new Phrase(especimen.get("tanda") + " · Espécimen " + especimen.get("numeroCilindro"), letraTexto)));
+			tabla.addCell(estilo.izquierda(especimen.get("tanda") + " · Espécimen " + especimen.get("numeroCilindro"), letraTexto, true));
 			Map<String, Object> totales = DatosGraficas.mapa(especimen.get("totales"));
 			for (String columna : columnas) {
 				Map<String, Object> par = DatosGraficas.mapa(totales.get(columna));
 				// "180 (60.0 %)": los segundos y su porcentaje. Con null se deja la celda vacía en vez de
 				// escribir "null".
 				String texto = par == null ? "" : par.get("segundos") + " (" + DatosGraficas.numero(DatosGraficas.dbl(par.get("porcentaje"))) + " %)";
-				tabla.addCell(celdaCentrada(texto, letraTexto));
+				tabla.addCell(estilo.derecha(texto, letraTexto));
 			}
 		}
 		return tabla;
@@ -1186,21 +1144,10 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	//
 	// Es un "pivote": pasar de filas largas (una por conducta) a filas anchas (una por minuto, con las
 	// conductas en columnas), que es como se lee una tabla en papel.
-	private PdfPTable armarTabla(List<FilaResultado> filas, Set<String> revisados) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(7);
-		tabla.setWidthPercentage(100);
-		tabla.setWidths(new float[] {3.2f, 1.6f, 1f, 1.3f, 1.2f, 1.3f, 1f});
+	private PdfPTable armarTabla(List<FilaResultado> filas, Set<String> revisados, EstiloReportePdf estilo) throws DocumentException {
+		PdfPTable tabla = estilo.tabla(4.0f, 1.5f, 0.9f, 1.5f, 1.4f, 1.4f, 0.9f);
 
-		// Encabezados, como en la práctica: Stream.of con los títulos y una celda con formato por cada uno.
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-		Stream.of("Espécimen", "Tiempo (min:seg)", "Nado", "Escalamiento", "Inmovilidad", "Conducta activa", "Sin ver")
-				.forEach(textoEncabezado -> {
-					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
-					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-					encabezado.setPadding(4);
-					tabla.addCell(encabezado);
-				});
+		estilo.encabezados(tabla, "IDDDDDD", "Espécimen", "Tiempo (min:seg)", "Nado", "Escalamiento", "Inmovilidad", "Conducta activa", "Sin ver");
 
 		// Agrupa: la llave es "espécimen|minuto" y el valor, los segundos de cada conducta. LinkedHashMap
 		// conserva el orden en que llegan las filas (el ORDER BY de la consulta).
@@ -1226,17 +1173,17 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			etiquetasPorFila.put(llave, new String[] {especimen, tiempo});
 		}
 
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
+		Font letraTexto = estilo.texto(8.5f);
 		for (Map.Entry<String, Map<String, BigDecimal>> fila : segundosPorFila.entrySet()) {
 			String[] etiquetas = etiquetasPorFila.get(fila.getKey());
-			tabla.addCell(new PdfPCell(new Phrase(etiquetas[0], letraTexto)));
-			tabla.addCell(celdaCentrada(etiquetas[1], letraTexto));
+			tabla.addCell(estilo.izquierda(etiquetas[0], letraTexto, true));
+			tabla.addCell(estilo.derecha(etiquetas[1], letraTexto));
 			// Las cinco columnas en el orden del encabezado. Una conducta que no ocurrió sale como 0.
 			for (String conducta : COLUMNAS_PDF) {
 				BigDecimal segundos = fila.getValue().getOrDefault(conducta, BigDecimal.ZERO);
 				// stripTrailingZeros + toPlainString escriben "12" en vez de "12.00", que es un conteo de
 				// segundos y no necesita decimales. toPlainString evita la notación científica.
-				tabla.addCell(celdaCentrada(segundos.stripTrailingZeros().toPlainString(), letraTexto));
+				tabla.addCell(estilo.derecha(segundos.stripTrailingZeros().toPlainString(), letraTexto));
 			}
 		}
 		return tabla;
@@ -1245,26 +1192,16 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// "Videos analizados": una fila por tanda con su grupo, el nombre del video como lo subió el usuario (o "nombre no
 	// registrado" en los videos anteriores al 20-oct-2026) y su duración.
 	// Es la tabla que permite rastrear de qué archivo salió cada medición.
-	private PdfPTable armarTablaVideos(List<Map<String, Object>> videos) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(3);
-		tabla.setWidthPercentage(100);
-		// La columna del nombre es la más ancha: los nombres de archivo son largos.
-		tabla.setWidths(new float[] {3.2f, 5f, 1.6f});
+	private PdfPTable armarTablaVideos(List<Map<String, Object>> videos, EstiloReportePdf estilo) throws DocumentException {
+		PdfPTable tabla = estilo.tabla(3.2f, 5f, 1.6f);
 
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-		Stream.of("Grupo · Tanda", "Video", "Duración (mm:ss)").forEach(textoEncabezado -> {
-			PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
-			encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-			encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-			encabezado.setPadding(4);
-			tabla.addCell(encabezado);
-		});
+		estilo.encabezados(tabla, "IID", "Grupo · Tanda", "Video", "Duración (mm:ss)");
 
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 9);
+		Font letraTexto = estilo.texto(9);
 		for (Map<String, Object> video : videos) {
-			tabla.addCell(new PdfPCell(new Phrase(video.get("grupo") + " · Tanda " + video.get("tanda"), letraTexto)));
-			tabla.addCell(new PdfPCell(new Phrase(nombreDelVideo(video), letraTexto)));
-			tabla.addCell(celdaCentrada(mmss((Number) video.get("duracionVideo")), letraTexto));
+			tabla.addCell(estilo.izquierda(video.get("grupo") + " · Tanda " + video.get("tanda"), letraTexto, true));
+			tabla.addCell(estilo.izquierda(nombreDelVideo(video), letraTexto, false));
+			tabla.addCell(estilo.derecha(mmss((Number) video.get("duracionVideo")), letraTexto));
 		}
 		return tabla;
 	}
@@ -1278,30 +1215,19 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 
 	// Una fila por tanda analizada: grupo y tanda, duración del video, tiempo total, tiempo de cada etapa y equipo.
 	// Solo sale en modo desarrollador: sirve para comparar cuánto tarda el análisis en distintas máquinas.
-	private PdfPTable armarTablaTiempos(List<Map<String, Object>> tandas) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(7);
-		tabla.setWidthPercentage(100);
-		tabla.setWidths(new float[] {2.6f, 1.2f, 1.3f, 1.4f, 1.3f, 1.5f, 3.2f});
+	private PdfPTable armarTablaTiempos(List<Map<String, Object>> tandas, EstiloReportePdf estilo) throws DocumentException {
+		PdfPTable tabla = estilo.tabla(2.3f, 1.1f, 1.4f, 2.3f, 1.2f, 1.8f, 2.5f);
 
-		// Letra 8 y no 9: son siete columnas con datos largos y hay que apretar.
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
-		Stream.of("Grupo · Tanda", "Video (mm:ss)", "Total (mm:ss)", "Preprocesamiento", "Cilindros",
-				"Clasificación", "Equipo")
-				.forEach(textoEncabezado -> {
-					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
-					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-					encabezado.setPadding(4);
-					tabla.addCell(encabezado);
-				});
+		// Letra 8 y no 9 en los datos: son siete columnas con datos largos y hay que apretar.
+		estilo.encabezados(tabla, "IDDDDDI", "Grupo · Tanda", "Video (mm:ss)", "Total (mm:ss)", "Preprocesamiento", "Cilindros", "Clasificación", "Equipo");
 
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 8);
+		Font letraTexto = estilo.texto(8);
 		for (Map<String, Object> tanda : tandas) {
 			// Además del grupo y la tanda, el nombre del video, para saber a qué archivo corresponde cada tiempo.
 			// El \n lo parte en dos renglones dentro de la misma celda.
-			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
-					+ nombreDelVideo(tanda), letraTexto)));
-			tabla.addCell(celdaCentrada(mmss((Number) tanda.get("duracionVideo")), letraTexto));
+			tabla.addCell(estilo.izquierda(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
+					+ nombreDelVideo(tanda), letraTexto, true));
+			tabla.addCell(estilo.derecha(mmss((Number) tanda.get("duracionVideo")), letraTexto));
 
 			@SuppressWarnings("unchecked")
 			Map<String, Object> tiempos = (Map<String, Object>) tanda.get("tiempos");
@@ -1309,13 +1235,14 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 				// Análisis de antes de que el worker midiera el tiempo.
 				// Hay que rellenar las cinco celdas que faltan: una tabla de iText se llena en orden y
 				// dejar huecos correría todo lo demás.
-				tabla.addCell(celdaCentrada("sin registro", letraTexto));
-				for (int i = 0; i < 4; i++) {
-					tabla.addCell(celdaCentrada("—", letraTexto));
+				tabla.addCell(estilo.derecha("sin registro", letraTexto));
+				for (int i = 0; i < 3; i++) {
+					tabla.addCell(estilo.derecha("—", letraTexto));
 				}
+				tabla.addCell(estilo.izquierda("—", letraTexto, false));
 				continue;
 			}
-			tabla.addCell(celdaCentrada(mmss((Number) tiempos.get("totalSegundos")), letraTexto));
+			tabla.addCell(estilo.derecha(mmss((Number) tiempos.get("totalSegundos")), letraTexto));
 			// Las etapas vienen como lista; se pasan a mapa para poder pedirlas por nombre.
 			Map<String, Number> porEtapa = new HashMap<>();
 			for (Object etapa : (List<?>) tiempos.get("etapas")) {
@@ -1325,9 +1252,9 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			// Se recorre el ENUM y no la lista del archivo: así las columnas salen siempre en el mismo
 			// orden y en el mismo número, aunque el archivo traiga las etapas desordenadas o falte alguna.
 			for (EtapaAnalisis etapa : EtapaAnalisis.values()) {
-				tabla.addCell(celdaCentrada(mmss(porEtapa.get(etapa.valor())), letraTexto));
+				tabla.addCell(estilo.derecha(mmss(porEtapa.get(etapa.valor())), letraTexto));
 			}
-			tabla.addCell(new PdfPCell(new Phrase(textoDelEquipo((Map<?, ?>) tiempos.get("equipo")), letraTexto)));
+			tabla.addCell(estilo.izquierda(textoDelEquipo((Map<?, ?>) tiempos.get("equipo")), letraTexto, false));
 		}
 		return tabla;
 	}
@@ -1336,25 +1263,15 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 	// y fecha del archivo). Las de antes de que se anotara el modelo dicen "sin registro".
 	//
 	// Es la tabla que permite explicar por qué dos corridas del mismo video dieron resultados distintos.
-	private PdfPTable armarTablaModelos(List<Map<String, Object>> tandas) throws DocumentException {
-		PdfPTable tabla = new PdfPTable(6);
-		tabla.setWidthPercentage(100);
-		tabla.setWidths(new float[] {2.8f, 2.2f, 1.4f, 2.6f, 1.2f, 1.6f});
+	private PdfPTable armarTablaModelos(List<Map<String, Object>> tandas, EstiloReportePdf estilo) throws DocumentException {
+		PdfPTable tabla = estilo.tabla(2.8f, 2.2f, 1.4f, 2.6f, 1.2f, 1.6f);
 
-		Font letraEncabezado = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8);
-		Stream.of("Grupo · Tanda", "Archivo del modelo", "Versión de la red", "SHA-256", "Tamaño", "Archivo del")
-				.forEach(textoEncabezado -> {
-					PdfPCell encabezado = new PdfPCell(new Phrase(textoEncabezado, letraEncabezado));
-					encabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-					encabezado.setBackgroundColor(BaseColor.LIGHT_GRAY);
-					encabezado.setPadding(4);
-					tabla.addCell(encabezado);
-				});
+		estilo.encabezados(tabla, "IIIIDD", "Grupo · Tanda", "Archivo del modelo", "Versión de la red", "SHA-256", "Tamaño", "Archivo del");
 
-		Font letraTexto = FontFactory.getFont(FontFactory.HELVETICA, 8);
+		Font letraTexto = estilo.texto(8);
 		for (Map<String, Object> tanda : tandas) {
-			tabla.addCell(new PdfPCell(new Phrase(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
-					+ nombreDelVideo(tanda), letraTexto)));
+			tabla.addCell(estilo.izquierda(tanda.get("grupo") + " · Tanda " + tanda.get("tanda") + "\n"
+					+ nombreDelVideo(tanda), letraTexto, true));
 
 			@SuppressWarnings("unchecked")
 			Map<String, Object> tiempos = (Map<String, Object>) tanda.get("tiempos");
@@ -1362,19 +1279,20 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 			@SuppressWarnings("unchecked")
 			Map<String, Object> modelo = tiempos == null ? null : (Map<String, Object>) tiempos.get("modelo");
 			if (modelo == null) {
-				tabla.addCell(celdaCentrada(ModeloDelAnalisis.SIN_REGISTRO, letraTexto));
-				for (int i = 0; i < 4; i++) {
-					tabla.addCell(celdaCentrada("—", letraTexto));
-				}
+				tabla.addCell(estilo.izquierda(ModeloDelAnalisis.SIN_REGISTRO, letraTexto, false));
+				tabla.addCell(estilo.izquierda("—", letraTexto, false));
+				tabla.addCell(estilo.izquierda("—", letraTexto, false));
+				tabla.addCell(estilo.derecha("—", letraTexto));
+				tabla.addCell(estilo.derecha("—", letraTexto));
 				continue;
 			}
-			tabla.addCell(new PdfPCell(new Phrase(String.valueOf(modelo.get("archivo")), letraTexto)));
+			tabla.addCell(estilo.izquierda(String.valueOf(modelo.get("archivo")), letraTexto, false));
 			// Cada campo que puede faltar escribe una raya en vez de "null".
-			tabla.addCell(celdaCentrada(modelo.get("version") != null ? modelo.get("version").toString() : "—", letraTexto));
+			tabla.addCell(estilo.izquierda(modelo.get("version") != null ? modelo.get("version").toString() : "—", letraTexto, false));
 			// huella() y fecha() son de ModeloDelAnalisis, el mismo que arma la línea del CSV y del XLSX.
-			tabla.addCell(celdaCentrada(ModeloDelAnalisis.huella(modelo) != null ? ModeloDelAnalisis.huella(modelo) : "—", letraTexto));
-			tabla.addCell(celdaCentrada(modelo.get("tamanoMB") != null ? modelo.get("tamanoMB") + " MB" : "—", letraTexto));
-			tabla.addCell(celdaCentrada(ModeloDelAnalisis.fecha(modelo) != null ? ModeloDelAnalisis.fecha(modelo) : "—", letraTexto));
+			tabla.addCell(estilo.izquierda(ModeloDelAnalisis.huella(modelo) != null ? ModeloDelAnalisis.huella(modelo) : "—", letraTexto, false));
+			tabla.addCell(estilo.derecha(modelo.get("tamanoMB") != null ? modelo.get("tamanoMB") + " MB" : "—", letraTexto));
+			tabla.addCell(estilo.derecha(ModeloDelAnalisis.fecha(modelo) != null ? ModeloDelAnalisis.fecha(modelo) : "—", letraTexto));
 		}
 		return tabla;
 	}
@@ -1403,14 +1321,6 @@ public class ExperimentoServiceImpl implements ExperimentoService {
 		long minutos = (total % 3600) / 60;
 		long resto = total % 60;
 		return horas > 0 ? String.format("%d:%02d:%02d", horas, minutos, resto) : String.format("%d:%02d", minutos, resto);
-	}
-
-	// Una celda centrada, que es como van todos los números de las tablas. Se escribe una vez aquí en vez
-	// de repetir las dos líneas en cada celda.
-	private PdfPCell celdaCentrada(String texto, Font letra) {
-		PdfPCell celda = new PdfPCell(new Phrase(texto, letra));
-		celda.setHorizontalAlignment(Element.ALIGN_CENTER);
-		return celda;
 	}
 
 }
