@@ -94,16 +94,20 @@ function Barra({ x, bw, valor, de, color, patron, prefijo, valoresS, puntos, eti
   )
 }
 
-// Un punto grande (el promedio), una línea hasta ± una desviación estándar y, detrás, un punto pequeño por espécimen.
-function PuntoConLinea({ cx, ancho, y, m, forma, color, puntos, grupo, conducta, unidad, base, ver, quitar }) {
-  const cap = Math.max(5, ancho * 0.28)
+// Un punto grande (el promedio), una línea hasta ± una desviación estándar y, EN UNA COLUMNA A LA IZQUIERDA, un punto pequeño por
+// espécimen. Van aparte, no encima: sobre el promedio y su línea se estorbaban y no se distinguían.
+// `dx` es la distancia entre el promedio y la columna de especímenes (más que la mitad de la marca más grande, 8,5);
+// `paso` reparte los especímenes de valor parecido para que no se tapen entre sí.
+const DX_PUNTOS = 13
+const PASO_PUNTOS = 1.4
+function PuntoConLinea({ cx, y, m, forma, color, puntos, grupo, conducta, unidad, base, ver, quitar, dx = DX_PUNTOS, paso = PASO_PUNTOS }) {
+  const cap = 6
   const lo = y(Math.min(y.escala, m.media + (m.de ?? 0)))
   const hi = y(Math.max(0, m.media - (m.de ?? 0)))
-  const separacion = Math.max(2.4, ancho * 0.1)
   return (
     <g>
       {puntos && m.valoresS.map((v, i) => (
-        <circle key={i} cx={cx + (((i * 7) % 5) - 2) * separacion} cy={y(v)} r="2.7" fill="var(--color-text)" fillOpacity="0.38" stroke="var(--color-bg)" strokeWidth="0.6"
+        <circle key={i} cx={cx - dx + (((i * 7) % 5) - 2) * paso} cy={y(v)} r="2.7" fill="var(--color-text)" fillOpacity="0.5" stroke="var(--color-bg)" strokeWidth="0.6"
           style={{ cursor: 'pointer' }} onMouseEnter={() => ver(lecturaDeEspecimen(grupo, conducta, v, unidad, base))} onMouseLeave={quitar}>
           <title>{lecturaDeEspecimen(grupo, conducta, v, unidad, base)}</title>
         </circle>
@@ -142,7 +146,10 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
   const mostradas = tres ? CONDUCTAS_BARRAS : CONDUCTAS_BARRAS.filter((c) => c.clave === conducta)
   const slot = grupos.length ? PW / grupos.length : PW
   const bw = tres ? Math.min(26, slot * 0.22) : Math.min(44, slot * 0.5)
-  const offsets = tres ? [-1, 0, 1].map((k) => k * bw * 1.15) : [0]
+  // Con puntos y línea, cada conducta lleva a su izquierda su columna de especímenes: se separan más que las barras.
+  const espaciado = Math.max(22, Math.min(30, slot * 0.32))
+  const offsets = tres ? [-1, 0, 1].map((k) => k * (dePuntos ? espaciado : bw * 1.15)) : [0]
+  const corrimiento = tres ? 5 : 7   // con la columna a la izquierda, el conjunto se corre a la derecha para quedar centrado
   const activa = CONDUCTAS_GRAFICA.find((c) => c.clave === 'conducta activa')
   const dibujable = (g) => !g.nivelMixto && g.porConducta && g.n > 0
   const maxCar = Math.max(4, Math.floor((slot - 6) / CAR))
@@ -297,7 +304,8 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
                 if (dePuntos) {
                   const forma = tres ? FORMA_DE_CONDUCTA[c.clave] : estilos.get(g.idGrupo).forma
                   return m.media == null ? null : (
-                    <PuntoConLinea key={c.clave} cx={cx + offsets[j]} ancho={bw} y={y} m={m} forma={forma} color={color} puntos={puntos}
+                    <PuntoConLinea key={c.clave} cx={cx + offsets[j] + corrimiento} y={y} m={m} forma={forma} color={color} puntos={puntos}
+                      dx={tres ? 11 : DX_PUNTOS} paso={tres ? 1.2 : PASO_PUNTOS}
                       grupo={g.etiqueta} conducta={c.etiqueta.toLowerCase()} unidad={unidad} base={baseDe(g)}
                       ver={setLectura} quitar={() => setLectura(null)} />
                   )
@@ -311,7 +319,7 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
               {dibujable(g) && !tres && (() => {
                 const m = g.porConducta[mostradas[0].clave]
                 return m.media == null ? null : (
-                  <text x={cx} y={y(Math.min(escala, m.media + (m.de ?? 0))) - (dePuntos ? 10 : 6)} textAnchor="middle" fontSize="10.5" fill="var(--color-text)" stroke="var(--color-bg)" strokeWidth="3" paintOrder="stroke">
+                  <text x={cx + (dePuntos ? corrimiento : 0)} y={y(Math.min(escala, m.media + (m.de ?? 0))) - (dePuntos ? 10 : 6)} textAnchor="middle" fontSize="10.5" fill="var(--color-text)" stroke="var(--color-bg)" strokeWidth="3" paintOrder="stroke">
                     {textoMediaDeEnUnidad(m.media, m.de, unidad, baseDe(g))}
                   </text>
                 )

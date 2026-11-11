@@ -22,7 +22,7 @@ import java.util.Map;
 // Es la gráfica principal del reporte: la que responde la pregunta del experimento, si el grupo tratado se
 // comporta distinto del control.
 // Dos decisiones de presentación que merecen entenderse:
-//   el PUNTO POR ESPECIMEN encima de la barra enseña los datos crudos, no solo el promedio. Con n = 6,
+//   el PUNTO POR ESPECIMEN, en el hueco a la derecha de cada barra, enseña los datos crudos, no solo el promedio. Con n = 6,
 //   ver los seis individuos dice mucho más que una barra sola: una media de 30 puede venir de seis
 //   animales en torno a 30 o de tres en 5 y tres en 55, y la figura lo delata.
 //   «conducta activa» se saca de las barras y va a una nota porque solo existe en los análisis de nivel
@@ -155,9 +155,11 @@ public final class G1BarrasGruposPdf implements GraficaPdf {
 		float yBase = M_SUP + alto;
 		// El ancho que le toca a cada grupo, repartiendo el espacio por igual.
 		float slot = grupos.isEmpty() ? ancho : ancho / grupos.size();
-		// El ancho de cada barra: la quinta parte del hueco del grupo, con un tope de 40 puntos para que
-		// con pocos grupos no salgan barras absurdamente anchas.
-		float bw = Math.min(40f, slot * 0.2f);
+		// El ancho de cada barra: algo menos de la quinta parte del hueco del grupo, con un tope de 40 puntos para que
+		// con pocos grupos no salgan barras absurdamente anchas. Entre una barra y la siguiente queda un hueco (gap) donde
+		// van los puntos de los especímenes: ya no se dibujan encima de la barra ni de su barra de error, donde se tapaban.
+		float bw = Math.min(40f, slot * 0.17f);
+		float gap = Math.max(7f, Math.min(11f, slot * 0.12f));
 
 		// Ejes y marcas: 0 a la escala, cada quinta parte.
 		// Seis líneas (de 0 a 5) con su número a la izquierda. La de k == 0 es la base y va más gruesa.
@@ -178,7 +180,7 @@ public final class G1BarrasGruposPdf implements GraficaPdf {
 			// El centro del hueco de este grupo: el 0.5 lo pone en medio y no en el borde.
 			float cx = M_IZQ + slot * (i + 0.5f);
 			if (tieneDatos(g)) {
-				dibujarGrupo(d, g, cx, bw, yBase, alto, escala);
+				dibujarGrupo(d, g, cx, bw, gap, yBase, alto, escala);
 			} else {
 				// Un grupo sin barras deja su hueco con un texto que dice por qué: así se ve que el grupo
 				// existe y no se pudo dibujar, en vez de desaparecer de la figura.
@@ -199,9 +201,9 @@ public final class G1BarrasGruposPdf implements GraficaPdf {
 	}
 
 	// Las tres barras de un grupo, en su orden, con el patrón de cada conducta y su barra de error.
-	private void dibujarGrupo(DibujanteGraficas d, Map<String, Object> g, float cx, float bw, float yBase, float alto, double escala) {
-		// Un poco más que el ancho de barra, para que queden separadas sin tocarse.
-		float separacion = bw * 1.15f;
+	private void dibujarGrupo(DibujanteGraficas d, Map<String, Object> g, float cx, float bw, float gap, float yBase, float alto, double escala) {
+		// El ancho de barra más el hueco donde van los puntos de la barra de la izquierda.
+		float separacion = bw + gap;
 		for (int j = 0; j < DatosGraficas.CONDUCTAS_TRES.size(); j++) {
 			String conducta = DatosGraficas.CONDUCTAS_TRES.get(j);
 			EstiloPdf estilo = EstiloPdf.conducta(conducta);
@@ -231,8 +233,10 @@ public final class G1BarrasGruposPdf implements GraficaPdf {
 				d.linea(cxBarra - bw * 0.3f, lo, cxBarra + bw * 0.3f, lo, 0.9f, EstiloPdf.NEGRO, null);
 				d.linea(cxBarra - bw * 0.3f, hi, cxBarra + bw * 0.3f, hi, 0.9f, EstiloPdf.NEGRO, null);
 			}
-			// Los puntos de cada espécimen, encima de la barra: los datos crudos detrás del promedio.
+			// Los puntos de cada espécimen, en el hueco a la derecha de la barra: los datos crudos al lado del promedio,
+			// sin tapar la barra ni su barra de error (encima se estorbaban y no se distinguían).
 			List<Double> valores = valoresS(e);
+			float cxPuntos = x + bw + gap / 2;
 			for (int k = 0; k < valores.size(); k++) {
 				Double v = valores.get(k);
 				if (v == null) {
@@ -240,11 +244,11 @@ public final class G1BarrasGruposPdf implements GraficaPdf {
 				}
 				// El desplazamiento horizontal reparte los puntos para que dos valores iguales no se
 				// tapen. (k * 7) % 5 genera 0,2,4,1,3,... que es una dispersión más repartida que k % 5;
-				// el -2 la centra sobre la barra. Es determinista: la misma figura sale siempre igual,
-				// cosa que un desplazamiento al azar no garantizaría.
-				float px = cxBarra + (((k * 7) % 5) - 2) * (bw * 0.12f);
+				// el -2 la centra en el hueco, y un punto de paso deja los extremos dentro de él. Es determinista:
+				// la misma figura sale siempre igual, cosa que un desplazamiento al azar no garantizaría.
+				float px = cxPuntos + (((k * 7) % 5) - 2) * 1.0f;
 				float py = yBase - (float) (Math.min(v, escala) / escala) * alto;
-				d.marca(EstiloPdf.Forma.CIRCULO, px, py, 1.6f, EstiloPdf.NEGRO, false);
+				d.marca(EstiloPdf.Forma.CIRCULO, px, py, 1.7f, EstiloPdf.NEGRO, false);
 			}
 		}
 	}
