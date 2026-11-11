@@ -513,14 +513,14 @@ describe('cargar video', () => {
 })
 
 describe('resultados', () => {
-  it('muestra los especímenes de la tanda y la comparación entre grupos', async () => {
+  it('muestra los especímenes de la tanda y manda a comparar grupos a los resultados del experimento', async () => {
     const user = await conSesion('/experimentos/7/resultados?grupo=2&tanda=A')
     expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
     expect(screen.getAllByText('Tanda A · Espécimen 1').length).toBeGreaterThan(0)
-    await user.click(screen.getByRole('button', { name: 'Comparación entre grupos' }))
-    // La comparación es la galería de gráficas, con todos los grupos del experimento.
-    expect(await screen.findByRole('heading', { name: '¿Cuánto hizo cada grupo?' })).toBeTruthy()
-    expect((await screen.findAllByText(/Sus tandas se analizaron con distinto detalle y no se pueden promediar juntas\. Míralas por separado en el detalle\./)).length).toBeGreaterThan(0)
+    // Comparar grupos entre sí no es del detalle de una tanda: no hay pestaña, hay un enlace a los resultados del experimento.
+    expect(screen.queryByRole('button', { name: 'Comparación entre grupos' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Comparar con los otros grupos →' }).getAttribute('href')).toBe('/experimentos/7/resultados')
+    await user.click(screen.getByRole('button', { name: 'Minuto a minuto' }))
     await user.click(screen.getByRole('button', { name: 'Por espécimen' }))
     // Cuatro columnas de conducta, también la conducta activa (R-12).
     expect(screen.getAllByRole('columnheader', { name: 'Conducta activa' }).length).toBeGreaterThan(0)
@@ -1009,6 +1009,12 @@ describe('resultados del experimento (pantalla principal, segundo a segundo y de
     expect(screen.getByText(/^Control: .* s de inmovilidad/)).toBeTruthy()
     await user.click(screen.getByRole('checkbox', { name: 'Experimental A' }))
     expect(screen.getByText(/^Experimental A: .* s de inmovilidad/)).toBeTruthy()
+  })
+
+  it('un enlace viejo con ?vista=comparacion abre el detalle por espécimen, sin romperse', async () => {
+    await conSesion('/experimentos/7/resultados?grupo=2&tanda=A&vista=comparacion')
+    expect(await screen.findByRole('heading', { name: 'Resultados · Grupo referencia, Tanda A' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Por espécimen' }).getAttribute('aria-current')).toBe('true')
   })
 
   it('las dos descargas: en demo no hay archivo y lo dice', async () => {

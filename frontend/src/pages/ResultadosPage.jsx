@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useModo } from '../contexts/ModoContext'
 import Topbar, { Brand } from '../components/Topbar'
 import { getBatchResults, getReporte, getSalidaModelo } from '../services/results'
@@ -129,6 +129,10 @@ function ResultadosTanda({ clave, gid, letra }) {
             <button key={t.id} type="button" className={'tab' + (vista === t.id ? ' on' : '')} aria-current={vista === t.id ? 'true' : undefined}
               onClick={() => cambiarVista(t.id)} style={{ whiteSpace: 'nowrap' }}>{t.label}</button>
           ))}
+          {/* Comparar grupos entre sí no es del detalle de una tanda: vive en los resultados del experimento, con todos sus grupos. */}
+          <Link to={enlaceResultadosExperimento(exp.clave)} className="linkbtn" style={{ marginLeft: 'auto', alignSelf: 'center', paddingLeft: 16, whiteSpace: 'nowrap', fontSize: 13 }}>
+            Comparar con los otros grupos →
+          </Link>
         </nav>
 
         <div className="rejilla-lateral" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 2, background: 'var(--color-divider)' }}>

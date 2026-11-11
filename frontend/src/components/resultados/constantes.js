@@ -61,5 +61,4 @@ export const TABS = [
   { id: 'segundo', label: 'Segundo a segundo' },
   { id: 'timeline', label: 'Minuto a minuto' },
   { id: 'bloques', label: 'Cada 5 segundos' },
-  { id: 'comparacion', label: 'Comparación entre grupos' },
 ]
