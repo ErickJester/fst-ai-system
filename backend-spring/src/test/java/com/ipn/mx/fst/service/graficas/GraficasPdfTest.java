@@ -155,6 +155,54 @@ class GraficasPdfTest {
 		}
 	}
 
+	// El subtítulo de una gráfica y su leyenda no se encimaban: entre la línea base del subtítulo (8 pt) y la de la leyenda
+	// (7.5 pt) tiene que haber al menos 12 pt, que es lo que ocupan la letra y el cuadrito de la leyenda.
+	@Test
+	void el_subtitulo_de_cada_grafica_queda_separado_de_su_leyenda() throws IOException {
+		int comprobados = 0;
+		for (Map<String, Object> datos : List.of(datosDeVariosGrupos(), datosConNombresLargos())) {
+			PdfReader lector = new PdfReader(pdfConGraficas(datos));
+			com.itextpdf.text.pdf.parser.PdfReaderContentParser parser = new com.itextpdf.text.pdf.parser.PdfReaderContentParser(lector);
+			for (int pagina = 1; pagina <= lector.getNumberOfPages(); pagina++) {
+				List<String> textos = new ArrayList<>();
+				List<Float> alturas = new ArrayList<>();
+				parser.processContent(pagina, new com.itextpdf.text.pdf.parser.RenderListener() {
+					@Override public void beginTextBlock() { }
+					@Override public void endTextBlock() { }
+					@Override public void renderImage(com.itextpdf.text.pdf.parser.ImageRenderInfo info) { }
+					@Override public void renderText(com.itextpdf.text.pdf.parser.TextRenderInfo info) {
+						textos.add(info.getText());
+						alturas.add(info.getBaseline().getStartPoint().get(com.itextpdf.text.pdf.parser.Vector.I2));
+					}
+				});
+				// Cada subtítulo («Media ...» o «Promedio ...») va seguido, más abajo, de la primera muestra de su leyenda.
+				for (int i = 0; i < textos.size(); i++) {
+					if (!textos.get(i).startsWith("Media ± DE de los espec") && !textos.get(i).startsWith("Media por minuto")) {
+						continue;
+					}
+					comprobados++;
+					float ySubtitulo = alturas.get(i);
+					// La leyenda es el texto con contenido más cercano por debajo del subtítulo, en la misma página. Se busca por
+					// POSICIÓN y no por orden de aparición, porque iText dibuja la leyenda en otra capa, después de los párrafos.
+					float yLeyenda = Float.NaN;
+					for (int j = 0; j < textos.size(); j++) {
+						if (j == i || textos.get(j).isBlank() || alturas.get(j) >= ySubtitulo - 0.5f) {
+							continue;
+						}
+						if (Float.isNaN(yLeyenda) || alturas.get(j) > yLeyenda) {
+							yLeyenda = alturas.get(j);
+						}
+					}
+					assertFalse(Float.isNaN(yLeyenda), "no se encontró la leyenda debajo del subtítulo: " + textos.get(i));
+					assertTrue(ySubtitulo - yLeyenda >= 12f,
+							"el subtítulo «" + textos.get(i) + "» queda a solo " + (ySubtitulo - yLeyenda) + " pt de su leyenda");
+				}
+			}
+		}
+		// Si no se encontró ningún subtítulo, la prueba no comprobó nada: eso también es un fallo.
+		assertTrue(comprobados >= 2, "se esperaban al menos dos subtítulos con su leyenda y hubo " + comprobados);
+	}
+
 	// Escribe un PDF de prueba con solo la sección de gráficas (el resto del reporte necesita la base de datos).
 	static byte[] pdfConGraficas(Map<String, Object> datos) throws IOException {
 		// El PDF se arma en memoria (ByteArrayOutputStream): la prueba no toca el disco.

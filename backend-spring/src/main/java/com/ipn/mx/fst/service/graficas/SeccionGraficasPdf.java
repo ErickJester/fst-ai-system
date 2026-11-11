@@ -45,6 +45,8 @@ public final class SeccionGraficasPdf {
 	private static final float ALTO_NOTA = 9.5f;
 	private static final float ALTO_TITULO = 44f;
 	private static final float TAMANO_LEYENDA = 7.5f;
+	// El aire que se deja debajo del subtítulo: sin él la leyenda empieza pegada a la letra del subtítulo y se encima.
+	private static final float ESPACIO_SUBTITULO = 8f;
 
 	private SeccionGraficasPdf() {
 	}
@@ -76,7 +78,7 @@ public final class SeccionGraficasPdf {
 			// La leyenda ocupa tantas filas como quepan sus muestras; el +4 es un respiro debajo.
 			float alturaLeyenda = filasDeLeyenda(fuente, grafica.leyenda(datos), ancho) * ALTO_FILA_LEYENDA + 4;
 			// La altura de TODO el bloque: título, leyenda, dibujo, notas y un margen.
-			float alturaTotal = ALTO_TITULO + alturaLeyenda + grafica.alto() + grafica.notas(datos).size() * ALTO_NOTA + 14;
+			float alturaTotal = ALTO_TITULO + ESPACIO_SUBTITULO + alturaLeyenda + grafica.alto() + grafica.notas(datos).size() * ALTO_NOTA + 14;
 			// Si el bloque entero no cabe en lo que queda de página, se salta a la siguiente. Sin esto,
 			// una gráfica podría partirse entre dos páginas, con el título arriba y el dibujo abajo.
 			// getVerticalPosition da la altura actual del cursor; en un PDF el eje Y crece hacia arriba,
@@ -93,7 +95,9 @@ public final class SeccionGraficasPdf {
 			titulo.setSpacingBefore(8);
 			documento.add(titulo);
 			// El subtítulo en cursiva gris, como las notas: se lee como una aclaración.
-			documento.add(new Paragraph(grafica.subtitulo(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, BaseColor.DARK_GRAY)));
+			Paragraph subtitulo = new Paragraph(grafica.subtitulo(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, BaseColor.DARK_GRAY));
+			subtitulo.setSpacingAfter(ESPACIO_SUBTITULO);
+			documento.add(subtitulo);
 			dibujarBloque(documento, writer, fuente, negrita, grafica, datos, alturaLeyenda);
 		}
 		return true;

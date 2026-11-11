@@ -64,7 +64,7 @@ public class ReporteAlmacen {
 	// Es una solución elegante a un problema real: al mejorar el PDF, los ya guardados siguen siendo los
 	// viejos y nada en los datos ha cambiado, así que ninguna invalidación normal los tocaría. Un número
 	// de versión en un archivo del volumen resuelve el caso sin añadir una columna al esquema.
-	static final String VERSION_PDF = "2";
+	static final String VERSION_PDF = "3";
 	private static final String MARCA_VERSION = "version-pdf.txt";
 	// La expresión regular que valida el alcance: la palabra grupo o tanda, un guion y uno o más dígitos.
 	// \\d es un dígito (la barra va doble porque en Java la primera escapa a la segunda).
@@ -135,7 +135,9 @@ public class ReporteAlmacen {
 					for (Path carpeta : carpetas.toList()) {
 						// Solo el PDF: los CSV y XLSX de cada carpeta no dependen de esta versión y se
 						// quedan. deleteIfExists no se queja si no está.
-						Files.deleteIfExists(carpeta.resolve("experimento.pdf"));
+						if (Files.isDirectory(carpeta)) { // la marca de versión es un archivo, no una carpeta de experimento
+								Files.deleteIfExists(carpeta.resolve("experimento.pdf"));
+							}
 					}
 				}
 			}

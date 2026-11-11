@@ -98,6 +98,21 @@ class ReporteAlmacenVersionTest {
 	}
 
 	@Test
+	void la_marca_de_una_version_anterior_no_se_confunde_con_una_carpeta_de_experimento() throws IOException {
+		// Un servidor que ya tiene la marca (archivo) pero de otra versión: al arrancar con la versión nueva
+		// debe borrar el PDF viejo y reescribir la marca, sin fallar por intentar abrir la marca como carpeta.
+		Path carpeta = carpetaDelExperimento();
+		Files.writeString(carpeta.resolve("experimento.pdf"), "pdf de la versión anterior");
+		Path marca = raiz.resolve("reportes").resolve("version-pdf.txt");
+		Files.writeString(marca, "0");
+
+		almacen(mock(JdbcTemplate.class)).prepararRaiz();
+
+		assertFalse(Files.exists(carpeta.resolve("experimento.pdf")));
+		assertEquals(ReporteAlmacen.VERSION_PDF, Files.readString(marca));
+	}
+
+	@Test
 	void si_la_base_falla_al_invalidar_el_arranque_se_detiene() throws IOException {
 		carpetaDelExperimento();
 		JdbcTemplate jdbc = mock(JdbcTemplate.class);
