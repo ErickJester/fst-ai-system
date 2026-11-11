@@ -4,7 +4,7 @@ import Patrones, { patronId } from './Patrones'
 import MuestraLeyenda from './MuestraLeyenda'
 import Marca from './Marca'
 import { CONDUCTAS_BARRAS, CONDUCTAS_GRAFICA, ESCALA_SEGUNDOS, NOTA_MIXTO, estilosDeGrupos, numero, textoMediaDe, textoN, textoAnimales } from './estilos'
-import { UNIDADES, fraseDeComparacion, marcasDelEje, textoMediaDeEnUnidad, tiempoEnPalabras, valorEnUnidad } from './explicacion'
+import { UNIDADES, marcasDelEje, textoMediaDeEnUnidad, tiempoEnPalabras, valorEnUnidad } from './explicacion'
 
 // G1 · ¿Cuánto hizo cada grupo? La media de una conducta por grupo, con su ± desviación estándar y un punto por espécimen.
 // Por defecto se dibuja como punto con línea (el punto grande es el promedio; la línea llega a ± una desviación estándar;
@@ -180,7 +180,6 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
     notas.push(`Conducta activa, fuera de la gráfica (segundos medios por espécimen): ${conActiva.map((g) => `${g.etiqueta} ${numero(g.porConducta[activa.clave].media)} s`).join(' · ')}.`)
   }
 
-  const frase = tres ? [] : fraseDeComparacion(grupos, conducta)
   const titulo = '¿Cuánto hizo cada grupo?'
   const etiquetaSvg = dePuntos
     ? 'Puntos con línea: el promedio de cada grupo con su ± desviación estándar y un punto por espécimen, del Día 2.'
@@ -272,12 +271,6 @@ export default function G1BarrasGrupos({ datos, conducta, setConducta, puntos, s
         </table>
       )}
     >
-      {frase.length > 0 && (
-        <div role="note" style={{ margin: '0 0 12px', padding: '10px 14px', borderLeft: '3px solid var(--color-accent)', background: 'var(--color-surface)', fontSize: 13.5, lineHeight: 1.6 }}>
-          <strong style={{ display: 'block', fontSize: 12, marginBottom: 3 }}>En palabras</strong>
-          {frase.map((texto) => <span key={texto} style={{ display: 'block' }}>{texto}</span>)}
-        </div>
-      )}
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby={`${prefijo}-t ${prefijo}-d`}
         style={{ display: 'block', width: '100%', maxWidth: 560, height: 'auto', fontFamily: 'var(--font-body)' }}>
         <title id={`${prefijo}-t`}>{titulo}</title>

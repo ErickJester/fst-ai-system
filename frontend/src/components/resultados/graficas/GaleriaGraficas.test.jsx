@@ -262,7 +262,7 @@ describe('G1 · etiquetas largas, escala y nivel mixto', () => {
   })
 })
 
-describe('G1 · puntos con línea, unidades y frase en palabras', () => {
+describe('G1 · puntos con línea y unidades', () => {
   const dos = {
     ...datosDeUnGrupo,
     grupos: [
@@ -287,20 +287,10 @@ describe('G1 · puntos con línea, unidades y frase en palabras', () => {
     expect(container.querySelector('svg[role=img]').querySelectorAll('rect').length).toBeGreaterThan(1)
   })
 
-  it('la frase cuenta los promedios, su diferencia y que las líneas se traslapan, y avisa que no es una prueba', () => {
+  it('la gráfica de grupos ya no trae el recuadro «En palabras»', () => {
     render(<GaleriaGraficas datos={dos} />)
-    const nota = screen.getByRole('note')
-    expect(nota.textContent).toContain('En palabras')
-    expect(nota.textContent).toContain('en Acu-YBN, cada espécimen pasó 2 min 2 s inmóvil (41 % del tiempo)')
-    expect(nota.textContent).toContain('La diferencia entre los dos promedios es de 20 s')
-    expect(nota.textContent).toContain('se traslapan')
-    expect(nota.textContent).toContain('no es una prueba estadística')
-  })
-
-  it('con «Las tres juntas» no hay frase (no hay una sola conducta que contar)', () => {
-    render(<GaleriaGraficas datos={dos} />)
-    fireEvent.change(screen.getByLabelText('Conducta'), { target: { value: 'tres' } })
     expect(screen.queryByRole('note')).toBeNull()
+    expect(screen.queryByText('En palabras')).toBeNull()
   })
 
   it('«Mostrar en» cambia los valores y el eje: reloj y porcentaje', () => {
@@ -343,7 +333,7 @@ describe('G1 · puntos con línea, unidades y frase en palabras', () => {
     expect(screen.getByLabelText('Mostrar en').value).toBe('s')
   })
 
-  it('sin fallos de axe-core con puntos, frase y lectura', async () => {
+  it('sin fallos de axe-core con puntos y lectura', async () => {
     const { container } = render(<GaleriaGraficas datos={dos} />)
     const resultado = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } })
     expect(resultado.violations.map((v) => v.id)).toEqual([])
