@@ -971,15 +971,44 @@ describe('resultados del experimento (pantalla principal, segundo a segundo y de
     expect(await screen.findByRole('heading', { name: 'Compuesto CSR-14 · curva de dosis' })).toBeTruthy()
     expect(screen.getByText(/Listos 1 de 4 grupos/)).toBeTruthy()
     expect(screen.getByText(/Falta: Control \(Tanda B en pausa\)/)).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '¿Qué pasó? (comparado con el control)' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '¿Qué pasó? (comparado con Control)' })).toBeTruthy()
   })
 
   it('¿Qué pasó? compara con el control y dice en palabras comunes los casos de nivel mixto y sin datos', async () => {
     await conSesion('/experimentos/7/resultados')
     expect(await screen.findByText(/^Control: .* s de inmovilidad en promedio\.$/)).toBeTruthy()
-    expect(screen.getByText(/^Experimental A: .* que el control/)).toBeTruthy()
+    expect(screen.getByText(/^Experimental A: .* que Control/)).toBeTruthy()
     expect(screen.getByText(/^Referencia: sus tandas se analizaron con distinto detalle/)).toBeTruthy()
     expect(screen.getByText(/^Experimental B: todavía no tiene datos del Día 2\.$/)).toBeTruthy()
+  })
+
+  it('¿Qué pasó? se puede comparar contra cualquier grupo, no solo contra el control', async () => {
+    const user = await conSesion('/experimentos/7/resultados')
+    await screen.findByText(/^Control: .* s de inmovilidad en promedio\.$/)
+    await user.selectOptions(screen.getByLabelText('Comparar contra'), 'Experimental A')
+    expect(screen.getByRole('heading', { name: '¿Qué pasó? (comparado con Experimental A)' })).toBeTruthy()
+    expect(screen.getByText(/^Control: .* que Experimental A/)).toBeTruthy()
+    expect(screen.getByText(/^Experimental A: .* s de inmovilidad en promedio\.$/)).toBeTruthy()
+  })
+
+  it('¿Qué pasó? con una referencia sin datos avisa que no hay con qué comparar y deja solo los promedios', async () => {
+    const user = await conSesion('/experimentos/7/resultados')
+    await screen.findByText(/^Control: .* s de inmovilidad en promedio\.$/)
+    await user.selectOptions(screen.getByLabelText('Comparar contra'), 'Experimental B')
+    expect(screen.getByText(/Experimental B no tiene datos del Día 2 en inmovilidad, así que no hay con qué comparar/)).toBeTruthy()
+    expect(screen.getByText(/^Control: .* s de inmovilidad en promedio\.$/)).toBeTruthy()
+  })
+
+  it('¿Qué pasó? deja quitar grupos de la comparación, salvo el de referencia', async () => {
+    const user = await conSesion('/experimentos/7/resultados')
+    await screen.findByText(/^Control: .* s de inmovilidad en promedio\.$/)
+    expect(screen.getByRole('checkbox', { name: 'Control' }).disabled).toBe(true)
+    await user.click(screen.getByRole('checkbox', { name: 'Experimental A' }))
+    // Las filas de «¿Qué pasó?» dicen «… s de inmovilidad»; otros avisos de la pantalla también empiezan con el nombre del grupo.
+    expect(screen.queryByText(/^Experimental A: .* s de inmovilidad/)).toBeNull()
+    expect(screen.getByText(/^Control: .* s de inmovilidad/)).toBeTruthy()
+    await user.click(screen.getByRole('checkbox', { name: 'Experimental A' }))
+    expect(screen.getByText(/^Experimental A: .* s de inmovilidad/)).toBeTruthy()
   })
 
   it('las dos descargas: en demo no hay archivo y lo dice', async () => {
