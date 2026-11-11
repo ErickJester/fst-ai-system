@@ -75,10 +75,10 @@ describe('revisión: el borrador se guarda al esconder o cerrar la pestaña', ()
 })
 
 describe('lista de experimentos: reportes', () => {
-  it('cada experimento con resultados tiene «Ver resultados →» y un PDF; sin CSV ni XLSX sueltos', async () => {
+  it('cada experimento con resultados tiene «Ver resultados» y un PDF; sin CSV ni XLSX sueltos', async () => {
     await conSesion('/experimentos')
     const tabla = await screen.findByRole('table')
-    expect(within(tabla).getAllByRole('link', { name: 'Ver resultados →' }).length).toBeGreaterThan(0)
+    expect(within(tabla).getAllByRole('link', { name: 'Ver resultados' }).length).toBeGreaterThan(0)
     expect(within(tabla).getAllByRole('button', { name: 'PDF' }).length).toBeGreaterThan(0)
     expect(within(tabla).queryByRole('button', { name: 'CSV' })).toBeNull()
     expect(within(tabla).queryByRole('link', { name: 'CSV' })).toBeNull()

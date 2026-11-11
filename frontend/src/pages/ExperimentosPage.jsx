@@ -201,11 +201,11 @@ export default function ExperimentosPage() {
                       {conReportes(e)
                         ? (
                           <>
-                            <Link className="chip" to={`/experimentos/${e.clave}/resultados`}>Ver resultados →</Link>
+                            <Link className="chip" to={`/experimentos/${e.clave}/resultados`}>Ver resultados</Link>
                             <button type="button" className="chip" onClick={() => descargarPdf(e)}>PDF</button>
                           </>
                         )
-                        : <span className="chip" style={chipInactivo} aria-disabled="true" title={e.con_detalle ? 'Todavía no hay resultados' : 'Sin detalle en el modo demo'}>Ver resultados →</span>}
+                        : <span className="chip" style={chipInactivo} aria-disabled="true" title={e.con_detalle ? 'Todavía no hay resultados' : 'Sin detalle en el modo demo'}>Ver resultados</span>}
                       {puedeEliminar(user, e) && (
                         <button type="button" className="linkbtn" style={{ fontSize: 12, marginLeft: 6, whiteSpace: 'nowrap' }}
                           aria-label={'Eliminar ' + e.titulo} onClick={() => setBorrar(e)}>Eliminar…</button>
