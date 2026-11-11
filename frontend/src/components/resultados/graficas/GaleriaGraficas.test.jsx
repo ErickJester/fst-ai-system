@@ -99,12 +99,11 @@ describe('GaleriaGraficas · G1', () => {
 })
 
 describe('GaleriaGraficas · selector y teclado', () => {
-  it('las seis gráficas se pueden elegir y cada una abre la suya', () => {
+  it('las cinco gráficas se pueden elegir y cada una abre la suya', () => {
     render(<GaleriaGraficas datos={datosDeUnGrupo} />)
     const titulos = [
       '¿Cuánto hizo cada grupo?',
       '¿Cómo cambió minuto a minuto?',
-      '¿Cómo se compara cada minuto?',
       '¿En qué se fue el tiempo?',
       '¿Qué tan parecidos son los especímenes?',
       '¿En qué minuto cambia?',
@@ -120,7 +119,7 @@ describe('GaleriaGraficas · selector y teclado', () => {
   it('«Ver varias» muestra hasta tres gráficas juntas, sin repetir ids', () => {
     const { container } = render(<GaleriaGraficas datos={datosDeUnGrupo} />)
     fireEvent.click(screen.getByRole('checkbox', { name: /Ver varias/ }))
-    for (const pregunta of ['¿Cómo cambió minuto a minuto?', '¿Cómo se compara cada minuto?', '¿En qué se fue el tiempo?']) {
+    for (const pregunta of ['¿Cómo cambió minuto a minuto?', '¿En qué se fue el tiempo?', '¿Qué tan parecidos son los especímenes?']) {
       fireEvent.click(screen.getByRole('button', { name: pregunta }))
     }
     expect(screen.getAllByRole('heading', { level: 3 }).length).toBe(3)

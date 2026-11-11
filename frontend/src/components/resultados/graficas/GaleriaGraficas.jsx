@@ -2,7 +2,6 @@ import React, { useEffect, useId, useState } from 'react'
 import G1BarrasGrupos, { ESTILOS_G1 } from './G1BarrasGrupos'
 import { UNIDADES } from './explicacion'
 import G2CurvaPorMinuto from './G2CurvaPorMinuto'
-import G3BarrasPorMinuto from './G3BarrasPorMinuto'
 import G4ApiladaPorGrupo from './G4ApiladaPorGrupo'
 import G5Variabilidad from './G5Variabilidad'
 import G6MapaPorMinuto from './G6MapaPorMinuto'
@@ -11,7 +10,6 @@ import G6MapaPorMinuto from './G6MapaPorMinuto'
 const GRAFICAS = [
   { id: 'g1', nombre: '¿Cuánto hizo cada grupo?', disponible: true },
   { id: 'g2', nombre: '¿Cómo cambió minuto a minuto?', disponible: true, Componente: G2CurvaPorMinuto },
-  { id: 'g3', nombre: '¿Cómo se compara cada minuto?', disponible: true, Componente: G3BarrasPorMinuto },
   { id: 'g4', nombre: '¿En qué se fue el tiempo?', disponible: true, Componente: G4ApiladaPorGrupo },
   { id: 'g5', nombre: '¿Qué tan parecidos son los especímenes?', disponible: true, Componente: G5Variabilidad },
   { id: 'g6', nombre: '¿En qué minuto cambia?', disponible: true, Componente: G6MapaPorMinuto },
