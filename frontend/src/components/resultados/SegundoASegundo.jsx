@@ -64,7 +64,8 @@ export default function SegundoASegundo({ datos }) {
         </select>
       </div>
 
-      <svg viewBox={`0 0 ${ANCHO_VISTA} ${altoVista}`} role="img" aria-labelledby={`${id}-t ${id}-d`}
+      <div className="cuadricula-seg-caja">
+      <svg className="cuadricula-seg" viewBox={`0 0 ${ANCHO_VISTA} ${altoVista}`} role="img" aria-labelledby={`${id}-t ${id}-d`}
         style={{ display: 'block', width: '100%', maxWidth: 800, height: 'auto', fontFamily: 'var(--font-body)' }}>
         <title id={`${id}-t`}>{`Conducta segundo a segundo, ${etiquetaEspecimen}`}</title>
         <desc id={`${id}-d`}>Una cuadrícula con un renglón por minuto y un cuadro por segundo: el color y el patrón indican la conducta; los segundos sin dato quedan vacíos.</desc>
@@ -97,6 +98,7 @@ export default function SegundoASegundo({ datos }) {
           </g>
         ))}
       </svg>
+      </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: 12 }}>
         {CATEGORIAS.map((c) => (

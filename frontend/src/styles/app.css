@@ -69,3 +69,42 @@ button.seg-opt{border:0;background:transparent;font:inherit;font-size:13px;color
   .rejilla-lateral { grid-template-columns: minmax(0, 1fr) !important; }
   .rejilla-lateral > div { padding-left: 0 !important; padding-right: 0 !important; padding-top: 22px; }
 }
+
+/* — celular (390 px): todas las pantallas menos la revisión segundo a segundo, que queda como estaba — */
+@media (max-width: 640px) {
+  :root:not(:has(.pantalla-revision)) .app { border-left: 0; border-right: 0; }
+  :root:not(:has(.pantalla-revision)) .page { padding: 18px 16px 28px; }
+  :root:not(:has(.pantalla-revision)) .nav { flex-wrap: wrap; padding: 10px 16px; gap: 6px 14px; }
+  :root:not(:has(.pantalla-revision)) .nav-brand { flex: 1 1 auto; min-width: 0; }
+  :root:not(:has(.pantalla-revision)) .nav-sub { display: block; margin-left: 0; }
+  :root:not(:has(.pantalla-revision)) .crumbs { flex: 1 0 100%; order: 5; margin-right: 0; }
+  :root:not(:has(.pantalla-revision)) .dropdown { left: 8px; right: 8px; width: auto !important; }
+  :root:not(:has(.pantalla-revision)) .page [style*="display: flex"] { flex-wrap: wrap; }
+  :root:not(:has(.pantalla-revision)) .input, :root:not(:has(.pantalla-revision)) select.input { max-width: 100%; }
+  :root:not(:has(.pantalla-revision)) .table { display: block; max-width: 100%; overflow-x: auto; }
+  :root:not(:has(.pantalla-revision)) h2 { font-size: 24px; line-height: 1.15; overflow-wrap: break-word; }
+  :root:not(:has(.pantalla-revision)) .btn { white-space: normal; }
+  :root:not(:has(.pantalla-revision)) .acc-page { padding: 16px 12px; }
+  :root:not(:has(.pantalla-revision)) [style*="grid-template-columns: 1fr 1fr"], :root:not(:has(.pantalla-revision)) [style*="430px"], :root:not(:has(.pantalla-revision)) [style*="410px 1fr"] { grid-template-columns: minmax(0, 1fr) !important; }
+  :root:not(:has(.pantalla-revision)) [style*="430px"] > form { border-right: 0 !important; padding: 20px 16px 24px !important; }
+  :root:not(:has(.pantalla-revision)) [style*="430px"] > div { padding: 20px 16px !important; }
+  :root:not(:has(.pantalla-revision)) .version-esquina { display: none; }
+  /* tablas que en celular pasan a tarjetas: cada celda lleva su rótulo en data-label */
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas { display: block; overflow: visible; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas thead { display: none; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas tbody { display: block; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--color-divider); }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas td { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: auto !important; padding: 4px 0; border: 0; text-align: right !important; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas td::before { content: attr(data-label); flex: 0 0 38%; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas td:not([data-label])::before { display: none; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas td:not([data-label]) { display: block; text-align: left !important; }
+  :root:not(:has(.pantalla-revision)) .tabla-tarjetas td > * { min-width: 0; }
+  /* tablas de pocas columnas que en celular pasan a renglones que se parten */
+  :root:not(:has(.pantalla-revision)) .tabla-filas { display: block; overflow: visible; }
+  :root:not(:has(.pantalla-revision)) .tabla-filas tbody { display: block; }
+  :root:not(:has(.pantalla-revision)) .tabla-filas tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--color-divider); }
+  :root:not(:has(.pantalla-revision)) .tabla-filas td { width: auto !important; padding: 2px 0; border: 0; text-align: left !important; }
+  /* la cuadrícula de segundo a segundo conserva el tamaño de sus cuadros y se desliza de lado */
+  :root:not(:has(.pantalla-revision)) .cuadricula-seg-caja { overflow-x: auto; min-width: 0; max-width: 100%; }
+  :root:not(:has(.pantalla-revision)) .cuadricula-seg { min-width: 640px; }
+}

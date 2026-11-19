@@ -96,7 +96,7 @@ export default function ProgresoPage() {
         {cancelados.map((j) => <TrabajoCancelado key={j.job_id} j={j} />)}
 
         <div className="k" style={{ margin: '26px 0 12px' }}>Cola · {proc} procesando, {cola.length - proc} en cola</div>
-        <table className="table">
+        <table className="table tabla-filas">
           <tbody>
             {cola.map((j) => (
               <tr key={j.job_id}>
@@ -351,7 +351,7 @@ function Terminados({ lista }) {
   return (
     <>
       <div className="k" style={{ margin: '26px 0 12px' }}>Completados recientemente</div>
-      <table className="table">
+      <table className="table tabla-filas">
         <tbody>
           {lista.map((j) => (
             <tr key={j.job_id}>

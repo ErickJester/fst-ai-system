@@ -118,7 +118,7 @@ export default function ExperimentosPage() {
         {avisoPdf && <div className="note-bar" style={{ marginBottom: 18 }}>{avisoPdf}</div>}
         {eliminados.map((t) => <div key={t} className="note-bar" role="status" style={{ marginBottom: 18 }}>Se eliminó «{t}».</div>)}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28, marginBottom: 22 }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: '1 1 260px' }}>
             <h2 style={{ margin: '0 0 8px' }}>Experimentos</h2>
             <p className="lead" style={{ maxWidth: 620 }}>
               Prueba de nado forzado (<em>Forced Swim Test</em>, FST). El archivo completo del laboratorio, visible para cualquier cuenta activa.
@@ -165,7 +165,7 @@ export default function ExperimentosPage() {
           <input className="input" type="search" aria-label="Buscar por nombre o tratamiento" placeholder="Buscar por nombre o tratamiento" style={{ width: 250 }} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
 
-        <table className="table">
+        <table className="table tabla-tarjetas">
           <thead>
             <tr>
               <th style={{ width: '27%' }}>Experimento</th><th>Grupos</th><th>Especímenes</th><th style={{ width: '13%' }}>Día 2 analizados</th>
@@ -187,16 +187,16 @@ export default function ExperimentosPage() {
                         maquetas): no se pueden abrir. Con el backend todos tienen detalle. */}
                     {!e.con_detalle && <div className="hint" style={{ fontSize: 11, marginTop: 3 }}>Sin detalle en el modo demo: solo se muestra su fila.</div>}
                   </td>
-                  <td className="num">{e.n_grupos}</td>
-                  <td className="num">{e.n_especimenes}</td>
-                  <td>
+                  <td className="num" data-label="Grupos">{e.n_grupos}</td>
+                  <td className="num" data-label="Especímenes">{e.n_especimenes}</td>
+                  <td data-label="Día 2 analizados">
                     <div className="num" style={{ fontSize: 12, marginBottom: 5 }}>{videos.texto}</div>
                     <div className="meter"><div style={{ width: videos.pct }} /></div>
                   </td>
-                  <td><span className={'tag ' + TAG[e.estado].cls} style={{ whiteSpace: 'nowrap', ...TAG[e.estado].style }}>{ESTADO_EXPERIMENTO[e.estado]}</span></td>
-                  <td style={{ fontSize: 13 }}>{e.responsable}</td>
-                  <td className="num" style={{ fontSize: 12, color: ret.color }} title={ret.motivo}>{ret.texto}</td>
-                  <td>
+                  <td data-label="Estado"><span className={'tag ' + TAG[e.estado].cls} style={{ whiteSpace: 'nowrap', ...TAG[e.estado].style }}>{ESTADO_EXPERIMENTO[e.estado]}</span></td>
+                  <td style={{ fontSize: 13 }} data-label="Responsable">{e.responsable}</td>
+                  <td className="num" style={{ fontSize: 12, color: ret.color }} title={ret.motivo} data-label="Retención">{ret.texto}</td>
+                  <td data-label="Acciones">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {conReportes(e)
                         ? (

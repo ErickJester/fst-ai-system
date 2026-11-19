@@ -174,7 +174,7 @@ export default function AdminPage() {
           </select>
           <button ref={crearRef} type="button" className="btn btn-primary" style={btnLeft} onClick={() => abrir()}>Crear cuenta</button>
         </div>
-        <table className="table">
+        <table className="table tabla-tarjetas">
           <thead><tr><th>Persona</th><th>Correo</th><th>Rol</th><th>Estado</th><th style={{ textAlign: 'right' }}>Experimentos</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
           <tbody>
             {visibles.map((u) => {
@@ -183,10 +183,10 @@ export default function AdminPage() {
               return (
                 <tr key={u.id}>
                   <td className="nd" style={{ fontSize: 13 }}>{nombreCorto(u)}</td>
-                  <td className="num" style={{ fontSize: 12.5, color: MUT70 }}>{u.email}</td>
-                  <td style={{ fontSize: 12.5 }}>{ROL[u.role]}</td>
-                  <td><span className="tag tag-neutral">{u.is_active ? 'Activa' : 'Inactiva'}{yo ? ' · tú' : ''}</span></td>
-                  <td className="num" style={{ textAlign: 'right' }}>{u.n_experimentos ?? '—'}</td>
+                  <td className="num" style={{ fontSize: 12.5, color: MUT70 }} data-label="Correo">{u.email}</td>
+                  <td style={{ fontSize: 12.5 }} data-label="Rol">{ROL[u.role]}</td>
+                  <td data-label="Estado"><span className="tag tag-neutral">{u.is_active ? 'Activa' : 'Inactiva'}{yo ? ' · tú' : ''}</span></td>
+                  <td className="num" style={{ textAlign: 'right' }} data-label="Experimentos">{u.n_experimentos ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                       {/* La cuenta propia se edita en Mi perfil, para que la sesión no quede desactualizada. */}
