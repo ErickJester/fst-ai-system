@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 // El enum de los estados del análisis.
 import com.ipn.mx.fst.domain.valores.EstadoAnalisis;
+import com.ipn.mx.fst.domain.valores.TipoNotificacion;
+import com.ipn.mx.fst.utilerias.service.EmailService;
 import com.ipn.mx.fst.utilerias.ErrorApi;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -34,6 +36,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Implementa PausaService. La pausa la escribe el worker (analisis/{id}/pausa.json); aquí se lee, se ajusta y se cancela.
 //
@@ -65,6 +71,14 @@ public class PausaServiceImpl implements PausaService {
 
 	@Autowired
 	private JdbcTemplate jdbc;
+
+	@Autowired
+	private EmailService emailService;
+
+	private static final Logger log = LoggerFactory.getLogger(PausaServiceImpl.class);
+
+	// El asunto del correo de una cancelación: el mismo que usa el worker para la cancelación automática.
+	private static final String ASUNTO_CANCELACION = "Análisis cancelado";
 
 	private Path raiz;
 
@@ -242,6 +256,57 @@ public class PausaServiceImpl implements PausaService {
 		if (cambios == 0) {
 			throw new ErrorApi(HttpStatus.CONFLICT, "El análisis ya no está en pausa");
 		}
+		avisarCancelacion(idAnalisis);
+	}
+
+	// El aviso de una cancelación hecha desde la pantalla de pausa: la notificación (campanita) y una copia por correo. Le
+	// llega a quien creó el experimento, igual que la cancelación por falta de respuesta que hace el worker. La notificación va
+	// en la misma transacción que el cambio de estado; el correo sale después del commit y, si falla, no deshace nada.
+	private void avisarCancelacion(Integer idAnalisis) {
+		jdbc.query("""
+				SELECT x.idexperimento, x.nombre, x.idinstitucional, u.correo, g.etiqueta, t.ordinal
+				FROM analisis a
+				JOIN video v       ON v.idvideo = a.idvideo
+				JOIN tanda t       ON t.idtanda = v.idtanda
+				JOIN grupo g       ON g.idgrupo = t.idgrupo
+				JOIN experimento x ON x.idexperimento = g.idexperimento
+				JOIN usuario u     ON u.idinstitucional = x.idinstitucional
+				WHERE a.idanalisis = ?
+				""", rs -> {
+			String mensaje = mensajeDeCancelacion(rs.getString("etiqueta"), rs.getInt("ordinal"), rs.getString("nombre"));
+			jdbc.update("INSERT INTO notificacion (idinstitucional, idexperimento, tipo, mensaje) VALUES (?, ?, ?, ?)",
+					rs.getString("idinstitucional"), rs.getInt("idexperimento"), TipoNotificacion.ANALISIS_CANCELADO.valor(), mensaje);
+			enviarCopia(rs.getString("correo"), mensaje);
+		}, idAnalisis);
+	}
+
+	// La copia por correo, con el mismo asunto que la cancelación automática. Después del commit; sin transacción (una prueba)
+	// se manda al momento. Un fallo del correo se registra y no se propaga.
+	private void enviarCopia(String correo, String mensaje) {
+		Runnable envio = () -> {
+			try {
+				emailService.enviarCorreo(correo, ASUNTO_CANCELACION, mensaje);
+			} catch (RuntimeException e) {
+				log.error("No se pudo enviar el aviso de cancelación a {}: {}", correo, e.getMessage());
+			}
+		};
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					envio.run();
+				}
+			});
+		} else {
+			envio.run();
+		}
+	}
+
+	// El texto del aviso: grupo y tanda, el experimento y que se canceló desde la pantalla de pausa.
+	static String mensajeDeCancelacion(String grupo, int ordinal, String experimento) {
+		char letra = (char) ('A' + ordinal - 1);
+		return "El análisis de " + grupo + " · Tanda " + letra + " del experimento '" + experimento
+				+ "' se canceló desde la pantalla de pausa.";
 	}
 
 	// 404 si el análisis no es de ese experimento; 403 si quien pide no subió el video ni es Administrador (D-107); 409

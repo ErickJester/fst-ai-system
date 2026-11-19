@@ -75,7 +75,8 @@ def revisar_pausas(conn):
             if cur.rowcount == 1:
                 d = datos_analisis(cur, id_analisis)
                 log.info("Análisis %s cancelado: pasaron %s horas sin ajuste", id_analisis, PAUSE_TIMEOUT_HOURS)
-                # Solo la cancelación por falta de respuesta crea notificación (sección 4.3).
+                # La cancelación por falta de respuesta crea su notificación aquí; la que hace una persona desde la pantalla de pausa la
+                # crea el backend (PausaServiceImpl.cancelar).
                 notificar(cur, pendientes, d["idinstitucional"], d["correo"], "analisis cancelado",
                           f"El análisis de {d['tanda']} del experimento '{d['nombre']}' se canceló: "
                           f"pasaron {PAUSE_TIMEOUT_HOURS} horas sin que se ajustara el recuadro.",
