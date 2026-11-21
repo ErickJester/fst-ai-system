@@ -250,7 +250,7 @@ export default function AdminPage() {
           </div>
         )}
         {aviso && (
-          <div className="ok-bar" style={{ marginTop: 18, border: '2px solid var(--color-text)', borderLeft: '4px solid var(--color-text)' }}>
+          <div className="ok-bar" style={{ marginTop: 18, border: '2px solid var(--color-text)' }}>
             {aviso === 'creada' && <><strong>Cuenta creada.</strong> La persona entra con su contraseña temporal y la cambia en su primer acceso.</>}
             {aviso === 'editada' && <><strong>Cambios guardados.</strong></>}
             {aviso === 'temporal' && <><strong>Contraseña temporal restablecida.</strong> La persona la cambia en su próximo acceso.</>}

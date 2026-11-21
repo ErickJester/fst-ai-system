@@ -129,7 +129,7 @@ export default function ExperimentosPage() {
 
         {/* Aviso de vencimiento (R-05): videos que se borran en 7 días o menos, con la fecha exacta. */}
         {avisos.length > 0 && (
-          <div style={{ padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', borderLeft: '4px solid var(--color-accent)', fontSize: 12.5, lineHeight: 1.55 }}>
+          <div style={{ padding: '13px 16px', marginBottom: 22, background: 'var(--color-accent-100)', fontSize: 12.5, lineHeight: 1.55 }}>
             {avisos.map((e) => (
               <div key={e.clave}>Los videos de <strong>{e.titulo}</strong> se borran el <strong className="num">{fechaCorta(e.fecha_borrado)}</strong>.</div>
             ))}
