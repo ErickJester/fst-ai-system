@@ -28,18 +28,28 @@ afterEach(() => {
 })
 
 describe('AvisoPrivacidadPage', () => {
-  it('muestra su título y sus tres secciones, sin pedir sesión', () => {
+  it('muestra su título y sus siete secciones, sin pedir sesión', () => {
     renderSinSesion(AvisoPrivacidadPage)
     expect(screen.getByRole('heading', { level: 2, name: 'Aviso de privacidad' })).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 3, name: 'Qué datos personales se tratan' })).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 3, name: 'Para qué se usan' })).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 3, name: 'Cómo se protegen' })).toBeTruthy()
+    for (const nombre of ['Responsable', 'Datos que se tratan', 'Para qué se usan', 'Cómo se protegen', 'Transferencias', 'Derechos', 'Cambios']) {
+      expect(screen.getByRole('heading', { level: 3, name: nombre })).toBeTruthy()
+    }
   })
 
-  it('lista los datos, los usos y la protección de la contraseña, y tiene la nota de redacción', () => {
+  it('dice quién es el responsable, qué datos se tratan, cómo se protege la contraseña y a quién se escribe para ejercer los derechos', () => {
     renderSinSesion(AvisoPrivacidadPage)
-    expect(screen.getByText('Correo electrónico.')).toBeTruthy()
+    expect(screen.getByText(/Laboratorio de Bioquímica Estructural/)).toBeTruthy()
+    expect(screen.getByText(/Identificador institucional, nombre, apellidos y correo electrónico/)).toBeTruthy()
+    expect(screen.getByText(/no están destinados a contener datos personales/)).toBeTruthy()
     expect(screen.getByText(/hash y sal/)).toBeTruthy()
+    expect(screen.getByText(/Unidad de Transparencia del IPN/)).toBeTruthy()
+    expect(screen.getByText(/LGPDPPSO/)).toBeTruthy()
+  })
+
+  it('declara que los avisos por correo salen con una cuenta de Gmail y que no se comparten datos con otros terceros', () => {
+    renderSinSesion(AvisoPrivacidadPage)
+    expect(screen.getByText(/cuenta de Gmail y una contraseña de aplicación/)).toBeTruthy()
+    expect(screen.getByText(/Fuera de eso, los datos no se comparten con terceros/)).toBeTruthy()
     expect(screen.queryByText(/redacción oficial/)).toBeNull()
   })
 
