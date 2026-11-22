@@ -44,6 +44,7 @@ describe('AvisoPrivacidadPage', () => {
     expect(screen.getByText(/hash y sal/)).toBeTruthy()
     expect(screen.getByText(/Unidad de Transparencia del IPN/)).toBeTruthy()
     expect(screen.getByText(/LGPDPPSO/)).toBeTruthy()
+    expect(screen.getByText(/cancelar una cuenta significa desactivarla/)).toBeTruthy()
   })
 
   it('declara que los avisos por correo salen con una cuenta de Gmail y que no se comparten datos con otros terceros', () => {
@@ -72,6 +73,16 @@ describe('TerminosPage', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Uso del sistema' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Resultados' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Videos y conservación' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Uso de la cuenta' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Alcance' })).toBeTruthy()
+  })
+
+  it('dice que la cuenta es personal, que todos ven los experimentos y que las cuentas no se borran', () => {
+    renderSinSesion(TerminosPage)
+    expect(screen.getByText(/La cuenta es personal/)).toBeTruthy()
+    expect(screen.getByText(/Toda cuenta activa puede ver los experimentos y resultados de todo el laboratorio/)).toBeTruthy()
+    expect(screen.getByText('Las cuentas se desactivan, nunca se borran.')).toBeTruthy()
+    expect(screen.getByText(/prototipo desarrollado como trabajo terminal/)).toBeTruthy()
   })
 
   it('dice que no emite diagnóstico y que los videos se borran a los 30 días', () => {

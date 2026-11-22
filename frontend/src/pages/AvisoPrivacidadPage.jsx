@@ -50,6 +50,7 @@ export default function AvisoPrivacidadPage() {
         <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Derechos</h3>
           <p style={{ margin: 0, lineHeight: 1.6 }}>Puedes acceder a tus datos, corregirlos, cancelarlos u oponerte a su uso, conforme a la Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados (LGPDPPSO), escribiendo a la Unidad de Transparencia del IPN (Edificio «Adolfo Ruiz Cortines», planta baja, Av. Wilfrido Massieu s/n esq. Luis Enrique Erro, Zacatenco; correo acceinfo@ipn.mx; teléfono 55 5729 6000, ext. 50128) o a través de la Plataforma Nacional de Transparencia.</p>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>El sistema no borra cuentas: cancelar una cuenta significa desactivarla. Una cuenta desactivada ya no puede entrar, y los experimentos, resultados y reportes que registró se conservan como parte del historial del laboratorio. Si pides la cancelación de tus datos, la misma unidad atiende tu solicitud conforme a la ley.</p>
         </section>
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -46,6 +46,23 @@ export default function TerminosPage() {
           </ul>
         </section>
 
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>Uso de la cuenta</h3>
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
+        <li>El sistema es para el personal autorizado del laboratorio. Las cuentas las crea el administrador y no hay autorregistro.</li>
+        <li>La cuenta es personal. No compartas tu contraseña: lo que se haga con tu cuenta queda registrado a tu nombre.</li>
+        <li>Toda cuenta activa puede ver los experimentos y resultados de todo el laboratorio. Solo quien creó un experimento o un administrador puede borrarlo.</li>
+        <li>Las cuentas se desactivan, nunca se borran.</li>
+        </ul>
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>Alcance</h3>
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
+        <li>Este sistema es un prototipo desarrollado como trabajo terminal.</li>
+        </ul>
+        </section>
+
         <Link to="/login" onClick={volver} style={{ alignSelf: 'flex-start' }}>Volver</Link>
       </div>
     </Acceso>
